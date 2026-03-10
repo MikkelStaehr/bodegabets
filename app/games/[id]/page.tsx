@@ -1,5 +1,4 @@
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
@@ -416,14 +415,6 @@ export default async function GamePage({ params }: Props) {
               enabled={activeRound.computedStatus === 'open' || activeRound.computedStatus === 'active'}
             />
           )}
-          <div className="px-5 mt-3">
-            <Link
-              href={`/games/${gameId}/rounds`}
-              className="text-xs text-[#7a7060] hover:text-[#3a3530] transition-colors"
-            >
-              › Se alle runder
-            </Link>
-          </div>
         </section>
 
         {sortedRounds.length === 0 && (
