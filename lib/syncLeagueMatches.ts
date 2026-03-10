@@ -5,8 +5,8 @@
  *   Henter seneste resultater fra Bold.dk og opdaterer scores i league_matches.
  *   Køres dagligt via cron.
  *
- * buildGameRounds(gameId, leagueId)
- *   Opretter/opdaterer runder og matches i ét spilrum fra league_matches.
+ * buildLeagueRounds(leagueId)
+ *   Opretter/opdaterer runder og matches for en liga fra league_matches.
  *   Forudsætter at league_matches er populeret (via admin-sync).
  *
  * runLeagueSync()
@@ -269,10 +269,11 @@ export async function syncBoldFixtures(
   return { synced: rows.length, errors }
 }
 
-// ─── 2. Opbyg runder + matches i ét spilrum fra league_matches ───────────────
+// ─── 2. Opbyg runder + matches for en liga fra league_matches ────────────────
 // Optimeret: maks 6 DB-kald uanset antal kampe/runder (batch insert/update)
 
-export type BuildGameRoundsResult = Pick<SyncResult, 'rounds_created' | 'matches_created' | 'matches_updated'> & {
+export type BuildGameRoundsResult = BuildLeagueRoundsResult
+export type BuildLeagueRoundsResult = Pick<SyncResult, 'rounds_created' | 'matches_created' | 'matches_updated'> & {
   debug?: {
     rounds_matched: number
     rounds_skipped: number
@@ -282,10 +283,12 @@ export type BuildGameRoundsResult = Pick<SyncResult, 'rounds_created' | 'matches
   }
 }
 
-export async function buildGameRounds(
-  gameId: number,
+/** @deprecated Brug buildLeagueRounds(leagueId) i stedet */
+export const buildGameRounds = (_gameId: number, leagueId: number) => buildLeagueRounds(leagueId)
+
+export async function buildLeagueRounds(
   leagueId: number
-): Promise<BuildGameRoundsResult> {
+): Promise<BuildLeagueRoundsResult> {
   const stats = { rounds_created: 0, matches_created: 0, matches_updated: 0 }
 
   type LM = {
@@ -295,7 +298,7 @@ export async function buildGameRounds(
   type ExRound = { id: number; name: string }
   type ExMatch = { id: number; home_team: string; away_team: string; status: string; round_id: number; league_match_id?: number | null }
 
-  // 1. Hent alt data parallelt (3 queries)
+  // 1. Hent alt data parallelt (2 queries)
   const [lmRes, roundRes] = await Promise.all([
     supabaseAdmin
       .from('league_matches')
@@ -305,18 +308,18 @@ export async function buildGameRounds(
     supabaseAdmin
       .from('rounds')
       .select('id, name')
-      .eq('game_id', gameId),
+      .eq('league_id', leagueId),
   ])
 
   const leagueMatches  = (lmRes.data ?? []) as LM[]
   if (!leagueMatches.length) {
-    console.log(`[buildGameRounds] game ${gameId}: ingen league_matches for liga ${leagueId}`)
+    console.log(`[buildLeagueRounds] liga ${leagueId}: ingen league_matches`)
     return stats
   }
 
   const existingRounds = (roundRes.data ?? []) as ExRound[]
 
-  // round_id.game_id filter virker ikke direkte — hent matches via runde-IDs
+  // Hent matches via runde-IDs
   const existingRoundIds = existingRounds.map((r) => r.id)
   let existingMatches: ExMatch[] = []
   if (existingRoundIds.length) {
@@ -357,18 +360,20 @@ export async function buildGameRounds(
   }
 
   // 4. Batch-insert nye runder (1 query)
-  // betting_closes_at og betting_opens_at = NULL — brugeren vælger deadline ved oprettelse af spilrum
   const newRoundNames = [...groups.keys()].filter((name) => !getRoundId(name))
   if (newRoundNames.length) {
     const roundRows = newRoundNames.map((name) => {
       const matches = groups.get(name)!
+      const firstKickoff = matches.reduce<string | null>((min, m) => {
+        if (!m.kickoff_at) return min
+        return !min || m.kickoff_at < min ? m.kickoff_at : min
+      }, null)
       return {
-        game_id:           gameId,
         league_id:         leagueId,
         name,
         stage:             'Grundspil',
         status:            matches.every((m) => m.status === 'finished') ? 'finished' : 'upcoming',
-        betting_closes_at: null,
+        betting_closes_at: firstKickoff,
         betting_opens_at:  null,
       }
     })
@@ -385,12 +390,19 @@ export async function buildGameRounds(
       if (num) roundByNumber.set(num, r.id)
       stats.rounds_created++
     }
-    // Reset betting_balance til 1000 for alle game_members når nye runder oprettes (start af ny runde)
+    // Reset betting_balance til 1000 for alle game_members i denne liga
     if ((inserted ?? []).length > 0) {
-      await supabaseAdmin
-        .from('game_members')
-        .update({ betting_balance: 1000 })
-        .eq('game_id', gameId)
+      const { data: gamesInLeague } = await supabaseAdmin
+        .from('games')
+        .select('id')
+        .eq('league_id', leagueId)
+      const gameIds = (gamesInLeague ?? []).map((g: { id: number }) => g.id)
+      if (gameIds.length > 0) {
+        await supabaseAdmin
+          .from('game_members')
+          .update({ betting_balance: 1000 })
+          .in('game_id', gameIds)
+      }
     }
   }
 
@@ -452,11 +464,11 @@ export async function buildGameRounds(
 
   // 6. Batch-insert nye matches (1 query per chunk)
   if (toInsert.length) {
-    console.log(`[buildGameRounds] game ${gameId}: indsætter ${toInsert.length} matches`)
+    console.log(`[buildLeagueRounds] liga ${leagueId}: indsætter ${toInsert.length} matches`)
     for (let i = 0; i < toInsert.length; i += 500) {
       const { error } = await supabaseAdmin.from('matches').insert(toInsert.slice(i, i + 500))
       if (error) {
-        console.error(`[buildGameRounds] match insert fejlede (chunk ${i}–${i + 500}) for game ${gameId}:`, error.message)
+        console.error(`[buildLeagueRounds] match insert fejlede (chunk ${i}–${i + 500}) for liga ${leagueId}:`, error.message)
       } else {
         stats.matches_created += toInsert.slice(i, i + 500).length
       }
@@ -477,7 +489,7 @@ export async function buildGameRounds(
     stats.matches_updated++
   }
 
-  const result: BuildGameRoundsResult = { ...stats }
+  const result: BuildLeagueRoundsResult = { ...stats }
   if (stats.matches_created === 0 && stats.matches_updated === 0) {
     const dbRoundSample = existingRounds.slice(0, 5).map((r) => `"${r.name}"`)
     result.debug = {
@@ -593,27 +605,19 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
       continue
     }
 
-    // Kør buildGameRounds for ALLE games (inkl. template) — ikke kun aktive
+    // Kør buildLeagueRounds for ligaen
+    // Sørg for at der findes mindst ét template-game (til live-scores)
     const { data: gamesForLeague } = await supabaseAdmin
       .from('games')
       .select('id')
       .eq('league_id', league.id)
 
-    let gamesToBuild = (gamesForLeague ?? []) as { id: number }[]
-
-    // Hvis ingen games findes: opret template-game så rounds/matches kan oprettes (live-scores)
-    if (gamesToBuild.length === 0) {
-      const templateGameId = await ensureLeagueTemplateGame(league.id, league.name)
-      if (templateGameId) gamesToBuild = [{ id: templateGameId }]
+    if ((gamesForLeague ?? []).length === 0) {
+      await ensureLeagueTemplateGame(league.id, league.name)
     }
 
-    let rounds_created = 0, matches_created = 0, matches_updated = 0
-    for (const g of gamesToBuild) {
-      const s = await buildGameRounds(g.id, league.id)
-      rounds_created += s.rounds_created
-      matches_created += s.matches_created
-      matches_updated += s.matches_updated
-    }
+    const s = await buildLeagueRounds(league.id)
+    const { rounds_created, matches_created, matches_updated } = s
 
     console.log(
       `[sync-fixtures] ${league.name} (id=${league.id}, bold_phase_id=${league.bold_phase_id}): ` +
@@ -656,26 +660,14 @@ export async function runSyncResultsOnly(): Promise<SyncResult[]> {
 
     const res = await syncResults(league.id, league.bold_slug)
 
-    const { data: gamesForLeague } = await supabaseAdmin
-      .from('games')
-      .select('id')
-      .eq('league_id', league.id)
-      .eq('status', 'active')
-
-    let rounds_created = 0, matches_created = 0, matches_updated = 0
-    for (const g of (gamesForLeague ?? []) as { id: number }[]) {
-      const s = await buildGameRounds(g.id, league.id)
-      rounds_created  += s.rounds_created
-      matches_created += s.matches_created
-      matches_updated += s.matches_updated
-    }
+    const s = await buildLeagueRounds(league.id)
 
     results.push({
       league_id: league.id,
       synced: res.synced,
-      rounds_created,
-      matches_created,
-      matches_updated,
+      rounds_created: s.rounds_created,
+      matches_created: s.matches_created,
+      matches_updated: s.matches_updated,
       errors: res.errors,
     })
   }

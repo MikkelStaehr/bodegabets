@@ -1,11 +1,12 @@
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import RoundSlider from '@/components/games/RoundSlider'
 import type { Game, Round, RoundScore } from '@/types'
+
+export const dynamic = 'force-dynamic'
 
 type Props = {
   params: Promise<{ id: string }>
@@ -51,6 +52,7 @@ function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'act
 
 export default async function GamePage({ params }: Props) {
   const { id } = await params
+  console.log('[DEBUG0] GamePage called with id:', id)
   const gameId = parseInt(id)
   if (isNaN(gameId)) notFound()
 
@@ -58,8 +60,18 @@ export default async function GamePage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Hent game først for at finde league_id
+  const { data: game } = await supabase
+    .from('games')
+    .select('id, name, description, host_id, invite_code, status, created_at, league_id')
+    .eq('id', gameId)
+    .single()
+
+  if (!game) notFound()
+  console.log('[DEBUG1] game:', game?.id, 'league_id:', (game as any)?.league_id)
+  const gameLeagueId = (game as { league_id?: number }).league_id
+
   const [
-    { data: game },
     { data: rawMembers },
     { data: rounds },
     { data: roundScores },
@@ -67,22 +79,18 @@ export default async function GamePage({ params }: Props) {
     { data: profile },
   ] = await Promise.all([
     supabase
-      .from('games')
-      .select('id, name, description, host_id, invite_code, status, created_at, league_id')
-      .eq('id', gameId)
-      .single(),
-
-    supabase
       .from('game_members')
       .select('user_id, points, profile:profiles(username)')
       .eq('game_id', gameId)
       .order('points', { ascending: false }),
 
-    supabase
-      .from('rounds')
-      .select('id, name, stage, status, betting_opens_at, betting_closes_at')
-      .eq('game_id', gameId)
-      .order('created_at', { ascending: true }),
+    gameLeagueId
+      ? supabase
+          .from('rounds')
+          .select('id, name, stage, status, betting_opens_at, betting_closes_at')
+          .eq('league_id', gameLeagueId)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
 
     supabase
       .from('round_scores')
@@ -103,7 +111,8 @@ export default async function GamePage({ params }: Props) {
       .single(),
   ])
 
-  if (!game) notFound()
+  console.log('[DEBUG2] gameLeagueId:', gameLeagueId, '| rounds:', rounds?.length ?? 'null', '| membership:', !!myMembership)
+
   if (!myMembership) redirect('/dashboard')
 
   const leagueId = (game as { league_id?: number }).league_id ?? null
@@ -409,14 +418,6 @@ export default async function GamePage({ params }: Props) {
               enabled={activeRound.computedStatus === 'open' || activeRound.computedStatus === 'active'}
             />
           )}
-          <div className="px-5 mt-3">
-            <Link
-              href={`/games/${gameId}/rounds`}
-              className="text-xs text-[#7a7060] hover:text-[#3a3530] transition-colors"
-            >
-              › Se alle runder
-            </Link>
-          </div>
         </section>
 
         {sortedRounds.length === 0 && (

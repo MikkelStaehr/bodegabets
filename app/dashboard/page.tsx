@@ -32,16 +32,16 @@ async function getActiveRoundForGame(
     if (current?.round_name) {
       const { data: round } = await supabase
         .from('rounds')
-        .select('id, game_id, name, status, betting_closes_at')
-        .eq('game_id', gameId)
+        .select('id, league_id, name, status, betting_closes_at')
+        .eq('league_id', leagueId)
         .eq('name', current.round_name)
         .single()
 
       if (round) {
-        // next_kickoff = næste uafspillede kamp; first_kickoff = første kamp i runden
         const bettingClosesAt = (current as { next_kickoff?: string | null }).next_kickoff ?? current.first_kickoff ?? null
         return {
           ...round,
+          game_id: gameId,
           betting_closes_at: bettingClosesAt,
           round_status: (current.round_status as 'upcoming' | 'active' | 'finished') ?? null,
           matches_count: (current as { match_count?: number }).match_count ?? 0,
@@ -50,16 +50,18 @@ async function getActiveRoundForGame(
     }
   }
 
+  if (!leagueId) return null
+
   const { data: rounds } = await supabase
     .from('rounds')
-    .select('id, game_id, name, status, betting_closes_at')
-    .eq('game_id', gameId)
+    .select('id, league_id, name, status, betting_closes_at')
+    .eq('league_id', leagueId)
     .neq('status', 'finished')
     .order('betting_closes_at', { ascending: false })
     .limit(1)
   const fallback = rounds?.[0]
   if (!fallback) return null
-  return { ...fallback, round_status: null, matches_count: 0 }
+  return { ...fallback, game_id: gameId, round_status: null, matches_count: 0 }
 }
 
 type GameRow = {
@@ -142,11 +144,16 @@ export default async function DashboardPage() {
       .in('game_id', gameIds)
       .order('points', { ascending: false }),
 
-    supabase
-      .from('rounds')
-      .select('id, game_id, name, status, betting_closes_at')
-      .in('game_id', gameIds)
-      .order('created_at', { ascending: true }),
+    (() => {
+      const leagueIds = [...new Set(rawGames.map((m) => m.game!.league_id).filter((id): id is number => id != null))]
+      return leagueIds.length > 0
+        ? supabase
+            .from('rounds')
+            .select('id, league_id, name, status, betting_closes_at')
+            .in('league_id', leagueIds)
+            .order('created_at', { ascending: true })
+        : Promise.resolve({ data: [] })
+    })(),
 
     supabase
       .from('bets')
@@ -156,7 +163,7 @@ export default async function DashboardPage() {
     ...rawGames.map((m) => getActiveRoundForGame(supabase, m.game!.id, m.game!.league_id ?? null)),
   ])
   const allMembers = (results[0] as { data: { game_id: number; user_id: string; points: number }[] | null }).data
-  const rounds = (results[1] as { data: { id: number; game_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
+  const rounds = (results[1] as { data: { id: number; league_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
   const bets = (results[2] as { data: { round_id: number }[] | null }).data
   const activeRoundsPerGame = results.slice(3) as Awaited<ReturnType<typeof getActiveRoundForGame>>[]
 
@@ -169,7 +176,7 @@ export default async function DashboardPage() {
           .in('round_id', roundIds)
       : { data: [] }
 
-  const typedRounds = (rounds ?? []) as { id: number; game_id: number; name: string; status: string; betting_closes_at: string | null }[]
+  const typedRounds = (rounds ?? []) as { id: number; league_id: number; name: string; status: string; betting_closes_at: string | null }[]
   const now = new Date()
 
   const matchCountByRound = new Map<number, number>()
@@ -180,7 +187,7 @@ export default async function DashboardPage() {
 
   const activeRoundByGame = new Map<
     number,
-    (typeof typedRounds)[0] & { matches_count: number; round_status: 'upcoming' | 'active' | 'finished' | null }
+    ActiveRoundResult
   >()
   for (let i = 0; i < rawGames.length; i++) {
     const round = activeRoundsPerGame[i] as Awaited<ReturnType<typeof getActiveRoundForGame>>

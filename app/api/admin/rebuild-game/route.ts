@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { buildGameRounds } from '@/lib/syncLeagueMatches'
+import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 export const maxDuration = 60
 
@@ -22,14 +22,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Spilrum eller liga ikke fundet' }, { status: 404 })
   }
 
-  const result = await buildGameRounds(game.id, game.league_id)
+  const result = await buildLeagueRounds(game.league_id)
 
   // Hvis ingen matches blev oprettet, hent diagnostic
   let diagnostic: { league_matches_count?: number; rounds_count?: number } | null = null
   if (result.matches_created === 0 && result.matches_updated === 0) {
     const [lmRes, rRes] = await Promise.all([
       supabaseAdmin.from('league_matches').select('*', { count: 'exact', head: true }).eq('league_id', game.league_id),
-      supabaseAdmin.from('rounds').select('*', { count: 'exact', head: true }).eq('game_id', game.id),
+      supabaseAdmin.from('rounds').select('*', { count: 'exact', head: true }).eq('league_id', game.league_id),
     ])
     diagnostic = {
       league_matches_count: lmRes.count ?? 0,

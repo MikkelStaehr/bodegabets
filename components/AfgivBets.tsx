@@ -487,6 +487,7 @@ export default function AfgivBets({
     }
 
     const payload = {
+      game_id: gameId,
       bets: [
         ...selections.map((s) => ({
           match_id: s.matchId,

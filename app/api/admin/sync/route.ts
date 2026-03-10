@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
-import { syncResults, buildGameRounds, runLeagueSync } from '@/lib/syncLeagueMatches'
+import { syncResults, buildLeagueRounds, runLeagueSync } from '@/lib/syncLeagueMatches'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 60
 
 type SyncBody =
   | { all: true }
-  | { league_id: number; game_id?: number }
+  | { league_id: number }
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req)
@@ -46,36 +46,16 @@ export async function POST(req: NextRequest) {
         errors.push(...res.errors)
       }
 
-      // Byg runder i spilrum
-      let rounds_created = 0, matches_created = 0, matches_updated = 0
-
-      if (body.game_id) {
-        const s = await buildGameRounds(body.game_id, league.id)
-        rounds_created = s.rounds_created
-        matches_created = s.matches_created
-        matches_updated = s.matches_updated
-      } else {
-        const { data: games } = await supabaseAdmin
-          .from('games')
-          .select('id')
-          .eq('league_id', league.id)
-          .eq('status', 'active')
-
-        for (const g of (games ?? []) as { id: number }[]) {
-          const s = await buildGameRounds(g.id, league.id)
-          rounds_created  += s.rounds_created
-          matches_created += s.matches_created
-          matches_updated += s.matches_updated
-        }
-      }
+      // Byg runder for ligaen
+      const s = await buildLeagueRounds(league.id)
 
       return NextResponse.json({
         ok: true,
-        output: `${synced} kampe synkroniseret, +${rounds_created} runder, +${matches_created} kampe`,
+        output: `${synced} kampe synkroniseret, +${s.rounds_created} runder, +${s.matches_created} kampe`,
         synced,
-        rounds_created,
-        matches_created,
-        matches_updated,
+        rounds_created: s.rounds_created,
+        matches_created: s.matches_created,
+        matches_updated: s.matches_updated,
         errors,
       })
     }

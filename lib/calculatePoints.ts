@@ -114,23 +114,24 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('game_id, wildcard_match_id')
+    .select('league_id, wildcard_match_id')
     .eq('id', roundId)
     .single()
 
   if (!round) return
 
-  const { data: game } = await supabaseAdmin
-    .from('games')
-    .select('league_id')
-    .eq('id', round.game_id)
-    .single()
-
-  if (!game) return
-
-  const leagueId = game.league_id as number | null
+  const leagueId = round.league_id as number | null
   const wildcardMatchId = round.wildcard_match_id as number | null
   const matchIds = matches.map((m) => m.id)
+
+  // Hent ALLE unikke game_ids fra bets for denne rundes kampe
+  const { data: betGameRows } = await supabaseAdmin
+    .from('bets')
+    .select('game_id')
+    .in('match_id', matchIds)
+
+  const allGameIds = [...new Set((betGameRows ?? []).map((b) => b.game_id as number))]
+  if (allGameIds.length === 0) return
 
   // Hent rivalries for denne liga (begge retninger: A-B og B-A)
   let rivalryMap = new Map<string, number>()
@@ -147,214 +148,218 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     }
   }
 
-  const extraBetsCorrectByUser = new Map<string, number>()
+  // Kør point-beregning for hvert spilrum separat
+  for (const gameId of allGameIds) {
+    const extraBetsCorrectByUser = new Map<string, number>()
 
-  for (const match of matches) {
-    if (match.home_score === null || match.away_score === null) continue
+    for (const match of matches) {
+      if (match.home_score === null || match.away_score === null) continue
 
-    const { data: bets } = await supabaseAdmin
-      .from('bets')
-      .select('id, user_id, prediction, stake, bet_type, result')
-      .eq('match_id', match.id)
-      .is('result', null)
+      const { data: bets } = await supabaseAdmin
+        .from('bets')
+        .select('id, user_id, prediction, stake, bet_type, result')
+        .eq('match_id', match.id)
+        .eq('game_id', gameId)
+        .is('result', null)
 
-    if (!bets?.length) continue
+      if (!bets?.length) continue
 
-    const historicFactors = await calculateHistoricFactors(
-      match.home_team,
-      match.away_team,
-      game.league_id
-    )
-
-    const predictionCounts = new Map<string, number>()
-    for (const bet of bets) {
-      predictionCounts.set(bet.prediction, (predictionCounts.get(bet.prediction) ?? 0) + 1)
-    }
-    const totalBets = bets.length
-
-    for (const bet of bets) {
-      const isCorrect = isBetCorrect(
-        bet.bet_type,
-        bet.prediction,
-        match.home_score,
-        match.away_score,
-        match.home_ht_score,
-        match.away_ht_score
+      const historicFactors = await calculateHistoricFactors(
+        match.home_team,
+        match.away_team,
+        leagueId
       )
 
-      if (!isCorrect) {
-        await supabaseAdmin
-          .from('bets')
-          .update({ result: 'loss', points_delta: 0 })
-          .eq('id', bet.id)
-        continue
+      const predictionCounts = new Map<string, number>()
+      for (const bet of bets) {
+        predictionCounts.set(bet.prediction, (predictionCounts.get(bet.prediction) ?? 0) + 1)
       }
+      const totalBets = bets.length
 
-      const { data: member } = await supabaseAdmin
-        .from('game_members')
-        .select('points, current_streak, total_wins, total_losses')
-        .eq('game_id', round.game_id)
-        .eq('user_id', bet.user_id)
-        .single()
-
-      const streak = (member as { current_streak?: number } | null)?.current_streak ?? 0
-      const streakBonus = getStreakBonus(streak)
-
-      const sameCount = predictionCounts.get(bet.prediction) ?? 1
-      const konsensus = getKonsensus(sameCount, totalBets)
-      const historisk = getHistoricFactor(bet.bet_type, bet.prediction, historicFactors)
-      let pointsEarned = Math.round(bet.stake * konsensus * historisk * streakBonus)
-
-      // Rivalry multiplier (×1.5) for matches between rival teams
-      const rivalryKey = `${match.home_team}|${match.away_team}`
-      const rivalryMultiplier = rivalryMap.get(rivalryKey) ?? 1.0
-      pointsEarned = Math.round(pointsEarned * rivalryMultiplier)
-
-      await supabaseAdmin
-        .from('bets')
-        .update({
-          result: 'win',
-          points_delta: pointsEarned,
-        })
-        .eq('id', bet.id)
-
-      // Track extra bets correct (non-match_result)
-      if (bet.bet_type !== BET_TYPES.MATCH_RESULT) {
-        extraBetsCorrectByUser.set(bet.user_id, (extraBetsCorrectByUser.get(bet.user_id) ?? 0) + 1)
-      }
-
-      const currentPoints = member?.points ?? 0
-      const totalWins = (member as { total_wins?: number } | null)?.total_wins ?? 0
-
-      await supabaseAdmin
-        .from('game_members')
-        .update({
-          points: currentPoints + pointsEarned,
-          current_streak: streak + 1,
-          total_wins: totalWins + 1,
-        })
-        .eq('game_id', round.game_id)
-        .eq('user_id', bet.user_id)
-    }
-
-    const losingUserIds = bets
-      .filter((b) => {
-        const correct = isBetCorrect(
-          b.bet_type,
-          b.prediction,
-          match.home_score!,
-          match.away_score!,
+      for (const bet of bets) {
+        const isCorrect = isBetCorrect(
+          bet.bet_type,
+          bet.prediction,
+          match.home_score,
+          match.away_score,
           match.home_ht_score,
           match.away_ht_score
         )
-        return !correct
-      })
-      .map((b) => b.user_id)
 
-    for (const userId of losingUserIds) {
+        if (!isCorrect) {
+          await supabaseAdmin
+            .from('bets')
+            .update({ result: 'loss', points_delta: 0 })
+            .eq('id', bet.id)
+          continue
+        }
+
+        const { data: member } = await supabaseAdmin
+          .from('game_members')
+          .select('points, current_streak, total_wins, total_losses')
+          .eq('game_id', gameId)
+          .eq('user_id', bet.user_id)
+          .single()
+
+        const streak = (member as { current_streak?: number } | null)?.current_streak ?? 0
+        const streakBonus = getStreakBonus(streak)
+
+        const sameCount = predictionCounts.get(bet.prediction) ?? 1
+        const konsensus = getKonsensus(sameCount, totalBets)
+        const historisk = getHistoricFactor(bet.bet_type, bet.prediction, historicFactors)
+        let pointsEarned = Math.round(bet.stake * konsensus * historisk * streakBonus)
+
+        // Rivalry multiplier (×1.5) for matches between rival teams
+        const rivalryKey = `${match.home_team}|${match.away_team}`
+        const rivalryMultiplier = rivalryMap.get(rivalryKey) ?? 1.0
+        pointsEarned = Math.round(pointsEarned * rivalryMultiplier)
+
+        await supabaseAdmin
+          .from('bets')
+          .update({
+            result: 'win',
+            points_delta: pointsEarned,
+          })
+          .eq('id', bet.id)
+
+        // Track extra bets correct (non-match_result)
+        if (bet.bet_type !== BET_TYPES.MATCH_RESULT) {
+          extraBetsCorrectByUser.set(bet.user_id, (extraBetsCorrectByUser.get(bet.user_id) ?? 0) + 1)
+        }
+
+        const currentPoints = member?.points ?? 0
+        const totalWins = (member as { total_wins?: number } | null)?.total_wins ?? 0
+
+        await supabaseAdmin
+          .from('game_members')
+          .update({
+            points: currentPoints + pointsEarned,
+            current_streak: streak + 1,
+            total_wins: totalWins + 1,
+          })
+          .eq('game_id', gameId)
+          .eq('user_id', bet.user_id)
+      }
+
+      const losingUserIds = bets
+        .filter((b) => {
+          const correct = isBetCorrect(
+            b.bet_type,
+            b.prediction,
+            match.home_score!,
+            match.away_score!,
+            match.home_ht_score,
+            match.away_ht_score
+          )
+          return !correct
+        })
+        .map((b) => b.user_id)
+
+      for (const userId of losingUserIds) {
+        const { data: member } = await supabaseAdmin
+          .from('game_members')
+          .select('total_losses')
+          .eq('game_id', gameId)
+          .eq('user_id', userId)
+          .single()
+
+        const totalLosses = (member as { total_losses?: number } | null)?.total_losses ?? 0
+
+        await supabaseAdmin
+          .from('game_members')
+          .update({
+            current_streak: 0,
+            total_losses: totalLosses + 1,
+          })
+          .eq('game_id', gameId)
+          .eq('user_id', userId)
+      }
+    }
+
+    // Aggregér point per bruger og beregn earnings_delta (med wildcard ×2)
+    const { data: allBetsInRound } = await supabaseAdmin
+      .from('bets')
+      .select('user_id, points_delta, match_id')
+      .eq('game_id', gameId)
+      .in('match_id', matchIds)
+      .not('points_delta', 'is', null)
+
+    const pointsByUser = new Map<string, number>()
+    const earningsDeltaByUser = new Map<string, number>()
+
+    for (const b of allBetsInRound ?? []) {
+      pointsByUser.set(b.user_id, (pointsByUser.get(b.user_id) ?? 0) + (b.points_delta ?? 0))
+      // earnings_delta: wildcard match contribution doubled
+      const matchPoints = b.points_delta ?? 0
+      const wildcardMultiplier = b.match_id === wildcardMatchId ? 2.0 : 1.0
+      const earningsContrib = Math.round(matchPoints * wildcardMultiplier)
+      earningsDeltaByUser.set(b.user_id, (earningsDeltaByUser.get(b.user_id) ?? 0) + earningsContrib)
+    }
+
+    // Inkluder alle brugere der har afgivet bets i runden (også dem der kun tabte)
+    const { data: allBetsForRound } = await supabaseAdmin
+      .from('bets')
+      .select('user_id')
+      .eq('game_id', gameId)
+      .in('match_id', matchIds)
+    const allUserIds = new Set((allBetsForRound ?? []).map((b) => b.user_id))
+    for (const userId of allUserIds) {
+      const pointsEarned = pointsByUser.get(userId) ?? 0
+      const earningsDelta = earningsDeltaByUser.get(userId) ?? 0
+      const extraBetsCorrect = extraBetsCorrectByUser.get(userId) ?? 0
+
+      await supabaseAdmin.from('round_scores').upsert(
+        {
+          user_id: userId,
+          round_id: roundId,
+          game_id: gameId,
+          points_earned: pointsEarned,
+          earnings_delta: earningsDelta,
+          extra_bets_correct: extraBetsCorrect,
+        },
+        { onConflict: 'user_id,round_id' }
+      )
+
+      // Opdater game_members.earnings
       const { data: member } = await supabaseAdmin
         .from('game_members')
-        .select('total_losses')
-        .eq('game_id', round.game_id)
+        .select('earnings')
+        .eq('game_id', gameId)
         .eq('user_id', userId)
         .single()
-
-      const totalLosses = (member as { total_losses?: number } | null)?.total_losses ?? 0
-
+      const currentEarnings = (member as { earnings?: number } | null)?.earnings ?? 0
       await supabaseAdmin
         .from('game_members')
-        .update({
-          current_streak: 0,
-          total_losses: totalLosses + 1,
-        })
-        .eq('game_id', round.game_id)
+        .update({ earnings: currentEarnings + earningsDelta })
+        .eq('game_id', gameId)
         .eq('user_id', userId)
+
+      if (pointsEarned > 0) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('points')
+          .eq('id', userId)
+          .single()
+
+        const totalPoints = (profile?.points ?? 0) + pointsEarned
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({ points: totalPoints })
+          .eq('id', userId)
+
+        if (error) console.error('Failed to update profiles.points:', error)
+      }
     }
-  }
 
-  // Aggregér point per bruger og beregn earnings_delta (med wildcard ×2)
-  const { data: allBetsInRound } = await supabaseAdmin
-    .from('bets')
-    .select('user_id, points_delta, match_id')
-    .eq('game_id', round.game_id)
-    .in('match_id', matchIds)
-    .not('points_delta', 'is', null)
+    await awardRoundBonus(roundId, gameId, matchIds)
+    await awardFullHouseBonus(gameId, matchIds, matches.length)
 
-  const pointsByUser = new Map<string, number>()
-  const earningsDeltaByUser = new Map<string, number>()
-
-  for (const b of allBetsInRound ?? []) {
-    pointsByUser.set(b.user_id, (pointsByUser.get(b.user_id) ?? 0) + (b.points_delta ?? 0))
-    // earnings_delta: wildcard match contribution doubled
-    const matchPoints = b.points_delta ?? 0
-    const wildcardMultiplier = b.match_id === wildcardMatchId ? 2.0 : 1.0
-    const earningsContrib = Math.round(matchPoints * wildcardMultiplier)
-    earningsDeltaByUser.set(b.user_id, (earningsDeltaByUser.get(b.user_id) ?? 0) + earningsContrib)
-  }
-
-  // Inkluder alle brugere der har afgivet bets i runden (også dem der kun tabte)
-  const { data: allBetsForRound } = await supabaseAdmin
-    .from('bets')
-    .select('user_id')
-    .eq('game_id', round.game_id)
-    .in('match_id', matchIds)
-  const allUserIds = new Set((allBetsForRound ?? []).map((b) => b.user_id))
-  for (const userId of allUserIds) {
-    const pointsEarned = pointsByUser.get(userId) ?? 0
-    const earningsDelta = earningsDeltaByUser.get(userId) ?? 0
-    const extraBetsCorrect = extraBetsCorrectByUser.get(userId) ?? 0
-
-    await supabaseAdmin.from('round_scores').upsert(
-      {
-        user_id: userId,
-        round_id: roundId,
-        game_id: round.game_id,
-        points_earned: pointsEarned,
-        earnings_delta: earningsDelta,
-        extra_bets_correct: extraBetsCorrect,
-      },
-      { onConflict: 'user_id,round_id' }
-    )
-
-    // Opdater game_members.earnings
-    const { data: member } = await supabaseAdmin
-      .from('game_members')
-      .select('earnings')
-      .eq('game_id', round.game_id)
-      .eq('user_id', userId)
-      .single()
-    const currentEarnings = (member as { earnings?: number } | null)?.earnings ?? 0
+    // Reset betting_balance til 1000 for alle game_members i dette spilrum
     await supabaseAdmin
       .from('game_members')
-      .update({ earnings: currentEarnings + earningsDelta })
-      .eq('game_id', round.game_id)
-      .eq('user_id', userId)
-
-    if (pointsEarned > 0) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('points')
-        .eq('id', userId)
-        .single()
-
-      const totalPoints = (profile?.points ?? 0) + pointsEarned
-      const { error } = await supabaseAdmin
-        .from('profiles')
-        .update({ points: totalPoints })
-        .eq('id', userId)
-
-      if (error) console.error('Failed to update profiles.points:', error)
-    }
+      .update({ betting_balance: 1000 })
+      .eq('game_id', gameId)
   }
-
-  await awardRoundBonus(roundId, round.game_id, matchIds)
-  await awardFullHouseBonus(round.game_id, matchIds, matches.length)
-
-  // Reset betting_balance til 1000 for alle game_members når runden er færdig (klar til næste runde)
-  await supabaseAdmin
-    .from('game_members')
-    .update({ betting_balance: 1000 })
-    .eq('game_id', round.game_id)
 
   await supabaseAdmin.from('rounds').update({ status: 'finished' }).eq('id', roundId)
 }

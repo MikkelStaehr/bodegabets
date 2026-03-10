@@ -14,32 +14,23 @@ export async function syncMatchesForRound(
 ): Promise<void> {
   console.log('[syncMatchesForRound] gameId:', gameId, 'roundId:', roundId)
 
-  const { data: game } = await supabaseAdmin
-    .from('games')
-    .select('league_id')
-    .eq('id', gameId)
-    .single()
-
-  console.log('[syncMatchesForRound] league_id:', game?.league_id)
-
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('name')
+    .select('name, league_id')
     .eq('id', roundId)
-    .eq('game_id', gameId)
     .single()
 
-  console.log('[syncMatchesForRound] round name:', round?.name)
+  console.log('[syncMatchesForRound] round name:', round?.name, 'league_id:', round?.league_id)
 
-  if (!game?.league_id || !round?.name) {
-    console.log('[syncMatchesForRound] early return: missing game.league_id or round.name')
+  if (!round?.league_id || !round?.name) {
+    console.log('[syncMatchesForRound] early return: missing round.league_id or round.name')
     return
   }
 
   const { data: leagueMatches } = await supabaseAdmin
     .from('league_matches')
     .select('id, home_team, away_team, kickoff_at, status, home_score, away_score')
-    .eq('league_id', game.league_id)
+    .eq('league_id', round.league_id)
     .eq('round_name', round.name)
     .order('kickoff_at', { ascending: true })
 

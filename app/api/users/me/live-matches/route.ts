@@ -39,17 +39,21 @@ export async function GET() {
   for (const gameId of gameIds) {
     const { data: game } = await supabaseAdmin
       .from('games')
-      .select('id, name')
+      .select('id, name, league_id')
       .eq('id', gameId)
       .eq('status', 'active')
       .single()
 
     if (!game) continue
 
+    // Hent league_id fra game for at finde rounds
+    const leagueId = (game as { league_id?: number }).league_id
+    if (!leagueId) continue
+
     const { data: rounds } = await supabaseAdmin
       .from('rounds')
       .select('id, name, status, betting_closes_at')
-      .eq('game_id', gameId)
+      .eq('league_id', leagueId)
       .order('created_at', { ascending: true })
 
     const typedRounds = (rounds ?? []) as { id: number; name: string; status: string; betting_closes_at: string | null }[]

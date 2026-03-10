@@ -5,7 +5,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
+  const url = new URL(req.url)
   const auth = req.headers.get('authorization')
+    ?? `Bearer ${url.searchParams.get('secret')}`
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

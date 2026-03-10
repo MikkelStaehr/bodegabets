@@ -50,7 +50,7 @@ export type GameMember = {
 
 export type Round = {
   id: number
-  game_id: number
+  league_id: number
   name: string
   stage: string
   betting_opens_at: string | null

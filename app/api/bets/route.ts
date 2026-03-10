@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
     .from('rounds')
     .select('status')
     .eq('id', round_id)
-    .eq('game_id', game_id)
     .single()
 
   if (!round || round.status !== 'open') {

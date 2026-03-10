@@ -2,23 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Find alle runder der er lukkede/aktive men ikke finished
-  // (closed = betting lukket, active = deadline passeret — begge kan have færdige kampe)
-  const { data: closedRounds } = await supabaseAdmin
+  // Find alle runder der er finished men endnu ikke har fået points beregnet
+  const { data: finishedRounds } = await supabaseAdmin
     .from('rounds')
-    .select('id, game_id')
-    .in('status', ['closed', 'active'])
+    .select('id')
+    .eq('status', 'finished')
 
   let processed = 0
 
-  if (closedRounds?.length) {
-    for (const round of closedRounds) {
+  if (finishedRounds?.length) {
+    for (const round of finishedRounds) {
       // Tjek om alle kampe er finished
       const { data: matches } = await supabaseAdmin
         .from('matches')
@@ -29,13 +28,6 @@ export async function POST(req: NextRequest) {
       if (!allFinished) continue
 
       await calculateRoundPoints(round.id)
-
-      // Markér runden som finished (calculateRoundPoints gør det også, men sikrer konsistens)
-      await supabaseAdmin
-        .from('rounds')
-        .update({ status: 'finished' })
-        .eq('id', round.id)
-
       processed++
     }
   }
