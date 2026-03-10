@@ -1,26 +1,100 @@
 @import "tailwindcss";
 
+@theme {
+  /* ── Fonte ─────────────────────────────────────────────── */
+  --font-display:   var(--ff-display,   'Playfair Display', serif);
+  --font-condensed: var(--ff-condensed, 'Barlow Condensed', sans-serif);
+  --font-body:      var(--ff-body,      'Barlow', sans-serif);
+
+  /* ── Farver ─────────────────────────────────────────────── */
+  --color-cream:          #F5F0E8;
+  --color-cream-dark:     #EDE8DF;
+  --color-forest:         #1B3A2D;
+  --color-forest-light:   #2E5040;
+  --color-vintage-red:    #C8392B;
+  --color-gold:           #C9A84C;
+  --color-warm-gray:      #5C5C4A;
+  --color-warm-border:    #D4CFC4;
+  --color-ink:            #1A1A1A;
+
+  /* ── Border radius — skarpe kanter ──────────────────────── */
+  --radius-none: 0px;
+  --radius-sm:   2px;
+  --radius:      2px;
+  --radius-md:   4px;
+  --radius-lg:   4px;
+  --radius-xl:   4px;
+  --radius-2xl:  4px;
+  --radius-full: 9999px;
+}
+
+/* ── CSS custom properties (tilgængelige overalt) ──────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-primary:    #F5F0E8;
+  --bg-secondary:  #EDE8DF;
+  --bg-dark:       #1B3A2D;
+  --text-primary:  #1A1A1A;
+  --text-secondary:#5C5C4A;
+  --text-inverted: #F5F0E8;
+  --accent-red:    #C8392B;
+  --accent-green:  #1B3A2D;
+  --accent-gold:   #C9A84C;
+  --border:        #D4CFC4;
+  --border-dark:   #2E5040;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Base ────────────────────────────────────────────────── */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--ff-body, 'Barlow', sans-serif);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Typografi-hjælpeklasser ─────────────────────────────── */
+.label-caps {
+  font-family: var(--ff-condensed, 'Barlow Condensed', sans-serif);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stat-number {
+  font-family: var(--ff-condensed, 'Barlow Condensed', sans-serif);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
+
+/* ── RoundSlider ───────────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 0 3px rgba(184,150,62,0.35); }
+  50%       { box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 0 7px rgba(184,150,62,0.12); }
+}
+.pulse-ring { animation: pulse-ring 2.5s ease-in-out infinite; }
