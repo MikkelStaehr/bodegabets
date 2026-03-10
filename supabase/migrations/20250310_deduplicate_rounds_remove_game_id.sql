@@ -57,17 +57,15 @@ END $$;
 
 CREATE TEMP TABLE match_mapping AS
 SELECT
-  m_old.id      AS old_match_id,
-  m_keep.id     AS keep_match_id
+  m_old.id   AS old_match_id,
+  m_keep.id  AS keep_match_id
 FROM matches m_old
-JOIN round_mapping rm_old  ON rm_old.old_id  = m_old.round_id
-JOIN round_mapping rm_keep ON rm_keep.old_id = rm_keep.keep_id  -- self-join for kept round
-  AND rm_keep.keep_id = rm_old.keep_id
-JOIN matches m_keep ON m_keep.round_id   = rm_old.keep_id
+JOIN round_mapping rm ON rm.old_id = m_old.round_id
+  AND rm.old_id != rm.keep_id
+JOIN matches m_keep ON m_keep.round_id  = rm.keep_id
   AND m_keep.home_team  = m_old.home_team
   AND m_keep.away_team  = m_old.away_team
-  AND m_keep.kickoff_at = m_old.kickoff_at
-WHERE m_old.round_id != rm_old.keep_id;  -- kun de der skal fjernes
+  AND m_keep.kickoff_at = m_old.kickoff_at;
 
 CREATE INDEX ON match_mapping (old_match_id);
 
@@ -88,15 +86,23 @@ WHERE b.match_id = mm.old_match_id;
 
 DO $$
 DECLARE
-  bets_round_updated INT;
-  bets_match_updated INT;
+  cnt INT;
 BEGIN
-  GET DIAGNOSTICS bets_round_updated = ROW_COUNT;
-  RAISE NOTICE '=== Bets round_id opdateret (seneste): % rækker ===', bets_round_updated;
+  SELECT count(*) INTO cnt FROM bets WHERE round_id IN (SELECT keep_id FROM round_mapping);
+  RAISE NOTICE '=== Bets efter remap: % rækker har opdateret round_id ===', cnt;
 END $$;
 
 
 -- ─── Trin 3: Opdater round_scores.round_id til beholdte runder ─────────────
+
+-- Slet round_scores der vil konflikte ved remap (samme user + kept round findes allerede)
+DELETE FROM round_scores rs
+WHERE rs.round_id IN (SELECT old_id FROM round_mapping WHERE old_id != keep_id)
+  AND EXISTS (
+    SELECT 1 FROM round_scores rs2
+    JOIN round_mapping rm ON rm.old_id = rs.round_id
+    WHERE rs2.user_id = rs.user_id AND rs2.round_id = rm.keep_id
+  );
 
 UPDATE round_scores rs
 SET round_id = rm.keep_id
