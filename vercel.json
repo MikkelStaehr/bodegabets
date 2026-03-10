@@ -1,8 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/sync-fixtures", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/sync-results", "schedule": "* * * * *" },
-    { "path": "/api/cron/update-rounds", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/calculate-points", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/sync-scores",   "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/update-rounds", "schedule": "*/30 * * * *" }
   ]
 }
