@@ -108,6 +108,8 @@ export default async function GamePage({ params }: Props) {
       .single(),
   ])
 
+  console.log('[DEBUG] gameLeagueId:', gameLeagueId, '| rounds:', rounds?.length ?? 'null')
+
   if (!myMembership) redirect('/dashboard')
 
   const leagueId = (game as { league_id?: number }).league_id ?? null
