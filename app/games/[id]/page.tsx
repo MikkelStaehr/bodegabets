@@ -58,8 +58,17 @@ export default async function GamePage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Hent game først for at finde league_id
+  const { data: game } = await supabase
+    .from('games')
+    .select('id, name, description, host_id, invite_code, status, created_at, league_id')
+    .eq('id', gameId)
+    .single()
+
+  if (!game) notFound()
+  const gameLeagueId = (game as { league_id?: number }).league_id
+
   const [
-    { data: game },
     { data: rawMembers },
     { data: rounds },
     { data: roundScores },
@@ -67,22 +76,18 @@ export default async function GamePage({ params }: Props) {
     { data: profile },
   ] = await Promise.all([
     supabase
-      .from('games')
-      .select('id, name, description, host_id, invite_code, status, created_at, league_id')
-      .eq('id', gameId)
-      .single(),
-
-    supabase
       .from('game_members')
       .select('user_id, points, profile:profiles(username)')
       .eq('game_id', gameId)
       .order('points', { ascending: false }),
 
-    supabase
-      .from('rounds')
-      .select('id, name, stage, status, betting_opens_at, betting_closes_at')
-      .eq('game_id', gameId)
-      .order('created_at', { ascending: true }),
+    gameLeagueId
+      ? supabase
+          .from('rounds')
+          .select('id, name, stage, status, betting_opens_at, betting_closes_at')
+          .eq('league_id', gameLeagueId)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
 
     supabase
       .from('round_scores')
@@ -103,7 +108,6 @@ export default async function GamePage({ params }: Props) {
       .single(),
   ])
 
-  if (!game) notFound()
   if (!myMembership) redirect('/dashboard')
 
   const leagueId = (game as { league_id?: number }).league_id ?? null

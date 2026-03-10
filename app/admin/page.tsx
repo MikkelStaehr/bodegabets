@@ -38,8 +38,8 @@ export default async function AdminPage() {
     supabaseAdmin
       .from('rounds')
       .select(`
-        id, name, status, betting_closes_at, game_id,
-        game:games ( name, league:leagues ( name ) ),
+        id, name, status, betting_closes_at, league_id,
+        league:leagues ( name ),
         match_count:matches ( count )
       `)
       .order('created_at', { ascending: false }),
@@ -49,7 +49,7 @@ export default async function AdminPage() {
       .select(`
         id, home_team, away_team, kickoff_at,
         home_score, away_score, status, round_id,
-        round:rounds ( name, game_id, game:games ( name ) ),
+        round:rounds ( name, league:leagues ( name ) ),
         sidebet_options:match_sidebet_options ( id, bet_type )
       `)
       .order('kickoff_at', { ascending: true }),
@@ -80,29 +80,29 @@ export default async function AdminPage() {
 
   // Normalisér rounds
   const rounds = (roundsData ?? []).map((r) => {
-    const game = r.game as unknown as { name: string; league: { name: string } } | null
+    const league = r.league as unknown as { name: string } | null
     const matchCount = r.match_count as unknown as { count: number }[]
     return {
       id: r.id as number,
       name: r.name as string,
       status: r.status as 'upcoming' | 'open' | 'closed' | 'finished',
       betting_closes_at: r.betting_closes_at as string | null,
-      game_id: r.game_id as number,
-      game_name: game?.name ?? '—',
-      league_name: game?.league?.name ?? '—',
+      league_id: r.league_id as number,
+      game_name: '—',
+      league_name: league?.name ?? '—',
       match_count: matchCount?.[0]?.count ?? 0,
     }
   })
 
   // Normalisér matches
   const matches = (matchesData ?? []).map((m) => {
-    const round = m.round as unknown as { name: string; game_id: number; game: { name: string } } | null
+    const round = m.round as unknown as { name: string; league: { name: string } } | null
     const sidebets = m.sidebet_options as unknown as { id: number; bet_type: string }[]
     return {
       id: m.id as number,
       round_id: m.round_id as number,
       round_name: round?.name ?? '—',
-      game_name: round?.game?.name ?? '—',
+      game_name: round?.league?.name ?? '—',
       home_team: m.home_team as string,
       away_team: m.away_team as string,
       kickoff_at: m.kickoff_at as string | null,

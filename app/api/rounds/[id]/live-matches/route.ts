@@ -14,23 +14,32 @@ export async function GET(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Ugyldigt round_id' }, { status: 400 })
   }
 
-  // Tjek at brugeren har adgang til runden (medlem af spillet)
+  // Tjek at brugeren har adgang til runden (medlem af et spilrum i ligaen)
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('game_id')
+    .select('league_id')
     .eq('id', roundId)
     .single()
 
   if (!round) return NextResponse.json({ error: 'Runde ikke fundet' }, { status: 404 })
 
-  const { data: membershipRows } = await supabaseAdmin
-    .from('game_members')
-    .select('user_id')
-    .eq('game_id', round.game_id)
-    .eq('user_id', user.id)
-    .limit(1)
+  // Find games i denne liga og tjek om brugeren er medlem af mindst ét
+  const { data: gamesInLeague } = await supabaseAdmin
+    .from('games')
+    .select('id')
+    .eq('league_id', round.league_id)
+  const gameIds = (gamesInLeague ?? []).map((g: { id: number }) => g.id)
 
-  const membership = membershipRows?.[0] ?? null
+  let membership = null
+  if (gameIds.length > 0) {
+    const { data: membershipRows } = await supabaseAdmin
+      .from('game_members')
+      .select('user_id')
+      .in('game_id', gameIds)
+      .eq('user_id', user.id)
+      .limit(1)
+    membership = membershipRows?.[0] ?? null
+  }
   if (!membership) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
   const since = new Date()

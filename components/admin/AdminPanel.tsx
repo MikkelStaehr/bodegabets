@@ -15,7 +15,7 @@ type RoundRow = {
   name: string
   status: 'upcoming' | 'open' | 'closed' | 'finished'
   betting_closes_at: string | null
-  game_id: number
+  league_id: number
   game_name: string
   league_name: string
   match_count: number
@@ -494,7 +494,7 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
                             {round.status === 'closed' && (
                               <>
                                 <AdminBtn size="xs" variant="primary" loading={loading}
-                                  onClick={() => calculateRound(round.id, round.game_id)}>
+                                  onClick={() => calculateRound(round.id, round.league_id)}>
                                   Beregn pt
                                 </AdminBtn>
                                 <AdminBtn size="xs" variant="secondary" loading={loading}

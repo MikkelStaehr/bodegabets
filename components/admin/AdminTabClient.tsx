@@ -59,7 +59,7 @@ export type RoundRow = {
   name: string
   status: 'upcoming' | 'open' | 'closed' | 'finished'
   betting_closes_at: string | null
-  game_id: number
+  league_id: number
   game_name: string
   league_name: string
   match_count: number

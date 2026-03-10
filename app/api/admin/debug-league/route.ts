@@ -36,11 +36,11 @@ export async function GET(req: NextRequest) {
   let totalRounds = 0
   let totalMatches = 0
 
-  if (gameIds.length > 0) {
+  if (true) {
     const { data: roundsData, count: roundsCount } = await supabaseAdmin
       .from('rounds')
-      .select('id, game_id, name, league_id', { count: 'exact' })
-      .in('game_id', gameIds)
+      .select('id, name, league_id', { count: 'exact' })
+      .eq('league_id', leagueId)
     rounds = roundsData ?? []
     totalRounds = roundsCount ?? 0
     const roundIds = (roundsData ?? []).map((r: { id: number }) => r.id)

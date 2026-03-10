@@ -24,16 +24,20 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   const body = await req.json()
-  const { bets } = body as { bets: BetInput[] }
+  const { bets, game_id: bodyGameId } = body as { bets: BetInput[]; game_id?: number }
 
   if (!Array.isArray(bets) || bets.length === 0) {
     return NextResponse.json({ error: 'Manglende eller tom bets-array' }, { status: 400 })
   }
 
+  if (!bodyGameId) {
+    return NextResponse.json({ error: 'game_id er påkrævet' }, { status: 400 })
+  }
+
   // Tjek at runden stadig er åben
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('status, game_id, betting_closes_at')
+    .select('status, betting_closes_at')
     .eq('id', roundId)
     .single()
 
@@ -51,7 +55,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   const { data: member } = await supabaseAdmin
     .from('game_members')
     .select('betting_balance')
-    .eq('game_id', round.game_id)
+    .eq('game_id', bodyGameId)
     .eq('user_id', user.id)
     .single()
 
@@ -108,7 +112,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Indsæt nye bets (inkl. round_id)
   const rows = bets.map((b) => ({
     round_id: roundId,
-    game_id: round.game_id,
+    game_id: bodyGameId,
     match_id: b.match_id,
     user_id: user.id,
     bet_type: b.bet_type,

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   // Hent alle aktive runder (ikke finished) med deres match-statistik
   const { data: rounds, error: roundsError } = await supabaseAdmin
     .from('rounds')
-    .select('id, game_id, name, status, betting_closes_at')
+    .select('id, name, status, betting_closes_at')
     .neq('status', 'finished')
 
   if (roundsError) {
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  type RoundRow = { id: number; game_id: number; name: string; status: string; betting_closes_at: string | null }
+  type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null }
   const typedRounds = rounds as RoundRow[]
 
   // 1) Markér runder som 'finished' hvor alle kampe er finished
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
     rounds_marked_finished: finishedIds.length,
     rounds_marked_open: openIds.length,
     deadlines_set: toSetDeadline.length,
-    finished_rounds: toMarkFinished.map((r) => ({ id: r.id, name: r.name, game_id: r.game_id })),
-    opened_rounds: toMarkOpen.map((r) => ({ id: r.id, name: r.name, game_id: r.game_id })),
+    finished_rounds: toMarkFinished.map((r) => ({ id: r.id, name: r.name })),
+    opened_rounds: toMarkOpen.map((r) => ({ id: r.id, name: r.name })),
   })
 }

@@ -36,23 +36,27 @@ export default async function RoundPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Hent game først for at finde league_id
+  const { data: game } = await supabase
+    .from('games')
+    .select('id, name, status, league_id')
+    .eq('id', gameId)
+    .single()
+
+  if (!game) notFound()
+
+  const leagueId = (game as { league_id?: number }).league_id
+
   const [
     { data: round },
-    { data: game },
     { data: membership },
     { data: rawMatches },
   ] = await Promise.all([
     supabase
       .from('rounds')
-      .select('id, name, stage, status, betting_opens_at, betting_closes_at, game_id, extra_bets_enabled')
+      .select('id, name, stage, status, betting_opens_at, betting_closes_at, league_id, extra_bets_enabled')
       .eq('id', roundIdNum)
-      .eq('game_id', gameId)
-      .single(),
-
-    supabase
-      .from('games')
-      .select('id, name, status')
-      .eq('id', gameId)
+      .eq('league_id', leagueId!)
       .single(),
 
     supabase
@@ -75,7 +79,7 @@ export default async function RoundPage({ params }: Props) {
       .order('kickoff_at', { ascending: true }),
   ])
 
-  if (!round || !game) notFound()
+  if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
 
   let matches = (rawMatches ?? []) as unknown as MatchRow[]
@@ -96,7 +100,7 @@ export default async function RoundPage({ params }: Props) {
     matches = (matchesRetry ?? []) as unknown as MatchRow[]
   }
 
-  const typedRound = round as Round
+  const typedRound = round as unknown as Round
   const matchIds = matches.map((m) => m.id)
 
   const { data: betsData } = await supabase
