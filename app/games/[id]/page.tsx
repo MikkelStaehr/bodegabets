@@ -6,6 +6,8 @@ import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import RoundSlider from '@/components/games/RoundSlider'
 import type { Game, Round, RoundScore } from '@/types'
 
+export const dynamic = 'force-dynamic'
+
 type Props = {
   params: Promise<{ id: string }>
 }
