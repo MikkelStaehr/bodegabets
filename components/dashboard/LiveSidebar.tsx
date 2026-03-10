@@ -5,7 +5,6 @@ import { LiveMatchesTicker } from '@/components/LiveMatchesTicker'
 
 type Round = {
   id: number
-  game_id: number
   name: string
   matches_count: number
 }

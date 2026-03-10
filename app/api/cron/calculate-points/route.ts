@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   // Find alle runder der er finished men endnu ikke har fået points beregnet
   const { data: finishedRounds } = await supabaseAdmin
     .from('rounds')
-    .select('id, game_id')
+    .select('id')
     .eq('status', 'finished')
 
   let processed = 0

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { syncLeagueFixtures } from '@/lib/fixtureDownload'
-import { buildGameRounds } from '@/lib/syncLeagueMatches'
+import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get('authorization')
@@ -38,45 +38,26 @@ export async function POST(req: NextRequest) {
 
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('game_id')
+    .select('league_id')
     .eq('id', match.round_id)
     .single()
 
-  if (!round) {
-    return NextResponse.json({ error: 'Runden blev ikke fundet' }, { status: 404 })
-  }
-
-  const { data: game } = await supabaseAdmin
-    .from('games')
-    .select('league_id')
-    .eq('id', round.game_id)
-    .single()
-
-  if (!game?.league_id) {
+  if (!round?.league_id) {
     return NextResponse.json(
-      { error: 'Spillet har ingen liga — kan ikke synkronisere resultat' },
+      { error: 'Runden har ingen liga — kan ikke synkronisere resultat' },
       { status: 400 }
     )
   }
 
   // 2. Sync liga (Bold.dk / fixturedownload) — opdaterer league_matches med resultater
-  const syncRes = await syncLeagueFixtures(game.league_id)
+  const syncRes = await syncLeagueFixtures(round.league_id)
   if (syncRes.errors.length) {
     console.warn('[sync-result] Sync fejl:', syncRes.errors)
   }
 
-  // 3. Byg runder for alle aktive spil i ligaen — propagerer scores til matches
-  const { data: gamesForLeague } = await supabaseAdmin
-    .from('games')
-    .select('id')
-    .eq('league_id', game.league_id)
-    .eq('status', 'active')
-
-  let matches_updated = 0
-  for (const g of gamesForLeague ?? []) {
-    const s = await buildGameRounds(g.id, game.league_id)
-    matches_updated += s.matches_updated
-  }
+  // 3. Byg runder for ligaen — propagerer scores til matches
+  const s = await buildLeagueRounds(round.league_id)
+  const matches_updated = s.matches_updated
 
   // 4. Hent opdateret kamp
   const { data: updated } = await supabaseAdmin

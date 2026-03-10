@@ -57,11 +57,13 @@ export async function GET(req: NextRequest) {
       `)
       .eq('game_id', gameId)
       .order('points', { ascending: false }),
-    supabaseAdmin
-      .from('rounds')
-      .select('id, name, status')
-      .eq('game_id', gameId)
-      .order('betting_closes_at', { ascending: true }),
+    leagueId
+      ? supabaseAdmin
+          .from('rounds')
+          .select('id, name, status')
+          .eq('league_id', leagueId)
+          .order('betting_closes_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
     leagueId
       ? supabaseAdmin.from('current_rounds').select('round_name').eq('league_id', leagueId).maybeSingle()
       : Promise.resolve({ data: null }),

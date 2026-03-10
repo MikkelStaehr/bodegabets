@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import { buildGameRounds } from '@/lib/syncLeagueMatches'
+import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 import { syncMatchesForRound } from '@/lib/syncMatchesForRound'
 
 export const maxDuration = 30
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
   // Byg runder fra eksisterende league_matches (stille fejl hvis ingen kampe endnu)
   let rounds_created = 0, matches_created = 0
   try {
-    const buildRes = await buildGameRounds(game.id, league_id)
+    const buildRes = await buildLeagueRounds(league_id)
     rounds_created  = buildRes.rounds_created
     matches_created = buildRes.matches_created
 
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       const { data: rounds } = await supabaseAdmin
         .from('rounds')
         .select('id')
-        .eq('game_id', game.id)
+        .eq('league_id', league_id)
         .eq('name', currentRound.round_name)
         .limit(1)
       const activeRound = rounds?.[0]

@@ -63,15 +63,15 @@ export async function GET(req: NextRequest) {
       name: string
       status: string
       betting_closes_at: string | null
-      game_id: number
+      league_id: number
       match_count: number
     }> = []
 
-    if (gameIds.length > 0) {
+    {
       const { data: roundsData } = await supabaseAdmin
         .from('rounds')
-        .select('id, name, status, betting_closes_at, game_id')
-        .in('game_id', gameIds)
+        .select('id, name, status, betting_closes_at, league_id')
+        .eq('league_id', leagueId)
         .order('betting_closes_at', { ascending: true })
 
       for (const r of roundsData ?? []) {

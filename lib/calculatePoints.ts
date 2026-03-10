@@ -114,23 +114,26 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('game_id, wildcard_match_id')
+    .select('league_id, wildcard_match_id')
     .eq('id', roundId)
     .single()
 
   if (!round) return
 
-  const { data: game } = await supabaseAdmin
-    .from('games')
-    .select('league_id')
-    .eq('id', round.game_id)
-    .single()
-
-  if (!game) return
-
-  const leagueId = game.league_id as number | null
+  const leagueId = round.league_id as number | null
   const wildcardMatchId = round.wildcard_match_id as number | null
   const matchIds = matches.map((m) => m.id)
+
+  // Hent game_id fra bets — rounds tilhører nu en liga, ikke et spilrum
+  const { data: betGameRow } = await supabaseAdmin
+    .from('bets')
+    .select('game_id')
+    .in('match_id', matchIds)
+    .limit(1)
+    .maybeSingle()
+
+  const gameId = betGameRow?.game_id as number | undefined
+  if (!gameId) return
 
   // Hent rivalries for denne liga (begge retninger: A-B og B-A)
   let rivalryMap = new Map<string, number>()
@@ -163,7 +166,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     const historicFactors = await calculateHistoricFactors(
       match.home_team,
       match.away_team,
-      game.league_id
+      leagueId
     )
 
     const predictionCounts = new Map<string, number>()
@@ -193,7 +196,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       const { data: member } = await supabaseAdmin
         .from('game_members')
         .select('points, current_streak, total_wins, total_losses')
-        .eq('game_id', round.game_id)
+        .eq('game_id', gameId)
         .eq('user_id', bet.user_id)
         .single()
 
@@ -233,7 +236,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           current_streak: streak + 1,
           total_wins: totalWins + 1,
         })
-        .eq('game_id', round.game_id)
+        .eq('game_id', gameId)
         .eq('user_id', bet.user_id)
     }
 
@@ -255,7 +258,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       const { data: member } = await supabaseAdmin
         .from('game_members')
         .select('total_losses')
-        .eq('game_id', round.game_id)
+        .eq('game_id', gameId)
         .eq('user_id', userId)
         .single()
 
@@ -267,7 +270,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           current_streak: 0,
           total_losses: totalLosses + 1,
         })
-        .eq('game_id', round.game_id)
+        .eq('game_id', gameId)
         .eq('user_id', userId)
     }
   }
@@ -276,7 +279,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
   const { data: allBetsInRound } = await supabaseAdmin
     .from('bets')
     .select('user_id, points_delta, match_id')
-    .eq('game_id', round.game_id)
+    .eq('game_id', gameId)
     .in('match_id', matchIds)
     .not('points_delta', 'is', null)
 
@@ -296,7 +299,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
   const { data: allBetsForRound } = await supabaseAdmin
     .from('bets')
     .select('user_id')
-    .eq('game_id', round.game_id)
+    .eq('game_id', gameId)
     .in('match_id', matchIds)
   const allUserIds = new Set((allBetsForRound ?? []).map((b) => b.user_id))
   for (const userId of allUserIds) {
@@ -308,7 +311,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       {
         user_id: userId,
         round_id: roundId,
-        game_id: round.game_id,
+        game_id: gameId,
         points_earned: pointsEarned,
         earnings_delta: earningsDelta,
         extra_bets_correct: extraBetsCorrect,
@@ -320,14 +323,14 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     const { data: member } = await supabaseAdmin
       .from('game_members')
       .select('earnings')
-      .eq('game_id', round.game_id)
+      .eq('game_id', gameId)
       .eq('user_id', userId)
       .single()
     const currentEarnings = (member as { earnings?: number } | null)?.earnings ?? 0
     await supabaseAdmin
       .from('game_members')
       .update({ earnings: currentEarnings + earningsDelta })
-      .eq('game_id', round.game_id)
+      .eq('game_id', gameId)
       .eq('user_id', userId)
 
     if (pointsEarned > 0) {
@@ -347,14 +350,14 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     }
   }
 
-  await awardRoundBonus(roundId, round.game_id, matchIds)
-  await awardFullHouseBonus(round.game_id, matchIds, matches.length)
+  await awardRoundBonus(roundId, gameId, matchIds)
+  await awardFullHouseBonus(gameId, matchIds, matches.length)
 
   // Reset betting_balance til 1000 for alle game_members når runden er færdig (klar til næste runde)
   await supabaseAdmin
     .from('game_members')
     .update({ betting_balance: 1000 })
-    .eq('game_id', round.game_id)
+    .eq('game_id', gameId)
 
   await supabaseAdmin.from('rounds').update({ status: 'finished' }).eq('id', roundId)
 }
