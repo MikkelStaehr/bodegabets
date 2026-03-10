@@ -362,13 +362,17 @@ export async function buildGameRounds(
   if (newRoundNames.length) {
     const roundRows = newRoundNames.map((name) => {
       const matches = groups.get(name)!
+      const firstKickoff = matches.reduce<string | null>((min, m) => {
+        if (!m.kickoff_at) return min
+        return !min || m.kickoff_at < min ? m.kickoff_at : min
+      }, null)
       return {
         game_id:           gameId,
         league_id:         leagueId,
         name,
         stage:             'Grundspil',
         status:            matches.every((m) => m.status === 'finished') ? 'finished' : 'upcoming',
-        betting_closes_at: null,
+        betting_closes_at: firstKickoff,
         betting_opens_at:  null,
       }
     })
