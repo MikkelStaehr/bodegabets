@@ -99,7 +99,7 @@ export default function NewGameForm({ leagues }: Props) {
     const newGameId = data.game_id
     setGameId(newGameId)
 
-    if (data.rounds_created > 0) { setSyncState('done'); router.push(`/games/${newGameId}`); return }
+    if (!data.warning) { setSyncState('done'); router.push(`/games/${newGameId}`); return }
 
     setSyncState('syncing')
     setPollAttempts(0)
