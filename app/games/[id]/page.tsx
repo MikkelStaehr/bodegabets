@@ -1,5 +1,4 @@
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
@@ -51,6 +50,7 @@ function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'act
 
 export default async function GamePage({ params }: Props) {
   const { id } = await params
+  console.log('[DEBUG0] GamePage called with id:', id)
   const gameId = parseInt(id)
   if (isNaN(gameId)) notFound()
 
@@ -66,6 +66,7 @@ export default async function GamePage({ params }: Props) {
     .single()
 
   if (!game) notFound()
+  console.log('[DEBUG1] game:', game?.id, 'league_id:', (game as any)?.league_id)
   const gameLeagueId = (game as { league_id?: number }).league_id
 
   const [
@@ -107,6 +108,8 @@ export default async function GamePage({ params }: Props) {
       .eq('id', user.id)
       .single(),
   ])
+
+  console.log('[DEBUG2] gameLeagueId:', gameLeagueId, '| rounds:', rounds?.length ?? 'null', '| membership:', !!myMembership)
 
   if (!myMembership) redirect('/dashboard')
 
@@ -413,14 +416,6 @@ export default async function GamePage({ params }: Props) {
               enabled={activeRound.computedStatus === 'open' || activeRound.computedStatus === 'active'}
             />
           )}
-          <div className="px-5 mt-3">
-            <Link
-              href={`/games/${gameId}/rounds`}
-              className="text-xs text-[#7a7060] hover:text-[#3a3530] transition-colors"
-            >
-              › Se alle runder
-            </Link>
-          </div>
         </section>
 
         {sortedRounds.length === 0 && (
