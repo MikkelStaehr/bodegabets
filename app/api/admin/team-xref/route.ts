@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         .in('id', leagueIds)
       leaguesData = (fallback ?? []).map((l) => ({ ...l, bold_phase_id: null }))
     } else {
-      leaguesData = leaguesRaw as typeof leaguesData
+      leaguesData = (leaguesRaw ?? []) as NonNullable<typeof leaguesData>
     }
 
     const phaseByLeague = new Map(
@@ -71,7 +71,8 @@ export async function GET(req: NextRequest) {
     >()
 
     for (const r of rows ?? []) {
-      const league = r.league as { id: number; name: string; country?: string } | null
+      const leagueRaw = r.league as unknown
+      const league = (Array.isArray(leagueRaw) ? leagueRaw[0] : leagueRaw) as { id: number; name: string; country?: string } | null
       const leagueId = r.bb_league_id as number
       const leagueName = league?.name ?? '—'
       const country = league?.country ?? '—'
