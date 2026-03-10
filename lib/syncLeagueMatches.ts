@@ -165,10 +165,13 @@ export async function syncBoldFixtures(
   const errors: string[] = []
 
   const allMatches: BoldMatchItem[] = []
+  const limit = 50
   let page = 1
+  let totalPageCount = 1
 
   while (true) {
-    const url = `${BOLD_MATCHES_API}?phase_ids=${boldPhaseId}&page=${page}`
+    const offset = (page - 1) * limit
+    const url = `${BOLD_MATCHES_API}?phase_ids=${boldPhaseId}&page=${page}&limit=${limit}&offset=${offset}`
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'BodegaBets/1.0',
@@ -188,8 +191,14 @@ export async function syncBoldFixtures(
       errors.push('Bold API returnerede ikke valid JSON')
       break
     }
-    allMatches.push(...(data.matches ?? []))
-    if (page >= (data.total_page_count ?? 1)) break
+    const pageMatches = data.matches ?? []
+    allMatches.push(...pageMatches)
+    const rawTotal = data.total_page_count
+    if (page === 1 && rawTotal != null) {
+      totalPageCount = typeof rawTotal === 'number' ? rawTotal : parseInt(String(rawTotal), 10) || 1
+    }
+    console.log(`[Liga ${leagueId}] side ${page}/${totalPageCount} — ${pageMatches.length} kampe`)
+    if (page >= totalPageCount) break
     if (page > 20) break // Safety: ingen liga har mere end 1000 kampe
     page++
   }
@@ -248,25 +257,16 @@ export async function syncBoldFixtures(
     }
   }).filter((r) => r.home_team && r.away_team)
 
-  // Deduplikér på konfliktnøgle — undgå "cannot affect row a second time" ved upsert
-  const conflictKey = (r: { league_id: number; home_team: string; away_team: string; kickoff_at: string }) =>
-    `${r.league_id}|${r.home_team}|${r.away_team}|${r.kickoff_at}`
-  const rowsByKey = new Map<string, (typeof rows)[0]>()
-  for (const r of rows) {
-    rowsByKey.set(conflictKey(r), r) // sidste vinder — én per konfliktnøgle
-  }
-  const uniqueRows = [...rowsByKey.values()]
-
   const { error } = await supabaseAdmin
     .from('league_matches')
-    .upsert(uniqueRows, { onConflict: 'league_id,home_team,away_team,kickoff_at' })
+    .upsert(rows, { onConflict: 'bold_match_id' })
 
   if (error) {
     return { synced: 0, errors: [error.message] }
   }
 
-  console.log(`[syncBoldFixtures] liga ${leagueId}: ${uniqueRows.length} kampe fra Bold API (phase_id=${boldPhaseId})`)
-  return { synced: uniqueRows.length, errors }
+  console.log(`[syncBoldFixtures] liga ${leagueId}: ${rows.length} kampe fra Bold API (phase_id=${boldPhaseId})`)
+  return { synced: rows.length, errors }
 }
 
 // ─── 2. Opbyg runder + matches i ét spilrum fra league_matches ───────────────

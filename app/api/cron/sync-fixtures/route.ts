@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runLeagueSync } from '@/lib/syncLeagueMatches'
+import { runLeagueSync, syncBoldFixtures } from '@/lib/syncLeagueMatches'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 60
 
@@ -9,8 +10,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const leagueId = req.nextUrl.searchParams.get('league_id')
+  const forceBold = req.nextUrl.searchParams.get('force_bold') === '1'
+
   try {
-    const results = await runLeagueSync()
+    let results: Awaited<ReturnType<typeof runLeagueSync>>
+    if (leagueId && forceBold) {
+      const id = parseInt(leagueId, 10)
+      const { data: league } = await supabaseAdmin
+        .from('leagues')
+        .select('id, name, bold_phase_id')
+        .eq('id', id)
+        .single()
+      if (!league?.bold_phase_id) {
+        return NextResponse.json({ error: `Liga ${id} har ikke bold_phase_id` }, { status: 400 })
+      }
+      const res = await syncBoldFixtures(id, league.bold_phase_id)
+      results = [{
+        league_id: id,
+        synced: res.synced,
+        rounds_created: 0,
+        matches_created: 0,
+        matches_updated: 0,
+        errors: res.errors,
+      }]
+    } else {
+      results = await runLeagueSync()
+    }
 
     const totals = results.reduce(
       (acc, r) => ({
