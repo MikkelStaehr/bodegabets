@@ -50,6 +50,7 @@ function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'act
 
 export default async function GamePage({ params }: Props) {
   const { id } = await params
+  console.log('[DEBUG0] GamePage called with id:', id)
   const gameId = parseInt(id)
   if (isNaN(gameId)) notFound()
 
