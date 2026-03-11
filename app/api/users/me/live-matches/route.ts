@@ -30,6 +30,7 @@ export async function GET() {
   const items: Array<{
     gameId: number
     gameName: string
+    leagueName: string | null
     roundId: number
     roundName: string
     matches: unknown[]
@@ -49,6 +50,14 @@ export async function GET() {
     // Hent league_id fra game for at finde rounds
     const leagueId = (game as { league_id?: number }).league_id
     if (!leagueId) continue
+
+    // Hent league name
+    const { data: league } = await supabaseAdmin
+      .from('leagues')
+      .select('name')
+      .eq('id', leagueId)
+      .single()
+    const leagueName = league?.name ?? null
 
     const { data: rounds } = await supabaseAdmin
       .from('rounds')
@@ -111,6 +120,7 @@ export async function GET() {
     items.push({
         gameId: game.id,
         gameName: game.name,
+        leagueName,
         roundId: activeRound.id,
         roundName: activeRound.name,
         matches: matchList,
