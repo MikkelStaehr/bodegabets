@@ -551,48 +551,6 @@ export async function buildLeagueRounds(
   return result
 }
 
-// ─── 2b. Template-game for ligaer uden spilrum (live-scores) ─────────────────
-
-/** Opretter et template-game for en liga hvis ingen games findes. Returnerer game_id eller null. */
-async function ensureLeagueTemplateGame(leagueId: number, leagueName: string): Promise<number | null> {
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('id')
-    .limit(1)
-    .maybeSingle()
-
-  if (!profile?.id) {
-    console.warn(`[sync-fixtures] Ingen profil fundet — kan ikke oprette template-game for ${leagueName}`)
-    return null
-  }
-
-  const inviteCode = `SYNC${leagueId.toString().padStart(4, '0')}`
-  const { data: game, error } = await supabaseAdmin
-    .from('games')
-    .insert({
-      name:           `[Sync] ${leagueName}`,
-      description:    'Automatisk oprettet for fixture-sync. Bruges ikke af brugere.',
-      host_id:        profile.id,
-      invite_code:    inviteCode,
-      league_id:      leagueId,
-      status:         'active',
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error(`[sync-fixtures] Kunne ikke oprette template-game for ${leagueName}:`, error.message)
-    return null
-  }
-
-  await supabaseAdmin
-    .from('game_members')
-    .insert({ game_id: game.id, user_id: profile.id, points: 0 })
-
-  console.log(`[sync-fixtures] Oprettet template-game id=${game.id} for ${leagueName}`)
-  return game.id
-}
-
 // ─── 3. Daglig cron: opdater resultater + byg runder ─────────────────────────
 
 export async function runLeagueSync(): Promise<SyncResult[]> {
@@ -647,16 +605,6 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
     }
 
     // Kør buildLeagueRounds for ligaen
-    // Sørg for at der findes mindst ét template-game (til live-scores)
-    const { data: gamesForLeague } = await supabaseAdmin
-      .from('games')
-      .select('id')
-      .eq('league_id', league.id)
-
-    if ((gamesForLeague ?? []).length === 0) {
-      await ensureLeagueTemplateGame(league.id, league.name)
-    }
-
     const s = await buildLeagueRounds(league.id)
     const { rounds_created, matches_created, matches_updated } = s
 
