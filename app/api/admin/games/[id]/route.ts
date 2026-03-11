@@ -26,35 +26,10 @@ export async function DELETE(
     return NextResponse.json({ error: 'Spil ikke fundet' }, { status: 404 })
   }
 
-  // Rounds tilhører nu en liga, ikke et spil. Slet kun game-specifik data.
-  // Hent round_ids via league_id for at finde match_ids til bets-sletning
-  const roundIds = game.league_id
-    ? await supabaseAdmin
-        .from('rounds')
-        .select('id')
-        .eq('league_id', game.league_id)
-        .then(({ data }) => (data ?? []).map((r: { id: number }) => r.id))
-    : []
+  // Slet game-specifik data (bets, round_scores, members) — scoped til game_id
+  await supabaseAdmin.from('bets').delete().eq('game_id', gameId)
+  await supabaseAdmin.from('round_scores').delete().eq('game_id', gameId)
 
-  const matchIds = roundIds.length
-    ? await supabaseAdmin
-        .from('matches')
-        .select('id')
-        .in('round_id', roundIds)
-        .then(({ data }) => (data ?? []).map((m: { id: number }) => m.id))
-    : []
-
-  // Slet bets for dette game (bets har game_id)
-  if (matchIds.length) {
-    await supabaseAdmin.from('bets').delete().eq('game_id', gameId).in('match_id', matchIds)
-  }
-
-  // Slet round_scores for dette game
-  if (roundIds.length) {
-    await supabaseAdmin.from('round_scores').delete().eq('game_id', gameId).in('round_id', roundIds)
-  }
-
-  // Slet game_members og selve gamet
   await supabaseAdmin.from('game_members').delete().eq('game_id', gameId)
   const { error } = await supabaseAdmin.from('games').delete().eq('id', gameId)
 

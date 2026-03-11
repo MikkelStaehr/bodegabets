@@ -13,24 +13,29 @@ export async function GET(req: NextRequest) {
 
   const now = new Date()
   const nowIso = now.toISOString()
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Hent alle aktive runder (ikke finished) med deres match-statistik
-  const { data: rounds, error: roundsError } = await supabaseAdmin
+  // Hent ALLE runder (inkl. finished) så vi kan bestemme rækkefølge per liga
+  const { data: allRounds, error: roundsError } = await supabaseAdmin
     .from('rounds')
-    .select('id, name, status, betting_closes_at')
-    .neq('status', 'finished')
+    .select('id, name, status, betting_closes_at, league_id')
+    .order('id', { ascending: true })
 
   if (roundsError) {
     return NextResponse.json({ error: roundsError.message }, { status: 500 })
   }
 
-  const roundIds = (rounds ?? []).map((r: { id: number }) => r.id)
+  type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; league_id: number }
+  const typedAllRounds = (allRounds ?? []) as RoundRow[]
+
+  // Ikke-finished runder er dem vi skal arbejde med
+  const rounds = typedAllRounds.filter((r) => r.status !== 'finished')
+  const roundIds = rounds.map((r) => r.id)
+
   if (!roundIds.length) {
     return NextResponse.json({ ok: true, timestamp: nowIso, finished: 0, opened: 0, message: 'Ingen aktive runder' })
   }
 
-  // Hent alle matches for disse runder (status + kickoff_at)
+  // Hent alle matches for ikke-finished runder (status + kickoff_at)
   const { data: matchRows, error: statsError } = await supabaseAdmin
     .from('matches')
     .select('round_id, status, kickoff_at')
@@ -54,7 +59,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null }
   const typedRounds = rounds as RoundRow[]
 
   // 1) Markér runder som 'finished' hvor alle kampe er finished
@@ -71,13 +75,38 @@ export async function GET(req: NextRequest) {
       .in('id', finishedIds)
   }
 
-  // 2) Markér 'upcoming' runder som 'open' når MIN(kickoff_at) <= now + 7 dage
+  // Byg effektiv status per liga (efter finished-markering)
+  // Gruppér alle runder per liga i id-rækkefølge
+  const roundsByLeague = new Map<number, RoundRow[]>()
+  for (const r of typedAllRounds) {
+    if (!roundsByLeague.has(r.league_id)) roundsByLeague.set(r.league_id, [])
+    roundsByLeague.get(r.league_id)!.push(r)
+  }
+
+  // 2) Åbn næste upcoming runde per liga hvis:
+  //    - Ingen anden runde i ligaen er 'open' eller 'closed'
+  //    - Forrige runde (lavere id) er 'finished' eller findes ikke
   const toMarkOpen = typedRounds.filter((r) => {
     if (r.status !== 'upcoming') return false
     if (finishedIds.includes(r.id)) return false
-    const stat = statMap[r.id]
-    if (!stat || !stat.minKickoff) return false
-    return stat.minKickoff <= sevenDaysFromNow
+
+    const leagueRounds = roundsByLeague.get(r.league_id) ?? []
+
+    // Tjek at ingen anden runde i ligaen er open/closed (med finished-korrektion)
+    const effectiveStatus = (rd: RoundRow) => finishedIds.includes(rd.id) ? 'finished' : rd.status
+    const hasActiveRound = leagueRounds.some(
+      (rd) => rd.id !== r.id && (effectiveStatus(rd) === 'open' || effectiveStatus(rd) === 'closed')
+    )
+    if (hasActiveRound) return false
+
+    // Find forrige runde (lavere id) i samme liga
+    const idx = leagueRounds.findIndex((rd) => rd.id === r.id)
+    if (idx > 0) {
+      const prev = leagueRounds[idx - 1]
+      if (effectiveStatus(prev) !== 'finished') return false
+    }
+
+    return true
   })
 
   const openIds = toMarkOpen.map((r) => r.id)
@@ -88,7 +117,7 @@ export async function GET(req: NextRequest) {
       .in('id', openIds)
   }
 
-  // 3) Sæt betting_closes_at = MIN(kickoff_at) for runder hvor den er NULL
+  // 3) Sæt betting_closes_at = 1 time før MIN(kickoff_at) for runder hvor den er NULL
   const toSetDeadline = typedRounds.filter((r) => {
     if (r.betting_closes_at) return false
     if (finishedIds.includes(r.id)) return false
@@ -98,9 +127,10 @@ export async function GET(req: NextRequest) {
 
   for (const r of toSetDeadline) {
     const stat = statMap[r.id]
+    const deadline = new Date(new Date(stat.minKickoff!).getTime() - 60 * 60 * 1000).toISOString()
     await supabaseAdmin
       .from('rounds')
-      .update({ betting_closes_at: stat.minKickoff })
+      .update({ betting_closes_at: deadline })
       .eq('id', r.id)
   }
 

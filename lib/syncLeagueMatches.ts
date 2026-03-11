@@ -516,7 +516,7 @@ export async function buildLeagueRounds(
     result.debug = {
       rounds_matched: roundsMatched,
       rounds_skipped: roundsSkipped,
-      to_insert: toInsert.length,
+      to_insert: toUpsert.length,
       round_names_sample: roundNamesSample.length ? roundNamesSample : undefined,
       db_round_names_sample: dbRoundSample,
     }
