@@ -316,7 +316,7 @@ export default async function HomePage() {
 
       {/* ── 5. Leaderboard ─────────────────────────────────────── */}
       <section className="bg-cream-dark">
-        <div className="max-w-[640px] mx-auto px-6 lg:px-8 py-24">
+        <div className="max-w-[640px] mx-auto px-6 lg:px-8 py-12 lg:py-24">
           <div className="flex items-center gap-3 mb-3">
             <span className="block w-6 h-[2px] bg-gold" />
             <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
@@ -416,7 +416,7 @@ export default async function HomePage() {
             className="absolute inset-0 pointer-events-none"
             style={{ background: 'radial-gradient(ellipse at center, rgba(184,150,62,0.07) 0%, transparent 70%)' }}
           />
-          <div className="relative max-w-4xl mx-auto px-6 lg:px-8 py-28 text-center">
+          <div className="relative max-w-4xl mx-auto px-6 lg:px-8 py-16 lg:py-28 text-center">
             <h2
               className="font-display italic text-cream mb-5"
               style={{ fontWeight: 900, fontSize: 'clamp(72px, 10vw, 120px)', lineHeight: 1 }}
