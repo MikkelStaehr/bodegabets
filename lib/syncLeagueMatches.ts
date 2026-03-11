@@ -454,15 +454,8 @@ export async function buildLeagueRounds(
     }
   }
 
-  // 5. Beregn hvilke matches der skal indsættes vs opdateres
-  const toInsert: object[] = []
-  const toUpdate: {
-    id: number
-    home_score: number | null
-    away_score: number | null
-    status: string
-    league_match_id: number
-  }[] = []
+  // 5. Byg upsert-rækker for alle kampe (scores + status kopieres altid fra league_matches)
+  const toUpsert: object[] = []
 
   let roundsMatched = 0
   let roundsSkipped = 0
@@ -478,26 +471,9 @@ export async function buildLeagueRounds(
     roundsMatched++
 
     for (const lm of roundMatches) {
-      const existing = matchByLmId.get(lm.id) ?? matchByPair.get(`${roundId}|${lm.home_team}|${lm.away_team}`)
-
-      if (existing) {
-        const hasScores = lm.home_score != null && lm.away_score != null
-        if (existing.status !== 'finished' && hasScores) {
-          const newStatus = lm.status === 'finished' ? 'finished' : lm.status === 'halftime' ? 'halftime' : 'live'
-          toUpdate.push({
-            id: existing.id,
-            home_score: lm.home_score,
-            away_score: lm.away_score,
-            status: newStatus,
-            league_match_id: lm.id,
-          })
-        }
-        continue
-      }
-
       const matchStatus =
         lm.status === 'finished' ? 'finished' : lm.status === 'halftime' ? 'halftime' : lm.status === 'live' ? 'live' : 'scheduled'
-      toInsert.push({
+      toUpsert.push({
         round_id:        roundId,
         league_match_id: lm.id,
         home_team:       lm.home_team,
@@ -510,31 +486,28 @@ export async function buildLeagueRounds(
     }
   }
 
-  // 6. Batch-insert nye matches (1 query per chunk)
-  if (toInsert.length) {
-    console.log(`[buildLeagueRounds] liga ${leagueId}: indsætter ${toInsert.length} matches`)
-    for (let i = 0; i < toInsert.length; i += 500) {
-      const { error } = await supabaseAdmin.from('matches').insert(toInsert.slice(i, i + 500))
+  // 6. Batch-upsert matches (scores + status opdateres altid fra league_matches)
+  if (toUpsert.length) {
+    const existingLmIds = new Set(existingMatches.filter((m) => m.league_match_id != null).map((m) => m.league_match_id!))
+    console.log(`[buildLeagueRounds] liga ${leagueId}: upsert ${toUpsert.length} matches`)
+    for (let i = 0; i < toUpsert.length; i += 500) {
+      const chunk = toUpsert.slice(i, i + 500)
+      const { error } = await supabaseAdmin
+        .from('matches')
+        .upsert(chunk, { onConflict: 'league_match_id' })
       if (error) {
-        console.error(`[buildLeagueRounds] match insert fejlede (chunk ${i}–${i + 500}) for liga ${leagueId}:`, error.message)
+        console.error(`[buildLeagueRounds] match upsert fejlede (chunk ${i}–${i + 500}) for liga ${leagueId}:`, error.message)
       } else {
-        stats.matches_created += toInsert.slice(i, i + 500).length
+        for (const row of chunk) {
+          const lmId = (row as { league_match_id: number }).league_match_id
+          if (existingLmIds.has(lmId)) {
+            stats.matches_updated++
+          } else {
+            stats.matches_created++
+          }
+        }
       }
     }
-  }
-
-  // 7. Opdater kampe med scores (live, halvleg, færdig)
-  for (const u of toUpdate) {
-    await supabaseAdmin
-      .from('matches')
-      .update({
-        home_score: u.home_score,
-        away_score: u.away_score,
-        status: u.status,
-        league_match_id: u.league_match_id,
-      })
-      .eq('id', u.id)
-    stats.matches_updated++
   }
 
   const result: BuildLeagueRoundsResult = { ...stats }
