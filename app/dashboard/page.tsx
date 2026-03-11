@@ -107,26 +107,52 @@ export default async function DashboardPage() {
 
   if (gameIds.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F2EDE4]">
-        <div className="max-w-[1100px] mx-auto px-4 py-8">
-          <div className="flex items-start justify-between mb-8">
-            <div>
-              <p className="text-[11px] font-semibold text-[#7a7060] uppercase tracking-widest mb-1">Velkommen tilbage</p>
-              <h1 className="font-['Playfair_Display'] text-4xl font-bold text-[#1a3329]">{profile?.username ?? 'Spiller'}</h1>
-              <p className="text-[13px] text-[#7a7060] mt-1">0 spilrum · {new Date().toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+      <div className="min-h-screen bg-[#F2EDE4] flex items-center justify-center px-4">
+        <div className="relative max-w-[480px] w-full py-12 text-center">
+          {/* Decorative "?" background */}
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+            style={{ fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontSize: '280px', fontWeight: 700, color: '#B8963E', opacity: 0.08, lineHeight: 1 }}
+          >
+            ?
+          </span>
+
+          {/* Content */}
+          <div className="relative z-10">
+            <h1
+              className="mb-3"
+              style={{ fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontSize: '32px', fontWeight: 700, color: '#1a3329' }}
+            >
+              Ingen spilrum endnu.
+            </h1>
+            <p
+              className="mb-8 mx-auto max-w-[320px]"
+              style={{ fontFamily: "'Barlow', sans-serif", fontWeight: 300, fontSize: '15px', color: '#7a7060', lineHeight: 1.6 }}
+            >
+              Opret dit eget spilrum eller join et eksisterende med en invitationskode.
+            </p>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-center gap-3">
+              <Link
+                href="/games/new"
+                className="inline-flex items-center justify-center gap-2 font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-[0.08em] px-6 py-3 rounded-sm transition-colors min-h-[44px] bg-[#2C4A3E] text-[#F2EDE4] hover:bg-[#1a3329]"
+              >
+                + Opret spilrum
+              </Link>
+              <a
+                href="#join-section"
+                className="inline-flex items-center justify-center gap-2 font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-[0.08em] px-6 py-3 rounded-sm transition-colors min-h-[44px] bg-transparent text-[#2C4A3E] border-[1.5px] border-[#2C4A3E] hover:bg-[#2C4A3E]/5"
+              >
+                Join med kode
+              </a>
             </div>
-            <Link href="/games/new" className="shrink-0 flex items-center gap-2 bg-[#2C4A3E] text-white font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-widest px-5 py-3 rounded-xl hover:bg-[#1a3329] transition-colors">
-              + Opret spil
-            </Link>
-          </div>
-          <div className="bg-white rounded-2xl border border-black/8 p-12 text-center">
-            <p className="text-[#7a7060] mb-4">Du er ikke med i nogen spilrum endnu</p>
-            <Link href="/games/new" className="inline-flex items-center gap-2 text-[#2C4A3E] font-['Barlow_Condensed'] font-bold text-sm uppercase hover:text-[#B8963E] transition-colors">
-              Opret dit første spil
-            </Link>
-          </div>
-          <div className="mt-6">
-            <JoinGameCard />
+
+            {/* Join card */}
+            <div className="mt-10" id="join-section">
+              <JoinGameCard />
+            </div>
           </div>
         </div>
       </div>
