@@ -168,13 +168,13 @@ export default function RegisterPage() {
     }
 
     // Join game if valid invite code
+    router.refresh()
     if (inviteStatus === 'valid' && inviteGame && signUpData.user) {
       await supabase.from('game_members').insert({ game_id: inviteGame.id, user_id: signUpData.user.id })
       router.push(`/games/${inviteGame.id}`)
     } else {
       router.push('/dashboard')
     }
-    router.refresh()
   }
 
   /* ── Input classes ───────────────────────────────────────── */
