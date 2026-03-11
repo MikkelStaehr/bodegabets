@@ -2,10 +2,10 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import DashboardGameCard from '@/components/dashboard/DashboardGameCard'
-import LiveSidebar from '@/components/dashboard/LiveSidebar'
+import DashboardContent from '@/components/dashboard/DashboardContent'
 import JoinGameCard from '@/components/dashboard/JoinGameCard'
 import type { Game } from '@/types'
+import type { SportType, GameRowWithSport } from '@/components/dashboard/DashboardContent'
 
 type ActiveRoundResult = {
   id: number
@@ -15,6 +15,16 @@ type ActiveRoundResult = {
   betting_closes_at: string | null
   round_status: 'upcoming' | 'active' | 'finished' | null
   matches_count: number
+}
+
+// Infer sport from league name
+function inferSport(leagueName: string | null): SportType {
+  if (!leagueName) return 'football'
+  const lower = leagueName.toLowerCase()
+  if (lower.includes('tour de france') || lower.includes('giro') || lower.includes('vuelta') || lower.includes('cykling') || lower.includes('cycling')) {
+    return 'cycling'
+  }
+  return 'football'
 }
 
 async function getActiveRoundForGame(
@@ -62,20 +72,6 @@ async function getActiveRoundForGame(
   const fallback = rounds?.[0]
   if (!fallback) return null
   return { ...fallback, game_id: gameId, round_status: null, matches_count: 0 }
-}
-
-type GameRow = {
-  points: number
-  rank: number
-  bets_count: number
-  game: Game & { member_count: number }
-  activeRound: {
-    id: number
-    name: string
-    betting_closes_at: string | null
-    matches_count: number
-    round_status: 'upcoming' | 'active' | 'finished' | null
-  } | null
 }
 
 export default async function DashboardPage() {
@@ -137,6 +133,19 @@ export default async function DashboardPage() {
     )
   }
 
+  // Fetch league names for all games
+  const leagueIds = [...new Set(rawGames.map((m) => m.game!.league_id).filter((id): id is number => id != null))]
+  const leagueNameMap = new Map<number, string>()
+  if (leagueIds.length > 0) {
+    const { data: leagues } = await supabase
+      .from('leagues')
+      .select('id, name')
+      .in('id', leagueIds)
+    for (const l of leagues ?? []) {
+      leagueNameMap.set(l.id, l.name)
+    }
+  }
+
   const results = await Promise.all([
     supabase
       .from('game_members')
@@ -145,7 +154,6 @@ export default async function DashboardPage() {
       .order('points', { ascending: false }),
 
     (() => {
-      const leagueIds = [...new Set(rawGames.map((m) => m.game!.league_id).filter((id): id is number => id != null))]
       return leagueIds.length > 0
         ? supabase
             .from('rounds')
@@ -226,21 +234,28 @@ export default async function DashboardPage() {
     betsCountByGame.set(r.game_id, count)
   }
 
-  const games: GameRow[] = rawGames.map((m) => {
+  const games: GameRowWithSport[] = rawGames.map((m) => {
     const g = m.game!
     const memberCount = (g.member_count as unknown as { count: number }[])[0]?.count ?? 0
     const activeRound = activeRoundByGame.get(g.id) ?? null
     const rank = rankByGame.get(g.id)?.get(user.id) ?? 1
     const bets_count = betsCountByGame.get(g.id) ?? 0
+    const leagueName = g.league_id ? leagueNameMap.get(g.league_id) ?? null : null
 
     return {
       points: m.points,
       rank,
       bets_count,
       game: {
-        ...g,
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        status: g.status,
+        invite_code: g.invite_code,
         member_count: memberCount,
-      } as Game & { member_count: number },
+        league_name: leagueName,
+        sport_type: inferSport(leagueName),
+      },
       activeRound: activeRound
         ? {
             id: activeRound.id,
@@ -253,8 +268,6 @@ export default async function DashboardPage() {
     }
   })
 
-  const activeGames = games.filter((g) => g.game.status === 'active')
-  const finishedGames = games.filter((g) => g.game.status === 'finished')
   const activeRounds = [...activeRoundByGame.values()]
 
   const nextRoundDate = (() => {
@@ -268,9 +281,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
-      <div className="max-w-[1100px] mx-auto px-4 py-8">
+      <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-6">
           <div>
             <p className="text-[11px] font-semibold text-[#7a7060] uppercase tracking-widest mb-1">Velkommen tilbage</p>
             <h1 className="font-['Playfair_Display'] text-4xl font-bold text-[#1a3329]">{profile?.username ?? 'Spiller'}</h1>
@@ -283,44 +296,11 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* To-kolonne layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-          {/* Venstre — spilrum */}
-          <div className="flex flex-col gap-4">
-            <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest">Dine spilrum</h2>
-
-            {activeGames.length === 0 && finishedGames.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-black/8 p-12 text-center">
-                <p className="text-[#7a7060] mb-4">Du er ikke med i nogen spilrum endnu</p>
-                <Link href="/games/new" className="inline-flex items-center gap-2 text-[#2C4A3E] font-['Barlow_Condensed'] font-bold text-sm uppercase hover:text-[#B8963E] transition-colors">
-                  Opret dit første spil
-                </Link>
-              </div>
-            ) : (
-              <>
-                {activeGames.map((row) => (
-                  <DashboardGameCard key={row.game.id} row={row} />
-                ))}
-                {finishedGames.length > 0 && (
-                  <div className="mt-4">
-                    <h3 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">Afsluttede spil</h3>
-                    <div className="flex flex-col gap-4 opacity-75">
-                      {finishedGames.map((row) => (
-                        <DashboardGameCard key={row.game.id} row={row} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Højre — live + join */}
-          <div className="flex flex-col gap-4">
-            <LiveSidebar rounds={activeRounds} nextRoundDate={nextRoundDate} />
-            <JoinGameCard />
-          </div>
-        </div>
+        <DashboardContent
+          games={games}
+          activeRounds={activeRounds}
+          nextRoundDate={nextRoundDate}
+        />
       </div>
     </div>
   )
