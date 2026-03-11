@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { syncLeagueFixtures } from '@/lib/fixtureDownload'
+import { syncLeagueViaBold } from '@/lib/syncLeagueMatches'
 import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 export async function POST(req: NextRequest) {
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
 
   const leagueName = league?.name ?? 'Liga'
 
-  // 2. Sync liga (Bold.dk / fixturedownload) — opdaterer league_matches
-  const syncRes = await syncLeagueFixtures(leagueId)
+  // 2. Sync liga (Bold.dk) — opdaterer league_matches
+  const syncRes = await syncLeagueViaBold(leagueId)
   if (syncRes.errors.length) {
     console.warn('[sync-schedule] Sync fejl:', syncRes.errors)
   }

@@ -82,7 +82,7 @@ export function AdminUsersTab({ adminSecret }: Props) {
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-black/8 bg-white p-12 text-center text-[#7a7060]">
+      <div className="border border-warm-border bg-cream p-12 text-center font-body text-warm-gray" style={{ borderRadius: '2px' }}>
         Henter brugere...
       </div>
     )
@@ -96,16 +96,17 @@ export function AdminUsersTab({ adminSecret }: Props) {
           placeholder="Søg på navn eller email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-md border border-black/10 rounded-lg px-4 py-2.5 text-sm placeholder:text-[#7a7060]"
+          className="w-full max-w-md border border-warm-border bg-cream text-ink px-4 py-2.5 text-sm placeholder:text-warm-gray focus:outline-none focus:border-forest font-body"
+          style={{ borderRadius: '2px' }}
         />
       </div>
 
-      <div className="rounded-xl border border-black/8 overflow-hidden">
+      <div className="border border-warm-border overflow-hidden" style={{ borderRadius: '2px' }}>
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-black/5 border-b border-black/8">
+            <tr className="bg-cream-dark border-b border-warm-border">
               {['#', 'Navn', 'Email', 'Oprettet', 'Spilrum', 'Sidst aktiv', 'Status', 'Handling'].map((h) => (
-                <th key={h} className="px-4 py-3 text-[11px] font-bold text-[#7a7060] uppercase tracking-wide">
+                <th key={h} className="px-4 py-3 font-condensed text-[11px] font-bold text-warm-gray uppercase tracking-wide">
                   {h}
                 </th>
               ))}
@@ -116,18 +117,19 @@ export function AdminUsersTab({ adminSecret }: Props) {
               const msg = messages[user.id]
               const suspending = suspendLoading.has(user.id)
               return (
-                <tr key={user.id} className="border-b border-black/6 hover:bg-black/[0.02]">
-                  <td className="px-4 py-3 text-[13px] text-[#7a7060]">{i + 1}</td>
-                  <td className="px-4 py-3 font-medium text-[#1a3329]">{user.username || '—'}</td>
-                  <td className="px-4 py-3 text-[13px] text-[#7a7060]">{user.email || '—'}</td>
-                  <td className="px-4 py-3 text-[13px] text-[#7a7060]">{formatDate(user.created_at)}</td>
-                  <td className="px-4 py-3 text-[13px] text-[#1a3329]">{user.games_count}</td>
-                  <td className="px-4 py-3 text-[13px] text-[#7a7060]">{user.last_active ?? '—'}</td>
+                <tr key={user.id} className="border-b border-warm-border bg-cream hover:bg-cream-dark/40">
+                  <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{i + 1}</td>
+                  <td className="px-4 py-3 font-medium text-ink">{user.username || '—'}</td>
+                  <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{user.email || '—'}</td>
+                  <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{formatDate(user.created_at)}</td>
+                  <td className="px-4 py-3 font-body text-[13px] text-ink">{user.games_count}</td>
+                  <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{user.last_active ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        user.is_suspended ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                      className={`font-condensed text-xs uppercase tracking-wide border px-2 py-0.5 ${
+                        user.is_suspended ? 'bg-vintage-red/10 text-vintage-red border-vintage-red/30' : 'bg-forest/10 text-forest border-forest/30'
                       }`}
+                      style={{ borderRadius: '2px' }}
                     >
                       {user.is_suspended ? 'Suspenderet' : 'Aktiv'}
                     </span>
@@ -135,7 +137,7 @@ export function AdminUsersTab({ adminSecret }: Props) {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       {msg && (
-                        <span className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-600'}`}>
+                        <span className={`font-body text-xs ${msg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>
                           {msg.text}
                         </span>
                       )}
@@ -150,11 +152,12 @@ export function AdminUsersTab({ adminSecret }: Props) {
                           }
                         }}
                         disabled={suspending}
-                        className={`text-[11px] font-bold px-3 py-1 rounded disabled:opacity-50 ${
+                        className={`font-condensed text-[11px] font-bold px-3 py-1 border disabled:opacity-50 ${
                           user.is_suspended
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            ? 'bg-forest text-cream hover:bg-forest/90 border-forest'
+                            : 'bg-vintage-red/10 text-vintage-red hover:bg-vintage-red/20 border-vintage-red/30'
                         }`}
+                        style={{ borderRadius: '2px' }}
                       >
                         {suspending ? '...' : user.is_suspended ? 'Genaktivér' : 'Suspendér'}
                       </button>
@@ -166,7 +169,7 @@ export function AdminUsersTab({ adminSecret }: Props) {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div className="px-4 py-12 text-center text-[#7a7060] text-sm">
+          <div className="px-4 py-12 text-center font-body text-warm-gray text-sm">
             Ingen brugere fundet
           </div>
         )}

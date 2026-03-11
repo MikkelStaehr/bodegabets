@@ -36,15 +36,15 @@ function formatTime(iso: string): string {
 
 function StatusIcon({ status }: { status: string }) {
   if (status === 'success') {
-    return <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+    return <span className="w-2 h-2 rounded-full bg-forest shrink-0" />
   }
   if (status === 'error') {
-    return <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+    return <span className="w-2 h-2 rounded-full bg-vintage-red animate-pulse shrink-0" />
   }
   if (status === 'warning') {
-    return <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+    return <span className="w-2 h-2 rounded-full bg-gold shrink-0" />
   }
-  return <span className="w-2 h-2 rounded-full bg-[#7a7060] shrink-0" />
+  return <span className="w-2 h-2 rounded-full bg-warm-gray shrink-0" />
 }
 
 export function AdminLogsTab({ adminSecret }: Props) {
@@ -75,11 +75,12 @@ export function AdminLogsTab({ adminSecret }: Props) {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`text-[11px] font-bold px-3 py-1.5 rounded-full transition-colors ${
+            className={`font-condensed text-[11px] font-bold px-3 py-1.5 transition-colors ${
               filter === f
-                ? 'bg-[#2C4A3E] text-white'
-                : 'bg-black/5 text-[#7a7060] hover:bg-black/10'
+                ? 'bg-forest text-cream'
+                : 'bg-cream-dark text-warm-gray hover:bg-cream-dark/80 border border-warm-border'
             }`}
+            style={{ borderRadius: '2px' }}
           >
             {f}
           </button>
@@ -87,47 +88,47 @@ export function AdminLogsTab({ adminSecret }: Props) {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border border-black/8 bg-white p-12 text-center text-[#7a7060]">
+        <div className="border border-warm-border bg-cream p-12 text-center font-body text-warm-gray" style={{ borderRadius: '2px' }}>
           Henter logs...
         </div>
       ) : logs.length === 0 ? (
-        <div className="rounded-xl border border-black/8 bg-white p-12 text-center text-[#7a7060] text-sm">
+        <div className="border border-warm-border bg-cream p-12 text-center font-body text-warm-gray text-sm" style={{ borderRadius: '2px' }}>
           Ingen logs fundet
         </div>
       ) : (
-        <div className="rounded-xl border border-black/8 overflow-hidden divide-y divide-black/6">
+        <div className="border border-warm-border overflow-hidden divide-y divide-warm-border" style={{ borderRadius: '2px' }}>
           {logs.map((log) => {
             const isExpanded = expandedId === log.id
             const hasMetadata = log.metadata && Object.keys(log.metadata).length > 0
             return (
-              <div key={log.id} className="bg-white">
+              <div key={log.id} className="bg-cream">
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                  className="w-full px-4 py-3 flex items-start gap-3 text-left hover:bg-black/[0.02] transition-colors"
+                  className="w-full px-4 py-3 flex items-start gap-3 text-left hover:bg-cream-dark/40 transition-colors"
                 >
                   <StatusIcon status={log.status} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-bold text-[#7a7060] uppercase">
+                      <span className="font-condensed text-[10px] font-bold text-warm-gray uppercase">
                         {log.type}
                       </span>
-                      <span className="text-[11px] text-[#7a7060]">
+                      <span className="font-body text-[11px] text-warm-gray">
                         {formatTime(log.created_at)}
                       </span>
                     </div>
-                    <p className="text-[13px] text-[#1a3329] mt-0.5 truncate">
+                    <p className="font-body text-[13px] text-ink mt-0.5 truncate">
                       {log.message || '—'}
                     </p>
                   </div>
                   {hasMetadata && (
-                    <span className="text-[10px] text-[#7a7060] shrink-0">
+                    <span className="font-body text-[10px] text-warm-gray shrink-0">
                       {isExpanded ? '▲' : '▼'} JSON
                     </span>
                   )}
                 </button>
                 {isExpanded && hasMetadata && (
                   <div className="px-4 pb-3 pt-0">
-                    <pre className="text-[11px] bg-black/5 rounded-lg p-3 overflow-x-auto text-[#7a7060]">
+                    <pre className="font-body text-[11px] bg-cream-dark border border-warm-border p-3 overflow-x-auto text-warm-gray" style={{ borderRadius: '2px' }}>
                       {JSON.stringify(log.metadata, null, 2)}
                     </pre>
                   </div>

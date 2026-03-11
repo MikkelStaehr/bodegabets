@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { syncLeagueFixtures } from '@/lib/fixtureDownload'
+import { syncLeagueViaBold } from '@/lib/syncLeagueMatches'
 import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 function isAuthorized(req: NextRequest): boolean {
@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // 2. Sync liga (Bold.dk / fixturedownload) — opdaterer league_matches med resultater
-  const syncRes = await syncLeagueFixtures(round.league_id)
+  // 2. Sync liga (Bold.dk) — opdaterer league_matches med resultater
+  const syncRes = await syncLeagueViaBold(round.league_id)
   if (syncRes.errors.length) {
     console.warn('[sync-result] Sync fejl:', syncRes.errors)
   }

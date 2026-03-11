@@ -15,7 +15,6 @@
 
 import { supabaseAdmin } from '@/lib/supabase'
 import { getResults, danishTimeToUtc } from '@/lib/boldApi'
-import { syncLeagueFixtures } from '@/lib/fixtureDownload'
 import { findBestTeamMatch } from '@/lib/teamNameNormalizer'
 
 const BOLD_MATCHES_API = 'https://api.bold.dk/aggregator/v1/apps/page/matches'
@@ -156,12 +155,26 @@ type BoldMatchItem = {
 
 /**
  * Henter fixtures fra Bold API via phase_ids og upsert til league_matches.
- * Bruges for ligaer med bold_slug men uden fixturedownload_slug (fx Superligaen).
+ * Bruges for alle ligaer med bold_phase_id (Bold.dk er eneste datakilde).
  */
+export type SyncBoldFixturesPreview = Array<{
+  league_id: number
+  round_name: string
+  home_team: string
+  away_team: string
+  kickoff_at: string
+  home_score: number | null
+  away_score: number | null
+  status: string
+  bold_match_id: number
+}>
+
 export async function syncBoldFixtures(
   leagueId: number,
-  boldPhaseId: number
-): Promise<{ synced: number; errors: string[] }> {
+  boldPhaseId: number,
+  options?: { dryRun?: boolean }
+): Promise<{ synced: number; errors: string[]; preview?: SyncBoldFixturesPreview; raw_bold_response?: BoldMatchItem[] }> {
+  const dryRun = options?.dryRun ?? false
   const errors: string[] = []
 
   const allMatches: BoldMatchItem[] = []
@@ -243,6 +256,11 @@ export async function syncBoldFixtures(
 
     const round_name = mt.round?.includes('runde') ? mt.round : mt.round ? `${mt.round}. runde` : 'Ukendt runde'
 
+    // Aldrig sæt fremtidige kampe til finished/live/halftime
+    if (new Date(kickoff_at) > new Date()) {
+      status = 'scheduled'
+    }
+
     return {
       league_id: leagueId,
       round_name,
@@ -257,16 +275,46 @@ export async function syncBoldFixtures(
     }
   }).filter((r) => r.home_team && r.away_team)
 
-  const { error } = await supabaseAdmin
-    .from('league_matches')
-    .upsert(rows, { onConflict: 'bold_match_id' })
+  if (!dryRun) {
+    const { error } = await supabaseAdmin
+      .from('league_matches')
+      .upsert(rows, { onConflict: 'bold_match_id' })
 
-  if (error) {
-    return { synced: 0, errors: [error.message] }
+    if (error) {
+      return { synced: 0, errors: [error.message] }
+    }
   }
 
-  console.log(`[syncBoldFixtures] liga ${leagueId}: ${rows.length} kampe fra Bold API (phase_id=${boldPhaseId})`)
-  return { synced: rows.length, errors }
+  const preview: SyncBoldFixturesPreview = rows.map((r) => ({
+    league_id: r.league_id,
+    round_name: r.round_name,
+    home_team: r.home_team,
+    away_team: r.away_team,
+    kickoff_at: r.kickoff_at,
+    home_score: r.home_score,
+    away_score: r.away_score,
+    status: r.status,
+    bold_match_id: r.bold_match_id,
+  }))
+
+  console.log(`[syncBoldFixtures] liga ${leagueId}: ${rows.length} kampe fra Bold API (phase_id=${boldPhaseId})${dryRun ? ' (dry-run)' : ''}`)
+  return dryRun
+    ? { synced: rows.length, errors, preview, raw_bold_response: allMatches }
+    : { synced: rows.length, errors }
+}
+
+/** Synkroniser en liga via Bold API. Kræver bold_phase_id. */
+export async function syncLeagueViaBold(leagueId: number): Promise<{ synced: number; errors: string[] }> {
+  const { data: league } = await supabaseAdmin
+    .from('leagues')
+    .select('bold_phase_id, name')
+    .eq('id', leagueId)
+    .single()
+
+  if (!league?.bold_phase_id) {
+    return { synced: 0, errors: [`Liga ${league?.name ?? leagueId} mangler bold_phase_id`] }
+  }
+  return syncBoldFixtures(leagueId, league.bold_phase_id)
 }
 
 // ─── 2. Opbyg runder + matches for en liga fra league_matches ────────────────
@@ -551,7 +599,7 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
   // Hent ALLE ligaer med bold_phase_id og is_active (ikke kun dem fra aktive spilrum)
   const { data: leagues } = await supabaseAdmin
     .from('leagues')
-    .select('id, name, bold_slug, fixturedownload_slug, bold_phase_id')
+    .select('id, name, bold_slug, bold_phase_id')
     .eq('is_active', true)
     .not('bold_phase_id', 'is', null)
 
@@ -566,7 +614,6 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
     id: number
     name: string
     bold_slug: string | null
-    fixturedownload_slug: string | null
     bold_phase_id: number | null
   }
 
@@ -575,20 +622,14 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
     const errors: string[] = []
 
     try {
-      if (league.fixturedownload_slug) {
-        // Primær kilde: fixturedownload.com — opdaterer scores + nye kampe
-        const res = await syncLeagueFixtures(league.id)
-        synced = res.synced
-        errors.push(...res.errors)
-      } else if (league.bold_slug && league.bold_phase_id) {
-        // Fallback: Bold API via phase_ids — bruges til Superligaen og ligaer uden fixturedownload
+      if (league.bold_slug && league.bold_phase_id) {
         const res = await syncBoldFixtures(league.id, league.bold_phase_id)
         synced = res.synced
         errors.push(...res.errors)
       } else if (league.bold_slug && !league.bold_phase_id) {
         errors.push(`${league.name}: bold_slug findes men bold_phase_id mangler — sæt phase_id i admin`)
       } else {
-        errors.push(`Ingen datakilde konfigureret for ${league.name} (fixturedownload_slug eller bold_slug mangler)`)
+        errors.push(`Ingen datakilde konfigureret for ${league.name} (bold_slug + bold_phase_id mangler)`)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)

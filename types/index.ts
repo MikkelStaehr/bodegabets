@@ -26,6 +26,7 @@ export type League = {
   country: string
   is_active: boolean
   total_matches?: number
+  /** @deprecated Bruges ikke længere — Bold.dk er eneste datakilde. Kolonnen beholdes i DB. */
   fixturedownload_slug?: string | null
   bold_slug?: string | null
   league_match_id?: number | null

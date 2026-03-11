@@ -31,10 +31,13 @@ function formatDate(iso: string): string {
 function StatusBadge({ status }: { status: string }) {
   const colors =
     status === 'active'
-      ? 'bg-green-100 text-green-700'
-      : 'bg-black/10 text-[#7a7060]'
+      ? 'bg-forest/10 text-forest border-forest/30'
+      : 'bg-cream-dark text-warm-gray border-warm-border'
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${colors}`}>
+    <span
+      className={`font-condensed text-xs uppercase tracking-wide border px-2 py-0.5 ${colors}`}
+      style={{ borderRadius: '2px' }}
+    >
       {status === 'active' ? 'Aktiv' : 'Afsluttet'}
     </span>
   )
@@ -48,25 +51,25 @@ function GameDetailCard({
   onDelete: (id: number, name: string) => void
 }) {
   return (
-    <div className="border border-black/8 rounded-xl overflow-hidden">
-      <div className="bg-[#2C4A3E] px-5 py-4 flex items-center justify-between flex-wrap gap-3">
+    <div className="border border-warm-border overflow-hidden" style={{ borderRadius: '2px' }}>
+      <div className="bg-forest px-5 py-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="font-['Barlow_Condensed'] text-xl font-bold text-white uppercase">
+          <h3 className="font-condensed text-xl font-bold text-cream uppercase">
             {game.name}
           </h3>
-          <p className="text-white/60 text-[12px] mt-0.5">
+          <p className="font-body text-cream/60 text-[12px] mt-0.5">
             {game.league_name} · Oprettet {formatDate(game.created_at)}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-white/50 uppercase tracking-wider">Kode</p>
-          <p className="font-['Barlow_Condensed'] text-xl font-bold text-[#B8963E]">
+          <p className="font-condensed text-[10px] text-cream/50 uppercase tracking-wider">Kode</p>
+          <p className="font-condensed text-xl font-bold text-gold">
             {game.invite_code}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-black/8 border-b border-black/8 bg-white">
+      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-warm-border border-b border-warm-border bg-cream">
         {[
           { label: 'Deltagere', value: String(game.member_count) },
           { label: 'Aktiv runde', value: game.current_round_name },
@@ -74,30 +77,31 @@ function GameDetailCard({
           { label: 'Status', value: <StatusBadge status={game.status} /> },
         ].map(({ label, value }) => (
           <div key={label} className="px-4 py-3 text-center">
-            <p className="text-[9px] font-bold text-[#7a7060] uppercase tracking-wider mb-1">
+            <p className="font-condensed text-[9px] font-bold text-warm-gray uppercase tracking-wider mb-1">
               {label}
             </p>
-            <div className="font-['Barlow_Condensed'] text-[15px] font-bold text-[#1a3329]">
+            <div className="font-condensed text-[15px] font-bold text-ink">
               {value}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="px-5 py-4 bg-white">
-        <p className="text-[11px] font-bold text-[#7a7060] uppercase tracking-wider mb-3">
+      <div className="px-5 py-4 bg-cream">
+        <p className="font-condensed text-[11px] font-bold text-warm-gray uppercase tracking-wider mb-3">
           Deltagere
         </p>
         <div className="flex flex-wrap gap-2">
           {game.members.map((member) => (
             <div
               key={member.id}
-              className="flex items-center gap-2 px-3 py-1.5 bg-black/4 rounded-full"
+              className="flex items-center gap-2 px-3 py-1.5 bg-cream-dark"
+              style={{ borderRadius: '2px' }}
             >
-              <span className="text-[12px] font-medium text-[#1a3329]">
+              <span className="font-body text-[12px] font-medium text-ink">
                 {member.username}
               </span>
-              <span className="text-[11px] text-[#7a7060]">
+              <span className="font-body text-[11px] text-warm-gray">
                 #{member.rank} · {member.points.toLocaleString('da-DK')} pt
               </span>
             </div>
@@ -105,10 +109,11 @@ function GameDetailCard({
         </div>
       </div>
 
-      <div className="px-5 py-3 bg-[#fafaf8] border-t border-black/8 flex justify-end">
+      <div className="px-5 py-3 bg-cream-dark border-t border-warm-border flex justify-end">
         <button
           onClick={() => onDelete(game.id, game.name)}
-          className="text-[12px] font-semibold text-red-500 hover:text-red-700 px-4 py-2 border border-red-200 rounded-lg hover:border-red-400 transition-colors"
+          className="font-condensed text-[12px] font-semibold text-vintage-red hover:text-vintage-red/90 px-4 py-2 border border-vintage-red/30 hover:border-vintage-red/50 transition-colors"
+          style={{ borderRadius: '2px' }}
         >
           Slet rum
         </button>
@@ -180,9 +185,8 @@ export function AdminGamesTab({ adminSecret }: Props) {
 
   return (
     <div>
-      <h3 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-4">
-        Søg rum
-      </h3>
+      <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Administration</p>
+      <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Søg rum</h2>
 
       <div className="flex gap-3 mb-8">
         <input
@@ -190,19 +194,21 @@ export function AdminGamesTab({ adminSecret }: Props) {
           onChange={(e) => setQuery(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Invitationskode (fx. ABC123) eller rum-navn..."
-          className="flex-1 text-[14px] border border-black/15 rounded-xl px-4 py-3 font-['Barlow_Condensed'] tracking-widest text-[#1a3329] placeholder:font-normal placeholder:tracking-normal placeholder:text-[#7a7060]/50 focus:outline-none focus:border-[#2C4A3E]"
+          className="flex-1 font-condensed text-[14px] tracking-widest text-ink border border-warm-border bg-cream px-4 py-3 placeholder:font-body placeholder:tracking-normal placeholder:text-warm-gray/50 focus:outline-none focus:border-forest"
+          style={{ borderRadius: '2px' }}
         />
         <button
           onClick={handleSearch}
           disabled={query.trim().length < 3 || loading}
-          className="px-6 py-3 bg-[#2C4A3E] text-white text-[13px] font-bold rounded-xl disabled:opacity-40 hover:bg-[#1a3329] transition-colors"
+          className="font-condensed px-6 py-3 bg-forest text-cream text-[13px] font-bold disabled:opacity-40 hover:bg-ink transition-colors"
+          style={{ borderRadius: '2px' }}
         >
           {loading ? 'Søger...' : 'Søg'}
         </button>
       </div>
 
       {notFound && (
-        <p className="text-[13px] text-[#7a7060] text-center py-8">
+        <p className="font-body text-[13px] text-warm-gray text-center py-8">
           Intet rum fundet med koden eller navnet &quot;{query}&quot;
         </p>
       )}

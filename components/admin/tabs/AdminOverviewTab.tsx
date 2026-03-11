@@ -80,37 +80,41 @@ function StatusCard({
 }) {
   return (
     <div
-      className={`rounded-xl border p-4 flex items-start gap-3 ${
-        status === 'ok' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+      className={`border p-4 flex items-start gap-3 ${
+        status === 'ok' ? 'border-forest/30 bg-forest/10' : 'border-vintage-red/30 bg-vintage-red/10'
       }`}
+      style={{ borderRadius: '2px' }}
     >
       <div
         className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-          status === 'ok' ? 'bg-green-500' : 'bg-red-500 animate-pulse'
+          status === 'ok' ? 'bg-forest' : 'bg-vintage-red animate-pulse'
         }`}
       />
       <div className="min-w-0">
-        <p className="text-[12px] font-bold text-[#1a3329] uppercase tracking-wide">{title}</p>
-        <p className="text-[13px] text-[#1a3329] mt-0.5">{detail}</p>
-        <p className="text-[11px] text-[#7a7060] mt-0.5">{sub}</p>
+        <p className="font-condensed text-[12px] font-bold text-ink uppercase tracking-wide">{title}</p>
+        <p className="font-body text-[13px] text-ink mt-0.5">{detail}</p>
+        <p className="font-body text-[11px] text-warm-gray mt-0.5">{sub}</p>
       </div>
     </div>
   )
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  upcoming: 'text-amber-600 bg-amber-50 border-amber-200',
-  open: 'text-green-600 bg-green-50 border-green-200',
-  closed: 'text-red-600/80 bg-red-50 border-red-200',
-  finished: 'text-[#7a7060] bg-black/5 border-black/10',
-  scheduled: 'text-[#7a7060] bg-black/5 border-black/10',
-  live: 'text-red-600 bg-red-50 border-red-200',
-  halftime: 'text-amber-600 bg-amber-50 border-amber-200',
+  upcoming: 'text-gold bg-gold/10 border-gold/30',
+  open: 'text-forest bg-forest/10 border-forest/30',
+  closed: 'text-vintage-red/80 bg-vintage-red/10 border-vintage-red/30',
+  finished: 'text-warm-gray bg-cream-dark border-warm-border',
+  scheduled: 'text-warm-gray bg-cream-dark border-warm-border',
+  live: 'text-vintage-red bg-vintage-red/10 border-vintage-red/30',
+  halftime: 'text-gold bg-gold/10 border-gold/30',
 }
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${STATUS_COLORS[status] ?? 'bg-black/5 text-[#7a7060]'}`}>
+    <span
+      className={`font-condensed text-xs uppercase tracking-wide border px-2 py-0.5 ${STATUS_COLORS[status] ?? 'bg-cream-dark text-warm-gray border-warm-border'}`}
+      style={{ borderRadius: '2px' }}
+    >
       {status}
     </span>
   )
@@ -162,7 +166,7 @@ function MatchList({
 
   if (loading) {
     return (
-      <div className="border-t border-black/8 bg-[#f7f6f3] px-5 py-4 text-center text-[#7a7060] text-sm">
+      <div className="border-t border-warm-border bg-cream-dark px-5 py-4 text-center font-body text-warm-gray text-sm">
         Henter kampe...
       </div>
     )
@@ -170,17 +174,17 @@ function MatchList({
 
   if (matches.length === 0) {
     return (
-      <div className="border-t border-black/8 bg-[#f7f6f3] px-5 py-4 text-center text-[#7a7060] text-sm">
+      <div className="border-t border-warm-border bg-cream-dark px-5 py-4 text-center font-body text-warm-gray text-sm">
         Ingen kampe i denne runde
       </div>
     )
   }
 
   return (
-    <div className="border-t border-black/8 bg-[#f7f6f3]">
-      <table className="w-full text-[13px]">
+    <div className="border-t border-warm-border bg-cream-dark">
+      <table className="w-full font-body text-[13px]">
         <thead>
-          <tr className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider border-b border-black/8">
+          <tr className="font-condensed text-[10px] font-bold text-warm-gray uppercase tracking-wider border-b border-warm-border">
             <th className="text-left px-5 py-2">Kamp</th>
             <th className="text-left py-2">Dato & tid</th>
             <th className="text-center py-2">Status</th>
@@ -193,12 +197,12 @@ function MatchList({
             return (
               <tr
                 key={match.id}
-                className={`border-b border-black/5 ${match.is_excluded ? 'opacity-40' : ''}`}
+                className={`border-b border-warm-border ${match.is_excluded ? 'opacity-40' : ''}`}
               >
-                <td className="px-5 py-2.5 font-medium text-[#1a3329]">
+                <td className="px-5 py-2.5 font-medium text-ink">
                   {match.home_team} vs {match.away_team}
                 </td>
-                <td className="py-2.5 text-[#7a7060]">
+                <td className="py-2.5 text-warm-gray">
                   {new Date(match.kickoff_at).toLocaleDateString('da-DK', {
                     weekday: 'short',
                     day: 'numeric',
@@ -215,7 +219,8 @@ function MatchList({
                     <button
                       onClick={() => toggleExclude(match.id, true)}
                       disabled={loading}
-                      className="text-[11px] font-semibold text-green-600 hover:text-green-800 px-3 py-1 border border-green-200 rounded-lg disabled:opacity-50"
+                      className="font-condensed text-[11px] font-semibold text-forest hover:text-forest/80 px-3 py-1 border border-forest/30 disabled:opacity-50"
+                      style={{ borderRadius: '2px' }}
                     >
                       Genaktivér
                     </button>
@@ -223,7 +228,8 @@ function MatchList({
                     <button
                       onClick={() => toggleExclude(match.id, false)}
                       disabled={loading}
-                      className="text-[11px] font-semibold text-orange-600 hover:text-orange-800 px-3 py-1 border border-orange-200 rounded-lg disabled:opacity-50"
+                      className="font-condensed text-[11px] font-semibold text-gold hover:text-gold/80 px-3 py-1 border border-gold/30 disabled:opacity-50"
+                      style={{ borderRadius: '2px' }}
                     >
                       Undtag
                     </button>
@@ -248,21 +254,21 @@ function LeagueOverblikCard({
   const [expandedRoundId, setExpandedRoundId] = useState<number | null>(null)
 
   return (
-    <div className="border border-black/8 rounded-xl overflow-hidden mb-4">
-      <div className="bg-[#2C4A3E] px-5 py-3 flex items-center justify-between flex-wrap gap-3">
+    <div className="border border-warm-border overflow-hidden mb-4" style={{ borderRadius: '2px' }}>
+      <div className="bg-forest px-5 py-3 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <h3 className="font-['Barlow_Condensed'] text-lg font-bold text-white uppercase tracking-wide">
+          <h3 className="font-condensed text-lg font-bold text-cream uppercase tracking-wide">
             {league.name}
           </h3>
-          <span className="text-white/50 text-[12px]">{league.country}</span>
+          <span className="text-cream/50 font-body text-[12px]">{league.country}</span>
         </div>
-        <div className="flex items-center gap-4 text-[12px] text-white/70">
+        <div className="flex items-center gap-4 font-body text-[12px] text-cream/70">
           <span>{league.activeRooms.toLocaleString('da-DK')} aktive rum</span>
           <span>{league.totalBets.toLocaleString('da-DK')} bets på aktuel runde</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-black/8 bg-white">
+      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-warm-border bg-cream">
         {[
           { label: 'Forrige runde', round: league.previousRound },
           { label: 'Aktuel runde', round: league.currentRound, highlight: true },
@@ -270,15 +276,15 @@ function LeagueOverblikCard({
         ].map(({ label, round, highlight }) => (
           <div
             key={label}
-            className={`px-4 py-3 ${highlight ? 'bg-[#fafaf8]' : ''}`}
+            className={`px-4 py-3 ${highlight ? 'bg-cream-dark' : ''}`}
           >
-            <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider mb-1">
+            <p className="font-condensed text-[10px] font-bold text-warm-gray uppercase tracking-wider mb-1">
               {label}
             </p>
             {round ? (
               <>
-                <p className="font-semibold text-[14px] text-[#1a3329]">{round.name}</p>
-                <p className="text-[12px] text-[#7a7060]">
+                <p className="font-condensed font-semibold text-[14px] text-ink">{round.name}</p>
+                <p className="font-body text-[12px] text-warm-gray">
                   {round.kickoff_date
                     ? new Date(round.kickoff_date).toLocaleDateString('da-DK', {
                         weekday: 'short',
@@ -293,14 +299,14 @@ function LeagueOverblikCard({
                     onClick={() =>
                       setExpandedRoundId(expandedRoundId === round.id ? null : round.id)
                     }
-                    className="text-[11px] text-[#2C4A3E] hover:text-[#B8963E] font-semibold"
+                    className="font-condensed text-[11px] text-forest hover:text-gold font-semibold"
                   >
                     {expandedRoundId === round.id ? '↑ Skjul' : '↓ Kampe'}
                   </button>
                 </div>
               </>
             ) : (
-              <p className="text-[12px] text-[#7a7060]">—</p>
+              <p className="font-body text-[12px] text-warm-gray">—</p>
             )}
           </div>
         ))}
@@ -318,11 +324,51 @@ function LeagueOverblikCard({
 }
 
 export function AdminOverviewTab({ adminSecret }: Props) {
+  const router = useRouter()
   const [status, setStatus] = useState<StatusData | null>(null)
   const [leagues, setLeagues] = useState<LeagueOverview[]>([])
   const [loading, setLoading] = useState(true)
+  const [cronLoading, setCronLoading] = useState<Set<string>>(new Set())
+  const [cronMessages, setCronMessages] = useState<Record<string, { type: 'ok' | 'err'; text: string }>>({})
 
-  const authHeader = { Authorization: `Bearer ${adminSecret}` }
+  const authHeader = { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` }
+
+  function setCronMsg(key: string, type: 'ok' | 'err', text: string) {
+    setCronMessages((prev) => ({ ...prev, [key]: { type, text } }))
+    setTimeout(() => {
+      setCronMessages((prev) => {
+        const n = { ...prev }
+        delete n[key]
+        return n
+      })
+    }, 5000)
+  }
+
+  async function runCron(cron: string) {
+    setCronLoading((s) => new Set(s).add(cron))
+    try {
+      const res = await fetch('/api/admin/run-cron', {
+        method: 'POST',
+        headers: authHeader,
+        body: JSON.stringify({ cron }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setCronMsg(cron, 'ok', 'Cron gennemført')
+        router.refresh()
+      } else {
+        setCronMsg(cron, 'err', data.error || 'Cron fejlede')
+      }
+    } catch {
+      setCronMsg(cron, 'err', 'Netværksfejl')
+    } finally {
+      setCronLoading((s) => {
+        const n = new Set(s)
+        n.delete(cron)
+        return n
+      })
+    }
+  }
 
   useEffect(() => {
     fetch('/api/admin/status', { headers: authHeader })
@@ -341,6 +387,46 @@ export function AdminOverviewTab({ adminSecret }: Props) {
 
   return (
     <div>
+      {/* Cron jobs */}
+      <div className="border border-warm-border bg-cream p-5 mb-8" style={{ borderRadius: '2px' }}>
+        <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>System</p>
+        <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Cron jobs</h2>
+        <div className="flex flex-wrap gap-3">
+          {[
+            { key: 'sync-fixtures', label: 'Sync fixtures' },
+            { key: 'sync-scores', label: 'Sync scores' },
+            { key: 'update-rounds', label: 'Opdater runder' },
+            { key: 'calculate-points', label: 'Beregn point' },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex flex-col gap-1">
+              <button
+                onClick={() => runCron(key)}
+                disabled={cronLoading.has(key)}
+                className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-forest px-4 py-2 border border-warm-border hover:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ borderRadius: '2px' }}
+              >
+                {cronLoading.has(key) && (
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                )}
+                {label}
+              </button>
+              {cronMessages[key] && (
+                <span
+                  className={`font-body text-[11px] ${
+                    cronMessages[key].type === 'ok' ? 'text-forest' : 'text-vintage-red'
+                  }`}
+                >
+                  {cronMessages[key].text}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         <StatusCard
           title="Cron · sync-results"
@@ -357,15 +443,14 @@ export function AdminOverviewTab({ adminSecret }: Props) {
       </div>
 
       <div>
-        <h3 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-4">
-          Liga-overblik
-        </h3>
+        <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Ligaer</p>
+        <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Liga-overblik</h2>
         {loading ? (
-          <div className="rounded-xl border border-black/8 bg-white p-8 text-center text-[#7a7060] text-sm">
+          <div className="border border-warm-border bg-cream p-8 text-center font-body text-warm-gray text-sm" style={{ borderRadius: '2px' }}>
             Henter...
           </div>
         ) : leagues.length === 0 ? (
-          <div className="rounded-xl border border-black/8 bg-white p-8 text-center text-[#7a7060] text-sm">
+          <div className="border border-warm-border bg-cream p-8 text-center font-body text-warm-gray text-sm" style={{ borderRadius: '2px' }}>
             Ingen ligaer
           </div>
         ) : (

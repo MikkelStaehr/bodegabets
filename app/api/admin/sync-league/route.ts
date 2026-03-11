@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
-import { syncLeagueFixtures } from '@/lib/fixtureDownload'
+import { syncLeagueViaBold } from '@/lib/syncLeagueMatches'
 import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 import { supabaseAdmin } from '@/lib/supabase'
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'league_id er påkrævet' }, { status: 400 })
   }
 
-  const syncRes = await syncLeagueFixtures(league_id)
+  const syncRes = await syncLeagueViaBold(league_id)
 
   let rounds_created = 0, matches_created = 0, matches_updated = 0
 

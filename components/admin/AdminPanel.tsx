@@ -89,6 +89,7 @@ const SIDEBET_TYPES = Object.keys(BET_TYPE_LABELS)
 export default function AdminPanel({ leagues, games, rounds, matches, adminSecret }: Props) {
   const router = useRouter()
   const [syncLoading, setSyncLoading] = useState<Set<string>>(new Set())
+  const [cronLoading, setCronLoading] = useState<string | null>(null)
   const [roundLoading, setRoundLoading] = useState<Set<number>>(new Set())
   const [messages, setMessages] = useState<Record<string, { type: 'ok' | 'err'; text: string }>>({})
 
@@ -111,6 +112,30 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
   }
 
   const authHeader = { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` }
+
+  // ── Cron jobs ─────────────────────────────────────────────────────────────────
+
+  async function runCron(cron: 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points') {
+    setCronLoading(cron)
+    try {
+      const res = await fetch('/api/admin/run-cron', {
+        method: 'POST',
+        headers: authHeader,
+        body: JSON.stringify({ cron }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setMsg('cron', 'ok', 'Cron gennemført')
+        router.refresh()
+      } else {
+        setMsg('cron', 'err', data.error || 'Cron fejlede')
+      }
+    } catch {
+      setMsg('cron', 'err', 'Netværksfejl')
+    } finally {
+      setCronLoading(null)
+    }
+  }
 
   // ── Slet spilrum ─────────────────────────────────────────────────────────────
 
@@ -289,6 +314,38 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
 
   return (
     <div className="space-y-10">
+
+      {/* ── Sektion 0: System (Cron) ───────────────────────────────── */}
+      <section>
+        <div className="mb-4">
+          <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>System</p>
+          <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide">Cron jobs</h2>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { key: 'sync-fixtures', label: 'Sync fixtures' },
+            { key: 'sync-scores', label: 'Sync scores' },
+            { key: 'update-rounds', label: 'Opdater runder' },
+            { key: 'calculate-points', label: 'Beregn point' },
+          ].map(({ key, label }) => (
+            <AdminBtn
+              key={key}
+              onClick={() => runCron(key as 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points')}
+              loading={cronLoading === key}
+              variant="secondary"
+              size="sm"
+            >
+              {label}
+            </AdminBtn>
+          ))}
+        </div>
+        {messages.cron && (
+          <div className="mt-3">
+            <MsgBanner msg={messages.cron} />
+          </div>
+        )}
+      </section>
 
       {/* ── Sektion 1: Sync ─────────────────────────────────────── */}
       <section>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, Fragment } from 'react'
+import { useState, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 export type LeagueRow = {
   id: number
@@ -117,15 +117,10 @@ function StatusBadge({ status }: { status: string | null }) {
 export default function LeagueHubClient({ leagues, logs }: Props) {
   const router = useRouter()
   const [syncing, setSyncing]           = useState<Set<number>>(new Set())
-  const [uploading, setUploading]       = useState<Set<number>>(new Set())
   const [syncAll, setSyncAll]           = useState(false)
   const [leagueData, setLeagueData]     = useState<LeagueRow[]>(leagues)
   const [logModal, setLogModal]         = useState<{ league: LeagueRow } | null>(null)
   const [globalLogOpen, setGlobalLogOpen] = useState(false)
-  const [uploadModal, setUploadModal]   = useState<{ league: LeagueRow } | null>(null)
-  const [editModal, setEditModal]       = useState<{ league: LeagueRow } | null>(null)
-  const [editSlug, setEditSlug]         = useState('')
-  const [editSaving, setEditSaving]     = useState(false)
   const [feedback, setFeedback]         = useState<Record<number, string>>({})
   const [collapsed, setCollapsed]       = useState<Set<string>>(new Set())
   const [rebuildGameId, setRebuildGameId] = useState('')
@@ -133,10 +128,9 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
   const [rebuildResult, setRebuildResult] = useState<string | null>(null)
   const [addingWorldCup, setAddingWorldCup] = useState(false)
   const [addWorldCupError, setAddWorldCupError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const hasWorldCup = leagueData.some(
-    (l) => l.fixturedownload_slug === 'fifa-world-cup-2026' || l.name?.toLowerCase().includes('world cup')
+    (l) => l.name?.toLowerCase().includes('world cup')
   )
 
   async function addWorldCup() {
@@ -150,20 +144,20 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
         body: JSON.stringify({
           name: 'FIFA World Cup 2026',
           country: 'World',
-          fixturedownload_slug: 'fifa-world-cup-2026',
+          bold_slug: 'fifa-world-cup-2026',
         }),
       })
       const data = await res.json()
       if (!res.ok) {
         setAddWorldCupError(data.error ?? 'Ukendt fejl')
       } else if (data.league) {
-        const L = data.league as { id: number; name: string; country: string; fixturedownload_slug: string | null }
+        const L = data.league as { id: number; name: string; country: string; bold_slug: string | null }
         setLeagueData((prev) => [...prev, {
           id: L.id,
           name: L.name,
           country: L.country,
           bold_slug: null,
-          fixturedownload_slug: L.fixturedownload_slug,
+          bold_slug: L.bold_slug,
           last_synced_at: null,
           sync_status: 'pending',
           sync_error: null,
@@ -257,74 +251,17 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
 
   async function syncAllLeagues() {
     setSyncAll(true)
-    const syncable = leagueData.filter((l) => l.fixturedownload_slug || l.bold_slug)
+    const syncable = leagueData.filter((l) => l.bold_slug)
     for (const l of syncable) {
       await syncLeague(l.id)
     }
     setSyncAll(false)
   }
 
-  async function handleCSVUpload(leagueId: number, file: File) {
-    setUploading((s) => new Set(s).add(leagueId))
-    setFeedback((f) => ({ ...f, [leagueId]: '' }))
-
-    const form = new FormData()
-    form.append('league_id', String(leagueId))
-    form.append('file', file)
-
-    try {
-      const res = await fetch('/api/admin/upload-fixtures', {
-        method: 'POST',
-        body: form,
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setFeedback((f) => ({ ...f, [leagueId]: `Fejl: ${data.error}` }))
-        updateRow(leagueId, { sync_status: 'error', sync_error: data.error })
-      } else {
-        const msg = `${data.synced} kampe importeret via CSV, ${data.rounds_created} runder oprettet`
-        setFeedback((f) => ({ ...f, [leagueId]: msg }))
-        updateRow(leagueId, {
-          sync_status:    'ok',
-          sync_error:     null,
-          last_synced_at: new Date().toISOString(),
-          total_matches:  data.synced,
-        })
-      }
-    } catch {
-      setFeedback((f) => ({ ...f, [leagueId]: 'Netværksfejl ved upload' }))
-    } finally {
-      setUploading((s) => { const n = new Set(s); n.delete(leagueId); return n })
-      setUploadModal(null)
-    }
-  }
-
-  async function saveSlug() {
-    if (!editModal) return
-    setEditSaving(true)
-    try {
-      const res = await fetch('/api/admin/leagues', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ league_id: editModal.league.id, fixturedownload_slug: editSlug || null }),
-      })
-      if (res.ok) {
-        updateRow(editModal.league.id, {
-          fixturedownload_slug: editSlug || null,
-          sync_status: 'pending',
-          sync_error: null,
-        })
-        setEditModal(null)
-      }
-    } finally {
-      setEditSaving(false)
-    }
-  }
-
   const logsForLeague = (leagueId: number) =>
     logs.filter((l) => l.league_id === leagueId).slice(0, 20)
 
-  const canAutoSync = (l: LeagueRow) => !!(l.fixturedownload_slug || l.bold_slug)
+  const canAutoSync = (l: LeagueRow) => !!l.bold_slug
 
   // ── Stats til header ────────────────────────────────────────────────────────
   const lastSyncedAll = leagueData
@@ -441,7 +378,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4 gap-3">
         <p className="font-body text-xs text-text-warm hidden sm:block">
-          Ligaer med <strong>fixturedownload</strong>-slug synkes automatisk. Øvrige kræver CSV-upload.
+          Ligaer med <strong>bold_slug</strong> og <strong>bold_phase_id</strong> synkes via Bold.dk.
         </p>
         <div className="flex items-center gap-2 ml-auto">
           <button
@@ -560,12 +497,9 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
 
                 {/* Liga-rækker — skjult når collapsed */}
                 {!collapsed.has(country) && group.map((league) => {
-                  const isSyncing   = syncing.has(league.id)
-                  const isUploading = uploading.has(league.id)
-                  const busy        = isSyncing || isUploading
-                  const source      = league.fixturedownload_slug
-                    ? 'fixturedownload'
-                    : league.bold_slug ? 'bold.dk' : 'manuel CSV'
+                  const isSyncing = syncing.has(league.id)
+                  const busy     = isSyncing
+                  const source   = league.bold_slug ? 'bold.dk' : '—'
 
                   return (
                     <tr
@@ -589,20 +523,9 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
                         <span className="font-condensed text-xs text-text-warm uppercase tracking-wide">{source}</span>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-condensed font-bold text-sm text-primary">
-                            {parseSeason(league.fixturedownload_slug)}
-                          </span>
-                          <button
-                            onClick={() => { setEditModal({ league }); setEditSlug(league.fixturedownload_slug ?? '') }}
-                            className="text-text-warm hover:text-forest transition-colors"
-                            title="Rediger sæson/slug"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
-                        </div>
+                        <span className="font-condensed font-bold text-sm text-primary">
+                          {parseSeason(league.bold_slug)}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right font-condensed font-bold text-base">
                         {league.total_matches ?? 0}
@@ -624,13 +547,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
                               {isSyncing ? '...' : 'Sync'}
                             </button>
                           ) : (
-                            <button
-                              onClick={() => setUploadModal({ league })}
-                              disabled={busy}
-                              className="px-3 py-1.5 bg-gold/80 text-forest font-condensed text-xs uppercase tracking-wide rounded-sm hover:opacity-85 disabled:opacity-40 transition-opacity"
-                            >
-                              {isUploading ? '...' : 'Upload CSV'}
-                            </button>
+                            <span className="text-xs text-text-warm font-body">Sæt bold_phase_id</span>
                           )}
                           <button
                             onClick={() => setLogModal({ league })}
@@ -648,103 +565,6 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
           </tbody>
         </table>
       </div>
-
-      {/* CSV Upload modal */}
-      {uploadModal && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setUploadModal(null)}
-        >
-          <div
-            className="bg-cream rounded-sm border border-border w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-              <h2 className="font-display font-bold text-lg text-forest">
-                Upload CSV — {uploadModal.league.name}
-              </h2>
-              <button onClick={() => setUploadModal(null)} className="text-text-warm hover:text-primary text-lg leading-none">×</button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div className="bg-cream-dark border border-border rounded-sm px-4 py-3 text-xs font-body text-text-warm space-y-1">
-                <p className="font-semibold text-primary">Hent CSV fra fixturedownload.com:</p>
-                <p>1. Gå til <span className="font-condensed text-forest">fixturedownload.com</span></p>
-                <p>2. Søg efter ligaen og vælg sæson 2025</p>
-                <p>3. Download som <strong>CSV</strong></p>
-                <p>4. Upload filen herunder</p>
-              </div>
-              <div>
-                <label className="block font-condensed text-xs uppercase tracking-wider text-text-warm mb-2">
-                  CSV-fil
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="block w-full text-sm font-body text-primary border border-border rounded-sm px-3 py-2 bg-white file:mr-3 file:py-1 file:px-3 file:rounded-sm file:border-0 file:font-condensed file:text-xs file:uppercase file:bg-forest file:text-cream hover:file:opacity-85 cursor-pointer"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleCSVUpload(uploadModal.league.id, file)
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rediger slug / sæson modal */}
-      {editModal && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setEditModal(null)}
-        >
-          <div
-            className="bg-cream rounded-sm border border-border w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-              <h2 className="font-display font-bold text-lg text-forest">
-                Rediger sæson — {editModal.league.name}
-              </h2>
-              <button onClick={() => setEditModal(null)} className="text-text-warm hover:text-primary text-lg leading-none">×</button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block font-condensed text-xs uppercase tracking-wider text-text-warm mb-1.5">
-                  fixturedownload slug
-                </label>
-                <input
-                  type="text"
-                  value={editSlug}
-                  onChange={(e) => setEditSlug(e.target.value)}
-                  placeholder="fx epl-2026"
-                  className="w-full border border-border rounded-sm px-3 py-2 font-body text-sm focus:outline-none focus:border-forest bg-white"
-                />
-                <p className="text-xs text-text-warm mt-1.5 font-body">
-                  Aktiv sæson: <strong>{parseSeason(editSlug || null)}</strong>
-                  {' · '}URL: fixturedownload.com/feed/csv/<span className="text-forest">{editSlug || '…'}</span>
-                </p>
-              </div>
-              <div className="flex gap-2 justify-end pt-1">
-                <button
-                  onClick={() => setEditModal(null)}
-                  className="px-4 py-2 border border-border text-text-warm font-condensed text-xs uppercase tracking-wide rounded-sm hover:bg-cream-dark transition-colors"
-                >
-                  Annullér
-                </button>
-                <button
-                  onClick={saveSlug}
-                  disabled={editSaving}
-                  className="px-4 py-2 bg-forest text-cream font-condensed text-xs uppercase tracking-wide rounded-sm hover:opacity-85 disabled:opacity-50 transition-opacity"
-                >
-                  {editSaving ? 'Gemmer...' : 'Gem'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Global sync log modal */}
       {globalLogOpen && (
