@@ -117,11 +117,9 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
       if (!bets?.length) continue
 
-      const historicFactors = await calculateHistoricFactors(
-        match.home_team,
-        match.away_team,
-        leagueId
-      )
+      const historicFactors = leagueId
+        ? await calculateHistoricFactors(match.home_team, match.away_team, leagueId)
+        : { home: 1.0, draw: 1.0, away: 1.0 }
 
       const predictionCounts = new Map<string, number>()
       for (const bet of bets) {

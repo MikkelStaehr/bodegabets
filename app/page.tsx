@@ -1,8 +1,6 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import FootballIcon from '@/components/icons/FootballIcon'
-import TargetIcon from '@/components/icons/TargetIcon'
-import TrophyIcon from '@/components/icons/TrophyIcon'
+import GameTicker from '@/components/GameTicker'
 import type { Profile } from '@/types'
 
 function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
@@ -28,21 +26,32 @@ export default async function HomePage() {
     .order('points', { ascending: false })
     .limit(20)
 
+  const { data: recentMatches } = await supabase
+    .from('matches')
+    .select('home_team, away_team, home_score, away_score, kickoff_at')
+    .eq('status', 'finished')
+    .order('kickoff_at', { ascending: false })
+    .limit(10)
+
+  const tickerItems = (recentMatches ?? []).map((m) => {
+    const date = m.kickoff_at
+      ? new Date(m.kickoff_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+      : ''
+    return `${m.home_team} ${m.home_score}-${m.away_score} ${m.away_team}${date ? ` · ${date}` : ''}`
+  })
+
   const ranked = assignRanks((profiles as Profile[]) ?? [])
   const currentUserRank = user ? ranked.find((p) => p.id === user.id) ?? null : null
 
   return (
     <div className="min-h-screen bg-cream">
 
+      {/* ── Ticker bar (seneste resultater) ────────────────── */}
+      {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
+
       {/* ── Hero (mørk grøn) ─────────────────────────────────── */}
       <header className="bg-forest">
         <div className="max-w-4xl mx-auto px-4 pt-16 pb-20 text-center">
-          {/* Sæson-badge */}
-          <div className="inline-flex items-center gap-2 border border-forest-light text-cream/70 font-condensed text-xs uppercase tracking-[0.12em] px-3 py-1.5 rounded-[4px] mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-gold" />
-            VM 2026 — Aktiv sæson
-          </div>
-
           <h1 className="font-display text-cream text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-5">
             Spil mod vennerne.<br />
             <span className="text-gold">Ingen rigtige penge.</span>
@@ -84,34 +93,44 @@ export default async function HomePage() {
         </div>
       </header>
 
-      {/* ── Features strip ───────────────────────────────────── */}
+      {/* ── Sådan virker det ───────────────────────────────── */}
       <section className="border-b border-warm-border">
-        <div className="max-w-4xl mx-auto px-4 py-0 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-warm-border">
-          {[
-            {
-              Icon: FootballIcon,
-              title: 'Private spilrum',
-              desc: 'Opret eller join et spil via en 6-tegns invitationskode',
-            },
-            {
-              Icon: TargetIcon,
-              title: '1-X-2 + side-bets',
-              desc: 'Bet på kampresultater, topscorer, kort og mere',
-            },
-            {
-              Icon: TrophyIcon,
-              title: 'Leaderboard',
-              desc: 'Følg din placering lokalt og globalt i realtid',
-            },
-          ].map(({ Icon, title, desc }) => (
-            <div key={title} className="bg-cream px-8 py-8" style={{ padding: '32px' }}>
-              <Icon className="w-6 h-6 mb-5 text-warm-gray" />
-              <h3 className="font-condensed font-700 text-ink text-sm uppercase tracking-[0.08em] mb-2">
-                {title}
-              </h3>
-              <p className="font-body text-warm-gray leading-relaxed" style={{ fontSize: '14px' }}>{desc}</p>
-            </div>
-          ))}
+        <div className="max-w-4xl mx-auto px-4 py-16">
+          <p className="font-condensed uppercase text-warm-gray mb-1" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Kom i gang</p>
+          <h2 className="font-display text-ink font-bold mb-10" style={{ fontSize: '28px' }}>Sådan virker det</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { step: 1, title: 'Opret en gratis profil', desc: 'Tilmeld dig på få sekunder med e-mail og adgangskode.' },
+              { step: 2, title: 'Opret eller join et spilrum', desc: 'Start dit eget spil eller brug en 6-tegns invitationskode.' },
+              { step: 3, title: 'Afgiv dine bets inden deadline', desc: 'Vælg kampresultat, side-bets og sæt din indsats.' },
+              { step: 4, title: 'Følg resultater og kæmp om point', desc: 'Se live-scores, tjek leaderboard og kæmp om førstepladsen.' },
+            ].map(({ step, title, desc }) => (
+              <div key={step} className="flex flex-col">
+                <span className="font-display text-gold font-bold text-3xl mb-3">{step}</span>
+                <h3 className="font-condensed font-700 text-ink text-sm uppercase tracking-[0.08em] mb-2">{title}</h3>
+                <p className="font-body text-warm-gray leading-relaxed" style={{ fontSize: '14px' }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA sektion ────────────────────────────────────── */}
+      <section className="bg-forest">
+        <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+          <h2 className="font-display text-cream text-3xl sm:text-4xl font-bold mb-6">
+            Klar til at udfordre vennerne?
+          </h2>
+          <Link
+            href={user ? '/dashboard' : '/register'}
+            className="inline-flex items-center gap-2 bg-cream text-forest font-condensed font-700 text-base uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-90 transition-opacity"
+          >
+            {user ? 'Gå til dashboard' : 'Opret profil gratis'}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
       </section>
 
