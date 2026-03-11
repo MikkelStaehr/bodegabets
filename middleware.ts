@@ -28,8 +28,6 @@ export async function middleware(req: NextRequest) {
   const user = session?.user
 
   const path = req.nextUrl.pathname
-  console.log('[MW] path:', path, 'user:', user?.id ?? 'none')
-
   // Suspend-tjek — redirect til /suspended
   if (user && !path.startsWith('/suspended') && !path.startsWith('/login') && !path.startsWith('/register')) {
     const { data: profile, error: suspendedError } = await supabase
@@ -37,8 +35,6 @@ export async function middleware(req: NextRequest) {
       .select('is_suspended')
       .eq('id', user.id)
       .single()
-
-    console.log('[MW] suspended query result:', profile, 'error:', suspendedError?.message)
 
     if (profile?.is_suspended) {
       return NextResponse.redirect(new URL('/suspended', req.url))
