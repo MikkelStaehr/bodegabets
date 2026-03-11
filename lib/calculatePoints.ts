@@ -317,7 +317,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           earnings_delta: earningsDelta,
           extra_bets_correct: extraBetsCorrect,
         },
-        { onConflict: 'user_id,round_id' }
+        { onConflict: 'user_id,round_id,game_id' }
       )
 
       // Opdater game_members.earnings
