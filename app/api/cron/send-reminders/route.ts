@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { supabaseAdmin } from '@/lib/supabase'
 
-webpush.setVapidDetails(
-  'mailto:hello@bodegabets.dk',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+function getWebPush() {
+  webpush.setVapidDetails(
+    'mailto:admin@bodegabets.dk',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+  return webpush
+}
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
@@ -84,7 +87,7 @@ export async function GET(req: NextRequest) {
 
       for (const sub of subscriptions) {
         try {
-          await webpush.sendNotification(
+          await getWebPush().sendNotification(
             sub.subscription as webpush.PushSubscription,
             payload
           )
