@@ -200,8 +200,12 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
-            <span className="font-display italic text-lg" style={{ fontWeight: 700, color: '#1a3329' }}>
-              Bodega <span style={{ color: '#B8963E' }}>Bets</span>
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}>
+              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '28px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
+              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '14px', color: '#2C4A3E' }}>odega</span>
+              <span style={{ display: 'inline-block', width: '4px' }} />
+              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '28px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
+              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '14px', color: '#2C4A3E' }}>ets</span>
             </span>
           </Link>
         </div>
