@@ -37,7 +37,7 @@ function getKonsensus(sameCount: number, totalCount: number): number {
 }
 
 // Tjek om prediction er korrekt
-function isBetCorrect(
+export function isBetCorrect(
   betType: string,
   prediction: string,
   homeScore: number,
@@ -317,7 +317,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           earnings_delta: earningsDelta,
           extra_bets_correct: extraBetsCorrect,
         },
-        { onConflict: 'user_id,round_id' }
+        { onConflict: 'user_id,round_id,game_id' }
       )
 
       // Opdater game_members.earnings

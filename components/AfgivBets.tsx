@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Match, Bet, MatchSidebetOption } from '@/types'
 import { BET_TYPE_LABELS } from '@/lib/betTypes'
+import { isBetCorrect } from '@/lib/calculatePoints'
 import { useToast } from '@/components/ui/Toast'
 import GameTicker from '@/components/GameTicker'
 import LiveMatches from '@/components/LiveMatches'
@@ -168,19 +169,24 @@ function getCorrectOutcome(match: Match): '1' | 'X' | '2' | null {
 }
 
 function ExtraBets({
+  match,
   matchId,
   isReadOnly,
   extraBets,
   onExtraChange,
   fastPoints,
+  userExtraPicks,
 }: {
+  match: Match
   matchId: number
   isReadOnly: boolean
   extraBets: ExtraBet[]
   onExtraChange: (matchId: number, extras: ExtraBet[]) => void
   fastPoints: number
+  userExtraPicks: Record<string, string>
 }) {
   const [open, setOpen] = useState(false)
+  const isFinished = match.status === 'finished'
 
   // picks[key] = lagret value (yes, no, over, under, h1, h2, draw, 2plus, 1goal, udraw)
   const picks: Record<string, string> = Object.fromEntries(
@@ -197,48 +203,84 @@ function ExtraBets({
     onExtraChange(matchId, extras)
   }
 
-  if (isReadOnly) return null
+  // For finished matches with user picks, show results expanded
+  if (isReadOnly && !isFinished) return null
+  if (isReadOnly && isFinished && Object.keys(userExtraPicks).length === 0) return null
+
+  // Finished matches with user picks: always show expanded
+  const showExpanded = isFinished ? true : open
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 border-t border-dashed border-black/10 text-left"
-      >
-        <span className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase flex-1">
-          + Ekstra valg
-        </span>
-        <span
-          className={`text-[9px] text-[#7a7060] transition-transform ${open ? 'rotate-180' : ''}`}
+      {!isFinished && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="w-full flex items-center gap-1.5 px-2.5 py-1.5 border-t border-dashed border-black/10 text-left"
         >
-          ▼
-        </span>
-      </button>
+          <span className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase flex-1">
+            + Ekstra valg
+          </span>
+          <span
+            className={`text-[9px] text-[#7a7060] transition-transform ${open ? 'rotate-180' : ''}`}
+          >
+            ▼
+          </span>
+        </button>
+      )}
 
-      {open && (
+      {showExpanded && (
         <div className="px-2.5 pb-3 pt-2 border-t border-black/10 bg-[#F2EDE4]/50 flex flex-col gap-1.5">
-          {EXTRA_BET_ROWS.map((row) => (
-            <div key={row.key} className="flex items-center gap-1.5">
-              <span className="text-[10px] text-[#7a7060] w-[115px] shrink-0">{row.label}</span>
-              <div className="flex gap-1 flex-1">
-                {row.opts.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => toggle(row.key, opt.value)}
-                    className={`flex-1 py-1 border-[1.5px] rounded text-[10px] font-semibold transition-all ${
-                      picks[row.key] === opt.value
-                        ? 'bg-[#2C4A3E] border-[#2C4A3E] text-white'
-                        : 'bg-white border-black/10 text-[#7a7060] hover:border-[#2C4A3E] hover:text-[#1a3329]'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+          {EXTRA_BET_ROWS
+            .filter((row) => !isFinished || userExtraPicks[row.key])
+            .map((row) => {
+            const userValue = userExtraPicks[row.key] ?? null
+            const canCheck = isFinished && match.home_score != null && match.away_score != null
+
+            return (
+              <div key={row.key} className="flex items-center gap-1.5">
+                <span className="text-[10px] text-[#7a7060] w-[115px] shrink-0">{row.label}</span>
+                <div className="flex gap-1 flex-1">
+                  {row.opts.map((opt) => {
+                    const isUserPick = isFinished && userValue === opt.value
+                    const isCorrect = canCheck && isBetCorrect(
+                      row.key, opt.value,
+                      match.home_score!, match.away_score!,
+                      match.home_ht_score, match.away_ht_score
+                    )
+                    const isUserCorrect = isUserPick && isCorrect
+
+                    let btnClass: string
+                    if (isFinished && (isUserPick || isCorrect)) {
+                      if (isUserCorrect) {
+                        btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E] text-white'
+                      } else if (isUserPick) {
+                        btnClass = 'bg-[#27ae60] border-[#27ae60] text-white'
+                      } else {
+                        btnClass = 'bg-[#F2EDE4] border-[#B8963E] border-[2.5px] text-[#7a7060]'
+                      }
+                    } else if (picks[row.key] === opt.value) {
+                      btnClass = 'bg-[#2C4A3E] border-[#2C4A3E] text-white'
+                    } else {
+                      btnClass = 'bg-white border-black/10 text-[#7a7060] hover:border-[#2C4A3E] hover:text-[#1a3329]'
+                    }
+
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={isFinished}
+                        onClick={() => toggle(row.key, opt.value)}
+                        className={`flex-1 py-1 border-[1.5px] rounded text-[10px] font-semibold transition-all ${btnClass} ${isFinished ? 'cursor-not-allowed' : ''}`}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </>
@@ -256,6 +298,7 @@ function MatchCard({
   onExtraChange,
   fastPoints,
   userPrediction,
+  userExtraPicks,
 }: {
   match: MatchWithOptions
   selectedOutcome: '1' | 'X' | '2' | null
@@ -267,6 +310,7 @@ function MatchCard({
   onExtraChange: (matchId: number, extras: ExtraBet[]) => void
   fastPoints: number
   userPrediction: '1' | 'X' | '2' | null
+  userExtraPicks: Record<string, string>
 }) {
   const isFinished = match.status === 'finished'
   const correctOutcome = getCorrectOutcome(match)
@@ -358,11 +402,13 @@ function MatchCard({
 
       {extraBetsEnabled && (
         <ExtraBets
+          match={match}
           matchId={match.id}
           isReadOnly={isReadOnly}
           extraBets={extraBets}
           onExtraChange={onExtraChange}
           fastPoints={fastPoints}
+          userExtraPicks={userExtraPicks}
         />
       )}
     </div>
@@ -651,6 +697,12 @@ export default function AfgivBets({
             const matchBet = existingBets.find(
               (b) => b.match_id === match.id && b.bet_type === 'match_result'
             )
+            const extraPicks: Record<string, string> = {}
+            for (const b of existingBets) {
+              if (b.match_id === match.id && EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType)) {
+                extraPicks[b.bet_type] = b.prediction
+              }
+            }
             return (
               <MatchCard
                 key={match.id}
@@ -664,6 +716,7 @@ export default function AfgivBets({
                 onExtraChange={updateExtraBets}
                 fastPoints={effectiveFastPoints}
                 userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
+                userExtraPicks={extraPicks}
               />
             )
           })}
