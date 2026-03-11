@@ -382,6 +382,9 @@ export default function AfgivBets({
   const router = useRouter()
   const { toast } = useToast()
 
+  // DEBUG: bekræft at existingBets ankommer til komponenten
+  console.log('[AfgivBets] existingBets:', existingBets)
+
   const [selections, setSelections] = useState<BetEntry[]>(() => initSelections(matches, existingBets))
   const [fastPoints, setFastPoints] = useState(100)
   const [isManuel, setIsManuel] = useState(false)
