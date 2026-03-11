@@ -26,18 +26,29 @@ export default async function HomePage() {
     .order('points', { ascending: false })
     .limit(20)
 
-  const { data: recentMatches } = await supabase
-    .from('matches')
-    .select('home_team, away_team, home_score, away_score, kickoff_at')
+  // Hent den seneste færdige runde og dens kampe
+  const { data: latestRound } = await supabase
+    .from('rounds')
+    .select('id')
     .eq('status', 'finished')
-    .order('kickoff_at', { ascending: false })
-    .limit(10)
+    .order('betting_closes_at', { ascending: false })
+    .limit(1)
+    .single()
 
-  const tickerItems = (recentMatches ?? []).map((m) => {
+  const roundId = latestRound?.id
+  const { data: roundMatches } = roundId
+    ? await supabase
+        .from('matches')
+        .select('home_team, away_team, home_score, away_score, kickoff_at')
+        .eq('round_id', roundId)
+        .order('kickoff_at', { ascending: true })
+    : { data: null }
+
+  const tickerItems = (roundMatches ?? []).map((m) => {
     const date = m.kickoff_at
       ? new Date(m.kickoff_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
       : ''
-    return `${m.home_team} ${m.home_score}-${m.away_score} ${m.away_team}${date ? ` · ${date}` : ''}`
+    return `${m.home_team} ${m.home_score ?? '?'}-${m.away_score ?? '?'} ${m.away_team}${date ? ` · ${date}` : ''}`
   })
 
   const ranked = assignRanks((profiles as Profile[]) ?? [])
@@ -113,24 +124,6 @@ export default async function HomePage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ── CTA sektion ────────────────────────────────────── */}
-      <section className="bg-forest">
-        <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-          <h2 className="font-display text-cream text-3xl sm:text-4xl font-bold mb-6">
-            Klar til at udfordre vennerne?
-          </h2>
-          <Link
-            href={user ? '/dashboard' : '/register'}
-            className="inline-flex items-center gap-2 bg-cream text-forest font-condensed font-700 text-base uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-90 transition-opacity"
-          >
-            {user ? 'Gå til dashboard' : 'Opret profil gratis'}
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
         </div>
       </section>
 
