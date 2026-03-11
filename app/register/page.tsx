@@ -182,7 +182,7 @@ export default function RegisterPage() {
     'w-full bg-white border-[1.5px] border-[#D4CFC4] text-[#1A1A1A] placeholder-[#5C5C4A]/50 rounded-sm px-4 py-3 font-body text-sm outline-none focus:border-[#1a3329] transition-colors min-h-[44px]'
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[1fr_3fr]">
 
       {/* ══════════════════════════════════════════════════════
           VENSTRE PANEL — forest
@@ -201,15 +201,6 @@ export default function RegisterPage() {
           className="absolute top-0 right-0 w-[1px] h-full"
           style={{ background: 'linear-gradient(to bottom, transparent, rgba(184,150,62,0.2) 30%, rgba(184,150,62,0.2) 70%, transparent)' }}
         />
-
-        {/* Logo */}
-        <div className="px-10 pt-10">
-          <Link href="/" className="inline-block">
-            <span className="font-display italic text-cream text-xl" style={{ fontWeight: 700 }}>
-              Bodega <span className="text-gold">Bets</span>
-            </span>
-          </Link>
-        </div>
 
         {/* Midten */}
         <div className="flex-1 flex items-center px-10">
