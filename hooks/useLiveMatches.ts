@@ -59,6 +59,7 @@ export function useLiveMatches(
 export type LiveMatchesForUserItem = {
   gameId: number
   gameName: string
+  leagueName: string | null
   roundId: number
   roundName: string
   matches: LiveMatch[]
@@ -77,7 +78,7 @@ export function useLiveMatchesForUser(enabled = true) {
         const json = await res.json()
         const raw = json.items ?? []
         setItems(
-          raw.map((item: { gameId: number; gameName: string; roundId: number; roundName: string; matches: unknown[]; summary: LiveSummary }) => ({
+          raw.map((item: { gameId: number; gameName: string; leagueName: string | null; roundId: number; roundName: string; matches: unknown[]; summary: LiveSummary }) => ({
             ...item,
             matches: ((item.matches ?? []) as Record<string, unknown>[]).map((m) => ({
               ...m,

@@ -187,7 +187,7 @@ export default function DashboardContent({
 
         {/* Right — live + join (desktop) */}
         <div className="flex flex-col gap-4">
-          <LiveSidebar rounds={activeRounds} nextRoundDate={nextRoundDate} />
+          <LiveSidebar rounds={activeRounds} nextRoundDate={nextRoundDate} sportFilter={activeTab} />
           <div className="hidden lg:block">
             <JoinGameCard />
           </div>

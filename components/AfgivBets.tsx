@@ -79,6 +79,8 @@ const EXTRA_LABELS: Record<ExtraBetType, string> = {
   malforskel: BET_TYPE_LABELS.malforskel ?? 'Målforskel',
 }
 
+type RivalryInfo = { rivalry_name: string; multiplier: number }
+
 type Props = {
   gameId: number
   roundId: number
@@ -94,6 +96,8 @@ type Props = {
   existingBets: Bet[]
   userPoints: number
   tickerItems: string[]
+  rivalryInfo?: Record<number, RivalryInfo>
+  totalMatchesInRound?: number
 }
 
 const OUTCOME_LABELS: Record<'1' | 'X' | '2', string> = {
@@ -287,6 +291,24 @@ function ExtraBets({
   )
 }
 
+function RivalryPointEstimate({
+  userPoints,
+  totalMatches,
+  multiplier,
+}: {
+  userPoints: number
+  totalMatches: number
+  multiplier: number
+}) {
+  const baseEstimate = totalMatches > 0 ? Math.round(userPoints / totalMatches) : 100
+  const boosted = Math.round(baseEstimate * multiplier)
+  return (
+    <p className="px-3 pb-2 text-[11px] font-['Barlow_Condensed'] font-light text-[#c4b89a]">
+      Korrekt tip giver ~{baseEstimate} pt · med {multiplier}× rivalry bonus → ~{boosted} pt
+    </p>
+  )
+}
+
 function MatchCard({
   match,
   selectedOutcome,
@@ -299,6 +321,9 @@ function MatchCard({
   fastPoints,
   userPrediction,
   userExtraPicks,
+  rivalry,
+  userPoints,
+  totalMatches,
 }: {
   match: MatchWithOptions
   selectedOutcome: '1' | 'X' | '2' | null
@@ -311,9 +336,123 @@ function MatchCard({
   fastPoints: number
   userPrediction: '1' | 'X' | '2' | null
   userExtraPicks: Record<string, string>
+  rivalry?: RivalryInfo
+  userPoints: number
+  totalMatches: number
 }) {
   const isFinished = match.status === 'finished'
   const correctOutcome = getCorrectOutcome(match)
+  const isRivalry = !!rivalry
+
+  if (isRivalry) {
+    return (
+      <div
+        className="rivalry-card relative rounded-lg mb-1.5 overflow-hidden transition-all"
+        style={{
+          background: '#1a3329',
+          border: '1.5px solid #B8963E',
+          boxShadow: selectedOutcome ? '0 0 0 1px #B8963E' : undefined,
+        }}
+      >
+        {/* Fire pseudo-elements via CSS class */}
+        <div className="rivalry-fire" />
+
+        {/* Rivalry badge */}
+        <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+          <span className="text-[12px]">🔥</span>
+          <span className="font-['Barlow_Condensed'] text-[11px] font-bold text-[#B8963E] uppercase tracking-widest">
+            {rivalry.rivalry_name} · {rivalry.multiplier}×
+          </span>
+        </div>
+
+        {/* Holdnavn + tid/resultat */}
+        <div className="flex items-center gap-2 px-2.5 h-10">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate max-w-[100px]">
+              {match.home_team}
+            </span>
+            {isFinished && match.home_score != null && match.away_score != null ? (
+              <span className="font-condensed font-bold text-[13px] text-[#F2EDE4]/60 shrink-0">
+                {match.home_score} – {match.away_score}
+              </span>
+            ) : (
+              <span className="text-[9px] text-[#F2EDE4]/50 font-semibold shrink-0">vs</span>
+            )}
+            <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate max-w-[100px]">
+              {match.away_team}
+            </span>
+          </div>
+          <span className="text-[10px] text-[#F2EDE4]/50 shrink-0">
+            {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
+          </span>
+        </div>
+
+        {/* 1-X-2 med guld border */}
+        <div className="flex gap-1 px-2.5 pb-2">
+          {(['1', 'X', '2'] as const).map((o) => {
+            const active = selectedOutcome === o
+            const isUserPick = isFinished && userPrediction === o
+            const isCorrect = isFinished && correctOutcome === o
+            const isUserCorrect = isUserPick && isCorrect
+
+            let btnClass: string
+            if (isFinished && (isUserPick || isCorrect)) {
+              if (isUserCorrect) {
+                btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
+              } else if (isUserPick) {
+                btnClass = 'bg-[#27ae60] border-[#27ae60]'
+              } else {
+                btnClass = 'bg-[#2C4A3E] border-[#B8963E] border-[2.5px]'
+              }
+            } else if (active) {
+              btnClass = 'bg-[#B8963E] border-[#B8963E]'
+            } else {
+              btnClass = 'bg-[#2C4A3E] border-[#B8963E]/30 hover:border-[#B8963E]'
+            }
+
+            const textLight = active || isUserPick
+            const sub =
+              o === '1' ? firstWord(match.home_team) : o === '2' ? firstWord(match.away_team) : 'Uafgjort'
+            return (
+              <button
+                key={o}
+                type="button"
+                disabled={disabled}
+                onClick={() => onSelect(o)}
+                className={`flex-1 py-1.5 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${btnClass} ${disabled ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <span className={`font-condensed text-[17px] font-bold leading-none ${textLight ? 'text-[#1a3329]' : 'text-[#F2EDE4]/70'}`}>
+                  {o}
+                </span>
+                <span className={`text-[8px] font-medium ${textLight ? 'text-[#1a3329]/60' : 'text-[#F2EDE4]/40'}`}>
+                  {sub}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Point calculator */}
+        <RivalryPointEstimate
+          userPoints={userPoints}
+          totalMatches={totalMatches}
+          multiplier={rivalry.multiplier}
+        />
+
+        {extraBetsEnabled && (
+          <ExtraBets
+            match={match}
+            matchId={match.id}
+            isReadOnly={isReadOnly}
+            extraBets={extraBets}
+            onExtraChange={onExtraChange}
+            fastPoints={fastPoints}
+            userExtraPicks={userExtraPicks}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -424,6 +563,8 @@ export default function AfgivBets({
   existingBets,
   userPoints,
   tickerItems,
+  rivalryInfo = {},
+  totalMatchesInRound,
 }: Props) {
   const router = useRouter()
   const { toast } = useToast()
@@ -717,6 +858,9 @@ export default function AfgivBets({
                 fastPoints={effectiveFastPoints}
                 userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
                 userExtraPicks={extraPicks}
+                rivalry={rivalryInfo[match.id]}
+                userPoints={userPoints}
+                totalMatches={totalMatchesInRound ?? totalMatches}
               />
             )
           })}
