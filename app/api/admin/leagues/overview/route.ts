@@ -24,20 +24,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ leagues: [] })
   }
 
-  const result: Array<{
-    id: number
-    name: string
-    country: string
-    activeRooms: number
-    totalBets: number
-    previousRound: RoundInfo | null
-    currentRound: RoundInfo | null
-    nextRound: RoundInfo | null
-  }> = []
+  const leagueIds = leagues.map((l) => l.id as number)
 
-  const { data: currentRoundsData } = await supabaseAdmin
-    .from('current_rounds')
-    .select('league_id, round_name, round_status')
+  // 1. All current rounds, all rounds, all active games — in parallel
+  const [
+    { data: currentRoundsData },
+    { data: allRounds },
+    { data: activeGames },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('current_rounds')
+      .select('league_id, round_name, round_status')
+      .in('league_id', leagueIds),
+    supabaseAdmin
+      .from('rounds')
+      .select('id, name, status, betting_closes_at, league_id')
+      .in('league_id', leagueIds)
+      .order('betting_closes_at', { ascending: true }),
+    supabaseAdmin
+      .from('games')
+      .select('id, league_id')
+      .in('league_id', leagueIds)
+      .eq('status', 'active'),
+  ])
 
   const currentRoundByLeague = new Map(
     (currentRoundsData ?? []).map((r: { league_id: number; round_name: string; round_status: string }) => [
@@ -46,45 +55,77 @@ export async function GET(req: NextRequest) {
     ])
   )
 
+  // Active rooms per league
+  const activeRoomsByLeague = new Map<number, number>()
+  for (const g of activeGames ?? []) {
+    const lid = g.league_id as number
+    activeRoomsByLeague.set(lid, (activeRoomsByLeague.get(lid) ?? 0) + 1)
+  }
+
+  // 2. All match counts per round in one query
+  const allRoundIds = (allRounds ?? []).map((r) => r.id as number)
+  const { data: allMatches } = allRoundIds.length
+    ? await supabaseAdmin
+        .from('matches')
+        .select('id, round_id')
+        .in('round_id', allRoundIds)
+    : { data: [] }
+
+  const matchCountByRound = new Map<number, number>()
+  const matchIdsByRound = new Map<number, number[]>()
+  for (const m of allMatches ?? []) {
+    const rid = m.round_id as number
+    matchCountByRound.set(rid, (matchCountByRound.get(rid) ?? 0) + 1)
+    if (!matchIdsByRound.has(rid)) matchIdsByRound.set(rid, [])
+    matchIdsByRound.get(rid)!.push(m.id as number)
+  }
+
+  // 3. Bets counts for current rounds only (one query)
+  const currentRoundIds: number[] = []
   for (const league of leagues) {
-    const leagueId = league.id as number
+    const crInfo = currentRoundByLeague.get(league.id as number)
+    if (!crInfo) continue
+    const round = (allRounds ?? []).find(
+      (r) => r.league_id === league.id && r.name === crInfo.round_name
+    )
+    if (round) currentRoundIds.push(round.id as number)
+  }
 
-    const { data: games } = await supabaseAdmin
-      .from('games')
-      .select('id')
-      .eq('league_id', leagueId)
-      .eq('status', 'active')
+  const currentMatchIds: number[] = []
+  for (const rid of currentRoundIds) {
+    const ids = matchIdsByRound.get(rid)
+    if (ids) currentMatchIds.push(...ids)
+  }
 
-    const gameIds = (games ?? []).map((g: { id: number }) => g.id)
-    const activeRooms = gameIds.length
+  const betCountByMatch = new Map<number, number>()
+  if (currentMatchIds.length) {
+    const { data: allBets } = await supabaseAdmin
+      .from('bets')
+      .select('match_id')
+      .in('match_id', currentMatchIds)
 
-    let rounds: Array<{
-      id: number
-      name: string
-      status: string
-      betting_closes_at: string | null
-      league_id: number
-      match_count: number
-    }> = []
-
-    {
-      const { data: roundsData } = await supabaseAdmin
-        .from('rounds')
-        .select('id, name, status, betting_closes_at, league_id')
-        .eq('league_id', leagueId)
-        .order('betting_closes_at', { ascending: true })
-
-      for (const r of roundsData ?? []) {
-        const { count: matchCount } = await supabaseAdmin
-          .from('matches')
-          .select('*', { count: 'exact', head: true })
-          .eq('round_id', r.id)
-        rounds.push({
-          ...r,
-          match_count: matchCount ?? 0,
-        })
-      }
+    for (const b of allBets ?? []) {
+      const mid = b.match_id as number
+      betCountByMatch.set(mid, (betCountByMatch.get(mid) ?? 0) + 1)
     }
+  }
+
+  // Assemble response
+  const result = leagues.map((league) => {
+    const leagueId = league.id as number
+    const activeRooms = activeRoomsByLeague.get(leagueId) ?? 0
+
+    const rounds = (allRounds ?? [])
+      .filter((r) => r.league_id === leagueId)
+      .map((r) => ({
+        ...r,
+        id: r.id as number,
+        name: r.name as string,
+        status: r.status as string,
+        betting_closes_at: r.betting_closes_at as string | null,
+        league_id: r.league_id as number,
+        match_count: matchCountByRound.get(r.id as number) ?? 0,
+      }))
 
     const finished = rounds.filter((r) => r.status === 'finished')
     const upcoming = rounds.filter((r) => r.status === 'upcoming')
@@ -97,12 +138,8 @@ export async function GET(req: NextRequest) {
     let currentRound: RoundInfo | null = null
     let totalBets = 0
     if (currentRoundMatch) {
-      const { data: matchRows } = await supabaseAdmin.from('matches').select('id').eq('round_id', currentRoundMatch.id)
-      const matchIds = (matchRows ?? []).map((m: { id: number }) => m.id)
-      const { count: betsCount } = matchIds.length
-        ? await supabaseAdmin.from('bets').select('*', { count: 'exact', head: true }).in('match_id', matchIds)
-        : { count: 0 }
-      totalBets = betsCount ?? 0
+      const matchIds = matchIdsByRound.get(currentRoundMatch.id) ?? []
+      totalBets = matchIds.reduce((sum, mid) => sum + (betCountByMatch.get(mid) ?? 0), 0)
       currentRound = {
         id: currentRoundMatch.id,
         name: currentRoundMatch.name,
@@ -133,8 +170,8 @@ export async function GET(req: NextRequest) {
         }
       : null
 
-    result.push({
-      id: league.id as number,
+    return {
+      id: leagueId,
       name: league.name as string,
       country: (league.country as string) ?? '',
       activeRooms,
@@ -142,8 +179,8 @@ export async function GET(req: NextRequest) {
       previousRound,
       currentRound,
       nextRound,
-    })
-  }
+    }
+  })
 
   return NextResponse.json({ leagues: result })
 }
