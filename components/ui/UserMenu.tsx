@@ -71,7 +71,7 @@ export default function UserMenu({ username, points, isAdmin }: Props) {
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 px-4 py-3 font-condensed text-xs uppercase tracking-[0.08em] text-ink hover:bg-cream transition-colors border-b border-warm-border"
           >
-            Profil
+            Rediger profil
           </Link>
           <Link
             href="/dashboard"

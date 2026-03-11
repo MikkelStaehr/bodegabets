@@ -1,181 +1,480 @@
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { createServerSupabaseClient } from '@/lib/supabase'
-import Badge from '@/components/ui/Badge'
-import LogoutButton from '@/components/LogoutButton'
-import type { Game } from '@/types'
+'use client'
 
-type MembershipRow = {
-  points: number
-  joined_at: string
-  game: Game & { member_count: number }
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
+import { useToast } from '@/components/ui/Toast'
+
+const supabase = createBrowserSupabaseClient()
+
+/* ── Password strength ────────────────────────────────────── */
+function getPasswordStrength(pw: string): { level: 0 | 1 | 2 | 3; label: string; color: string } {
+  if (!pw) return { level: 0, label: '', color: '' }
+  let score = 0
+  if (pw.length >= 6) score++
+  if (pw.length >= 10) score++
+  if (/[A-Z]/.test(pw) && /[0-9]/.test(pw)) score++
+  if (score <= 1) return { level: 1, label: 'Svag', color: '#C8392B' }
+  if (score === 2) return { level: 2, label: 'Middel', color: '#B8963E' }
+  return { level: 3, label: 'Stærk', color: '#3D6B5A' }
 }
 
-export default async function ProfilePage() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+/* ── Debounce hook ────────────────────────────────────────── */
+function useDebounce(value: string, delay: number) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
+  return debounced
+}
 
-  const [
-    { data: profile },
-    { data: memberships },
-    { data: allProfiles },
-  ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('username, points, is_admin, created_at')
-      .eq('id', user.id)
-      .single(),
+export default function ProfileEditPage() {
+  const router = useRouter()
+  const { toast } = useToast()
 
-    supabase
-      .from('game_members')
-      .select(`
-        points,
-        joined_at,
-        game:games (
-          id, name, description, status, invite_code, created_at,
-          member_count:game_members(count)
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('joined_at', { ascending: false }),
+  /* ── Loading state ─────────────────────────────────────── */
+  const [pageLoading, setPageLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState('')
 
-    supabase
-      .from('profiles')
-      .select('id, points')
-      .order('points', { ascending: false }),
-  ])
+  /* ── Form state ────────────────────────────────────────── */
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [username, setUsername] = useState('')
+  const [originalUsername, setOriginalUsername] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
-  const games: MembershipRow[] = ((memberships ?? []) as unknown as MembershipRow[]).filter(
-    (m) => m.game !== null
-  )
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  const activeGames = games.filter((g) => g.game.status === 'active').length
+  /* ── Avatar state ──────────────────────────────────────── */
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Beregn global rang
-  const sortedProfiles = (allProfiles ?? [])
-  let globalRank: number | null = null
-  for (let i = 0; i < sortedProfiles.length; i++) {
-    if (sortedProfiles[i].id === user.id) {
-      // Find delt rang
-      const myPoints = sortedProfiles[i].points
-      const rank = sortedProfiles.findIndex((p) => p.points === myPoints) + 1
-      globalRank = rank
-      break
+  /* ── Password state ────────────────────────────────────── */
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+
+  /* ── Load profile data ─────────────────────────────────── */
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+      setUserId(user.id)
+      setUserEmail(user.email ?? '')
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username, full_name, avatar_url')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) {
+        setUsername(profile.username ?? '')
+        setOriginalUsername(profile.username ?? '')
+        setAvatarUrl(profile.avatar_url ?? null)
+        setAvatarPreview(profile.avatar_url ?? null)
+
+        const fullName = (profile.full_name as string) ?? ''
+        const parts = fullName.split(' ')
+        if (parts.length >= 2) {
+          setFirstName(parts[0])
+          setLastName(parts.slice(1).join(' '))
+        } else if (parts.length === 1) {
+          setFirstName(parts[0])
+        }
+      }
+      setPageLoading(false)
     }
+    loadProfile()
+  }, [router])
+
+  /* ── Username availability ─────────────────────────────── */
+  const debouncedUsername = useDebounce(username.trim(), 500)
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const usernameChanged = username.trim() !== originalUsername
+
+  useEffect(() => {
+    if (!usernameChanged || debouncedUsername.length < 3) {
+      setUsernameStatus('idle')
+      return
+    }
+    let cancelled = false
+    setUsernameStatus('checking')
+    supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', debouncedUsername)
+      .limit(1)
+      .then(({ data }) => {
+        if (cancelled) return
+        setUsernameStatus(data && data.length > 0 ? 'taken' : 'available')
+      })
+    return () => { cancelled = true }
+  }, [debouncedUsername, usernameChanged])
+
+  /* ── Avatar handling ───────────────────────────────────── */
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Billedet må maks. være 2MB')
+      return
+    }
+    setAvatarFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => setAvatarPreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
   }
 
-  const memberSince = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString('da-DK', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
+  /* ── Initials ──────────────────────────────────────────── */
+  const initials =
+    [firstName[0], lastName[0]].filter(Boolean).map((c) => c.toUpperCase()).join('') ||
+    (username[0]?.toUpperCase() ?? '?')
+
+  /* ── Password strength ─────────────────────────────────── */
+  const strength = getPasswordStrength(newPassword)
+
+  /* ── Submit ────────────────────────────────────────────── */
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    if (!userId) return
+
+    const trimmedUsername = username.trim()
+    if (trimmedUsername.length < 3) return setError('Brugernavn skal være mindst 3 tegn')
+    if (usernameChanged && usernameStatus === 'taken') return setError('Brugernavnet er allerede taget')
+
+    // Validate password fields
+    if (newPassword && !currentPassword) return setError('Indtast din nuværende adgangskode')
+    if (newPassword && newPassword.length < 6) return setError('Ny adgangskode skal være mindst 6 tegn')
+
+    setSaving(true)
+
+    // Upload avatar if changed
+    let newAvatarUrl = avatarUrl
+    if (avatarFile) {
+      const ext = avatarFile.name.split('.').pop()
+      const filePath = `${userId}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, avatarFile, { upsert: true })
+
+      if (uploadError) {
+        setSaving(false)
+        return setError('Kunne ikke uploade billede: ' + uploadError.message)
+      }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+      if (urlData?.publicUrl) {
+        newAvatarUrl = urlData.publicUrl
+      }
+    }
+
+    // Update profile
+    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ')
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        username: trimmedUsername,
+        full_name: fullName || null,
+        avatar_url: newAvatarUrl,
       })
-    : '—'
+      .eq('id', userId)
 
-  return (
-    <div className="min-h-screen bg-cream">
-      <div className="max-w-2xl mx-auto px-4 py-10 space-y-10">
+    if (profileError) {
+      setSaving(false)
+      return setError('Kunne ikke gemme profil: ' + profileError.message)
+    }
 
-        {/* ── Profil header ─────────────────────────────────── */}
-        <section>
-          <p className="font-condensed uppercase text-warm-gray mb-1" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Konto</p>
-          <h1 className="font-display text-ink font-bold mb-4" style={{ fontSize: '28px' }}>
-            {profile?.username ?? '—'}
-          </h1>
-          <p className="font-body text-warm-gray text-sm">
-            Medlem siden {memberSince}
-          </p>
-        </section>
+    // Update password if provided
+    if (newPassword && currentPassword) {
+      // Verify current password by re-authenticating
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: currentPassword,
+      })
 
-        <hr className="border-warm-border" />
+      if (signInError) {
+        setSaving(false)
+        return setError('Nuværende adgangskode er forkert')
+      }
 
-        {/* ── Point oversigt ────────────────────────────────── */}
-        <section>
-          <p className="font-condensed uppercase text-warm-gray mb-4" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Point oversigt</p>
-          <div className="grid grid-cols-3 divide-x divide-warm-border border border-warm-border bg-cream-dark">
-            <StatBox label="Globale PT" value={(profile?.points ?? 0).toLocaleString('da-DK')} />
-            <StatBox label="Aktive spil" value={String(activeGames)} />
-            <StatBox label="Global rang" value={globalRank ? `#${globalRank}` : '—'} />
-          </div>
-        </section>
+      const { error: pwError } = await supabase.auth.updateUser({ password: newPassword })
+      if (pwError) {
+        setSaving(false)
+        return setError('Kunne ikke ændre adgangskode: ' + pwError.message)
+      }
+    }
 
-        <hr className="border-warm-border" />
+    setSaving(false)
+    setOriginalUsername(trimmedUsername)
+    setAvatarFile(null)
+    setCurrentPassword('')
+    setNewPassword('')
+    toast('Profil opdateret ✓', 'success')
+    router.refresh()
+  }
 
-        {/* ── Mine spilrum ──────────────────────────────────── */}
-        <section>
-          <p className="font-condensed uppercase text-warm-gray mb-4" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Mine spilrum</p>
+  /* ── Input classes ─────────────────────────────────────── */
+  const inputClass =
+    'w-full bg-white border-[1.5px] border-[#D4CFC4] text-[#1A1A1A] placeholder-[#5C5C4A]/50 rounded-sm px-4 py-3 font-body text-sm outline-none focus:border-[#1a3329] transition-colors min-h-[44px]'
 
-          {games.length === 0 ? (
-            <div className="border border-warm-border bg-cream-dark p-10 text-center">
-              <p className="font-body text-warm-gray text-sm">Du er ikke med i nogen spilrum endnu.</p>
-              <Link
-                href="/dashboard"
-                className="inline-block mt-4 font-condensed text-xs uppercase tracking-[0.08em] text-forest hover:opacity-70 transition-opacity"
-              >
-                Gå til dashboard →
-              </Link>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {games.map(({ game, points }) => (
-                <li key={game.id}>
-                  <Link
-                    href={`/games/${game.id}`}
-                    className="flex items-center justify-between gap-4 border border-warm-border bg-cream-dark px-5 py-4 hover:bg-cream transition-colors group"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-condensed font-bold text-ink text-base uppercase tracking-wide truncate">
-                          {game.name}
-                        </span>
-                        <Badge status={game.status === 'active' ? 'active' : 'finished'} />
-                      </div>
-                      <span className="font-body text-warm-gray text-xs">
-                        {(game.member_count as unknown as { count: number }).count ?? 0} deltagere
-                      </span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="font-condensed font-bold text-ink text-lg">
-                        {points.toLocaleString('da-DK')}
-                      </div>
-                      <div className="font-condensed text-warm-gray uppercase tracking-wide" style={{ fontSize: '10px' }}>lokale pt</div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <hr className="border-warm-border" />
-
-        {/* ── Konto ─────────────────────────────────────────── */}
-        <section>
-          <p className="font-condensed uppercase text-warm-gray mb-4" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Konto</p>
-          <div className="border border-warm-border bg-cream-dark p-5 space-y-4">
-            <div>
-              <label className="font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray block mb-1">
-                Email
-              </label>
-              <p className="font-body text-ink text-sm">{user.email}</p>
-            </div>
-            <div className="pt-2 border-t border-warm-border">
-              <LogoutButton />
-            </div>
-          </div>
-        </section>
-
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#1a3329' }}>
+        <div className="font-condensed text-[#F2EDE4]/50 text-sm uppercase tracking-widest">Indlæser...</div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="px-5 py-5 text-center">
-      <div className="font-condensed font-bold text-ink text-2xl mb-1">{value}</div>
-      <div className="font-condensed uppercase text-warm-gray" style={{ fontSize: '10px', letterSpacing: '0.08em' }}>{label}</div>
+    <div
+      className="min-h-screen flex items-center justify-center px-6 py-12 relative"
+      style={{ background: '#1a3329' }}
+    >
+      {/* Radial gold glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(184,150,62,0.07) 0%, transparent 60%)' }}
+      />
+
+      {/* Profile kort */}
+      <div
+        className="relative w-full max-w-[480px] rounded-sm p-8 sm:p-10"
+        style={{ background: '#F2EDE4', boxShadow: '0 16px 48px rgba(0,0,0,0.3)' }}
+      >
+        {/* Logo */}
+        <div className="text-center mb-6">
+          <Link href="/dashboard" className="inline-block">
+            <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}>
+              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '28px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
+              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '14px', color: '#2C4A3E' }}>odega</span>
+              <span style={{ display: 'inline-block', width: '4px' }} />
+              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '28px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
+              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '14px', color: '#2C4A3E' }}>ets</span>
+            </span>
+          </Link>
+        </div>
+
+        <h1 className="font-display text-center mb-1" style={{ fontWeight: 700, fontSize: '28px', color: '#1A1A1A' }}>
+          Rediger profil
+        </h1>
+        <p className="font-body text-center text-sm mb-8" style={{ color: '#5C5C4A' }}>
+          Opdater dine oplysninger
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* ── Avatar upload ──────────────────────────────── */}
+          <div
+            className="flex items-center gap-4 p-4 rounded-sm border-[1.5px] border-dashed border-[#D4CFC4] bg-[#EDE8DF] cursor-pointer hover:border-[#B8963E] transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div
+              className="shrink-0 w-16 h-16 rounded-full flex items-center justify-center overflow-hidden"
+              style={{ background: '#2C4A3E' }}
+            >
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="font-condensed text-cream text-lg" style={{ fontWeight: 700 }}>
+                  {initials}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="font-condensed text-ink text-xs uppercase tracking-[0.08em] mb-0.5" style={{ fontWeight: 700 }}>
+                Profilbillede
+              </p>
+              <p className="font-body text-warm-gray text-xs">
+                Klik for at ændre · JPG/PNG · Maks 2MB
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+          </div>
+
+          {/* ── Fornavn + Efternavn ────────────────────────── */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
+                Fornavn
+              </label>
+              <input
+                type="text"
+                placeholder="Anders"
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
+                Efternavn
+              </label>
+              <input
+                type="text"
+                placeholder="Jensen"
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {/* ── Brugernavn ─────────────────────────────────── */}
+          <div>
+            <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
+              Brugernavn
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-body text-sm text-warm-gray">@</span>
+              <input
+                type="text"
+                placeholder="dit_brugernavn"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                className={`${inputClass} pl-8 pr-20`}
+              />
+              {usernameChanged && usernameStatus === 'available' && (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-condensed text-xs text-[#3D6B5A]" style={{ fontWeight: 700 }}>
+                  ✓ Ledigt
+                </span>
+              )}
+              {usernameChanged && usernameStatus === 'taken' && (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-condensed text-xs text-[#C8392B]" style={{ fontWeight: 700 }}>
+                  ✗ Optaget
+                </span>
+              )}
+              {usernameChanged && usernameStatus === 'checking' && (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-condensed text-xs text-warm-gray" style={{ fontWeight: 600 }}>
+                  Tjekker…
+                </span>
+              )}
+            </div>
+            <p className="font-body text-warm-gray text-xs mt-1.5">Vises på leaderboard og i spilrum</p>
+          </div>
+
+          {/* ── E-mail (readonly) ──────────────────────────── */}
+          <div>
+            <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
+              E-mail
+            </label>
+            <input
+              type="email"
+              value={userEmail}
+              readOnly
+              className={`${inputClass} bg-[#EDE8DF] text-[#5C5C4A] cursor-not-allowed`}
+            />
+            <p className="font-body text-warm-gray text-xs mt-1.5">E-mail kan ikke ændres herfra</p>
+          </div>
+
+          {/* ── Divider — Skift adgangskode ─────────────────── */}
+          <div className="flex items-center gap-3 py-2">
+            <div className="flex-1 h-[1px] bg-[#D4CFC4]" />
+            <span className="font-condensed text-xs uppercase tracking-[0.06em] text-warm-gray whitespace-nowrap" style={{ fontWeight: 600 }}>
+              Skift adgangskode
+            </span>
+            <div className="flex-1 h-[1px] bg-[#D4CFC4]" />
+          </div>
+          <p className="font-body text-warm-gray text-xs -mt-3">
+            Udfyld kun hvis du vil ændre din adgangskode.
+          </p>
+
+          {/* ── Nuværende adgangskode ──────────────────────── */}
+          <div>
+            <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
+              Nuværende adgangskode
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          {/* ── Ny adgangskode ─────────────────────────────── */}
+          <div>
+            <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
+              Ny adgangskode
+            </label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className={inputClass}
+            />
+            {newPassword.length > 0 && (
+              <div className="mt-2">
+                <div className="flex gap-1.5 mb-1">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="h-[3px] flex-1 rounded-full transition-colors"
+                      style={{ background: i <= strength.level ? strength.color : '#D4CFC4' }}
+                    />
+                  ))}
+                </div>
+                <p className="font-body text-xs" style={{ color: strength.color }}>{strength.label}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Error ──────────────────────────────────────── */}
+          {error && (
+            <div className="bg-[#C8392B]/10 border border-[#C8392B]/30 text-[#C8392B] font-body text-sm rounded-sm px-4 py-3">
+              {error}
+            </div>
+          )}
+
+          {/* ── Submit ─────────────────────────────────────── */}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full inline-flex items-center justify-center gap-2 font-condensed uppercase tracking-[0.08em] text-sm px-8 py-4 rounded-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
+            style={{ fontWeight: 700, background: '#2C4A3E', color: '#F2EDE4' }}
+            onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#1a3329' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#2C4A3E' }}
+          >
+            {saving && (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            )}
+            {saving ? 'Gemmer...' : 'Gem ændringer →'}
+          </button>
+        </form>
+
+        {/* Footer link */}
+        <p className="text-center font-body text-sm mt-6" style={{ color: '#5C5C4A' }}>
+          <Link href="/dashboard" className="font-semibold hover:opacity-70 transition-opacity" style={{ color: '#1a3329' }}>
+            ← Tilbage til dashboard
+          </Link>
+        </p>
+      </div>
     </div>
   )
 }
