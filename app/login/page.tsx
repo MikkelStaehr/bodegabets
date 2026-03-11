@@ -33,8 +33,8 @@ export default function LoginPage() {
       return setError(signInError.message)
     }
 
-    router.push('/dashboard')
     router.refresh()
+    router.push('/dashboard')
   }
 
   const inputClass =
