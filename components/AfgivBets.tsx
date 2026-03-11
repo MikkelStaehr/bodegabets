@@ -159,6 +159,14 @@ function firstWord(s: string) {
   return s.split(' ')[0] || s
 }
 
+/** Compute the correct 1/X/2 result for a finished match */
+function getCorrectOutcome(match: Match): '1' | 'X' | '2' | null {
+  if (match.status !== 'finished' || match.home_score == null || match.away_score == null) return null
+  if (match.home_score > match.away_score) return '1'
+  if (match.home_score < match.away_score) return '2'
+  return 'X'
+}
+
 function ExtraBets({
   matchId,
   isReadOnly,
@@ -247,6 +255,7 @@ function MatchCard({
   extraBets,
   onExtraChange,
   fastPoints,
+  userPrediction,
 }: {
   match: MatchWithOptions
   selectedOutcome: '1' | 'X' | '2' | null
@@ -257,31 +266,67 @@ function MatchCard({
   extraBets: ExtraBet[]
   onExtraChange: (matchId: number, extras: ExtraBet[]) => void
   fastPoints: number
+  userPrediction: '1' | 'X' | '2' | null
 }) {
+  const isFinished = match.status === 'finished'
+  const correctOutcome = getCorrectOutcome(match)
+
   return (
     <div
       className={`bg-white border rounded-lg mb-1.5 overflow-hidden transition-all ${
         selectedOutcome ? 'border-[#2C4A3E] shadow-[0_0_0_1px_#2C4A3E]' : 'border-black/10'
       }`}
     >
-      {/* Holdnavn + tid — én linje */}
+      {/* Holdnavn + tid/resultat — én linje */}
       <div className="flex items-center gap-2 px-2.5 h-10">
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           <span className="font-condensed font-bold text-[15px] text-[#1a3329] truncate max-w-[100px]">
             {match.home_team}
           </span>
-          <span className="text-[9px] text-[#7a7060] font-semibold shrink-0">vs</span>
+          {isFinished && match.home_score != null && match.away_score != null ? (
+            <span className="font-condensed font-bold text-[13px] text-[#7a7060] shrink-0">
+              {match.home_score} – {match.away_score}
+            </span>
+          ) : (
+            <span className="text-[9px] text-[#7a7060] font-semibold shrink-0">vs</span>
+          )}
           <span className="font-condensed font-bold text-[15px] truncate max-w-[100px]">
             {match.away_team}
           </span>
         </div>
-        <span className="text-[10px] text-[#7a7060] shrink-0">{formatKickoff(match.kickoff_at)}</span>
+        <span className="text-[10px] text-[#7a7060] shrink-0">
+          {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
+        </span>
       </div>
 
       {/* 1-X-2 */}
       <div className="flex gap-1 px-2.5 pb-2.5">
         {(['1', 'X', '2'] as const).map((o) => {
           const active = selectedOutcome === o
+          const isUserPick = isFinished && userPrediction === o
+          const isCorrect = isFinished && correctOutcome === o
+          const isUserCorrect = isUserPick && isCorrect
+
+          // Finished match result styling
+          let btnClass: string
+          if (isFinished && (isUserPick || isCorrect)) {
+            if (isUserCorrect) {
+              // User picked correctly: green bg + gold border
+              btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
+            } else if (isUserPick) {
+              // User picked wrong: green bg
+              btnClass = 'bg-[#27ae60] border-[#27ae60]'
+            } else {
+              // Correct result user didn't pick: gold border on neutral bg
+              btnClass = 'bg-[#F2EDE4] border-[#B8963E] border-[2.5px]'
+            }
+          } else if (active) {
+            btnClass = 'bg-[#1a3329] border-[#1a3329]'
+          } else {
+            btnClass = 'bg-[#F2EDE4] border-black/10 hover:border-[#2C4A3E]'
+          }
+
+          const textLight = active || isUserPick
           const sub =
             o === '1' ? firstWord(match.home_team) : o === '2' ? firstWord(match.away_team) : 'Uafgjort'
           return (
@@ -290,22 +335,18 @@ function MatchCard({
               type="button"
               disabled={disabled}
               onClick={() => onSelect(o)}
-              className={`flex-1 py-1.5 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${
-                active
-                  ? 'bg-[#1a3329] border-[#1a3329]'
-                  : 'bg-[#F2EDE4] border-black/10 hover:border-[#2C4A3E]'
-              } ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+              className={`flex-1 py-1.5 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${btnClass} ${disabled ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <span
                 className={`font-condensed text-[17px] font-bold leading-none ${
-                  active ? 'text-[#F2EDE4]' : 'text-[#7a7060]'
+                  textLight ? 'text-white' : 'text-[#7a7060]'
                 }`}
               >
                 {o}
               </span>
               <span
                 className={`text-[8px] font-medium ${
-                  active ? 'text-[#F2EDE4]/50' : 'text-[#7a7060]'
+                  textLight ? 'text-white/60' : 'text-[#7a7060]'
                 }`}
               >
                 {sub}
@@ -603,20 +644,26 @@ export default function AfgivBets({
             </div>
           </div>
 
-          {matches.map((match) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              selectedOutcome={getSelection(match.id)?.outcome ?? null}
-              onSelect={(o) => selectOutcome(match.id, o)}
-              disabled={isReadOnly || !matchBettingOpen(match)}
-              extraBetsEnabled={extraBetsEnabled}
-              isReadOnly={isReadOnly}
-              extraBets={getSelection(match.id)?.extraBets ?? []}
-              onExtraChange={updateExtraBets}
-              fastPoints={effectiveFastPoints}
-            />
-          ))}
+          {matches.map((match) => {
+            const matchBet = existingBets.find(
+              (b) => b.match_id === match.id && b.bet_type === 'match_result'
+            )
+            return (
+              <MatchCard
+                key={match.id}
+                match={match}
+                selectedOutcome={getSelection(match.id)?.outcome ?? null}
+                onSelect={(o) => selectOutcome(match.id, o)}
+                disabled={isReadOnly || !matchBettingOpen(match)}
+                extraBetsEnabled={extraBetsEnabled}
+                isReadOnly={isReadOnly}
+                extraBets={getSelection(match.id)?.extraBets ?? []}
+                onExtraChange={updateExtraBets}
+                fastPoints={effectiveFastPoints}
+                userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
+              />
+            )
+          })}
         </div>
 
         {/* Højre — Dine valg */}
