@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
+import InviteCodeShare from '@/components/games/InviteCodeShare'
 import RoundSlider from '@/components/games/RoundSlider'
 import type { Game, Round, RoundScore } from '@/types'
 
@@ -372,10 +373,7 @@ export default async function GamePage({ params }: Props) {
                 {typedGame.status === 'active' ? 'Aktiv' : 'Afsluttet'}
               </span>
             </div>
-            <div style={{ background: 'rgba(242,237,228,0.08)', border: '1px solid rgba(242,237,228,0.2)', borderRadius: 2, padding: '8px 14px', textAlign: 'center', flexShrink: 0 }}>
-              <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(242,237,228,0.5)', marginBottom: 4 }}>Invitationskode</p>
-              <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: '0.15em', color: '#F2EDE4' }}>{typedGame.invite_code}</p>
-            </div>
+            <InviteCodeShare code={typedGame.invite_code} />
           </div>
 
           {/* Stats strip */}
