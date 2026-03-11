@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import GameTicker from '@/components/GameTicker'
+import RotatingWord from '@/components/RotatingWord'
 import type { Profile } from '@/types'
 
 function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
@@ -83,7 +84,7 @@ export default async function HomePage() {
                   className="block font-display italic text-gold leading-[1.05]"
                   style={{ fontWeight: 900, fontSize: 'clamp(60px, 8.5vw, 96px)' }}
                 >
-                  vennerne.
+                  <RotatingWord />
                 </span>
               </h1>
 
