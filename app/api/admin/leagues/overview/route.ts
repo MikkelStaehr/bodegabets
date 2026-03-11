@@ -128,12 +128,13 @@ export async function GET(req: NextRequest) {
       }))
 
     const finished = rounds.filter((r) => r.status === 'finished')
-    const upcoming = rounds.filter((r) => r.status === 'upcoming')
 
     const crInfo = currentRoundByLeague.get(leagueId)
     const currentRoundMatch = crInfo
       ? rounds.find((r) => r.name === crInfo.round_name)
       : null
+
+    const upcoming = rounds.filter((r) => r.status === 'upcoming' && r.id !== currentRoundMatch?.id)
 
     let currentRound: RoundInfo | null = null
     let totalBets = 0
