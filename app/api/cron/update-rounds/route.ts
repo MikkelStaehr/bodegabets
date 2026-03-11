@@ -108,6 +108,19 @@ export async function GET(req: NextRequest) {
     `[cron/update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}`
   )
 
+  await supabaseAdmin
+    .from('admin_logs')
+    .insert({
+      type: 'cron_sync',
+      status: finishedIds.length > 0 || openIds.length > 0 ? 'success' : 'info',
+      message: `update-rounds: ${finishedIds.length} finished, ${openIds.length} opened, ${toSetDeadline.length} deadlines sat`,
+      metadata: {
+        rounds_marked_finished: finishedIds,
+        rounds_marked_open: openIds,
+        deadlines_set: toSetDeadline.map(r => r.id),
+      }
+    })
+
   return NextResponse.json({
     ok: true,
     timestamp: nowIso,
