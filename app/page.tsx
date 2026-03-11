@@ -63,9 +63,9 @@ export default async function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center w-full py-20">
 
             {/* Venstre — tekst */}
-            <div className="animate-fadeUp">
+            <div className="animate-fadeUp text-center lg:text-left">
               {/* Eyebrow */}
-              <div className="flex items-center gap-3 mb-8">
+              <div className="flex items-center justify-center lg:justify-start gap-3 mb-8">
                 <span className="block w-8 h-[2px] bg-gold" />
                 <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
                   Privat sport-betting
@@ -87,10 +87,10 @@ export default async function HomePage() {
                 </span>
               </h1>
 
-              <p className="font-body text-cream/50 text-lg max-w-md mb-2 leading-relaxed" style={{ fontWeight: 500 }}>
+              <p className="font-body text-cream/50 text-lg max-w-md mx-auto lg:mx-0 mb-2 leading-relaxed" style={{ fontWeight: 500 }}>
                 Ingen rigtige penge. Al prestige.
               </p>
-              <p className="font-body text-cream/40 text-base max-w-md mb-10 leading-relaxed">
+              <p className="font-body text-cream/40 text-base max-w-md mx-auto lg:mx-0 mb-10 leading-relaxed">
                 Opret private spilrum, afgiv bets på sportskampe og kæmp om point og ære med vennerne.
               </p>
 
@@ -107,7 +107,7 @@ export default async function HomePage() {
                   </svg>
                 </Link>
               ) : (
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
                   <Link
                     href="/register"
                     className="inline-flex items-center justify-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-90 transition-opacity"
@@ -129,7 +129,7 @@ export default async function HomePage() {
               )}
 
               {/* Pills */}
-              <div className="flex flex-wrap gap-2 mt-10">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mt-10 justify-center lg:justify-start">
                 {['Sport & ligaer', 'Konsensus-odds', 'Live resultater', 'Gratis'].map((pill) => (
                   <span
                     key={pill}
@@ -218,7 +218,7 @@ export default async function HomePage() {
 
       {/* ── 3. Sådan virker det ─────────────────────────────────── */}
       <section className="bg-cream">
-        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-24">
+        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-12 lg:py-24">
           {/* Eyebrow */}
           <div className="flex items-center gap-3 mb-3">
             <span className="block w-6 h-[2px] bg-gold" />
@@ -262,7 +262,7 @@ export default async function HomePage() {
 
       {/* ── 4. Features ────────────────────────────────────────── */}
       <section style={{ background: '#2C4A3E' }}>
-        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-24">
+        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-12 lg:py-24">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 items-start">
 
             {/* Venstre */}
