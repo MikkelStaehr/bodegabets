@@ -43,7 +43,7 @@ export default async function HomePage() {
         .select('home_team, away_team, home_score, away_score, kickoff_at')
         .eq('round_id', roundId)
         .order('kickoff_at', { ascending: true })
-    : { data: [] as { home_team: string; away_team: string; home_score: number | null; away_score: number | null; kickoff_at: string }[] }
+    : { data: null }
 
   const tickerItems = (roundMatches ?? []).map((m) =>
     `⚽ ${m.home_team} ${m.home_score ?? '?'}–${m.away_score ?? '?'} ${m.away_team} · ${roundName}`
