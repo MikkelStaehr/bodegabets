@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import DashboardGameCard from './DashboardGameCard'
 import LiveSidebar from './LiveSidebar'
 import JoinGameCard from './JoinGameCard'
+import PushNotificationBanner from './PushNotificationBanner'
 
 export type SportType = 'football' | 'cycling'
 
@@ -108,6 +109,8 @@ export default function DashboardContent({
         transition: 'color 0.3s ease, background 0.3s ease',
       } as React.CSSProperties}
     >
+      <PushNotificationBanner />
+
       {/* Sport tabs */}
       <div className="mb-4 -mx-4 px-4 overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="flex gap-1 min-w-max">
