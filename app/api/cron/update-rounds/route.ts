@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     if (finishedIds.includes(r.id)) return false
     const stat = statMap[r.id]
     if (!stat || !stat.minKickoff) return false
-    return stat.minKickoff <= nowIso
+    return stat.minKickoff <= sevenDaysFromNow
   })
 
   const openIds = toMarkOpen.map((r) => r.id)
