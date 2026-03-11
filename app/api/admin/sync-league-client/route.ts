@@ -25,6 +25,19 @@ export async function POST(req: NextRequest) {
 
   const syncRes = await syncLeagueViaBold(league_id)
 
+  const now = new Date().toISOString()
+  if (syncRes.errors.length === 0) {
+    await supabaseAdmin
+      .from('leagues')
+      .update({ sync_error: null, sync_status: 'ok', last_synced_at: now })
+      .eq('id', league_id)
+  } else {
+    await supabaseAdmin
+      .from('leagues')
+      .update({ sync_status: 'error', sync_error: syncRes.errors[0], last_synced_at: now })
+      .eq('id', league_id)
+  }
+
   let rounds_created = 0, matches_created = 0, matches_updated = 0
 
   if (rebuild_rounds) {
