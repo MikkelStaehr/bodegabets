@@ -182,110 +182,38 @@ export default function RegisterPage() {
     'w-full bg-white border-[1.5px] border-[#D4CFC4] text-[#1A1A1A] placeholder-[#5C5C4A]/50 rounded-sm px-4 py-3 font-body text-sm outline-none focus:border-[#1a3329] transition-colors min-h-[44px]'
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[1fr_3fr]">
-
-      {/* ══════════════════════════════════════════════════════
-          VENSTRE PANEL — forest
-          ══════════════════════════════════════════════════════ */}
+    <div
+      className="min-h-screen flex items-center justify-center px-6 py-12 relative"
+      style={{ background: '#1a3329' }}
+    >
+      {/* Radial gold glow */}
       <div
-        className="hidden lg:flex flex-col relative overflow-hidden"
-        style={{ background: '#1a3329' }}
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(184,150,62,0.07) 0%, transparent 60%)' }}
+      />
+
+      {/* Register kort */}
+      <div
+        className="relative w-full max-w-[480px] rounded-sm p-8 sm:p-10"
+        style={{ background: '#F2EDE4', boxShadow: '0 16px 48px rgba(0,0,0,0.3)' }}
       >
-        {/* Radial glow nederst venstre */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 20% 80%, rgba(184,150,62,0.08) 0%, transparent 60%)' }}
-        />
-        {/* Guld vertikal linje højre side */}
-        <div
-          className="absolute top-0 right-0 w-[1px] h-full"
-          style={{ background: 'linear-gradient(to bottom, transparent, rgba(184,150,62,0.2) 30%, rgba(184,150,62,0.2) 70%, transparent)' }}
-        />
-
-        {/* Midten */}
-        <div className="flex-1 flex items-center px-10">
-          <div className="max-w-md">
-            {/* Eyebrow */}
-            <div className="flex items-center gap-3 mb-8">
-              <span className="block w-8 h-[2px] bg-gold" />
-              <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
-                Ny konto
-              </span>
-            </div>
-
-            <h1 className="mb-8">
-              <span
-                className="block font-condensed text-cream uppercase leading-[0.95]"
-                style={{ fontWeight: 800, fontSize: '56px' }}
-              >
-                Klar til
-              </span>
-              <span
-                className="block font-display italic text-gold leading-[1.05]"
-                style={{ fontWeight: 900, fontSize: '62px' }}
-              >
-                kampen?
-              </span>
-            </h1>
-
-            <p className="font-body text-cream/45 text-base leading-relaxed mb-12 max-w-sm">
-              Opret din gratis profil og join et spilrum med vennerne.
-              Ingen rigtige penge — kun prestige på spil.
-            </p>
-
-            {/* Perks */}
-            <div className="space-y-5">
-              {[
-                { icon: '🏆', text: 'Kæmp om førstepladsen i private spilrum' },
-                { icon: '📊', text: 'Konsensus-odds belønner modige tips' },
-                { icon: '⚡', text: 'Live resultater og leaderboard' },
-                { icon: '🎯', text: 'Ekstra bets: BTTS, over/under og mere' },
-              ].map(({ icon, text }) => (
-                <div key={text} className="flex items-center gap-4">
-                  <span
-                    className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-base"
-                    style={{ background: 'rgba(184,150,62,0.08)', border: '1.5px solid rgba(184,150,62,0.25)' }}
-                  >
-                    {icon}
-                  </span>
-                  <span className="font-body text-cream/60 text-sm">{text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Logo */}
+        <div className="text-center mb-6">
+          <Link href="/" className="inline-block">
+            <span className="font-display italic text-lg" style={{ fontWeight: 700, color: '#1a3329' }}>
+              Bodega <span style={{ color: '#B8963E' }}>Bets</span>
+            </span>
+          </Link>
         </div>
 
-        {/* Bund */}
-        <div className="px-10 pb-8">
-          <p className="font-body text-cream/20 text-xs">
-            © 2026 Bodega Bets — Ingen rigtige penge involveret
-          </p>
-        </div>
-      </div>
+        <h1 className="font-display text-center mb-1" style={{ fontWeight: 700, fontSize: '28px', color: '#1A1A1A' }}>
+          Opret konto
+        </h1>
+        <p className="font-body text-center text-sm mb-8" style={{ color: '#5C5C4A' }}>
+          Gratis — ingen kreditkort nødvendigt
+        </p>
 
-      {/* ══════════════════════════════════════════════════════
-          HØJRE PANEL — cream + formular
-          ══════════════════════════════════════════════════════ */}
-      <div className="bg-cream flex items-center justify-center px-6 py-12 lg:py-0 min-h-screen">
-        <div className="w-full max-w-[420px]">
-
-          {/* Mobil logo */}
-          <div className="lg:hidden mb-8">
-            <Link href="/" className="inline-block">
-              <span className="font-display italic text-ink text-xl" style={{ fontWeight: 700 }}>
-                Bodega <span className="text-gold">Bets</span>
-              </span>
-            </Link>
-          </div>
-
-          <h1 className="font-display text-ink mb-1" style={{ fontWeight: 700, fontSize: 'clamp(26px, 4vw, 32px)' }}>
-            Opret konto
-          </h1>
-          <p className="font-body text-warm-gray text-sm mb-8">
-            Gratis at tilmelde sig — ingen kreditkort nødvendigt
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
 
             {/* ── Avatar upload ──────────────────────────────── */}
             <div
@@ -513,19 +441,18 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          {/* ── Footer links ─────────────────────────────────── */}
-          <p className="text-center font-body text-sm text-warm-gray mt-6">
-            Har du allerede en konto?{' '}
-            <Link href="/login" className="text-forest font-semibold hover:opacity-70 transition-opacity">
-              Log ind her
-            </Link>
-          </p>
+        {/* Footer links */}
+        <p className="text-center font-body text-sm mt-6" style={{ color: '#5C5C4A' }}>
+          Har du allerede en konto?{' '}
+          <Link href="/login" className="font-semibold hover:opacity-70 transition-opacity" style={{ color: '#1a3329' }}>
+            Log ind her
+          </Link>
+        </p>
 
-          <p className="text-center font-body text-xs text-warm-gray/60 mt-4 leading-relaxed">
-            Ved at oprette en konto accepterer du vores vilkår.
-            Bodega Bets involverer aldrig rigtige penge.
-          </p>
-        </div>
+        <p className="text-center font-body text-xs mt-4 leading-relaxed" style={{ color: 'rgba(92,92,74,0.6)' }}>
+          Ved at oprette en konto accepterer du vores vilkår.
+          Bodega Bets involverer aldrig rigtige penge.
+        </p>
       </div>
     </div>
   )
