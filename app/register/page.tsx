@@ -179,7 +179,7 @@ export default function RegisterPage() {
 
   /* ── Input classes ───────────────────────────────────────── */
   const inputClass =
-    'w-full bg-white border-[1.5px] border-[#D4CFC4] text-[#1A1A1A] placeholder-[#5C5C4A]/50 rounded-sm px-4 py-3 font-body text-sm outline-none focus:border-[#1a3329] transition-colors'
+    'w-full bg-white border-[1.5px] border-[#D4CFC4] text-[#1A1A1A] placeholder-[#5C5C4A]/50 rounded-sm px-4 py-3 font-body text-sm outline-none focus:border-[#1a3329] transition-colors min-h-[44px]'
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
@@ -287,7 +287,7 @@ export default function RegisterPage() {
             </Link>
           </div>
 
-          <h1 className="font-display text-ink mb-1" style={{ fontWeight: 700, fontSize: '32px' }}>
+          <h1 className="font-display text-ink mb-1" style={{ fontWeight: 700, fontSize: 'clamp(26px, 4vw, 32px)' }}>
             Opret konto
           </h1>
           <p className="font-body text-warm-gray text-sm mb-8">
@@ -474,7 +474,7 @@ export default function RegisterPage() {
                   type="button"
                   onClick={checkInviteCode}
                   disabled={inviteCode.trim().length < 4}
-                  className="font-condensed text-xs uppercase tracking-[0.08em] px-5 py-3 rounded-sm border-[1.5px] border-[#D4CFC4] text-ink hover:border-[#1a3329] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  className="font-condensed text-xs uppercase tracking-[0.08em] px-5 py-3 rounded-sm border-[1.5px] border-[#D4CFC4] text-ink hover:border-[#1a3329] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
                   style={{ fontWeight: 700 }}
                 >
                   Tjek
@@ -503,7 +503,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 font-condensed uppercase tracking-[0.08em] text-sm px-8 py-4 rounded-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full inline-flex items-center justify-center gap-2 font-condensed uppercase tracking-[0.08em] text-sm px-8 py-4 rounded-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
               style={{ fontWeight: 700, background: '#2C4A3E', color: '#F2EDE4' }}
               onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1a3329' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#2C4A3E' }}
