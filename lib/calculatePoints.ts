@@ -37,7 +37,7 @@ function getKonsensus(sameCount: number, totalCount: number): number {
 }
 
 // Tjek om prediction er korrekt
-function isBetCorrect(
+export function isBetCorrect(
   betType: string,
   prediction: string,
   homeScore: number,
