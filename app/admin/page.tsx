@@ -22,7 +22,7 @@ export default async function AdminPage() {
   ] = await Promise.all([
     supabaseAdmin
       .from('leagues')
-      .select('id, name, country, bold_slug, fixturedownload_slug, last_synced_at, sync_status, sync_error, total_matches')
+      .select('id, name, country, bold_slug, fixturedownload_slug, last_synced_at, sync_status, sync_error, total_matches:league_matches(count)')
       .order('name'),
 
     supabaseAdmin
@@ -124,7 +124,7 @@ export default async function AdminPage() {
     last_synced_at: (l as { last_synced_at?: string }).last_synced_at ?? null,
     sync_status: (l as { sync_status?: string }).sync_status ?? null,
     sync_error: (l as { sync_error?: string }).sync_error ?? null,
-    total_matches: (l as { total_matches?: number }).total_matches ?? 0,
+    total_matches: (l.total_matches as unknown as { count: number }[])?.[0]?.count ?? 0,
   }))
 
   const syncLogs = (syncLogsData ?? []).map((log) => ({
