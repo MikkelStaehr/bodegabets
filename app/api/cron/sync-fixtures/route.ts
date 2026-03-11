@@ -50,6 +50,18 @@ export async function GET(req: NextRequest) {
       { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0 }
     )
 
+    await supabaseAdmin
+      .from('admin_logs')
+      .insert({
+        type: 'cron_sync',
+        status: totals.synced > 0 ? 'success' : 'info',
+        message: `sync-fixtures: ${results.length} leagues, ${totals.matches_created} created, ${totals.matches_updated} updated`,
+        metadata: {
+          leagues_synced: results.length,
+          ...totals,
+        }
+      })
+
     return NextResponse.json({
       ok: true,
       synced_at:      new Date().toISOString(),
@@ -59,6 +71,13 @@ export async function GET(req: NextRequest) {
     })
   } catch (err) {
     console.error('[cron/sync-fixtures]', err)
+    await supabaseAdmin
+      .from('admin_logs')
+      .insert({
+        type: 'cron_sync',
+        status: 'error',
+        message: `sync-fixtures failed: ${String(err)}`,
+      })
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

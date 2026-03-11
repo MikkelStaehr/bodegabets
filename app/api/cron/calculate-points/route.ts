@@ -35,5 +35,17 @@ export async function GET(req: NextRequest) {
   // Synkroniser profiles.points med sum af game_members.points for alle brugere
   const { updated } = await syncProfilesPoints()
 
+  await supabaseAdmin
+    .from('admin_logs')
+    .insert({
+      type: 'cron_sync',
+      status: processed > 0 ? 'success' : 'info',
+      message: `calculate-points: ${processed} rounds processed, ${updated} profiles updated`,
+      metadata: {
+        rounds_processed: processed,
+        profiles_updated: updated,
+      }
+    })
+
   return NextResponse.json({ ok: true, processed, profiles_updated: updated })
 }
