@@ -112,6 +112,28 @@ export default async function RoundPage({ params }: Props) {
 
   const typedBets = (betsData ?? []) as Bet[]
 
+  // Hent rivalries for denne liga
+  const rivalryInfo: Record<number, { rivalry_name: string; multiplier: number }> = {}
+  if (leagueId) {
+    const { data: rivalries } = await supabase
+      .from('rivalries')
+      .select('home_team, away_team, rivalry_name, multiplier')
+      .eq('league_id', leagueId)
+
+    if (rivalries) {
+      const rivalryLookup = new Map<string, { rivalry_name: string; multiplier: number }>()
+      for (const r of rivalries) {
+        const info = { rivalry_name: r.rivalry_name, multiplier: Number(r.multiplier) }
+        rivalryLookup.set(`${r.home_team}|${r.away_team}`, info)
+        rivalryLookup.set(`${r.away_team}|${r.home_team}`, info)
+      }
+      for (const m of matches) {
+        const rivalry = rivalryLookup.get(`${m.home_team}|${m.away_team}`)
+        if (rivalry) rivalryInfo[m.id] = rivalry
+      }
+    }
+  }
+
   // Ticker items for round page
   const tickerItems: string[] = []
   if (typedRound.betting_closes_at && typedRound.status === 'open') {
@@ -153,6 +175,8 @@ export default async function RoundPage({ params }: Props) {
       existingBets={typedBets}
       userPoints={(membership as { betting_balance?: number }).betting_balance ?? membership.points ?? 1000}
       tickerItems={tickerItems}
+      rivalryInfo={rivalryInfo}
+      totalMatchesInRound={matches.length}
     />
   )
 }
