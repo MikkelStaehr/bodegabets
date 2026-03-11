@@ -440,17 +440,6 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── 7. Footer ──────────────────────────────────────────── */}
-      <footer className="bg-forest border-t border-white/[0.06]">
-        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-8 flex items-center justify-between">
-          <span className="font-display italic text-cream text-lg" style={{ fontWeight: 700 }}>
-            Bodega Bets
-          </span>
-          <span className="font-body text-cream/30 text-sm">
-            © 2026 — Ingen rigtige penge involveret
-          </span>
-        </div>
-      </footer>
     </div>
   )
 }
