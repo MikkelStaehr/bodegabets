@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
 import { useToast } from '@/components/ui/Toast'
+import { registerServiceWorker, subscribeToPush, getExistingSubscription } from '@/lib/pushNotifications'
 
 const supabase = createBrowserSupabaseClient()
 
@@ -58,6 +59,11 @@ export default function ProfileEditPage() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
 
+  /* ── Push notifications state ────────────────────────────── */
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(true)
+  const [pushToggling, setPushToggling] = useState(false)
+
   /* ── Load profile data ─────────────────────────────────── */
   useEffect(() => {
     async function loadProfile() {
@@ -91,6 +97,18 @@ export default function ProfileEditPage() {
         }
       }
       setPageLoading(false)
+
+      // Check push subscription status
+      if ('Notification' in window && 'serviceWorker' in navigator) {
+        try {
+          const res = await fetch('/api/push-subscription')
+          const { subscribed } = await res.json()
+          setPushEnabled(subscribed)
+        } catch {
+          // Ignore
+        }
+      }
+      setPushLoading(false)
     }
     loadProfile()
   }, [router])
@@ -131,6 +149,58 @@ export default function ProfileEditPage() {
     const reader = new FileReader()
     reader.onload = (ev) => setAvatarPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
+  }
+
+  /* ── Push notification toggle ─────────────────────────── */
+  async function handlePushToggle() {
+    setPushToggling(true)
+    try {
+      if (pushEnabled) {
+        // Unsubscribe
+        const registration = await registerServiceWorker()
+        if (registration) {
+          const sub = await getExistingSubscription(registration)
+          if (sub) {
+            await fetch('/api/push-subscription', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint: sub.endpoint }),
+            })
+            await sub.unsubscribe()
+          }
+        }
+        setPushEnabled(false)
+        toast('Notifikationer slået fra', 'success')
+      } else {
+        // Subscribe
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') {
+          setPushToggling(false)
+          return
+        }
+        const registration = await registerServiceWorker()
+        if (!registration) {
+          setPushToggling(false)
+          return
+        }
+        let subscription = await getExistingSubscription(registration)
+        if (!subscription) {
+          subscription = await subscribeToPush(registration)
+        }
+        if (subscription) {
+          await fetch('/api/push-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription: subscription.toJSON() }),
+          })
+          setPushEnabled(true)
+          toast('Notifikationer slået til', 'success')
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
+    setPushToggling(false)
   }
 
   /* ── Initials ──────────────────────────────────────────── */
@@ -441,6 +511,42 @@ export default function ProfileEditPage() {
               </div>
             )}
           </div>
+
+          {/* ── Notifikationer ──────────────────────────────── */}
+          {'Notification' in globalThis && (
+            <>
+              <div className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-[1px] bg-[#D4CFC4]" />
+                <span className="font-condensed text-xs uppercase tracking-[0.06em] text-warm-gray whitespace-nowrap" style={{ fontWeight: 600 }}>
+                  Notifikationer
+                </span>
+                <div className="flex-1 h-[1px] bg-[#D4CFC4]" />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-condensed text-xs uppercase tracking-[0.08em] text-ink" style={{ fontWeight: 600 }}>
+                    Bet-deadline påmindelser
+                  </p>
+                  <p className="font-body text-warm-gray text-xs mt-0.5">
+                    Få besked når deadline nærmer sig
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePushToggle}
+                  disabled={pushLoading || pushToggling}
+                  className="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50"
+                  style={{ background: pushEnabled ? '#2C4A3E' : '#D4CFC4' }}
+                >
+                  <span
+                    className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                    style={{ transform: pushEnabled ? 'translateX(20px)' : 'translateX(0)' }}
+                  />
+                </button>
+              </div>
+            </>
+          )}
 
           {/* ── Error ──────────────────────────────────────── */}
           {error && (
