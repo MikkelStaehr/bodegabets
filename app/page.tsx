@@ -27,28 +27,30 @@ export default async function HomePage() {
     .order('points', { ascending: false })
     .limit(10)
 
-  // Hent den seneste færdige runde og dens kampe til ticker
-  const { data: latestRound } = await supabase
-    .from('rounds')
-    .select('id, name')
-    .eq('status', 'finished')
-    .order('betting_closes_at', { ascending: false })
-    .limit(1)
-    .single()
+  // Hent seneste resultater på tværs af alle ligaer til ticker
+  const { data: tickerMatches } = await supabase
+    .from('matches')
+    .select('home_team, away_team, home_score, away_score, match_date, round:rounds!inner(status, betting_closes_at)')
+    .eq('rounds.status', 'finished')
+    .order('match_date', { ascending: false })
+    .limit(20)
 
-  const roundId = latestRound?.id
-  const roundName = latestRound?.name ?? ''
-  const { data: roundMatches } = roundId
-    ? await supabase
-        .from('matches')
-        .select('home_team, away_team, home_score, away_score, kickoff_at')
-        .eq('round_id', roundId)
-        .order('kickoff_at', { ascending: true })
-    : { data: null }
+  // Shuffle (Fisher-Yates)
+  const shuffled = [...(tickerMatches ?? [])]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
 
-  const tickerItems = (roundMatches ?? []).map((m) =>
-    `⚽ ${m.home_team} ${m.home_score ?? '?'}–${m.away_score ?? '?'} ${m.away_team} · ${roundName}`
-  )
+  const tickerItems = shuffled.map((m) => {
+    const round = m.round as unknown as { betting_closes_at: string | null } | null
+    const dateStr = m.match_date
+      ? new Date(m.match_date).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+      : (round?.betting_closes_at
+        ? new Date(round.betting_closes_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+        : '')
+    return `⚽ ${m.home_team} ${m.home_score ?? '?'}–${m.away_score ?? '?'} ${m.away_team}${dateStr ? ` · ${dateStr}` : ''}`
+  })
 
   const ranked = assignRanks((profiles as Profile[]) ?? [])
 
