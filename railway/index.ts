@@ -39,7 +39,13 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-// ─── Auth middleware ────────────────────────────────────────────────────────
+// ─── GET /health (public, no auth) ──────────────────────────────────────────
+
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, timestamp: new Date().toISOString() })
+})
+
+// ─── Auth middleware (all routes below require CRON_SECRET) ─────────────────
 
 function authorize(req: express.Request, res: express.Response, next: express.NextFunction): void {
   const auth = req.headers.authorization
@@ -51,12 +57,6 @@ function authorize(req: express.Request, res: express.Response, next: express.Ne
 }
 
 app.use(authorize)
-
-// ─── GET /health ────────────────────────────────────────────────────────────
-
-app.get('/health', (_req, res) => {
-  res.json({ ok: true, timestamp: new Date().toISOString() })
-})
 
 // ─── GET /sync-scores ───────────────────────────────────────────────────────
 
