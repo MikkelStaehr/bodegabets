@@ -40,11 +40,19 @@ export async function GET(req: NextRequest) {
       (new Date(round.betting_closes_at!).getTime() - now.getTime()) / (1000 * 60 * 60)
     )
 
-    // Find games using this league
-    const { data: games } = await supabaseAdmin
-      .from('games')
-      .select('id, name')
+    // Find games using this league via game_leagues junction table
+    const { data: gameLeagueRows } = await supabaseAdmin
+      .from('game_leagues')
+      .select('game_id')
       .eq('league_id', round.league_id)
+
+    const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
+    const { data: games } = gameIdsForLeague.length
+      ? await supabaseAdmin
+          .from('games')
+          .select('id, name')
+          .in('id', gameIdsForLeague)
+      : { data: [] as { id: number; name: string }[] }
 
     if (!games?.length) continue
 

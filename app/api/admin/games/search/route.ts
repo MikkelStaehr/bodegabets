@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
   const qPattern = `%${q}%`
 
   // Søg først på eksakt invite_code, ellers partial match på name
-  let games: { id: number; name: string; invite_code: string; status: string; created_at: string; league_id: number | null }[] | null
+  let games: { id: number; name: string; invite_code: string; status: string; created_at: string }[] | null
   const { data: byCode } = await supabaseAdmin
     .from('games')
-    .select('id, name, invite_code, status, created_at, league_id')
+    .select('id, name, invite_code, status, created_at')
     .eq('invite_code', qUpper)
     .limit(1)
   if (byCode?.length) {
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   } else {
     const { data: byName } = await supabaseAdmin
       .from('games')
-      .select('id, name, invite_code, status, created_at, league_id')
+      .select('id, name, invite_code, status, created_at')
       .ilike('name', qPattern)
       .limit(5)
     games = byName
@@ -39,12 +39,20 @@ export async function GET(req: NextRequest) {
   const game = games[0]
   const gameId = game.id as number
 
-  const leagueId = game.league_id as number | null
+  // Hent league_id via game_leagues junction table
+  const { data: gameLeague } = await supabaseAdmin
+    .from('game_leagues')
+    .select('league_id')
+    .eq('game_id', gameId)
+    .limit(1)
+    .single()
+
+  const leagueId = gameLeague?.league_id as number | null
+
   const [
     { data: league },
     { data: members },
     { data: rounds },
-    { data: currentRoundRow },
   ] = await Promise.all([
     leagueId
       ? supabaseAdmin.from('leagues').select('name').eq('id', leagueId).single()
@@ -52,11 +60,10 @@ export async function GET(req: NextRequest) {
     supabaseAdmin
       .from('game_members')
       .select(`
-        user_id, points,
+        user_id,
         profile:profiles(username)
       `)
-      .eq('game_id', gameId)
-      .order('points', { ascending: false }),
+      .eq('game_id', gameId),
     leagueId
       ? supabaseAdmin
           .from('rounds')
@@ -64,22 +71,19 @@ export async function GET(req: NextRequest) {
           .eq('league_id', leagueId)
           .order('betting_closes_at', { ascending: true })
       : Promise.resolve({ data: [] }),
-    leagueId
-      ? supabaseAdmin.from('current_rounds').select('round_name').eq('league_id', leagueId).maybeSingle()
-      : Promise.resolve({ data: null }),
   ])
 
-  const crName = (currentRoundRow as { round_name?: string } | null)?.round_name
-  const matchingRound = crName
-    ? (rounds ?? []).find((r: { name: string }) => r.name === crName)
-    : null
+  // Find current round: latest non-finished round, or last round overall
+  const currentRoundMatch = (rounds ?? []).find((r: { status: string }) =>
+    r.status === 'open' || r.status === 'upcoming'
+  )
   const currentRoundName =
-    matchingRound?.name ??
+    currentRoundMatch?.name ??
     (rounds?.length ? (rounds as { name: string }[])[(rounds as unknown[]).length - 1]?.name : null) ??
     '—'
 
   let totalBets = 0
-  const roundForBets = matchingRound ?? (rounds ?? []).find((r: { status: string }) => r.status === 'open')
+  const roundForBets = currentRoundMatch ?? (rounds ?? []).find((r: { status: string }) => r.status === 'open')
   if (roundForBets) {
     const { data: matchRows } = await supabaseAdmin.from('matches').select('id').eq('round_id', roundForBets.id)
     const matchIds = (matchRows ?? []).map((m: { id: number }) => m.id)
@@ -89,13 +93,12 @@ export async function GET(req: NextRequest) {
     totalBets = count ?? 0
   }
 
-  const ranked = (members ?? []).map((m: { user_id: string; points: number; profile?: { username?: string } | { username?: string }[] }, i: number) => {
+  const ranked = (members ?? []).map((m: { user_id: string; profile?: { username?: string } | { username?: string }[] }, i: number) => {
     const p = Array.isArray(m.profile) ? m.profile[0] : m.profile
     return {
       id: m.user_id,
       username: (p as { username?: string })?.username ?? '—',
       rank: i + 1,
-      points: m.points,
     }
   })
 

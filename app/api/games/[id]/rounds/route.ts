@@ -14,21 +14,22 @@ export async function GET(_req: NextRequest, { params }: Props) {
 
   const supabase = await createServerSupabaseClient()
 
-  // Hent game for at finde league_id
-  const { data: game } = await supabase
-    .from('games')
+  // Hent league_id via game_leagues junction table
+  const { data: gameLeague } = await supabase
+    .from('game_leagues')
     .select('league_id')
-    .eq('id', gameId)
+    .eq('game_id', gameId)
+    .limit(1)
     .single()
 
-  if (!game?.league_id) {
+  if (!gameLeague?.league_id) {
     return NextResponse.json({ count: 0 })
   }
 
   const { count } = await supabase
     .from('rounds')
     .select('id', { count: 'exact', head: true })
-    .eq('league_id', game.league_id)
+    .eq('league_id', gameLeague.league_id)
 
   return NextResponse.json({ count: count ?? 0 })
 }

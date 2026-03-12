@@ -49,8 +49,6 @@ export async function PATCH(req: NextRequest) {
     .from('leagues')
     .update({
       fixturedownload_slug: fixturedownload_slug?.trim() || null,
-      sync_status: 'pending',
-      sync_error: null,
     })
     .eq('id', league_id)
 

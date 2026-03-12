@@ -9,7 +9,6 @@ type BetInput = {
   bet_type: BetType
   prediction: string
   stake: number
-  potential_win?: number
 }
 
 export async function POST(req: NextRequest, { params }: Props) {
@@ -51,10 +50,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Betting-deadline er overskredet' }, { status: 400 })
   }
 
-  // Tjek at brugeren er game_member og hent betting_balance (indsats-wallet)
+  // Tjek at brugeren er game_member
   const { data: member } = await supabaseAdmin
     .from('game_members')
-    .select('betting_balance')
+    .select('id')
     .eq('game_id', bodyGameId)
     .eq('user_id', user.id)
     .single()
@@ -63,10 +62,7 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Du er ikke med i dette spil' }, { status: 403 })
   }
 
-  const balance = (member as { betting_balance?: number }).betting_balance ?? 1000
-
   // Valider indsatser (minimum 10 pt for side-bets; match_result har stake 0)
-  const totalStake = bets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
   for (const bet of bets) {
     if (bet.stake < 0) {
       return NextResponse.json({ error: 'Indsats kan ikke være negativ' }, { status: 400 })
@@ -74,13 +70,6 @@ export async function POST(req: NextRequest, { params }: Props) {
     if (bet.stake > 0 && bet.stake < 10) {
       return NextResponse.json({ error: 'Minimum indsats er 10 pt' }, { status: 400 })
     }
-  }
-
-  if (totalStake > balance) {
-    return NextResponse.json(
-      { error: `Ikke nok point. Du har ${balance} pt, men bruger ${totalStake} pt.` },
-      { status: 400 }
-    )
   }
 
   // Validér at alle match_ids tilhører denne runde
@@ -118,9 +107,7 @@ export async function POST(req: NextRequest, { params }: Props) {
     bet_type: b.bet_type,
     prediction: b.prediction,
     stake: b.stake,
-    potential_win: b.potential_win ?? null,
     result: 'pending' as const,
-    points_delta: null,
   }))
 
   const { error: insertError } = await supabaseAdmin.from('bets').insert(rows)

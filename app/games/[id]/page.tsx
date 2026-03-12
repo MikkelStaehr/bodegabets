@@ -15,19 +15,19 @@ type Props = {
 
 type MemberRow = {
   user_id: string
-  points: number
+  earnings: number
   profile: { username: string } | null
 }
 
 type RoundScoreMap = Record<string, Record<number, number>>
 
-function assignRanks<T extends { points: number }>(rows: T[]): (T & { rank: number })[] {
+function assignRanks<T extends { earnings: number }>(rows: T[]): (T & { rank: number })[] {
   return rows.map((row, i, arr) => ({
     ...row,
     rank:
       i === 0
         ? 1
-        : row.points === arr[i - 1].points
+        : row.earnings === arr[i - 1].earnings
         ? (arr[i - 1] as T & { rank: number }).rank
         : i + 1,
   }))
@@ -60,15 +60,23 @@ export default async function GamePage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Hent game først for at finde league_id
+  // Hent game
   const { data: game } = await supabase
     .from('games')
-    .select('id, name, description, host_id, invite_code, status, created_at, league_id')
+    .select('id, name, host_id, invite_code, status, created_at')
     .eq('id', gameId)
     .single()
 
   if (!game) notFound()
-  const gameLeagueId = (game as { league_id?: number }).league_id
+
+  // Hent league_id fra game_leagues junction
+  const { data: gameLeagueRow } = await supabase
+    .from('game_leagues')
+    .select('league_id')
+    .eq('game_id', gameId)
+    .limit(1)
+    .maybeSingle()
+  const gameLeagueId = gameLeagueRow?.league_id as number | null ?? null
 
   const [
     { data: rawMembers },
@@ -80,14 +88,14 @@ export default async function GamePage({ params }: Props) {
   ] = await Promise.all([
     supabase
       .from('game_members')
-      .select('user_id, points, profile:profiles(username)')
+      .select('user_id, earnings, profile:profiles(username)')
       .eq('game_id', gameId)
-      .order('points', { ascending: false }),
+      .order('earnings', { ascending: false }),
 
     gameLeagueId
       ? supabase
           .from('rounds')
-          .select('id, name, stage, status, betting_opens_at, betting_closes_at')
+          .select('id, name, status, betting_closes_at')
           .eq('league_id', gameLeagueId)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -124,23 +132,14 @@ export default async function GamePage({ params }: Props) {
 
   if (!myMembership) redirect('/dashboard')
 
-  const leagueId = (game as { league_id?: number }).league_id ?? null
-  const { data: currentRound } =
-    leagueId != null
-      ? await supabase
-          .from('current_rounds')
-          .select('round_name, round_status, first_kickoff, last_kickoff, next_kickoff')
-          .eq('league_id', leagueId)
-          .single()
-      : { data: null }
+  const leagueId = gameLeagueId
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
-  const activeRoundEarly = currentRound?.round_name
-    ? typedRoundsEarly.find((r) => r.name === currentRound.round_name) ?? null
-    : typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'open') ??
-      typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'active') ??
-      typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'upcoming') ??
-      null
+  const activeRoundEarly =
+    typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'open') ??
+    typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'active') ??
+    typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'upcoming') ??
+    null
   const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string } | null) ?? null
 
   const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
@@ -200,7 +199,7 @@ export default async function GamePage({ params }: Props) {
     members.map((m) => ({
       user_id: m.user_id,
       username: m.profile?.username ?? 'Ukendt',
-      points: m.points,
+      earnings: m.earnings,
     }))
   )
 
@@ -218,18 +217,11 @@ export default async function GamePage({ params }: Props) {
 
   const finishedRounds = sortedRounds.filter((r) => r.computedStatus === 'finished')
 
-  // Aktuel runde: brug current_rounds.round_name hvis tilgængelig, ellers fallback til computeRoundStatus
-  const activeRound = currentRound?.round_name
-    ? (() => {
-        const r = sortedRounds.find((r) => r.name === currentRound.round_name)
-        if (!r) return null
-        const status = (currentRound.round_status as 'open' | 'active' | 'upcoming' | 'finished') || r.computedStatus
-        return { ...r, computedStatus: status }
-      })()
-    : sortedRounds.find((r) => r.computedStatus === 'open') ??
-      sortedRounds.find((r) => r.computedStatus === 'active') ??
-      sortedRounds.find((r) => r.computedStatus === 'upcoming') ??
-      null
+  const activeRound =
+    sortedRounds.find((r) => r.computedStatus === 'open') ??
+    sortedRounds.find((r) => r.computedStatus === 'active') ??
+    sortedRounds.find((r) => r.computedStatus === 'upcoming') ??
+    null
 
   // Seneste færdige runde
   const latestFinished = [...sortedRounds]
@@ -382,7 +374,7 @@ export default async function GamePage({ params }: Props) {
               { label: 'Deltagere', value: String(members.length), gold: false },
               { label: 'Runder',    value: String(typedRounds.length), gold: false },
               { label: 'Placering', value: myEntry ? `#${myEntry.rank}` : '—', gold: false },
-              { label: 'Dine point', value: myEntry?.points.toLocaleString('da-DK') ?? '—', gold: true },
+              { label: 'Dine point', value: myEntry?.earnings.toLocaleString('da-DK') ?? '—', gold: true },
             ].map((stat, i) => (
               <div key={stat.label} style={{ paddingLeft: i > 0 ? 12 : 0, paddingRight: i < 3 ? 12 : 0, borderRight: i < 3 ? '1px solid rgba(242,237,228,0.15)' : 'none' }}>
                 <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(242,237,228,0.5)', marginBottom: 4 }}>{stat.label}</p>
@@ -410,8 +402,8 @@ export default async function GamePage({ params }: Props) {
                     name: activeRound.name,
                     round_status: activeRound.computedStatus,
                     betting_closes_at: activeRound.betting_closes_at,
-                    first_kickoff: (currentRound as { first_kickoff?: string } | null)?.first_kickoff ?? null,
-                    next_kickoff: (currentRound as { next_kickoff?: string } | null)?.next_kickoff ?? null,
+                    first_kickoff: null,
+                    next_kickoff: null,
                   }
                 : null
             }
@@ -486,7 +478,7 @@ export default async function GamePage({ params }: Props) {
                   {/* T */}
                   <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, textAlign: 'center', color: '#8B2E2E' }}>{entry.losses}</span>
                   {/* PT */}
-                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textAlign: 'right', color: entry.rank === 1 ? '#B8963E' : '#1a1a1a' }}>{entry.points.toLocaleString('da-DK')}</span>
+                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textAlign: 'right', color: entry.rank === 1 ? '#B8963E' : '#1a1a1a' }}>{entry.earnings.toLocaleString('da-DK')}</span>
                 </div>
               )
             })}

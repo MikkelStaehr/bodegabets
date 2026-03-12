@@ -11,7 +11,7 @@ export default async function NewGamePage() {
 
   const { data: leagues } = await supabase
     .from('leagues')
-    .select('id, name, country, is_active, total_matches, fixturedownload_slug, bold_slug')
+    .select('id, name, country, is_active, fixturedownload_slug, bold_slug')
     .eq('is_active', true)
     .order('name', { ascending: true })
 

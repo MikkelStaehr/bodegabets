@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
-import { supabaseAdmin } from '@/lib/supabase'
 import { runMatchBoldIds, logMatchBoldRun } from '@/lib/matchBoldIds'
 
 export const maxDuration = 90
@@ -44,11 +43,6 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { data } = await supabaseAdmin
-    .from('bold_match_logs')
-    .select('id, ran_at, matches_matched, details, status, error_message')
-    .order('ran_at', { ascending: false })
-    .limit(20)
-
-  return NextResponse.json({ logs: data ?? [] })
+  // bold_match_logs table removed — return empty logs
+  return NextResponse.json({ logs: [] })
 }

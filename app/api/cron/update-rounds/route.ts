@@ -115,6 +115,7 @@ export async function GET(req: NextRequest) {
       .from('rounds')
       .update({ status: 'open' })
       .in('id', openIds)
+
   }
 
   // 3) Sæt betting_closes_at = 1 time før MIN(kickoff_at) for runder hvor den er NULL

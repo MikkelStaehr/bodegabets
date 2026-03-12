@@ -8,11 +8,10 @@ export type LiveMatch = {
   away_team: string
   home_score: number | null
   away_score: number | null
-  home_ht_score: number | null
-  away_ht_score: number | null
+  home_score_ht: number | null
+  away_score_ht: number | null
   status: 'live' | 'halftime' | 'finished'
   kickoff_at: string
-  bold_match_id: number | null
 }
 
 export type LiveSummary = {
@@ -80,10 +79,7 @@ export function useLiveMatchesForUser(enabled = true) {
         setItems(
           raw.map((item: { gameId: number; gameName: string; leagueName: string | null; roundId: number; roundName: string; matches: unknown[]; summary: LiveSummary }) => ({
             ...item,
-            matches: ((item.matches ?? []) as Record<string, unknown>[]).map((m) => ({
-              ...m,
-              bold_match_id: m.bold_match_id ?? null,
-            })) as LiveMatch[],
+            matches: (item.matches ?? []) as LiveMatch[],
           }))
         )
         setLastUpdate(new Date())

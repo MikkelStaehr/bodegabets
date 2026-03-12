@@ -16,15 +16,12 @@ export async function PATCH(req: NextRequest, { params }: Props) {
   }
 
   const body = await req.json()
-  const { home_score, away_score, home_ht_score, away_ht_score, first_scorer, yellow_cards, red_cards } =
+  const { home_score, away_score, home_score_ht, away_score_ht } =
     body as {
       home_score?: number
       away_score?: number
-      home_ht_score?: number
-      away_ht_score?: number
-      first_scorer?: string
-      yellow_cards?: number
-      red_cards?: number
+      home_score_ht?: number
+      away_score_ht?: number
     }
 
   if (home_score === undefined || away_score === undefined) {
@@ -36,11 +33,8 @@ export async function PATCH(req: NextRequest, { params }: Props) {
     away_score,
     status: 'finished',
   }
-  if (home_ht_score !== undefined) updatePayload.home_ht_score = home_ht_score
-  if (away_ht_score !== undefined) updatePayload.away_ht_score = away_ht_score
-  if (first_scorer !== undefined) updatePayload.first_scorer = first_scorer || null
-  if (yellow_cards !== undefined) updatePayload.yellow_cards = yellow_cards
-  if (red_cards !== undefined) updatePayload.red_cards = red_cards
+  if (home_score_ht !== undefined) updatePayload.home_score_ht = home_score_ht
+  if (away_score_ht !== undefined) updatePayload.away_score_ht = away_score_ht
 
   const { data, error } = await supabaseAdmin
     .from('matches')

@@ -40,15 +40,22 @@ export async function GET() {
   for (const gameId of gameIds) {
     const { data: game } = await supabaseAdmin
       .from('games')
-      .select('id, name, league_id')
+      .select('id, name')
       .eq('id', gameId)
       .eq('status', 'active')
       .single()
 
     if (!game) continue
 
-    // Hent league_id fra game for at finde rounds
-    const leagueId = (game as { league_id?: number }).league_id
+    // Hent league_id via game_leagues junction table
+    const { data: gameLeague } = await supabaseAdmin
+      .from('game_leagues')
+      .select('league_id')
+      .eq('game_id', gameId)
+      .limit(1)
+      .single()
+
+    const leagueId = gameLeague?.league_id
     if (!leagueId) continue
 
     // Hent league name
@@ -80,7 +87,7 @@ export async function GET() {
 
     const { data: allMatches } = await supabaseAdmin
       .from('matches')
-      .select('id, round_id, home_team, away_team, home_score, away_score, home_ht_score, away_ht_score, status, kickoff_at')
+      .select('id, round_id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at')
       .in('round_id', openRoundIds)
       .in('status', ['live', 'halftime', 'finished'])
       .gte('kickoff_at', since.toISOString())

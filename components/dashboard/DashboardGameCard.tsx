@@ -8,7 +8,6 @@ type GameRow = {
   game: {
     id: number
     name: string
-    description: string | null
     status: string
     invite_code: string
     member_count: number

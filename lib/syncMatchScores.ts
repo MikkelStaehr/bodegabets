@@ -59,7 +59,7 @@ export async function syncMatchScores(options?: {
             .from('league_matches')
             .select('id, bold_match_id, league_id, home_team, away_team, status')
             .in('id', liveMatchIds)
-        : { data: [] as typeof activeMatches }
+        : { data: [] as typeof activeMatches, error: null }
     const byTimeWindow = await supabaseAdmin
       .from('league_matches')
       .select('id, bold_match_id, league_id, home_team, away_team, status')
@@ -111,7 +111,7 @@ export async function syncMatchScores(options?: {
 
     const data = (await res.json()) as { matches?: unknown[] }
     rawBoldResponse = data
-    for (const m of (data.matches ?? [])) {
+    for (const m of (data.matches ?? []) as Array<{ match?: { id: number; status_type: string; paused?: boolean; home_team?: { score: number }; away_team?: { score: number } } }>) {
       const match = m.match
       if (!match) continue
 

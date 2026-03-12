@@ -29,8 +29,6 @@ export type LeagueRow = {
   bold_slug: string | null
   fixturedownload_slug?: string | null
   last_synced_at?: string | null
-  sync_status?: string | null
-  sync_error?: string | null
   total_matches?: number
 }
 
@@ -133,8 +131,6 @@ export default function AdminTabClient({
             bold_slug: l.bold_slug,
             fixturedownload_slug: l.fixturedownload_slug ?? null,
             last_synced_at: l.last_synced_at ?? null,
-            sync_status: l.sync_status ?? null,
-            sync_error: l.sync_error ?? null,
             total_matches: l.total_matches ?? 0,
           }))}
           logs={syncLogs}

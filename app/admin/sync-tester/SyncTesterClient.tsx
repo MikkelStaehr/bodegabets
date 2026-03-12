@@ -260,7 +260,7 @@ export default function SyncTesterClient({ leagues }: Props) {
                 </div>
                 <div>
                   <span className="text-[#7a7060] block text-xs">Antal kampe</span>
-                  <span className="font-semibold text-[#1a3329]">{result.total_matches ?? 0}</span>
+                  <span className="font-semibold text-[#1a3329]">{String(result.total_matches ?? 0)}</span>
                 </div>
               </div>
               {Array.isArray(result.rounds) && result.rounds.length > 0 && (

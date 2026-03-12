@@ -26,26 +26,28 @@ export async function POST(req: NextRequest) {
   const syncRes = await syncLeagueViaBold(league_id)
 
   const now = new Date().toISOString()
-  if (syncRes.errors.length === 0) {
-    await supabaseAdmin
-      .from('leagues')
-      .update({ sync_error: null, sync_status: 'ok', last_synced_at: now })
-      .eq('id', league_id)
-  } else {
-    await supabaseAdmin
-      .from('leagues')
-      .update({ sync_status: 'error', sync_error: syncRes.errors[0], last_synced_at: now })
-      .eq('id', league_id)
-  }
+  await supabaseAdmin
+    .from('leagues')
+    .update({ last_synced_at: now })
+    .eq('id', league_id)
 
   let rounds_created = 0, matches_created = 0, matches_updated = 0
 
   if (rebuild_rounds) {
-    const { data: games } = await supabaseAdmin
-      .from('games')
-      .select('id')
+    const { data: gameLeagueRows } = await supabaseAdmin
+      .from('game_leagues')
+      .select('game_id')
       .eq('league_id', league_id)
-      .eq('status', 'active')
+
+    const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
+
+    const { data: games } = gameIdsForLeague.length
+      ? await supabaseAdmin
+          .from('games')
+          .select('id')
+          .in('id', gameIdsForLeague)
+          .eq('status', 'active')
+      : { data: [] as { id: number }[] }
 
     for (const g of (games ?? []) as { id: number }[]) {
       const res = await buildGameRounds(g.id, league_id)

@@ -3,13 +3,13 @@ import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import AfgivBets from '@/components/AfgivBets'
 import { syncMatchesForRound } from '@/lib/syncMatchesForRound'
-import type { Match, Bet, Round, MatchSidebetOption } from '@/types'
+import type { Match, Bet, Round } from '@/types'
 
 type Props = {
   params: Promise<{ id: string; roundId: string }>
 }
 
-type MatchRow = Match & { sidebet_options: MatchSidebetOption[] }
+type MatchRow = Match
 
 function formatDate(iso: string | null) {
   if (!iso) return ''
@@ -36,16 +36,22 @@ export default async function RoundPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Hent game først for at finde league_id
   const { data: game } = await supabase
     .from('games')
-    .select('id, name, status, league_id')
+    .select('id, name, status')
     .eq('id', gameId)
     .single()
 
   if (!game) notFound()
 
-  const leagueId = (game as { league_id?: number }).league_id
+  // Hent league_id fra game_leagues junction
+  const { data: gameLeagueRow } = await supabase
+    .from('game_leagues')
+    .select('league_id')
+    .eq('game_id', gameId)
+    .limit(1)
+    .maybeSingle()
+  const leagueId = gameLeagueRow?.league_id as number | undefined
 
   const [
     { data: round },
@@ -54,14 +60,14 @@ export default async function RoundPage({ params }: Props) {
   ] = await Promise.all([
     supabase
       .from('rounds')
-      .select('id, name, stage, status, betting_opens_at, betting_closes_at, league_id, extra_bets_enabled')
+      .select('id, name, status, betting_closes_at, league_id')
       .eq('id', roundIdNum)
       .eq('league_id', leagueId!)
       .single(),
 
     supabase
       .from('game_members')
-      .select('points, betting_balance')
+      .select('earnings')
       .eq('game_id', gameId)
       .eq('user_id', user.id)
       .maybeSingle(),
@@ -69,11 +75,8 @@ export default async function RoundPage({ params }: Props) {
     supabase
       .from('matches')
       .select(`
-        id, round_id, home_team, away_team, kickoff_at, betting_closes_at,
-        home_score, away_score, home_ht_score, away_ht_score,
-        yellow_cards, red_cards, first_scorer,
-        odds_home, odds_draw, odds_away, status, source_url,
-        sidebet_options:match_sidebet_options(id, match_id, bet_type)
+        id, round_id, home_team, away_team, kickoff_at,
+        home_score, away_score, home_score_ht, away_score_ht, status
       `)
       .eq('round_id', roundIdNum)
       .order('kickoff_at', { ascending: true }),
@@ -89,11 +92,8 @@ export default async function RoundPage({ params }: Props) {
     const { data: matchesRetry } = await supabase
       .from('matches')
       .select(`
-        id, round_id, home_team, away_team, kickoff_at, betting_closes_at,
-        home_score, away_score, home_ht_score, away_ht_score,
-        yellow_cards, red_cards, first_scorer,
-        odds_home, odds_draw, odds_away, status, source_url,
-        sidebet_options:match_sidebet_options(id, match_id, bet_type)
+        id, round_id, home_team, away_team, kickoff_at,
+        home_score, away_score, home_score_ht, away_score_ht, status
       `)
       .eq('round_id', roundIdNum)
       .order('kickoff_at', { ascending: true })
@@ -166,14 +166,12 @@ export default async function RoundPage({ params }: Props) {
       gameName={(game as { name: string }).name}
       round={{
         name: typedRound.name,
-        stage: typedRound.stage,
         betting_closes_at: typedRound.betting_closes_at,
         status: typedRound.status,
-        extra_bets_enabled: (typedRound as { extra_bets_enabled?: boolean }).extra_bets_enabled,
       }}
       matches={matches}
       existingBets={typedBets}
-      userPoints={(membership as { betting_balance?: number }).betting_balance ?? membership.points ?? 1000}
+      userPoints={1000}
       tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}

@@ -103,7 +103,7 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
   const [sbLoading, setSbLoading] = useState(false)
 
   // Sektion 4 — resultater
-  const [scoreInputs, setScoreInputs] = useState<Record<number, { home: string; away: string; ht_home: string; ht_away: string; first_scorer: string; yellow: string; red: string }>>({})
+  const [scoreInputs, setScoreInputs] = useState<Record<number, { home: string; away: string; ht_home: string; ht_away: string }>>({})
   const [scoreLoading, setScoreLoading] = useState<Set<number>>(new Set())
 
   function setMsg(key: string, type: 'ok' | 'err', text: string) {
@@ -239,7 +239,7 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
   // ── Resultater ────────────────────────────────────────────────────────────────
 
   function getScoreInput(matchId: number) {
-    return scoreInputs[matchId] ?? { home: '', away: '', ht_home: '', ht_away: '', first_scorer: '', yellow: '', red: '' }
+    return scoreInputs[matchId] ?? { home: '', away: '', ht_home: '', ht_away: '' }
   }
 
   function updateScoreInput(matchId: number, field: string, value: string) {
@@ -261,11 +261,8 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
         home_score: parseInt(inp.home),
         away_score: parseInt(inp.away),
       }
-      if (inp.ht_home !== '') body.home_ht_score = parseInt(inp.ht_home)
-      if (inp.ht_away !== '') body.away_ht_score = parseInt(inp.ht_away)
-      if (inp.first_scorer.trim()) body.first_scorer = inp.first_scorer.trim()
-      if (inp.yellow !== '') body.yellow_cards = parseInt(inp.yellow)
-      if (inp.red !== '') body.red_cards = parseInt(inp.red)
+      if (inp.ht_home !== '') body.home_score_ht = parseInt(inp.ht_home)
+      if (inp.ht_away !== '') body.away_score_ht = parseInt(inp.ht_away)
 
       const res = await fetch(`/api/admin/matches/${matchId}`, {
         method: 'PATCH', headers: authHeader, body: JSON.stringify(body),
@@ -689,24 +686,11 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
                     {msg && <MsgBanner msg={msg} inline />}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 items-end">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
                     <ScoreInput label="Hjemme *" value={inp.home} onChange={(v) => updateScoreInput(match.id, 'home', v)} />
                     <ScoreInput label="Ude *" value={inp.away} onChange={(v) => updateScoreInput(match.id, 'away', v)} />
                     <ScoreInput label="HT hjemme" value={inp.ht_home} onChange={(v) => updateScoreInput(match.id, 'ht_home', v)} />
                     <ScoreInput label="HT ude" value={inp.ht_away} onChange={(v) => updateScoreInput(match.id, 'ht_away', v)} />
-                    <ScoreInput label="Gule kort" value={inp.yellow} onChange={(v) => updateScoreInput(match.id, 'yellow', v)} />
-                    <ScoreInput label="Røde kort" value={inp.red} onChange={(v) => updateScoreInput(match.id, 'red', v)} />
-                    <div className="flex flex-col gap-1">
-                      <label className="font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray">Første scorer</label>
-                      <input
-                        type="text"
-                        value={inp.first_scorer}
-                        onChange={(e) => updateScoreInput(match.id, 'first_scorer', e.target.value)}
-                        placeholder="Navn"
-                        className="bg-white border border-warm-border text-ink font-body text-sm px-2.5 py-2 outline-none focus:border-forest w-full"
-                        style={{ borderRadius: '2px' }}
-                      />
-                    </div>
                   </div>
 
                   <AdminBtn

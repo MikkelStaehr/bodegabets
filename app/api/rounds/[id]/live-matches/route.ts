@@ -23,12 +23,12 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   if (!round) return NextResponse.json({ error: 'Runde ikke fundet' }, { status: 404 })
 
-  // Find games i denne liga og tjek om brugeren er medlem af mindst ét
-  const { data: gamesInLeague } = await supabaseAdmin
-    .from('games')
-    .select('id')
+  // Find games i denne liga via game_leagues og tjek om brugeren er medlem af mindst ét
+  const { data: gameLeagueRows } = await supabaseAdmin
+    .from('game_leagues')
+    .select('game_id')
     .eq('league_id', round.league_id)
-  const gameIds = (gamesInLeague ?? []).map((g: { id: number }) => g.id)
+  const gameIds = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
 
   let membership = null
   if (gameIds.length > 0) {
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_team, away_team, home_score, away_score, home_ht_score, away_ht_score, status, kickoff_at, bold_match_id')
+    .select('id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at')
     .eq('round_id', roundId)
     .in('status', ['live', 'halftime', 'finished'])
     .gte('kickoff_at', since.toISOString())
