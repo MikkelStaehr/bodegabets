@@ -2,9 +2,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Install dependencies at root so both lib/ and railway/ can resolve packages
 COPY railway/package.json railway/package-lock.json* ./railway/
 RUN cd railway && npm install
+RUN ln -s /app/railway/node_modules /app/node_modules
 
 # Copy source files needed for compilation
 COPY lib/ ./lib/
