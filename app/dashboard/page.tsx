@@ -59,16 +59,15 @@ export default async function DashboardPage() {
 
     supabaseAdmin
       .from('game_members')
-      .select('game_id, points')
+      .select('game_id, earnings')
       .eq('user_id', user.id)
       .order('joined_at', { ascending: false }),
   ])
 
   const profile = profileResult.data
   const memberships = membershipsResult.data
-  console.log('[dashboard] user:', user.id, 'memberships:', memberships, 'membershipsError:', membershipsResult.error)
 
-  const membershipRows = (memberships ?? []) as { game_id: number; points: number }[]
+  const membershipRows = (memberships ?? []) as { game_id: number; earnings: number }[]
   const gameIds = membershipRows.map((m) => m.game_id)
 
   if (gameIds.length === 0) {
@@ -139,7 +138,6 @@ export default async function DashboardPage() {
 
   const gamesData = gamesResult.data
   const gameLeagueRows = gameLeaguesResult.data
-  console.log('[dashboard] gamesData:', gamesData, 'gamesError:', gamesResult.error, 'gameLeagues:', gameLeagueRows, 'gameLeaguesError:', gameLeaguesResult.error)
 
   const gamesById = new Map<number, { id: number; name: string; status: string; invite_code: string; created_at: string; member_count: { count: number }[] }>()
   for (const g of (gamesData ?? []) as { id: number; name: string; status: string; invite_code: string; created_at: string; member_count: { count: number }[] }[]) {
@@ -148,7 +146,7 @@ export default async function DashboardPage() {
 
   const rawGames = membershipRows
     .filter((m) => gamesById.has(m.game_id))
-    .map((m) => ({ game_id: m.game_id, points: m.points, game: gamesById.get(m.game_id)! }))
+    .map((m) => ({ game_id: m.game_id, earnings: m.earnings, game: gamesById.get(m.game_id)! }))
 
   const leagueIdByGame = new Map<number, number>()
   for (const gl of gameLeagueRows ?? []) {
@@ -265,7 +263,7 @@ export default async function DashboardPage() {
     const leagueName = gameLeagueId ? leagueNameMap.get(gameLeagueId) ?? null : null
 
     return {
-      points: m.points,
+      points: m.earnings,
       rank,
       bets_count,
       game: {
