@@ -1,10 +1,8 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createServerSupabaseClient } from '@/lib/supabase'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import DashboardContent from '@/components/dashboard/DashboardContent'
 import JoinGameCard from '@/components/dashboard/JoinGameCard'
-import type { Game } from '@/types'
 import type { SportType, GameRowWithSport } from '@/components/dashboard/DashboardContent'
 
 type ActiveRoundResult = {
@@ -28,14 +26,13 @@ function inferSport(leagueName: string | null): SportType {
 }
 
 async function getActiveRoundForGame(
-  supabase: SupabaseClient,
   gameId: number,
   leagueId: number | null
 ): Promise<ActiveRoundResult | null> {
   if (!leagueId) return null
 
   // Hent seneste ikke-færdige runde
-  const { data: rounds } = await supabase
+  const { data: rounds } = await supabaseAdmin
     .from('rounds')
     .select('id, league_id, name, status, betting_closes_at')
     .eq('league_id', leagueId)
@@ -54,13 +51,13 @@ export default async function DashboardPage() {
   if (!user) redirect('/login')
 
   const [{ data: profile }, { data: memberships }] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('profiles')
       .select('username, points, is_admin')
       .eq('id', user.id)
       .single(),
 
-    supabase
+    supabaseAdmin
       .from('game_members')
       .select('game_id, points')
       .eq('user_id', user.id)
@@ -69,8 +66,6 @@ export default async function DashboardPage() {
 
   const membershipRows = (memberships ?? []) as { game_id: number; points: number }[]
   const gameIds = membershipRows.map((m) => m.game_id)
-
-  console.log('[dashboard] user:', user.id, 'memberships raw:', memberships, 'gameIds:', gameIds)
 
   if (gameIds.length === 0) {
     return (
@@ -128,11 +123,11 @@ export default async function DashboardPage() {
 
   // Fetch games + league_ids via game_leagues junction (games.league_id dropped)
   const [{ data: gamesData }, { data: gameLeagueRows }] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('games')
       .select('id, name, status, invite_code, created_at, member_count:game_members(count)')
       .in('id', gameIds),
-    supabase
+    supabaseAdmin
       .from('game_leagues')
       .select('game_id, league_id')
       .in('game_id', gameIds),
@@ -147,8 +142,6 @@ export default async function DashboardPage() {
     .filter((m) => gamesById.has(m.game_id))
     .map((m) => ({ game_id: m.game_id, points: m.points, game: gamesById.get(m.game_id)! }))
 
-  console.log('[dashboard] gamesData:', gamesData, 'gamesById keys:', [...gamesById.keys()], 'rawGames count:', rawGames.length)
-
   const leagueIdByGame = new Map<number, number>()
   for (const gl of gameLeagueRows ?? []) {
     leagueIdByGame.set(gl.game_id as number, gl.league_id as number)
@@ -157,7 +150,7 @@ export default async function DashboardPage() {
   const leagueIds = [...new Set([...leagueIdByGame.values()])]
   const leagueNameMap = new Map<number, string>()
   if (leagueIds.length > 0) {
-    const { data: leagues } = await supabase
+    const { data: leagues } = await supabaseAdmin
       .from('leagues')
       .select('id, name')
       .in('id', leagueIds)
@@ -167,7 +160,7 @@ export default async function DashboardPage() {
   }
 
   const results = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('game_members')
       .select('game_id, user_id, earnings')
       .in('game_id', gameIds)
@@ -175,7 +168,7 @@ export default async function DashboardPage() {
 
     (() => {
       return leagueIds.length > 0
-        ? supabase
+        ? supabaseAdmin
             .from('rounds')
             .select('id, league_id, name, status, betting_closes_at')
             .in('league_id', leagueIds)
@@ -183,12 +176,12 @@ export default async function DashboardPage() {
         : Promise.resolve({ data: [] })
     })(),
 
-    supabase
+    supabaseAdmin
       .from('bets')
       .select('round_id')
       .eq('user_id', user.id),
 
-    ...rawGames.map((m) => getActiveRoundForGame(supabase, m.game.id, leagueIdByGame.get(m.game.id) ?? null)),
+    ...rawGames.map((m) => getActiveRoundForGame(m.game.id, leagueIdByGame.get(m.game.id) ?? null)),
   ])
   const allMembers = (results[0] as { data: { game_id: number; user_id: string; earnings: number }[] | null }).data
   const rounds = (results[1] as { data: { id: number; league_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
@@ -198,7 +191,7 @@ export default async function DashboardPage() {
   const roundIds = (rounds ?? []).map((r: { id: number }) => r.id)
   const { data: matchesByRound } =
     roundIds.length > 0
-      ? await supabase
+      ? await supabaseAdmin
           .from('matches')
           .select('round_id')
           .in('round_id', roundIds)
@@ -221,7 +214,7 @@ export default async function DashboardPage() {
     const round = activeRoundsPerGame[i] as Awaited<ReturnType<typeof getActiveRoundForGame>>
     if (round) {
       const fromCurrent = round.matches_count > 0 ? round.matches_count : null
-      activeRoundByGame.set(rawGames[i].game!.id, {
+      activeRoundByGame.set(rawGames[i].game.id, {
         ...round,
         matches_count: fromCurrent ?? matchCountByRound.get(round.id) ?? 0,
         round_status: round.round_status ?? null,
@@ -253,8 +246,6 @@ export default async function DashboardPage() {
     const count = userBetsInActiveRounds.filter((b: { round_id: number }) => b.round_id === r.id).length
     betsCountByGame.set(r.game_id, count)
   }
-
-  console.log('[dashboard] final games count:', rawGames.length, 'leagueIdByGame:', Object.fromEntries(leagueIdByGame))
 
   const games: GameRowWithSport[] = rawGames.map((m) => {
     const g = m.game
