@@ -103,17 +103,30 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
   // Kør point-beregning for hvert spilrum separat
   for (const gameId of allGameIds) {
+    // Løsning A: Skip hvis runden allerede er beregnet (undgå dobbelt akkumulering af earnings)
+    const { data: existingRoundScores } = await supabaseAdmin
+      .from('round_scores')
+      .select('id')
+      .eq('round_id', roundId)
+      .eq('game_id', gameId)
+      .limit(1)
+    if (existingRoundScores?.length) {
+      console.log(`[calculateRoundPoints] Spring game ${gameId} over – runde ${roundId} allerede beregnet`)
+      continue
+    }
+
     const extraBetsCorrectByUser = new Map<string, number>()
 
     for (const match of matches) {
       if (match.home_score === null || match.away_score === null) continue
 
+      // Hent bets der endnu ikke er vurderet (result null ELLER pending – nye bets oprettes med pending)
       const { data: bets } = await supabaseAdmin
         .from('bets')
         .select('id, user_id, prediction, stake, bet_type, result')
         .eq('match_id', match.id)
         .eq('game_id', gameId)
-        .is('result', null)
+        .or('result.is.null,result.eq.pending')
 
       if (!bets?.length) continue
 
@@ -140,7 +153,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
         if (!isCorrect) {
           await supabaseAdmin
             .from('bets')
-            .update({ result: 'loss', points_delta: 0 })
+            .update({ result: 'loss', points_delta: 0, points_earned: 0 })
             .eq('id', bet.id)
           continue
         }
@@ -170,6 +183,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           .update({
             result: 'win',
             points_delta: pointsEarned,
+            points_earned: pointsEarned,
           })
           .eq('id', bet.id)
 
@@ -247,14 +261,29 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       earningsDeltaByUser.set(b.user_id, (earningsDeltaByUser.get(b.user_id) ?? 0) + earningsContrib)
     }
 
-    // Inkluder alle brugere der har afgivet bets i runden (også dem der kun tabte)
+    // Inkluder KUN brugere der faktisk har afgivet bets i runden (undgå earnings til brugere uden bets)
     const { data: allBetsForRound } = await supabaseAdmin
       .from('bets')
       .select('user_id')
       .eq('game_id', gameId)
       .in('match_id', matchIds)
     const allUserIds = new Set((allBetsForRound ?? []).map((b) => b.user_id))
+
+    // Verificer at hver bruger har mindst én bet (sikkerhed mod BUG 2: earnings til brugere uden bets)
+    // Inkluder round_id ELLER match_id – nogle bets har round_id = null (api/bets)
+    const { data: usersWithBets } = await supabaseAdmin
+      .from('bets')
+      .select('user_id')
+      .eq('game_id', gameId)
+      .or(`round_id.eq.${roundId},round_id.is.null`)
+      .in('match_id', matchIds)
+    const usersWithBetsSet = new Set((usersWithBets ?? []).map((b) => b.user_id))
+
     for (const userId of allUserIds) {
+      if (!usersWithBetsSet.has(userId)) {
+        console.log(`[calculateRoundPoints] Spring bruger over (ingen bets i runde ${roundId}): ${userId}`)
+        continue
+      }
       const pointsEarned = pointsByUser.get(userId) ?? 0
       const earningsDelta = earningsDeltaByUser.get(userId) ?? 0
       const extraBetsCorrect = extraBetsCorrectByUser.get(userId) ?? 0

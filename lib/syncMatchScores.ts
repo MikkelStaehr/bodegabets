@@ -26,27 +26,60 @@ export async function syncMatchScores(options?: {
   let updated = 0
   const preview: SyncMatchScoresPreview = []
 
-  // 1. Find kun kampe der KAN have scores lige nu
-  // (kickoff indenfor de seneste 3 timer OG ikke allerede finished)
+  // 1. Find kampe der skal synkes:
+  // - Fra matches: status live/scheduled/halftime (uanset tid – fanger sen-aften kampe)
+  // - Eller league_matches: kickoff indenfor 18 timer, ikke finished (bredere tidsvindue)
   const now = new Date()
-  const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000)
+  const eighteenHoursAgo = new Date(now.getTime() - 18 * 60 * 60 * 1000)
 
-  let query = supabaseAdmin
-    .from('league_matches')
-    .select('id, bold_match_id, league_id, home_team, away_team, status')
-    .neq('status', 'finished')
+  let activeMatches: Array<{ id: number; bold_match_id: number | null; league_id: number; home_team: string; away_team: string; status: string }> = []
 
   if (boldMatchId != null) {
-    query = query.eq('bold_match_id', boldMatchId)
+    const { data, error } = await supabaseAdmin
+      .from('league_matches')
+      .select('id, bold_match_id, league_id, home_team, away_team, status')
+      .eq('bold_match_id', boldMatchId)
+    if (error) {
+      errors.push(`Fetch fejl: ${error.message}`)
+      return { updated, errors }
+    }
+    activeMatches = data ?? []
   } else {
-    query = query.lte('kickoff_at', now.toISOString()).gte('kickoff_at', threeHoursAgo.toISOString())
-  }
+    // Hent league_match_ids fra matches med status live/scheduled/halftime
+    const { data: matchRows } = await supabaseAdmin
+      .from('matches')
+      .select('league_match_id')
+      .in('status', ['live', 'scheduled', 'halftime'])
+    const liveMatchIds = [...new Set((matchRows ?? []).map((r) => r.league_match_id).filter((id): id is number => id != null))]
 
-  const { data: activeMatches, error: fetchError } = await query
+    // Hent league_matches: enten fra live-match-ids ELLER kickoff indenfor 18 timer
+    const byLiveMatch =
+      liveMatchIds.length > 0
+        ? await supabaseAdmin
+            .from('league_matches')
+            .select('id, bold_match_id, league_id, home_team, away_team, status')
+            .in('id', liveMatchIds)
+        : { data: [] as typeof activeMatches }
+    const byTimeWindow = await supabaseAdmin
+      .from('league_matches')
+      .select('id, bold_match_id, league_id, home_team, away_team, status')
+      .neq('status', 'finished')
+      .lte('kickoff_at', now.toISOString())
+      .gte('kickoff_at', eighteenHoursAgo.toISOString())
 
-  if (fetchError) {
-    errors.push(`Fetch fejl: ${fetchError.message}`)
-    return { updated, errors }
+    const fetchError = byLiveMatch.error ?? byTimeWindow.error
+    if (fetchError) {
+      errors.push(`Fetch fejl: ${fetchError.message}`)
+      return { updated, errors }
+    }
+
+    const seen = new Set<number>()
+    for (const m of [...(byLiveMatch.data ?? []), ...(byTimeWindow.data ?? [])]) {
+      if (!seen.has(m.id)) {
+        seen.add(m.id)
+        activeMatches.push(m)
+      }
+    }
   }
 
   if (!activeMatches?.length) {
