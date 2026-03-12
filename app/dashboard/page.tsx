@@ -70,6 +70,8 @@ export default async function DashboardPage() {
   const membershipRows = (memberships ?? []) as { game_id: number; points: number }[]
   const gameIds = membershipRows.map((m) => m.game_id)
 
+  console.log('[dashboard] user:', user.id, 'memberships raw:', memberships, 'gameIds:', gameIds)
+
   if (gameIds.length === 0) {
     return (
       <div className="min-h-screen bg-[#F2EDE4] flex items-center justify-center px-4">
@@ -144,6 +146,8 @@ export default async function DashboardPage() {
   const rawGames = membershipRows
     .filter((m) => gamesById.has(m.game_id))
     .map((m) => ({ game_id: m.game_id, points: m.points, game: gamesById.get(m.game_id)! }))
+
+  console.log('[dashboard] gamesData:', gamesData, 'gamesById keys:', [...gamesById.keys()], 'rawGames count:', rawGames.length)
 
   const leagueIdByGame = new Map<number, number>()
   for (const gl of gameLeagueRows ?? []) {
@@ -249,6 +253,8 @@ export default async function DashboardPage() {
     const count = userBetsInActiveRounds.filter((b: { round_id: number }) => b.round_id === r.id).length
     betsCountByGame.set(r.game_id, count)
   }
+
+  console.log('[dashboard] final games count:', rawGames.length, 'leagueIdByGame:', Object.fromEntries(leagueIdByGame))
 
   const games: GameRowWithSport[] = rawGames.map((m) => {
     const g = m.game
