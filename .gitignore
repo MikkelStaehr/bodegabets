@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+/railway/node_modules
+/railway/dist
 /.pnp
 .pnp.*
 .yarn/*

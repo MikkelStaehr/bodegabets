@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "rootDir": "..",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "baseUrl": "..",
+    "paths": {
+      "@/lib/supabase": ["./railway/lib-shims/supabase"],
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "index.ts",
+    "lib-shims/supabase.ts",
+    "../lib/syncMatchScores.ts",
+    "../lib/syncLeagueMatches.ts",
+    "../lib/calculatePoints.ts",
+    "../lib/betUtils.ts",
+    "../lib/betTypes.ts",
+    "../lib/boldApi.ts",
+    "../lib/teamNameNormalizer.ts"
+  ]
+}
