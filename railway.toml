@@ -1,0 +1,19 @@
+[services.sync-scores]
+cronSchedule = "*/5 * * * *"
+startCommand = "curl -s -H 'Authorization: Bearer $CRON_SECRET' https://bodegabets-production.up.railway.app/sync-scores"
+
+[services.sync-fixtures]
+cronSchedule = "0 6 * * *"
+startCommand = "curl -s -H 'Authorization: Bearer $CRON_SECRET' https://bodegabets-production.up.railway.app/sync-fixtures"
+
+[services.update-rounds]
+cronSchedule = "0 8 * * *"
+startCommand = "curl -s -H 'Authorization: Bearer $CRON_SECRET' https://bodegabets-production.up.railway.app/update-rounds"
+
+[services.calculate-points]
+cronSchedule = "0 9 * * *"
+startCommand = "curl -s -H 'Authorization: Bearer $CRON_SECRET' https://bodegabets-production.up.railway.app/calculate-points"
+
+[services.send-reminders]
+cronSchedule = "0 10 * * *"
+startCommand = "curl -s -H 'Authorization: Bearer $CRON_SECRET' https://bodegabets-production.up.railway.app/send-reminders"
