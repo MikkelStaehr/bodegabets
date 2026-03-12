@@ -115,6 +115,21 @@ export async function GET(req: NextRequest) {
       .from('rounds')
       .update({ status: 'open' })
       .in('id', openIds)
+
+    // Reset betting_balance for alle game_members i games der tilhører de åbnede runders leagues
+    const openedLeagueIds = [...new Set(toMarkOpen.map((r) => r.league_id))]
+    const { data: gamesInLeagues } = await supabaseAdmin
+      .from('games')
+      .select('id, starting_balance')
+      .in('league_id', openedLeagueIds)
+
+    for (const game of gamesInLeagues ?? []) {
+      const balance = (game as { starting_balance?: number }).starting_balance ?? 1000
+      await supabaseAdmin
+        .from('game_members')
+        .update({ betting_balance: balance })
+        .eq('game_id', game.id)
+    }
   }
 
   // 3) Sæt betting_closes_at = 1 time før MIN(kickoff_at) for runder hvor den er NULL
