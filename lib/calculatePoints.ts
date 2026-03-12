@@ -6,8 +6,8 @@ import { isBetCorrect } from './betUtils'
  *
  * PRINCIP:
  *   Korrekt bet → stake × 2 (stake + gevinst)
- *   Forkert bet → 0 (mister stake)
- *   earnings_delta = SUM(points_earned) - SUM(stake)  per runde
+ *   Forkert bet → 0 (stake mistes ikke)
+ *   earnings_delta = SUM(points_earned) per runde
  *   game_members.earnings = SUM(round_scores.earnings_delta) (absolut, aldrig relativt)
  *
  * Kan køres mange gange — upsert overalt, sætter absolut.
@@ -104,7 +104,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     }
 
     // 2b. Beregn earnings_delta per bruger i denne runde
-    //     earnings_delta = SUM(points_earned) - SUM(stake)
+    //     earnings_delta = SUM(points_earned)
     const { data: roundBets } = await supabaseAdmin
       .from('bets')
       .select('user_id, stake, points_earned')
@@ -130,9 +130,9 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
     // 2c. Upsert round_scores
     for (const [userId, stats] of userStats) {
-      const earningsDelta = stats.totalEarned - stats.totalStake
+      const earningsDelta = stats.totalEarned
 
-      console.log(`[calculateRoundPoints] round_scores UPSERT: user=${userId.slice(0,8)}, round=${roundId}, game=${gameId}, totalEarned=${stats.totalEarned}, totalStake=${stats.totalStake}, earnings_delta=${earningsDelta}`)
+      console.log(`[calculateRoundPoints] round_scores UPSERT: user=${userId.slice(0,8)}, round=${roundId}, game=${gameId}, totalEarned=${stats.totalEarned}, earnings_delta=${earningsDelta}`)
 
       const { error: upsertError } = await supabaseAdmin.from('round_scores').upsert(
         {
