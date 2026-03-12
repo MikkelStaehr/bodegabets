@@ -67,7 +67,6 @@ export default async function RootLayout({
           <div className="min-h-screen bg-cream flex flex-col">
             <Navbar
               username={profile?.username}
-              points={profile?.points ?? 0}
               isAdmin={(profile as { is_admin?: boolean } | null)?.is_admin === true}
             />
             <main className="flex-1">
