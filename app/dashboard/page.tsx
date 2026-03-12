@@ -50,7 +50,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: profile }, { data: memberships }] = await Promise.all([
+  const [profileResult, membershipsResult] = await Promise.all([
     supabaseAdmin
       .from('profiles')
       .select('username, points, is_admin')
@@ -63,6 +63,10 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .order('joined_at', { ascending: false }),
   ])
+
+  const profile = profileResult.data
+  const memberships = membershipsResult.data
+  console.log('[dashboard] user:', user.id, 'memberships:', memberships, 'membershipsError:', membershipsResult.error)
 
   const membershipRows = (memberships ?? []) as { game_id: number; points: number }[]
   const gameIds = membershipRows.map((m) => m.game_id)
@@ -122,7 +126,7 @@ export default async function DashboardPage() {
   }
 
   // Fetch games + league_ids via game_leagues junction (games.league_id dropped)
-  const [{ data: gamesData }, { data: gameLeagueRows }] = await Promise.all([
+  const [gamesResult, gameLeaguesResult] = await Promise.all([
     supabaseAdmin
       .from('games')
       .select('id, name, status, invite_code, created_at, member_count:game_members(count)')
@@ -132,6 +136,10 @@ export default async function DashboardPage() {
       .select('game_id, league_id')
       .in('game_id', gameIds),
   ])
+
+  const gamesData = gamesResult.data
+  const gameLeagueRows = gameLeaguesResult.data
+  console.log('[dashboard] gamesData:', gamesData, 'gamesError:', gamesResult.error, 'gameLeagues:', gameLeagueRows, 'gameLeaguesError:', gameLeaguesResult.error)
 
   const gamesById = new Map<number, { id: number; name: string; status: string; invite_code: string; created_at: string; member_count: { count: number }[] }>()
   for (const g of (gamesData ?? []) as { id: number; name: string; status: string; invite_code: string; created_at: string; member_count: { count: number }[] }[]) {
