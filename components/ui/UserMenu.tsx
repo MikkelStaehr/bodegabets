@@ -7,13 +7,12 @@ import { useRouter } from 'next/navigation'
 
 type Props = {
   username: string
-  points: number
   isAdmin?: boolean
 }
 
 const supabase = createBrowserSupabaseClient()
 
-export default function UserMenu({ username, points, isAdmin }: Props) {
+export default function UserMenu({ username, isAdmin }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -36,11 +35,6 @@ export default function UserMenu({ username, points, isAdmin }: Props) {
 
   return (
     <div ref={ref} className="relative flex items-center gap-3">
-      {/* Point badge */}
-      <div className="font-condensed font-bold text-sm text-gold tracking-wide hidden sm:block">
-        {points.toLocaleString('da-DK')} <span className="opacity-60">PT</span>
-      </div>
-
       {/* Avatar/navn knap */}
       <button
         onClick={() => setOpen((v) => !v)}

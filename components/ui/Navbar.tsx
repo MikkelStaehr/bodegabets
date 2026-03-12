@@ -7,7 +7,6 @@ import { useLiveMatchesContext } from '@/contexts/LiveMatchesContext'
 
 type Props = {
   username?: string
-  points?: number
   isAdmin?: boolean
   backHref?: string
   backLabel?: string
@@ -15,7 +14,7 @@ type Props = {
   activeRoundId?: number | null
 }
 
-export default function Navbar({ username, points, isAdmin, backHref, backLabel, gameId, activeRoundId }: Props) {
+export default function Navbar({ username, isAdmin, backHref, backLabel, gameId, activeRoundId }: Props) {
   const ctx = useLiveMatchesContext()
   const hookData = useLiveMatches(activeRoundId ?? null, !!activeRoundId && !ctx)
   const summary = ctx?.summary ?? hookData.summary
@@ -61,7 +60,7 @@ export default function Navbar({ username, points, isAdmin, backHref, backLabel,
 
         {/* Højre: bruger-dropdown eller gæste-links */}
         {username ? (
-          <UserMenu username={username} points={points ?? 0} isAdmin={isAdmin} />
+          <UserMenu username={username} isAdmin={isAdmin} />
         ) : (
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
