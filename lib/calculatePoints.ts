@@ -19,7 +19,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
   // 1. Hent finished matches for runden
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_team, away_team, home_score, away_score, home_ht_score, away_ht_score, status')
+    .select('id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status')
     .eq('round_id', roundId)
     .eq('status', 'finished')
 
@@ -68,11 +68,11 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
         // Halvleg: skip hvis HT-scores mangler
         if (
           (bet.bet_type === 'halvleg' || bet.bet_type === 'halftime') &&
-          (match.home_ht_score == null || match.away_ht_score == null)
+          (match.home_score_ht == null || match.away_score_ht == null)
         ) {
           await supabaseAdmin
             .from('bets')
-            .update({ result: 'pending', points_earned: 0, points_delta: 0 })
+            .update({ result: 'pending', points_earned: 0 })
             .eq('id', bet.id)
           continue
         }
@@ -82,19 +82,19 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           bet.prediction,
           match.home_score,
           match.away_score,
-          match.home_ht_score,
-          match.away_ht_score
+          match.home_score_ht,
+          match.away_score_ht
         )
 
         const stake = bet.stake ?? 0
         const pointsEarned = correct ? stake * 2 : 0
         const result = correct ? 'win' : 'loss'
 
-        console.log(`[calculateRoundPoints]   bet ${bet.id}: user=${bet.user_id.slice(0,8)}, type=${bet.bet_type}, pred=${bet.prediction}, stake=${stake}, correct=${correct}, points_earned=${pointsEarned}`)
+        console.log(`[calculateRoundPoints]   bet ${bet.id}: user=${(bet.user_id as string).slice(0,8)}, type=${bet.bet_type}, pred=${bet.prediction}, stake=${stake}, correct=${correct}, points_earned=${pointsEarned}`)
 
         const { error: betUpdateError } = await supabaseAdmin
           .from('bets')
-          .update({ result, points_earned: pointsEarned, points_delta: pointsEarned })
+          .update({ result, points_earned: pointsEarned })
           .eq('id', bet.id)
 
         if (betUpdateError) {

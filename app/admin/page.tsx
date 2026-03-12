@@ -22,7 +22,7 @@ export default async function AdminPage() {
   ] = await Promise.all([
     supabaseAdmin
       .from('leagues')
-      .select('id, name, country, bold_slug, fixturedownload_slug, last_synced_at, sync_status, sync_error, total_matches:league_matches(count)')
+      .select('id, name, country, bold_slug, fixturedownload_slug, last_synced_at, total_matches:league_matches(count)')
       .order('name'),
 
     supabaseAdmin
@@ -49,8 +49,7 @@ export default async function AdminPage() {
       .select(`
         id, home_team, away_team, kickoff_at,
         home_score, away_score, status, round_id,
-        round:rounds ( name, league:leagues ( name ) ),
-        sidebet_options:match_sidebet_options ( id, bet_type )
+        round:rounds ( name, league:leagues ( name ) )
       `)
       .order('kickoff_at', { ascending: true }),
 
@@ -97,7 +96,6 @@ export default async function AdminPage() {
   // Normalisér matches
   const matches = (matchesData ?? []).map((m) => {
     const round = m.round as unknown as { name: string; league: { name: string } } | null
-    const sidebets = m.sidebet_options as unknown as { id: number; bet_type: string }[]
     return {
       id: m.id as number,
       round_id: m.round_id as number,
@@ -109,7 +107,7 @@ export default async function AdminPage() {
       home_score: m.home_score as number | null,
       away_score: m.away_score as number | null,
       status: m.status as 'scheduled' | 'finished',
-      existing_sidebet_types: (sidebets ?? []).map((s) => s.bet_type),
+      existing_sidebet_types: [] as string[],
     }
   })
 
@@ -122,8 +120,6 @@ export default async function AdminPage() {
     bold_slug: l.bold_slug as string | null,
     fixturedownload_slug: (l as { fixturedownload_slug?: string | null }).fixturedownload_slug ?? null,
     last_synced_at: (l as { last_synced_at?: string }).last_synced_at ?? null,
-    sync_status: (l as { sync_status?: string }).sync_status ?? null,
-    sync_error: (l as { sync_error?: string }).sync_error ?? null,
     total_matches: (l.total_matches as unknown as { count: number }[])?.[0]?.count ?? 0,
   }))
 

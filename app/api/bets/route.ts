@@ -7,7 +7,6 @@ type BetInput = {
   bet_type: BetType
   prediction: string
   stake: number
-  potential_win: number
 }
 
 type RequestBody = {
@@ -39,25 +38,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Runden er ikke åben for bets' }, { status: 400 })
   }
 
-  // Tjek at brugeren er game_member og hent lokale point
+  // Tjek at brugeren er game_member
   const { data: member } = await supabaseAdmin
     .from('game_members')
-    .select('points')
+    .select('id')
     .eq('game_id', game_id)
     .eq('user_id', user.id)
     .single()
 
   if (!member) {
     return NextResponse.json({ error: 'Du er ikke med i dette spil' }, { status: 403 })
-  }
-
-  // Validér at total indsats ikke overstiger lokale point
-  const totalStake = bets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  if (totalStake > member.points) {
-    return NextResponse.json(
-      { error: `Ikke nok point. Du har ${member.points} pt, men bruger ${totalStake} pt.` },
-      { status: 400 }
-    )
   }
 
   // Validér at alle match_ids tilhører denne runde
@@ -80,9 +70,7 @@ export async function POST(req: NextRequest) {
     bet_type: b.bet_type,
     prediction: b.prediction,
     stake: b.stake,
-    potential_win: b.potential_win,
     result: 'pending' as const,
-    points_delta: null,
   }))
 
   const { error: upsertError } = await supabaseAdmin

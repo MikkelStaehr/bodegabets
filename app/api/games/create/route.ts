@@ -17,9 +17,8 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, description, league_id } = body as {
+  const { name, league_id } = body as {
     name: string
-    description?: string
     league_id: number
   }
 
@@ -64,10 +63,8 @@ export async function POST(req: NextRequest) {
     .from('games')
     .insert({
       name: name.trim(),
-      description: description ?? null,
       host_id: user.id,
       invite_code,
-      league_id,
     })
     .select()
     .single()
@@ -76,10 +73,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: gameError.message }, { status: 500 })
   }
 
-  // Tilmeld host som member med 1000 startpoint
+  // Link game to league via junction table
+  const { error: linkError } = await supabaseAdmin
+    .from('game_leagues')
+    .insert({ game_id: game.id, league_id })
+
+  if (linkError) {
+    return NextResponse.json({ error: linkError.message }, { status: 500 })
+  }
+
+  // Tilmeld host som member
   const { error: memberError } = await supabaseAdmin
     .from('game_members')
-    .insert({ game_id: game.id, user_id: user.id, points: 1000 })
+    .insert({ game_id: game.id, user_id: user.id })
 
   if (memberError) {
     return NextResponse.json({ error: memberError.message }, { status: 500 })

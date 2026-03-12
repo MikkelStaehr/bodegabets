@@ -419,10 +419,8 @@ export async function buildLeagueRounds(
       return {
         league_id:         leagueId,
         name,
-        stage:             'Grundspil',
         status:            matches.every((m) => m.status === 'finished') ? 'finished' : 'upcoming',
         betting_closes_at: firstKickoff,
-        betting_opens_at:  null,
       }
     })
 
@@ -437,20 +435,6 @@ export async function buildLeagueRounds(
       const num = parseInt(r.name.replace(/\D/g, ''), 10) || 0
       if (num) roundByNumber.set(num, r.id)
       stats.rounds_created++
-    }
-    // Reset betting_balance til 1000 for alle game_members i denne liga
-    if ((inserted ?? []).length > 0) {
-      const { data: gamesInLeague } = await supabaseAdmin
-        .from('games')
-        .select('id')
-        .eq('league_id', leagueId)
-      const gameIds = (gamesInLeague ?? []).map((g: { id: number }) => g.id)
-      if (gameIds.length > 0) {
-        await supabaseAdmin
-          .from('game_members')
-          .update({ betting_balance: 1000 })
-          .in('game_id', gameIds)
-      }
     }
   }
 
@@ -596,15 +580,23 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
 // ─── 4. Kort-interval cron: kun Bold resultater (live/halftime/finished) ────────
 
 export async function runSyncResultsOnly(): Promise<SyncResult[]> {
+  // Hent league_ids fra aktive spilrum via game_leagues junction
   const { data: activeGames } = await supabaseAdmin
     .from('games')
-    .select('league_id')
+    .select('id')
     .eq('status', 'active')
-    .not('league_id', 'is', null)
 
   if (!activeGames?.length) return []
 
-  const leagueIds = [...new Set((activeGames as { league_id: number }[]).map((g) => g.league_id))]
+  const gameIds = activeGames.map((g) => g.id)
+  const { data: gameLeagueRows } = await supabaseAdmin
+    .from('game_leagues')
+    .select('league_id')
+    .in('game_id', gameIds)
+
+  if (!gameLeagueRows?.length) return []
+
+  const leagueIds = [...new Set(gameLeagueRows.map((gl) => gl.league_id as number))]
 
   const { data: leagues } = await supabaseAdmin
     .from('leagues')

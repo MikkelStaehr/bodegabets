@@ -9,9 +9,10 @@ export type LeagueRow = {
   bold_slug: string | null
   fixturedownload_slug: string | null
   last_synced_at: string | null
-  sync_status: string | null
-  sync_error: string | null
   total_matches: number
+  /** Client-side sync status tracking (not persisted in DB) */
+  sync_status?: string | null
+  sync_error?: string | null
 }
 
 export type SyncLog = {
@@ -156,11 +157,9 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
           id: L.id,
           name: L.name,
           country: L.country,
-          bold_slug: null,
           bold_slug: L.bold_slug,
+          fixturedownload_slug: null,
           last_synced_at: null,
-          sync_status: 'pending',
-          sync_error: null,
           total_matches: 0,
         }])
         router.refresh()

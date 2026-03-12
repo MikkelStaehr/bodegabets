@@ -32,36 +32,9 @@ async function getActiveRoundForGame(
   gameId: number,
   leagueId: number | null
 ): Promise<ActiveRoundResult | null> {
-  if (leagueId) {
-    const { data: current } = await supabase
-      .from('current_rounds')
-      .select('round_name, round_status, first_kickoff, next_kickoff, match_count')
-      .eq('league_id', leagueId)
-      .single()
-
-    if (current?.round_name) {
-      const { data: round } = await supabase
-        .from('rounds')
-        .select('id, league_id, name, status, betting_closes_at')
-        .eq('league_id', leagueId)
-        .eq('name', current.round_name)
-        .single()
-
-      if (round) {
-        const bettingClosesAt = (current as { next_kickoff?: string | null }).next_kickoff ?? current.first_kickoff ?? null
-        return {
-          ...round,
-          game_id: gameId,
-          betting_closes_at: bettingClosesAt,
-          round_status: (current.round_status as 'upcoming' | 'active' | 'finished') ?? null,
-          matches_count: (current as { match_count?: number }).match_count ?? 0,
-        }
-      }
-    }
-  }
-
   if (!leagueId) return null
 
+  // Hent seneste ikke-færdige runde
   const { data: rounds } = await supabase
     .from('rounds')
     .select('id, league_id, name, status, betting_closes_at')
@@ -93,7 +66,7 @@ export default async function DashboardPage() {
         game_id,
         points,
         game:games (
-          id, name, description, status, invite_code, created_at, league_id,
+          id, name, status, invite_code, created_at,
           member_count:game_members(count)
         )
       `)
@@ -101,7 +74,7 @@ export default async function DashboardPage() {
       .order('joined_at', { ascending: false }),
   ])
 
-  const rawGames = ((memberships ?? []) as unknown as Array<{ game_id: number; points: number; game: { id: number; name: string; description: string | null; status: string; invite_code: string; created_at: string; league_id: number | null; member_count: { count: number }[] } | null }>).filter((m) => m.game !== null)
+  const rawGames = ((memberships ?? []) as unknown as Array<{ game_id: number; points: number; game: { id: number; name: string; status: string; invite_code: string; created_at: string; member_count: { count: number }[] } | null }>).filter((m) => m.game !== null)
 
   const gameIds = rawGames.map((m) => m.game!.id)
 
@@ -159,8 +132,18 @@ export default async function DashboardPage() {
     )
   }
 
-  // Fetch league names for all games
-  const leagueIds = [...new Set(rawGames.map((m) => m.game!.league_id).filter((id): id is number => id != null))]
+  // Fetch league_ids fra game_leagues junction
+  const { data: gameLeagueRows } = await supabase
+    .from('game_leagues')
+    .select('game_id, league_id')
+    .in('game_id', gameIds)
+
+  const leagueIdByGame = new Map<number, number>()
+  for (const gl of gameLeagueRows ?? []) {
+    leagueIdByGame.set(gl.game_id as number, gl.league_id as number)
+  }
+
+  const leagueIds = [...new Set([...leagueIdByGame.values()])]
   const leagueNameMap = new Map<number, string>()
   if (leagueIds.length > 0) {
     const { data: leagues } = await supabase
@@ -175,9 +158,9 @@ export default async function DashboardPage() {
   const results = await Promise.all([
     supabase
       .from('game_members')
-      .select('game_id, user_id, points')
+      .select('game_id, user_id, earnings')
       .in('game_id', gameIds)
-      .order('points', { ascending: false }),
+      .order('earnings', { ascending: false }),
 
     (() => {
       return leagueIds.length > 0
@@ -194,9 +177,9 @@ export default async function DashboardPage() {
       .select('round_id')
       .eq('user_id', user.id),
 
-    ...rawGames.map((m) => getActiveRoundForGame(supabase, m.game!.id, m.game!.league_id ?? null)),
+    ...rawGames.map((m) => getActiveRoundForGame(supabase, m.game!.id, leagueIdByGame.get(m.game!.id) ?? null)),
   ])
-  const allMembers = (results[0] as { data: { game_id: number; user_id: string; points: number }[] | null }).data
+  const allMembers = (results[0] as { data: { game_id: number; user_id: string; earnings: number }[] | null }).data
   const rounds = (results[1] as { data: { id: number; league_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
   const bets = (results[2] as { data: { round_id: number }[] | null }).data
   const activeRoundsPerGame = results.slice(3) as Awaited<ReturnType<typeof getActiveRoundForGame>>[]
@@ -236,8 +219,8 @@ export default async function DashboardPage() {
   }
 
   const rankByGame = new Map<number, Map<string, number>>()
-  const membersByGame = new Map<number, { user_id: string; points: number }[]>()
-  for (const m of (allMembers ?? []) as { game_id: number; user_id: string; points: number }[]) {
+  const membersByGame = new Map<number, { user_id: string; earnings: number }[]>()
+  for (const m of (allMembers ?? []) as { game_id: number; user_id: string; earnings: number }[]) {
     if (!membersByGame.has(m.game_id)) membersByGame.set(m.game_id, [])
     membersByGame.get(m.game_id)!.push(m)
   }
@@ -245,7 +228,7 @@ export default async function DashboardPage() {
     const rankMap = new Map<string, number>()
     let rank = 1
     for (let i = 0; i < arr.length; i++) {
-      if (i > 0 && arr[i].points < arr[i - 1].points) rank = i + 1
+      if (i > 0 && arr[i].earnings < arr[i - 1].earnings) rank = i + 1
       rankMap.set(arr[i].user_id, rank)
     }
     rankByGame.set(gid, rankMap)
@@ -266,7 +249,8 @@ export default async function DashboardPage() {
     const activeRound = activeRoundByGame.get(g.id) ?? null
     const rank = rankByGame.get(g.id)?.get(user.id) ?? 1
     const bets_count = betsCountByGame.get(g.id) ?? 0
-    const leagueName = g.league_id ? leagueNameMap.get(g.league_id) ?? null : null
+    const gameLeagueId = leagueIdByGame.get(g.id) ?? null
+    const leagueName = gameLeagueId ? leagueNameMap.get(gameLeagueId) ?? null : null
 
     return {
       points: m.points,
@@ -275,7 +259,6 @@ export default async function DashboardPage() {
       game: {
         id: g.id,
         name: g.name,
-        description: g.description,
         status: g.status,
         invite_code: g.invite_code,
         member_count: memberCount,

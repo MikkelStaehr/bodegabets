@@ -17,7 +17,7 @@ export async function GET(
 
   const { data: matches, error } = await supabaseAdmin
     .from('matches')
-    .select('id, home_team, away_team, kickoff_at, status, is_excluded, excluded_reason')
+    .select('id, home_team, away_team, kickoff_at, status')
     .eq('round_id', roundId)
     .order('kickoff_at', { ascending: true })
 
@@ -31,8 +31,6 @@ export async function GET(
     away_team: m.away_team,
     kickoff_at: m.kickoff_at,
     status: m.status,
-    is_excluded: (m as { is_excluded?: boolean }).is_excluded ?? false,
-    excluded_reason: (m as { excluded_reason?: string | null }).excluded_reason ?? null,
   }))
 
   return NextResponse.json({ matches: list })

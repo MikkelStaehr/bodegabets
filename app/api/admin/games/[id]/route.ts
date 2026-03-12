@@ -15,16 +15,19 @@ export async function DELETE(
     return NextResponse.json({ error: 'Ugyldigt game ID' }, { status: 400 })
   }
 
-  // Hent game for league_id
+  // Hent game
   const { data: game } = await supabaseAdmin
     .from('games')
-    .select('id, league_id')
+    .select('id')
     .eq('id', gameId)
     .single()
 
   if (!game) {
     return NextResponse.json({ error: 'Spil ikke fundet' }, { status: 404 })
   }
+
+  // Slet game_leagues junction
+  await supabaseAdmin.from('game_leagues').delete().eq('game_id', gameId)
 
   // Slet game-specifik data (bets, round_scores, members) — scoped til game_id
   await supabaseAdmin.from('bets').delete().eq('game_id', gameId)

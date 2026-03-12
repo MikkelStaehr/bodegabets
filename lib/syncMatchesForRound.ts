@@ -50,7 +50,6 @@ export async function syncMatchesForRound(
     status: lm.status ?? 'scheduled',
     home_score: lm.home_score ?? null,
     away_score: lm.away_score ?? null,
-    source_url: null,
   }))
 
   console.log('[syncMatchesForRound] rows[0]:', JSON.stringify(rows[0]))

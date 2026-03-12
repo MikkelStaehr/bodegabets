@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     supabaseAdmin
       .from('game_members')
-      .select('user_id, points')
+      .select('user_id')
       .eq('game_id', game_id),
 
     supabaseAdmin
@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
     .select('id, username, points')
     .in('id', userIds)
 
-  const memberMap = new Map(
-    (memberRows ?? []).map((m: { user_id: string; points: number }) => [m.user_id, m.points])
+  const memberSet = new Set(
+    (memberRows ?? []).map((m: { user_id: string }) => m.user_id)
   )
   const profileMap = new Map(
     (profileRows ?? []).map((p: { id: string; username: string; points: number }) => [
@@ -69,16 +69,16 @@ export async function POST(req: NextRequest) {
     ])
   )
 
-  // Synkroniser profiles.points med sum af game_members.points (kanonisk kilde)
+  // Synkroniser profiles.points med sum af round_scores (kanonisk kilde)
   await syncProfilesPoints()
 
   const results = scores
     .map((s: { user_id: string; points_earned: number }) => ({
       username: profileMap.get(s.user_id)?.username ?? s.user_id,
-      points_delta: s.points_earned ?? 0,
-      new_total: memberMap.get(s.user_id) ?? 0,
+      points_earned: s.points_earned ?? 0,
+      is_member: memberSet.has(s.user_id),
     }))
-    .sort((a, b) => b.points_delta - a.points_delta)
+    .sort((a, b) => b.points_earned - a.points_earned)
 
   await logAdmin('point_calc', 'success', `Runde ${round_id}: ${results.length} spillere opdateret`, {
     round_id,

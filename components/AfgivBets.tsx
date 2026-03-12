@@ -3,14 +3,14 @@
 import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { Match, Bet, MatchSidebetOption } from '@/types'
+import type { Match, Bet } from '@/types'
 import { BET_TYPE_LABELS } from '@/lib/betTypes'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
 import GameTicker from '@/components/GameTicker'
 import LiveMatches from '@/components/LiveMatches'
 
-type MatchWithOptions = Match & { sidebet_options: MatchSidebetOption[] }
+type MatchWithOptions = Match
 
 type ExtraBetType = 'btts' | 'over_under' | 'halvleg' | 'malforskel'
 
@@ -87,10 +87,8 @@ type Props = {
   gameName: string
   round: {
     name: string
-    stage?: string
     betting_closes_at: string | null
     status: string
-    extra_bets_enabled?: boolean
   }
   matches: MatchWithOptions[]
   existingBets: Bet[]
@@ -250,7 +248,7 @@ function ExtraBets({
                     const isCorrect = canCheck && isBetCorrect(
                       row.key, opt.value,
                       match.home_score!, match.away_score!,
-                      match.home_ht_score, match.away_ht_score
+                      match.home_score_ht, match.away_score_ht
                     )
                     const isUserCorrect = isUserPick && isCorrect
 
@@ -589,7 +587,6 @@ export default function AfgivBets({
     (match: MatchWithOptions): boolean => {
       if (round.status === 'finished') return false
       if (match.status === 'finished') return false
-      if (match.betting_closes_at && new Date(match.betting_closes_at) <= now) return false
       return true
     },
     [round.status, now]
@@ -603,7 +600,7 @@ export default function AfgivBets({
   }, 0)
   const progressPct = totalMatches > 0 ? (selections.length / totalMatches) * 100 : 0
   const effectiveFastPoints = isManuel ? customPoints : fastPoints
-  const extraBetsEnabled = round.extra_bets_enabled !== false
+  const extraBetsEnabled = true
 
   const getSelection = (matchId: number) => selections.find((s) => s.matchId === matchId)
 
@@ -790,7 +787,7 @@ export default function AfgivBets({
               Afgiv dine valg
             </h1>
             <p className="text-[11px] text-[#7a7060] mt-1">
-              {round.stage || 'Grundspil'} · {totalMatches} kampe
+              {totalMatches} kampe
             </p>
           </div>
           <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right shrink-0">

@@ -38,8 +38,6 @@ type MatchRow = {
   away_team: string
   kickoff_at: string
   status: string
-  is_excluded: boolean
-  excluded_reason: string | null
 }
 
 function formatRelative(iso: string | null): string {
@@ -123,16 +121,13 @@ function StatusBadge({ status }: { status: string }) {
 function MatchList({
   roundId,
   adminSecret,
-  onExcludeChange,
 }: {
   roundId: number
   adminSecret: string
-  onExcludeChange: () => void
+  onExcludeChange?: () => void
 }) {
   const [matches, setMatches] = useState<MatchRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [excludeLoading, setExcludeLoading] = useState<Set<number>>(new Set())
-  const authHeader = { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` } as const
 
   useEffect(() => {
     fetch(`/api/admin/rounds/${roundId}/matches`, {
@@ -144,25 +139,6 @@ function MatchList({
       .catch(() => setMatches([]))
       .finally(() => setLoading(false))
   }, [roundId, adminSecret])
-
-  async function toggleExclude(matchId: number, isExcluded: boolean) {
-    setExcludeLoading((s) => new Set(s).add(matchId))
-    try {
-      const res = await fetch(`/api/admin/matches/${matchId}/exclude`, {
-        method: 'PATCH',
-        headers: authHeader,
-        body: JSON.stringify({ excluded: !isExcluded }),
-      })
-      if (res.ok) {
-        setMatches((prev) =>
-          prev.map((m) => (m.id === matchId ? { ...m, is_excluded: !isExcluded } : m))
-        )
-        onExcludeChange()
-      }
-    } finally {
-      setExcludeLoading((s) => { const n = new Set(s); n.delete(matchId); return n })
-    }
-  }
 
   if (loading) {
     return (
@@ -192,12 +168,10 @@ function MatchList({
           </tr>
         </thead>
         <tbody>
-          {matches.map((match) => {
-            const loading = excludeLoading.has(match.id)
-            return (
+          {matches.map((match) => (
               <tr
                 key={match.id}
-                className={`border-b border-warm-border ${match.is_excluded ? 'opacity-40' : ''}`}
+                className="border-b border-warm-border"
               >
                 <td className="px-5 py-2.5 font-medium text-ink">
                   {match.home_team} vs {match.away_team}
@@ -214,30 +188,9 @@ function MatchList({
                 <td className="py-2.5 text-center">
                   <StatusBadge status={match.status} />
                 </td>
-                <td className="px-5 py-2.5 text-right">
-                  {match.is_excluded ? (
-                    <button
-                      onClick={() => toggleExclude(match.id, true)}
-                      disabled={loading}
-                      className="font-condensed text-[11px] font-semibold text-forest hover:text-forest/80 px-3 py-1 border border-forest/30 disabled:opacity-50"
-                      style={{ borderRadius: '2px' }}
-                    >
-                      Genaktivér
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => toggleExclude(match.id, false)}
-                      disabled={loading}
-                      className="font-condensed text-[11px] font-semibold text-gold hover:text-gold/80 px-3 py-1 border border-gold/30 disabled:opacity-50"
-                      style={{ borderRadius: '2px' }}
-                    >
-                      Undtag
-                    </button>
-                  )}
-                </td>
+                <td className="px-5 py-2.5 text-right" />
               </tr>
-            )
-          })}
+          ))}
         </tbody>
       </table>
     </div>

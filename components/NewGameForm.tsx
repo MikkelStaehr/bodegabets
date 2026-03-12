@@ -90,7 +90,7 @@ export default function NewGameForm({ leagues }: Props) {
     const res  = await fetch('/api/games/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), description: description.trim() || undefined, league_id: parseInt(leagueId) }),
+      body: JSON.stringify({ name: name.trim(), league_id: parseInt(leagueId) }),
     })
     const data = await res.json()
 
@@ -112,17 +112,16 @@ export default function NewGameForm({ leagues }: Props) {
         {items.map((l) => {
           const flag     = COUNTRY_FLAGS[l.country ?? ''] ?? '🏳️'
           const selected = leagueId === String(l.id)
-          const matches  = (l as League & { total_matches?: number }).total_matches
           const hasSrc   = (l as League & { fixturedownload_slug?: string; bold_slug?: string }).fixturedownload_slug
                         || (l as League & { bold_slug?: string }).bold_slug
-          const meta     = matches ? `${l.country} · ${matches} kampe` : `${l.country} · Manuel sync`
+          const meta     = l.country ?? ''
 
           return (
             <button
               key={l.id}
               type="button"
               onClick={() => setLeagueId(String(l.id))}
-              disabled={!hasSrc && matches === 0}
+              disabled={!hasSrc}
               className={`relative text-left p-3.5 border-[1.5px] rounded-sm transition-all flex flex-col gap-1.5 ${
                 selected
                   ? 'border-forest bg-cream-dark'

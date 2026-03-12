@@ -21,10 +21,10 @@ function isBearerAuthorized(req: NextRequest): boolean {
  */
 export async function requireAdmin(
   req: NextRequest
-): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+): Promise<{ ok: boolean; response: NextResponse<unknown> }> {
   // 1. Bearer token (cron, scripts, backwards compat)
   if (isBearerAuthorized(req)) {
-    return { ok: true }
+    return { ok: true, response: NextResponse.json({ ok: true }) }
   }
 
   // 2. Session fra cookies (browser, admin panel)
@@ -54,5 +54,5 @@ export async function requireAdmin(
     }
   }
 
-  return { ok: true }
+  return { ok: true, response: NextResponse.json({ ok: true }) }
 }
