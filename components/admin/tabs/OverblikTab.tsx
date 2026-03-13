@@ -129,13 +129,17 @@ export default function OverblikTab() {
           <StatusCard
             label="Bold API"
             ok={boldOk}
-            value={status?.boldApi?.lastSync ?? '—'}
+            value={status?.boldApi?.lastSync
+              ? new Date(status.boldApi.lastSync).toLocaleString('da-DK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : '—'}
             detail={`${status?.boldApi?.errorCount ?? '?'} fejl seneste 24t`}
           />
           <StatusCard
             label="Cron"
             ok={true}
-            value={status?.cron?.lastRun ?? '—'}
+            value={status?.cron?.lastRun
+              ? new Date(status.cron.lastRun).toLocaleString('da-DK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : '—'}
             detail="Sidst kørt"
           />
           <StatusCard

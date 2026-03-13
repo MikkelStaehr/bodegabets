@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
     { data: cronLogs },
     { data: boldLogs },
     { data: boldErrors },
+    { count: userCount },
+    { count: gameCount },
   ] = await Promise.all([
     supabaseAdmin
       .from('admin_logs')
@@ -29,6 +31,8 @@ export async function GET(req: NextRequest) {
       .eq('type', 'bold_api')
       .eq('status', 'error')
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+    supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('games').select('*', { count: 'exact', head: true }),
   ])
 
   const lastCron = cronLogs?.[0]
@@ -45,6 +49,10 @@ export async function GET(req: NextRequest) {
       lastSync: lastBold?.created_at ?? null,
       isHealthy: lastBold?.status === 'success',
       errorCount: boldErrors?.length ?? 0,
+    },
+    db: {
+      users: userCount ?? 0,
+      games: gameCount ?? 0,
     },
   })
 }
