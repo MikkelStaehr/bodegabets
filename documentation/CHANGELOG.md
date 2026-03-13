@@ -5,6 +5,20 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
+## [2026-03-13] Console.log oprydning og tsconfig fix
+
+- **Fjernet debug console.log fra lib/**
+  - `lib/syncMatchesForRound.ts` — alle logs fjernet (ren debug-fil)
+  - `lib/calculatePoints.ts` — detaljerede bet/match/user logs fjernet, START og DONE beholdt
+  - `app/api/cron/update-rounds/route.ts` — overflødig log fjernet (Railway logger allerede)
+
+- **`tsconfig.json`: railway/ udeladt fra Next.js kompilering**
+  - Tilføjet "railway" til exclude-arrayet
+  - Forhindrer Vercel i at forsøge at kompilere Express og node-cron som Next.js-kode
+  - Årsag: fjernelse af `ignoreBuildErrors` betød TypeScript nu validerede railway/-mappen
+
+---
+
 ## [2026-03-13] Rate limiting og Railway cleanup
 
 - **Tilføjet `lib/rateLimit.ts`** — in-memory sliding window rate limiter

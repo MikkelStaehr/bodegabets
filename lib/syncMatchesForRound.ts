@@ -12,18 +12,13 @@ export async function syncMatchesForRound(
   gameId: number,
   roundId: number
 ): Promise<void> {
-  console.log('[syncMatchesForRound] gameId:', gameId, 'roundId:', roundId)
-
   const { data: round } = await supabaseAdmin
     .from('rounds')
     .select('name, league_id')
     .eq('id', roundId)
     .single()
 
-  console.log('[syncMatchesForRound] round name:', round?.name, 'league_id:', round?.league_id)
-
   if (!round?.league_id || !round?.name) {
-    console.log('[syncMatchesForRound] early return: missing round.league_id or round.name')
     return
   }
 
@@ -34,10 +29,7 @@ export async function syncMatchesForRound(
     .eq('round_name', round.name)
     .order('kickoff_at', { ascending: true })
 
-  console.log('[syncMatchesForRound] leagueMatches count:', leagueMatches?.length)
-
   if (!leagueMatches?.length) {
-    console.log('[syncMatchesForRound] early return: no league matches')
     return
   }
 
@@ -52,15 +44,9 @@ export async function syncMatchesForRound(
     away_score: lm.away_score ?? null,
   }))
 
-  console.log('[syncMatchesForRound] rows[0]:', JSON.stringify(rows[0]))
-
   const { data: upsertData, error: upsertError } = await supabaseAdmin
     .from('matches')
     .upsert(rows, { onConflict: 'round_id,home_team,away_team' })
     .select()
 
-  if (upsertError) {
-    console.error('[syncMatchesForRound] upsert error:', JSON.stringify(upsertError, null, 2))
-  }
-  console.log('[syncMatchesForRound] upsert result:', { data: upsertData, error: upsertError })
 }

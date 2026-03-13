@@ -141,10 +141,6 @@ export async function GET(req: NextRequest) {
       .eq('id', r.id)
   }
 
-  console.log(
-    `[cron/update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}`
-  )
-
   await supabaseAdmin
     .from('admin_logs')
     .insert({
