@@ -5,6 +5,21 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
+## [2026-03-13] Lintfejl og konfiguration
+
+- **Rettet stavefejl i sync-scores import** (`app/api/cron/sync-scores/route.ts`)
+  - `@/lib/syncMatchScoes` → `@/lib/syncMatchScores`
+
+- **Fjernet ugyldig `eslint`-property fra `next.config.ts`**
+  - `eslint.ignoreDuringBuilds` er ikke en gyldig `NextConfig`-property i Next.js 16
+  - Fjernet blokken — ESLint-konfiguration håndteres via `.eslintrc` eller CLI
+
+- **`middleware.ts` → `proxy.ts` (udestående)**
+  - Next.js 16 deprecerer `middleware`-konventionen til fordel for `proxy`
+  - Advarsel observeret i build-output — tages i separat session
+
+---
+
 ## [2026-03-13] Sikkerhed & Teknisk Gæld — Fuld gennemgang
 
 ### Sikkerhed
