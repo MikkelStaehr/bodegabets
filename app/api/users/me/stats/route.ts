@@ -6,19 +6,11 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
 
-  const [betsRes, scoresRes] = await Promise.all([
-    supabaseAdmin
-      .from('bets')
-      .select('result')
-      .eq('user_id', user.id),
-    supabaseAdmin
-      .from('round_scores')
-      .select('points_earned, game_id')
-      .eq('user_id', user.id),
-  ])
-
+  const betsRes = await supabaseAdmin
+    .from('bets')
+    .select('result')
+    .eq('user_id', user.id)
   const bets = betsRes.data ?? []
-  const scores = scoresRes.data ?? []
 
   const totalBets = bets.filter(b => b.result !== null).length
   const correctBets = bets.filter(b => b.result === 'win').length

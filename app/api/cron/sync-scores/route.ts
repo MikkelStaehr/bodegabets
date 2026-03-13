@@ -7,14 +7,13 @@
 import { NextResponse } from 'next/server'
 import { syncMatchScores } from '@/lib/syncMatchScores'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireCronAuth } from '@/lib/cronAuth'
 
 export const maxDuration = 30
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = requireCronAuth(request.headers.get('authorization'))
+  if (authError) return authError
 
   try {
     const result = await syncMatchScores()

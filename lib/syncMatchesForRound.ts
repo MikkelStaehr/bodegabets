@@ -8,7 +8,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function syncMatchesForRound(
-  _supabase: unknown,
   gameId: number,
   roundId: number
 ): Promise<void> {
@@ -44,9 +43,12 @@ export async function syncMatchesForRound(
     away_score: lm.away_score ?? null,
   }))
 
-  const { data: upsertData, error: upsertError } = await supabaseAdmin
+  const { error: upsertError } = await supabaseAdmin
     .from('matches')
     .upsert(rows, { onConflict: 'round_id,home_team,away_team' })
     .select()
 
+  if (upsertError) {
+    console.error('[syncMatchesForRound] upsert fejl:', upsertError.message)
+  }
 }

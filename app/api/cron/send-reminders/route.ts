@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireCronAuth } from '@/lib/cronAuth'
 
 function getWebPush() {
   webpush.setVapidDetails(
@@ -18,10 +19,8 @@ function getWebPush() {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = requireCronAuth(req.headers.get('authorization'))
+  if (authError) return authError
 
   const now = new Date()
   const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000)

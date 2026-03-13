@@ -5,8 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { syncLeagueViaBold } from '@/lib/syncLeagueMatches'
-import { buildGameRounds } from '@/lib/syncLeagueMatches'
+import { syncLeagueViaBold, buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 export const maxDuration = 60
 
@@ -34,27 +33,10 @@ export async function POST(req: NextRequest) {
   let rounds_created = 0, matches_created = 0, matches_updated = 0
 
   if (rebuild_rounds) {
-    const { data: gameLeagueRows } = await supabaseAdmin
-      .from('game_leagues')
-      .select('game_id')
-      .eq('league_id', league_id)
-
-    const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
-
-    const { data: games } = gameIdsForLeague.length
-      ? await supabaseAdmin
-          .from('games')
-          .select('id')
-          .in('id', gameIdsForLeague)
-          .eq('status', 'active')
-      : { data: [] as { id: number }[] }
-
-    for (const g of (games ?? []) as { id: number }[]) {
-      const res = await buildGameRounds(g.id, league_id)
-      rounds_created  += res.rounds_created
-      matches_created += res.matches_created
-      matches_updated += res.matches_updated
-    }
+    const res = await buildLeagueRounds(league_id)
+    rounds_created = res.rounds_created
+    matches_created = res.matches_created
+    matches_updated = res.matches_updated
   }
 
   return NextResponse.json({ ...syncRes, rounds_created, matches_created, matches_updated })

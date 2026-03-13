@@ -331,9 +331,6 @@ export type BuildLeagueRoundsResult = Pick<SyncResult, 'rounds_created' | 'match
   }
 }
 
-/** @deprecated Brug buildLeagueRounds(leagueId) i stedet */
-export const buildGameRounds = (_gameId: number, leagueId: number) => buildLeagueRounds(leagueId)
-
 export async function buildLeagueRounds(
   leagueId: number
 ): Promise<BuildLeagueRoundsResult> {

@@ -7,12 +7,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
+import { requireCronAuth } from '@/lib/cronAuth'
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = requireCronAuth(req.headers.get('authorization'))
+  if (authError) return authError
 
   // Find aktive games
   const { data: activeGames } = await supabaseAdmin

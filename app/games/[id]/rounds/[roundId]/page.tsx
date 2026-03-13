@@ -88,7 +88,7 @@ export default async function RoundPage({ params }: Props) {
   let matches = (rawMatches ?? []) as unknown as MatchRow[]
 
   if (matches.length === 0) {
-    await syncMatchesForRound(supabaseAdmin, gameId, roundIdNum)
+    await syncMatchesForRound(gameId, roundIdNum)
     const { data: matchesRetry } = await supabase
       .from('matches')
       .select(`

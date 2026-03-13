@@ -6,16 +6,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-
-function isAuthorized(req: NextRequest): boolean {
-  const auth = req.headers.get('authorization')
-  return auth === `Bearer ${process.env.CRON_SECRET}`
-}
+import { requireCronAuth } from '@/lib/cronAuth'
 
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = requireCronAuth(req.headers.get('authorization'))
+  if (authError) return authError
 
   const now = new Date()
   const nowIso = now.toISOString()
