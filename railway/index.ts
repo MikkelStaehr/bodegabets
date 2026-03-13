@@ -22,6 +22,7 @@
  */
 
 import express from 'express'
+import cron from 'node-cron'
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { syncMatchScores } from '@/lib/syncMatchScores'
@@ -419,4 +420,30 @@ app.get('/send-reminders', async (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[bodegabets-cron] listening on port ${PORT}`)
+
+  const self = `http://localhost:${PORT}`
+  const headers = { Authorization: `Bearer ${process.env.CRON_SECRET ?? ''}` }
+
+  const call = (name: string, path: string) =>
+    fetch(`${self}${path}`, { headers })
+      .then(r => r.json())
+      .then(j => console.log(`[cron] ${name}`, j))
+      .catch(e => console.error(`[cron] ${name} failed`, e))
+
+  // Hvert 5. minut — sync live scores
+  cron.schedule('*/5 * * * *', () => call('sync-scores', '/sync-scores'))
+
+  // Hvert 30. minut — sync fixtures
+  cron.schedule('*/30 * * * *', () => call('sync-fixtures', '/sync-fixtures'))
+
+  // Dagligt 08:00 UTC — opdater rundes status
+  cron.schedule('0 8 * * *', () => call('update-rounds', '/update-rounds'))
+
+  // Dagligt 09:00 UTC — beregn points
+  cron.schedule('0 9 * * *', () => call('calculate-points', '/calculate-points'))
+
+  // Dagligt 10:00 UTC — send reminders
+  cron.schedule('0 10 * * *', () => call('send-reminders', '/send-reminders'))
+
+  console.log('[bodegabets-cron] cron jobs scheduled')
 })
