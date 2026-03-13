@@ -1,7 +1,7 @@
 /**
  * Admin-auth for API route handlers.
  * Understøtter både session (cookies) og Bearer token (ADMIN_SECRET).
- * Session-baseret auth bruger getSession() som fungerer bedre i route handlers.
+ * Session-baseret auth bruger getUser() som fungerer bedre i route handlers.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
@@ -29,9 +29,9 @@ export async function requireAdmin(
 
   // 2. Session fra cookies (browser, admin panel)
   const supabase = await createServerSupabaseClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error } = await supabase.auth.getUser()
 
-  if (!session?.user) {
+  if (error || !user) {
     return {
       ok: false,
       response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
@@ -41,11 +41,11 @@ export async function requireAdmin(
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('is_admin')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .maybeSingle()
 
   const isAdmin =
-    profile?.is_admin === true || ADMIN_EMAILS.includes(session.user.email ?? '')
+    profile?.is_admin === true || ADMIN_EMAILS.includes(user.email ?? '')
 
   if (!isAdmin) {
     return {
