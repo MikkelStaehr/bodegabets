@@ -5,6 +5,17 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
+## [2026-03-13] Feat — forlad spilrum med automatisk sletning ved sidste deltager
+
+- **DELETE `/api/games/[id]/leave`** — sletter membership, bets og round_scores
+  - Hvis brugeren er sidst tilbage, slettes hele spilrummet inkl. game_leagues
+  - Returnerer `{ ok: true, deleted: true/false }`
+- **GET `/api/games/[id]/members/count`** — returnerer antal medlemmer
+- **LeaveGameButton** viser forskellig bekræftelsesbesked afhængigt af om brugeren er sidst (advarsel om permanent sletning af rummet)
+- Knappen vises kun for ikke-hosts
+
+---
+
 ## [2026-03-13] Login og push notification fixes
 
 - **"Husk mig" på login fjernet**

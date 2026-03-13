@@ -4,6 +4,7 @@ import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
+import LeaveGameButton from '@/components/games/LeaveGameButton'
 import RoundSlider from '@/components/games/RoundSlider'
 import type { Game, Round, RoundScore } from '@/types'
 
@@ -372,6 +373,8 @@ export default async function GamePage({ params }: Props) {
               </div>
             ))}
           </div>
+
+          <LeaveGameButton gameId={gameId} isHost={typedGame.host_id === user.id} />
         </div>
       </div>
 
