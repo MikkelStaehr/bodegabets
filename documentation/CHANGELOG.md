@@ -5,14 +5,33 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
-## [2026-03-13] Feat — forlad spilrum med automatisk sletning ved sidste deltager
+## [2026-03-13] Feat — SeasonStats widget på dashboard
 
-- **DELETE `/api/games/[id]/leave`** — sletter membership, bets og round_scores
-  - Hvis brugeren er sidst tilbage, slettes hele spilrummet inkl. game_leagues
+- **Ny API-route: GET `/api/users/me/stats`**
+  - Returnerer `totalBets`, `correctBets` og `precision`
+  - Tæller bets med `result = 'win'`
+- **Ny komponent: `SeasonStats`** — tre nøgletal i diskret stribe
+  - Vises kun når `totalBets > 0`
+  - Placeret mellem header og spilrum-listen
+
+---
+
+## [2026-03-13] Forlad spilrum
+
+- **Ny API-route: `DELETE /api/games/[id]/leave`**
+  - Tjekker at brugeren er medlem og ikke host
+  - Sletter brugerens bets, round_scores og game_members
+  - Hvis brugeren er sidst tilbage: slettes hele spilrummet (bets, round_scores, game_leagues, games)
   - Returnerer `{ ok: true, deleted: true/false }`
-- **GET `/api/games/[id]/members/count`** — returnerer antal medlemmer
-- **LeaveGameButton** viser forskellig bekræftelsesbesked afhængigt af om brugeren er sidst (advarsel om permanent sletning af rummet)
-- Knappen vises kun for ikke-hosts
+
+- **Ny API-route: `GET /api/games/[id]/members/count`**
+  - Returnerer `{ memberCount: number }` for et spilrum
+
+- **Ny komponent: `components/games/LeaveGameButton.tsx`**
+  - Vises kun for ikke-hosts
+  - Kalder members/count og viser passende bekræftelsesbesked
+  - Ved sidst i rummet: advarsel om permanent sletning
+  - Redirect til dashboard ved success
 
 ---
 

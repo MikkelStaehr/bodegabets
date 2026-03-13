@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import DashboardContent from '@/components/dashboard/DashboardContent'
 import JoinGameCard from '@/components/dashboard/JoinGameCard'
+import SeasonStats from '@/components/dashboard/SeasonStats'
 import type { SportType, GameRowWithSport } from '@/components/dashboard/DashboardContent'
 
 type ActiveRoundResult = {
@@ -302,17 +303,20 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-[#F2EDE4]">
       <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
         {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <p className="text-[11px] font-semibold text-[#7a7060] uppercase tracking-widest mb-1">Velkommen tilbage</p>
-            <h1 className="font-['Playfair_Display'] text-4xl font-bold text-[#1a3329]">{profile?.username ?? 'Spiller'}</h1>
-            <p className="text-[13px] text-[#7a7060] mt-1">
-              {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
+        <div className="mb-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-semibold text-[#7a7060] uppercase tracking-widest mb-1">Velkommen tilbage</p>
+              <h1 className="font-['Playfair_Display'] text-4xl font-bold text-[#1a3329]">{profile?.username ?? 'Spiller'}</h1>
+              <p className="text-[13px] text-[#7a7060] mt-1">
+                {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
+            </div>
+            <Link href="/games/new" className="shrink-0 flex items-center gap-2 bg-[#2C4A3E] text-white font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-widest px-5 py-3 rounded-xl hover:bg-[#1a3329] transition-colors">
+              + Opret spil
+            </Link>
           </div>
-          <Link href="/games/new" className="shrink-0 flex items-center gap-2 bg-[#2C4A3E] text-white font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-widest px-5 py-3 rounded-xl hover:bg-[#1a3329] transition-colors">
-            + Opret spil
-          </Link>
+          <SeasonStats />
         </div>
 
         <DashboardContent
