@@ -439,10 +439,7 @@ app.listen(PORT, () => {
   // Dagligt 08:00 UTC — opdater rundes status
   cron.schedule('0 8 * * *', () => call('update-rounds', '/update-rounds'))
 
-  // Dagligt 09:00 UTC — beregn points
-  cron.schedule('0 9 * * *', () => call('calculate-points', '/calculate-points'))
-
-  // Dagligt 10:00 UTC — send reminders
+    // Dagligt 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => call('send-reminders', '/send-reminders'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')

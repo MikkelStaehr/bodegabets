@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
@@ -45,10 +45,11 @@ function formatDate(iso: string) {
 // Beregn dynamisk rundestatus baseret på betting_closes_at og DB-status
 function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'active' | 'finished' {
   if (round.status === 'finished') return 'finished'
+  if (round.status === 'upcoming') return 'upcoming'
   if (!round.betting_closes_at) return 'upcoming'
   const closes = new Date(round.betting_closes_at)
-  if (closes > now) return 'open'     // bets accepteres stadig
-  return 'active'                      // kampe i gang, ikke alle færdige
+  if (closes > now) return 'open'
+  return 'active'
 }
 
 export default async function GamePage({ params }: Props) {
@@ -142,34 +143,23 @@ export default async function GamePage({ params }: Props) {
     null
   const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string } | null) ?? null
 
-  const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
-    latestFinishedRound
-      ? supabase
-          .from('matches')
-          .select('home_team, away_team, home_score, away_score, kickoff_at')
-          .eq('round_id', latestFinishedRound.id)
-          .not('home_score', 'is', null)
-          .order('id', { ascending: true })
-          .limit(6)
-      : Promise.resolve({ data: [] }),
+  const { data: recentMatches } = latestFinishedRound
+    ? await supabase
+        .from('matches')
+        .select('home_team, away_team, home_score, away_score, kickoff_at')
+        .eq('round_id', latestFinishedRound.id)
+        .not('home_score', 'is', null)
+        .order('id', { ascending: true })
+        .limit(6)
+    : { data: [] }
 
-    activeRoundEarly
-      ? supabase
-          .from('matches')
-          .select('id')
-          .eq('round_id', activeRoundEarly.id)
-      : Promise.resolve({ data: [] }),
-  ])
-
-  // Bets har ikke round_id — hent via match_ids
-  const activeMatchIds = (activeRoundMatches ?? []).map((m: { id: number }) => m.id)
   const { data: roundBets } =
-    activeMatchIds.length > 0
-      ? await supabase
+    activeRoundEarly
+      ? await supabaseAdmin
           .from('bets')
           .select('id, user_id')
           .eq('game_id', gameId)
-          .in('match_id', activeMatchIds)
+          .eq('round_id', activeRoundEarly.id)
       : { data: [] as { id: number; user_id: string }[] }
 
   const typedRoundsForMatchCount = (rounds ?? []) as Round[]

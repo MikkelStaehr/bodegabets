@@ -23,21 +23,29 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Hurtigt — lokal JWT decode (ingen database roundtrip)
+  // Lokal JWT decode (ingen database roundtrip)
   const { data: { user } } = await supabase.auth.getUser()
-
   const path = req.nextUrl.pathname
-  // Suspend-tjek — redirect til /suspended
-  if (user && !path.startsWith('/suspended') && !path.startsWith('/login') && !path.startsWith('/register')) {
-    const { data: profile, error: suspendedError } = await supabase
+
+  // Hent profil én gang med begge felter — kun hvis bruger er logget ind
+  let profile: { is_suspended: boolean; is_admin: boolean } | null = null
+  if (user) {
+    const { data } = await supabase
       .from('profiles')
-      .select('is_suspended')
+      .select('is_suspended, is_admin')
       .eq('id', user.id)
       .single()
+    profile = data
+  }
 
-    if (profile?.is_suspended) {
-      return NextResponse.redirect(new URL('/suspended', req.url))
-    }
+  // Suspend-tjek — redirect til /suspended
+  if (
+    profile?.is_suspended &&
+    !path.startsWith('/suspended') &&
+    !path.startsWith('/login') &&
+    !path.startsWith('/register')
+  ) {
+    return NextResponse.redirect(new URL('/suspended', req.url))
   }
 
   // Beskyt /admin — kræver login + is_admin
@@ -45,13 +53,6 @@ export async function middleware(req: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
     if (!profile?.is_admin) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }

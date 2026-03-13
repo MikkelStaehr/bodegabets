@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { calculateRoundPoints } from '@/lib/calculatePoints'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -137,6 +138,8 @@ export async function syncMatchScores(options?: {
   const matchesStatus = (s: string) =>
     s === 'finished' ? 'finished' : s === 'halftime' ? 'halftime' : 'live'
 
+  const finishedRoundIds = new Set<number>()
+
   // Opdater kun de kampe der har nye scores
   for (const match of activeMatches) {
     if (!match.bold_match_id) continue
@@ -157,6 +160,11 @@ export async function syncMatchScores(options?: {
       updated++
       continue
     }
+
+    const { data: currentMatches } = await supabaseAdmin
+      .from('matches')
+      .select('status, round_id')
+      .eq('league_match_id', match.id)
 
     const { error } = await supabaseAdmin
       .from('league_matches')
@@ -180,7 +188,20 @@ export async function syncMatchScores(options?: {
           status: matchesStatus(boldData.status),
         })
         .eq('league_match_id', match.id)
+
+      if (boldData.status === 'finished') {
+        for (const m of currentMatches ?? []) {
+          if (m.status !== 'finished' && m.round_id != null) {
+            finishedRoundIds.add(m.round_id)
+          }
+        }
+      }
     }
+  }
+
+  for (const roundId of finishedRoundIds) {
+    console.log(`[syncMatchScores] Kamp finished → trigger calculateRoundPoints(${roundId})`)
+    await calculateRoundPoints(roundId)
   }
 
   console.log(`[syncMatchScores] ${updated} kampe opdateret${dryRun ? ' (dry-run)' : ''}`)

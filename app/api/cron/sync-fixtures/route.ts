@@ -1,3 +1,9 @@
+/**
+ * MANUEL FALLBACK — køres ikke automatisk.
+ * Railway (railway/index.ts) er den primære cron-kilde via node-cron (hvert 30. min).
+ * Kan trigges manuelt via POST /api/admin/run-cron { cron: 'sync-fixtures' }.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { runLeagueSync, syncBoldFixtures } from '@/lib/syncLeagueMatches'
 import { supabaseAdmin } from '@/lib/supabase'

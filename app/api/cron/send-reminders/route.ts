@@ -1,3 +1,9 @@
+/**
+ * MANUEL FALLBACK — køres ikke automatisk.
+ * Railway (railway/index.ts) er den primære cron-kilde via node-cron (dagligt 10:00 UTC).
+ * Kan trigges manuelt via POST /api/admin/run-cron { cron: 'send-reminders' }.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { supabaseAdmin } from '@/lib/supabase'

@@ -1,3 +1,9 @@
+/**
+ * MANUEL FALLBACK — køres ikke automatisk.
+ * Points beregnes event-drevet fra syncMatchScores.ts når en kamp skifter til 'finished'.
+ * Kan trigges manuelt via POST /api/admin/run-cron { cron: 'calculate-points' }.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
