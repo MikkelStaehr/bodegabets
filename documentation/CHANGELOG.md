@@ -5,6 +5,32 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
+## [2026-03-13] Push notification banner — server-side dismissed status
+
+- **Migration: `profiles.push_dismissed`**
+  - Ny boolean kolonne i `profiles`-tabellen, default `false`
+  - Gemmer om brugeren har afvist push notification banneret
+
+- **Ny API-route: `GET/POST /api/push-dismissed`**
+  - GET returnerer brugerens push_dismissed status
+  - POST sætter push_dismissed = true
+
+- **`PushNotificationBanner.tsx` omskrevet**
+  - Fjernet localStorage — valget gemmes nu i Supabase
+  - Tjekker server-side dismissed status og subscription parallelt via Promise.all
+  - Virker på tværs af browsere og enheder
+
+---
+
+## [2026-03-13] Input validering og sanitering
+
+- **`POST /api/games/create`** — spilnavn max 50 tegn
+- **`POST /api/games/join`** — invite_code max 10 tegn
+- **`DELETE /api/push-subscription`** — endpoint valideres (ikke tom, skal være string, max 500 tegn)
+- Verificeret: `submit-bets` og `bets` routes havde allerede tilstrækkelig validering
+
+---
+
 ## [2026-03-13] Console.log oprydning og tsconfig fix
 
 - **Fjernet debug console.log fra lib/**

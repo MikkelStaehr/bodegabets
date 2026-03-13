@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
   if (!invite_code?.trim()) {
     return NextResponse.json({ error: 'Invitationskode er påkrævet' }, { status: 400 })
   }
+  if (invite_code.trim().length > 10) {
+    return NextResponse.json({ error: 'Ugyldig invitationskode' }, { status: 400 })
+  }
 
   const { data: game, error: gameError } = await supabaseAdmin
     .from('games')

@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Navn er påkrævet' }, { status: 400 })
   }
+  if (name.trim().length > 50) {
+    return NextResponse.json({ error: 'Navn må max være 50 tegn' }, { status: 400 })
+  }
   if (!league_id) {
     return NextResponse.json({ error: 'Liga er påkrævet' }, { status: 400 })
   }

@@ -38,6 +38,9 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
 
   const { endpoint } = await req.json()
+  if (!endpoint || typeof endpoint !== 'string' || endpoint.length > 500) {
+    return NextResponse.json({ error: 'Ugyldig endpoint' }, { status: 400 })
+  }
 
   await supabaseAdmin
     .from('push_subscriptions')
