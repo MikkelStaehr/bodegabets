@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { betsLimiter } from '@/lib/rateLimit'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import type { BetType } from '@/types'
 
@@ -19,6 +20,11 @@ export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
+
+  const limit = betsLimiter(user.id)
+  if (!limit.ok) {
+    return NextResponse.json({ error: 'For mange forsøg — prøv igen om lidt' }, { status: 429 })
+  }
 
   const body: RequestBody = await req.json()
   const { game_id, round_id, bets } = body

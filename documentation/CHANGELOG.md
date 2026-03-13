@@ -5,6 +5,69 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
+## [2026-03-13] Rate limiting og Railway cleanup
+
+- **Tilføjet `lib/rateLimit.ts`** — in-memory sliding window rate limiter
+  - Ingen eksterne dependencies — kører direkte i Next.js
+  - Rydder automatisk op i gamle entries hvert 5. minut
+
+- **Rate limiting på tre API-routes**
+  - `POST /api/bets` — max 10 requests per minut per bruger
+  - `POST /api/games/create` — max 5 requests per minut per bruger
+  - `POST /api/games/join` — max 10 requests per minut per bruger
+  - Overskridelse returnerer `429 For mange forsøg`
+
+- **`railway/index.ts` JSDoc opdateret**
+  - Fjernet `calculate-points` som daglig cron fra kommentaren
+  - Tilføjet note om at calculate-points køres event-drevet fra `syncMatchScores`
+
+- **`railway/index.ts` console.log ensrettet**
+  - `[update-rounds]` log forkortet og ensrettet med resten af Railway logs
+
+---
+
+## [2026-03-08] Chore — Rate limiting, Railway cleanup og proxy migration
+
+- **Tilføjet `lib/rateLimit.ts`** — in-memory sliding window rate limiter
+  - Prækonfigurerede limiters: `betsLimiter`, `createGameLimiter`, `joinGameLimiter`
+  - Rydder gamle entries hvert 5. minut for at undgå memory leak
+
+- **Rate limit på API-routes**
+  - `/api/bets` — 10 req/min pr. bruger
+  - `/api/games/create` — 5 req/min pr. bruger
+  - `/api/games/join` — 10 req/min pr. bruger
+  - Returnerer 429 med "For mange forsøg — prøv igen om lidt" ved overskridelse
+
+- **Railway JSDoc opdateret** (`railway/index.ts`)
+  - Fjernet `GET /calculate-points` fra cron-listen
+  - Tilføjet note: calculate-points køres event-drevet fra syncMatchScores — ikke som cron
+
+- **Ensret `console.log` format** i update-rounds
+  - `[update-rounds] finished: X, opened: Y, deadlines: Z` (fjernet timestamp fra log-linjen)
+
+---
+
+## [2026-03-13] Produktionsklargøring — TypeScript og Proxy
+
+- **Fjernet `typescript.ignoreBuildErrors`** (`next.config.ts`)
+  - TypeScript validerer nu fuldt ud ved hvert build
+  - `tsc --noEmit` bekræftede 0 fejl inden ændringen
+  - Build viser nu `✓ Finished TypeScript` i stedet for `Skipping validation of types`
+
+- **`middleware.ts` omdøbt til `proxy.ts`** (Next.js 16 codemod)
+  - Kørt: `npx @next/codemod@canary middleware-to-proxy .`
+  - Funktion omdøbt fra `middleware()` til `proxy()`
+  - Fjerner deprecation-advarsel i build-output
+  - Build bekræfter: `ƒ Proxy (Middleware)` uden advarsler
+
+- **Verificeret: ingen høj-risiko npm vulnerabilities**
+  - `pg`-fjernelsen fra tidligere session eliminerede de 2 high severity vulnerabilities
+
+- **Verificeret: `supabase` singleton bruges ikke forkert**
+  - Alle server-side imports bruger korrekt `supabaseAdmin` eller `createServerSupabaseClient`
+
+---
+
 ## [2026-03-13] Lintfejl og konfiguration
 
 - **Rettet stavefejl i sync-scores import** (`app/api/cron/sync-scores/route.ts`)
@@ -14,9 +77,10 @@ Format: `[DATO] Kategori — Beskrivelse`
   - `eslint.ignoreDuringBuilds` er ikke en gyldig `NextConfig`-property i Next.js 16
   - Fjernet blokken — ESLint-konfiguration håndteres via `.eslintrc` eller CLI
 
-- **`middleware.ts` → `proxy.ts` (udestående)**
-  - Next.js 16 deprecerer `middleware`-konventionen til fordel for `proxy`
-  - Advarsel observeret i build-output — tages i separat session
+- **`middleware.ts` → `proxy.ts` (Next.js 16 codemod)**
+  - Omdøbt `middleware.ts` til `proxy.ts` via `npx @next/codemod@latest middleware-to-proxy .`
+  - Funktion omdøbt fra `middleware()` til `proxy()`
+  - Fjerner deprecation-advarsel i build-output
 
 ---
 

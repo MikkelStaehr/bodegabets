@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { createGameLimiter } from '@/lib/rateLimit'
 
 export const maxDuration = 30
 
@@ -14,6 +15,11 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
+  }
+
+  const limit = createGameLimiter(user.id)
+  if (!limit.ok) {
+    return NextResponse.json({ error: 'For mange forsøg — prøv igen om lidt' }, { status: 429 })
   }
 
   const body = await req.json()

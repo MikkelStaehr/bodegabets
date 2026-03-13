@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Opret response med request videresendt — nødvendigt for cookie-refresh
   let res = NextResponse.next({ request: req })
 

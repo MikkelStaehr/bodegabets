@@ -8,7 +8,7 @@
  *   GET /sync-scores       — hvert 5. min (sync live scores fra Bold API)
  *   GET /sync-fixtures     — dagligt 06:00 (sync fixtures fra Bold API)
  *   GET /update-rounds     — dagligt 08:00 (opdater runde-status)
- *   GET /calculate-points  — dagligt 09:00 (beregn points)
+ *   (calculate-points køres event-drevet fra syncMatchScores — ikke som cron)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /health            — health check
  *
@@ -226,7 +226,7 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ betting_closes_at: deadline }).eq('id', r.id)
     }
 
-    console.log(`[update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}`)
+    console.log(`[update-rounds] finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines: ${toSetDeadline.length}`)
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'cron_sync',
