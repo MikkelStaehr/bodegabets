@@ -5,20 +5,21 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
-## [2026-03-13] Push notification banner — server-side dismissed status
+## [2026-03-13] Login og push notification fixes
 
-- **Migration: `profiles.push_dismissed`**
-  - Ny boolean kolonne i `profiles`-tabellen, default `false`
-  - Gemmer om brugeren har afvist push notification banneret
+- **"Husk mig" på login fjernet**
+  - Supabase v2 understøtter ikke `persistSession` i `signInWithPassword` options
+  - Supabase håndterer session-persistering automatisk via refresh tokens (1 uge)
+  - Checkbox og state fjernet fra `app/login/page.tsx`
 
-- **Ny API-route: `GET/POST /api/push-dismissed`**
-  - GET returnerer brugerens push_dismissed status
-  - POST sætter push_dismissed = true
+---
 
-- **`PushNotificationBanner.tsx` omskrevet**
-  - Fjernet localStorage — valget gemmes nu i Supabase
-  - Tjekker server-side dismissed status og subscription parallelt via Promise.all
-  - Virker på tværs af browsere og enheder
+## [2026-03-13] Feat — push dismissed status server-side + login cleanup
+
+- **Tilføjet `profiles.push_dismissed` kolonne** (migration: `20250317_profiles_push_dismissed.sql`)
+- **Ny API-route: GET/POST `/api/push-dismissed`**
+- **PushNotificationBanner bruger server-side status** i stedet for localStorage
+- **Fjernet "Husk mig" checkbox fra login** (persistSession ikke tilgængelig i Supabase v2)
 
 ---
 
