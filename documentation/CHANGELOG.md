@@ -5,14 +5,72 @@ Format: `[DATO] Kategori — Beskrivelse`
 
 ---
 
-## [2026-03-13] Feat — SeasonStats widget på dashboard
+## [Unreleased] — 13. marts 2026
 
-- **Ny API-route: GET `/api/users/me/stats`**
+### Admin panel — komplet redesign
+
+**Nyt layout**
+- Sidebar-navigation erstatter tab-navigation — mørkegrøn sidebar (#2C4A3E) med tre sektioner: Oversigt, Konfiguration, Udvikling
+- Gul prik på Overblik, rød prik på Live test
+- "← Tilbage til appen" link i bunden af sidebar
+- Georgia serif page-headers på alle tab-sider (Overblik, Logs, Spilrum)
+- Dagens dato vises øverst på Overblik
+
+**Railway heartbeat logging**
+- Nyt POST endpoint `/api/admin/railway-ping` modtager heartbeat fra Railway og skriver til `admin_logs` med type `railway_ping`
+- `railway/index.ts`: alle fire cron-jobs wrappes med timing og `pingAdmin()` — viser job-navn, varighed (ms) og status direkte i admin-panelet
+- Kræver `NEXT_PUBLIC_APP_URL` sat i Railway-miljøet
+
+**Logs**
+- Loader nu korrekt (var brudt tidligere)
+- Filtrering på type: Alle · Railway · Scores · Fixtures · Point · Runder · Reminders
+- Klik på en række for at folde metadata ud (JSON)
+- Farvekodning: grøn (success) · gul (warning) · rød (error)
+
+**Log-typer og statuser rettet**
+- `sync-scores` skriver nu `type: sync_scores` og `status: warning` når Bold API returnerer fejl med 0 updates (var fejlagtigt `success`)
+- `sync-fixtures` → `type: sync_fixtures`
+- `calculate-points` → `type: calculate_points`
+- `update-rounds` → `type: update_rounds`
+- `send-reminders` → `type: send_reminders`
+- `/api/admin/status` og `/api/admin/logs` opdateret til at forespørge alle nye typer
+
+**Spilrum**
+- Ny tabel med alle spilrum: navn, invitationskode, antal deltagere, status og direkte link
+- Tom søgning returnerer alle rum (var krævet min. 3 tegn)
+
+**Ligaer — phase ID verificering**
+- Nyt GET endpoint `/api/admin/leagues/verify-phase` henter kampe fra Bold API for et givet `phase_id`
+- Returnerer antal kampe, min/max datoer og om det matcher ligaens nuværende phase
+- `PhaseVerifyWidget` i hver liga-række: input med nuværende phase_id, Verificér-knap, resultat inline (✓ grøn ≥50 kampe · ⚠ gul <50 · ✗ rød fejl)
+
+**Øvrige**
+- `run-cron` understøtter nu alle fem jobs inkl. `send-reminders`
+- Migration: `profiles.push_dismissed boolean` til server-side håndtering af push notification banner
+
+---
+
+## [2026-03-13] Teknisk gæld oprydning
+
+- Debug `console.log` fjernet fra `AfgivBets.tsx`
+- Ubrugt `scoresRes` fjernet fra `app/api/users/me/stats/route.ts`
+- `_supabase` parameter fjernet fra `syncMatchesForRound` + upsert fejlhåndtering tilføjet
+- `lib/historicFactor.ts` slettet (ubrugt)
+- `buildGameRounds` slettet (`@deprecated`) — `sync-league-client` bruger nu `buildLeagueRounds` direkte
+- Ny `lib/cronAuth.ts` — fælles `requireCronAuth()` helper til alle 5 cron-routes
+
+---
+
+## [2026-03-13] SeasonStats widget på dashboard
+
+- **Ny API-route: `GET /api/users/me/stats`**
   - Returnerer `totalBets`, `correctBets` og `precision`
-  - Tæller bets med `result = 'win'`
-- **Ny komponent: `SeasonStats`** — tre nøgletal i diskret stribe
-  - Vises kun når `totalBets > 0`
-  - Placeret mellem header og spilrum-listen
+  - Tæller bets med `result = 'win'` (ikke pending)
+
+- **Ny komponent: `components/dashboard/SeasonStats.tsx`**
+  - Tre nøgletal i en diskret stribe: Bets afgivet · Korrekte · Præcision %
+  - Vises kun hvis `totalBets > 0`
+  - Placeret mellem hilsen-header og spilrum-listen på dashboard
 
 ---
 

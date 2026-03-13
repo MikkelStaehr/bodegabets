@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   await supabaseAdmin
     .from('admin_logs')
     .insert({
-      type: 'cron_sync',
+      type: 'calculate_points',
       status: processed > 0 ? 'success' : 'info',
       message: `calculate-points: ${processed} rounds processed, ${updated} profiles updated`,
       metadata: {

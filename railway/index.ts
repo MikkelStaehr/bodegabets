@@ -29,6 +29,21 @@ import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 
+async function pingAdmin(job: string, durationMs: number, status: 'success' | 'error', message: string) {
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/railway-ping`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ job, duration_ms: durationMs, status, message }),
+    })
+  } catch {
+    // Best effort
+  }
+}
+
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
 
@@ -64,18 +79,21 @@ app.use(authorize)
 app.get('/sync-scores', async (_req, res) => {
   try {
     const result = await syncMatchScores()
+    const updated = (result as { updated?: number }).updated ?? 0
+    const errors = (result as { errors?: string[] }).errors ?? []
+    const hasErrors = errors.length > 0
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
-      status: 'success',
-      message: `sync-scores: ${(result as Record<string, unknown>).updated ?? 0} updated`,
-      metadata: result,
+      type: 'sync_scores',
+      status: hasErrors && updated === 0 ? 'warning' : 'success',
+      message: `sync-scores: ${updated} updated`,
+      metadata: { updated, errors },
     })
 
     res.json({ ok: true, ...result })
   } catch (e) {
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
+      type: 'sync_scores',
       status: 'error',
       message: `sync-scores failed: ${String(e)}`,
     })
@@ -100,7 +118,7 @@ app.get('/sync-fixtures', async (_req, res) => {
     )
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
+      type: 'sync_fixtures',
       status: totals.synced > 0 ? 'success' : 'info',
       message: `sync-fixtures: ${results.length} leagues, ${totals.matches_created} created, ${totals.matches_updated} updated`,
       metadata: { leagues_synced: results.length, ...totals },
@@ -116,7 +134,7 @@ app.get('/sync-fixtures', async (_req, res) => {
   } catch (err) {
     console.error('[sync-fixtures]', err)
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
+      type: 'sync_fixtures',
       status: 'error',
       message: `sync-fixtures failed: ${String(err)}`,
     })
@@ -229,7 +247,7 @@ app.get('/update-rounds', async (_req, res) => {
     console.log(`[update-rounds] finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines: ${toSetDeadline.length}`)
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
+      type: 'update_rounds',
       status: finishedIds.length > 0 || openIds.length > 0 ? 'success' : 'info',
       message: `update-rounds: ${finishedIds.length} finished, ${openIds.length} opened, ${toSetDeadline.length} deadlines sat`,
       metadata: {
@@ -289,7 +307,7 @@ app.get('/calculate-points', async (_req, res) => {
     const { updated } = await syncProfilesPoints()
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
+      type: 'calculate_points',
       status: processed > 0 ? 'success' : 'info',
       message: `calculate-points: ${processed} rounds processed, ${updated} profiles updated`,
       metadata: { rounds_processed: processed, profiles_updated: updated },
@@ -403,7 +421,7 @@ app.get('/send-reminders', async (_req, res) => {
     }
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
+      type: 'send_reminders',
       status: totalSent > 0 ? 'success' : 'info',
       message: `send-reminders: ${totalSent} sent, ${totalFailed} failed`,
       metadata: { sent: totalSent, failed: totalFailed, rounds: rounds.length },
@@ -427,20 +445,55 @@ app.listen(PORT, () => {
   const call = (name: string, path: string) =>
     fetch(`${self}${path}`, { headers })
       .then(r => r.json())
-      .then(j => console.log(`[cron] ${name}`, j))
-      .catch(e => console.error(`[cron] ${name} failed`, e))
+      .then(j => { console.log(`[cron] ${name}`, j); return j })
+      .catch(e => { console.error(`[cron] ${name} failed`, e); throw e })
 
   // Hvert 5. minut — sync live scores
-  cron.schedule('*/5 * * * *', () => call('sync-scores', '/sync-scores'))
+  cron.schedule('*/5 * * * *', async () => {
+    const start = Date.now()
+    try {
+      const result = await call('sync-scores', '/sync-scores')
+      await pingAdmin('sync-scores', Date.now() - start, 'success', `${(result as { updated?: number })?.updated ?? 0} updated`)
+    } catch (err) {
+      await pingAdmin('sync-scores', Date.now() - start, 'error', String(err))
+    }
+  })
 
   // Hvert 30. minut — sync fixtures
-  cron.schedule('*/30 * * * *', () => call('sync-fixtures', '/sync-fixtures'))
+  cron.schedule('*/30 * * * *', async () => {
+    const start = Date.now()
+    try {
+      const result = await call('sync-fixtures', '/sync-fixtures')
+      const r = result as { leagues_synced?: number; matches_created?: number; matches_updated?: number }
+      await pingAdmin('sync-fixtures', Date.now() - start, 'success', `${r?.leagues_synced ?? 0} leagues, ${r?.matches_created ?? 0} created, ${r?.matches_updated ?? 0} updated`)
+    } catch (err) {
+      await pingAdmin('sync-fixtures', Date.now() - start, 'error', String(err))
+    }
+  })
 
   // Dagligt 08:00 UTC — opdater rundes status
-  cron.schedule('0 8 * * *', () => call('update-rounds', '/update-rounds'))
+  cron.schedule('0 8 * * *', async () => {
+    const start = Date.now()
+    try {
+      const result = await call('update-rounds', '/update-rounds')
+      const r = result as { rounds_marked_finished?: number; rounds_marked_open?: number; deadlines_set?: number }
+      await pingAdmin('update-rounds', Date.now() - start, 'success', `finished: ${r?.rounds_marked_finished ?? 0}, opened: ${r?.rounds_marked_open ?? 0}, deadlines: ${r?.deadlines_set ?? 0}`)
+    } catch (err) {
+      await pingAdmin('update-rounds', Date.now() - start, 'error', String(err))
+    }
+  })
 
-    // Dagligt 10:00 UTC — send reminders
-  cron.schedule('0 10 * * *', () => call('send-reminders', '/send-reminders'))
+  // Dagligt 10:00 UTC — send reminders
+  cron.schedule('0 10 * * *', async () => {
+    const start = Date.now()
+    try {
+      const result = await call('send-reminders', '/send-reminders')
+      const r = result as { sent?: number; failed?: number }
+      await pingAdmin('send-reminders', Date.now() - start, 'success', `${r?.sent ?? 0} sent, ${r?.failed ?? 0} failed`)
+    } catch (err) {
+      await pingAdmin('send-reminders', Date.now() - start, 'error', String(err))
+    }
+  })
 
   console.log('[bodegabets-cron] cron jobs scheduled')
 })

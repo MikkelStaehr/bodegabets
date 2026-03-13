@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
   await supabaseAdmin
     .from('admin_logs')
     .insert({
-      type: 'cron_sync',
+      type: 'send_reminders',
       status: totalSent > 0 ? 'success' : 'info',
       message: `send-reminders: ${totalSent} sent, ${totalFailed} failed`,
       metadata: { sent: totalSent, failed: totalFailed, rounds: rounds.length },

@@ -2,7 +2,7 @@
  * POST /api/admin/run-cron
  * Manuelt kør cron jobs (kræver admin).
  *
- * Body: { cron: 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points' }
+ * Body: { cron: 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points' | 'send-reminders' }
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
@@ -12,6 +12,7 @@ const CRON_ROUTES: Record<string, string> = {
   'sync-scores': '/api/cron/sync-scores',
   'update-rounds': '/api/cron/update-rounds',
   'calculate-points': '/api/cron/calculate-points',
+  'send-reminders': '/api/cron/send-reminders',
 }
 
 export const maxDuration = 65

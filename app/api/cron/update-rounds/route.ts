@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
   await supabaseAdmin
     .from('admin_logs')
     .insert({
-      type: 'cron_sync',
+      type: 'update_rounds',
       status: finishedIds.length > 0 || openIds.length > 0 ? 'success' : 'info',
       message: `update-rounds: ${finishedIds.length} finished, ${openIds.length} opened, ${toSetDeadline.length} deadlines sat`,
       metadata: {

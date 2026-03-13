@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     await supabaseAdmin
       .from('admin_logs')
       .insert({
-        type: 'cron_sync',
+        type: 'sync_fixtures',
         status: totals.synced > 0 ? 'success' : 'info',
         message: `sync-fixtures: ${results.length} leagues, ${totals.matches_created} created, ${totals.matches_updated} updated`,
         metadata: {
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
     await supabaseAdmin
       .from('admin_logs')
       .insert({
-        type: 'cron_sync',
+        type: 'sync_fixtures',
         status: 'error',
         message: `sync-fixtures failed: ${String(err)}`,
       })

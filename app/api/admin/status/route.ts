@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin
       .from('admin_logs')
       .select('created_at, status, metadata')
-      .eq('type', 'cron_sync')
+      .in('type', ['sync_scores', 'sync_fixtures', 'update_rounds', 'calculate_points', 'send_reminders', 'railway_ping'])
       .order('created_at', { ascending: false })
       .limit(1),
     supabaseAdmin

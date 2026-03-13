@@ -17,14 +17,17 @@ export async function GET(request: Request) {
 
   try {
     const result = await syncMatchScores()
+    const updated = (result as { updated?: number }).updated ?? 0
+    const errors = (result as { errors?: string[] }).errors ?? []
+    const hasErrors = errors.length > 0
 
     await supabaseAdmin
       .from('admin_logs')
       .insert({
-        type: 'cron_sync',
-        status: 'success',
-        message: `sync-scores: ${(result as Record<string, unknown>).updated ?? 0} updated`,
-        metadata: result,
+        type: 'sync_scores',
+        status: hasErrors && updated === 0 ? 'warning' : 'success',
+        message: `sync-scores: ${updated} updated`,
+        metadata: { updated, errors },
       })
 
     return NextResponse.json({ ok: true, ...result })
@@ -32,7 +35,7 @@ export async function GET(request: Request) {
     await supabaseAdmin
       .from('admin_logs')
       .insert({
-        type: 'cron_sync',
+        type: 'sync_scores',
         status: 'error',
         message: `sync-scores failed: ${String(e)}`,
       })

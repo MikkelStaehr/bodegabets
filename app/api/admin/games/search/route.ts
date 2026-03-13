@@ -6,9 +6,41 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const q = new URL(req.url).searchParams.get('q')?.trim()
+  const q = new URL(req.url).searchParams.get('q')?.trim() ?? ''
+
+  // Tom søgning: returner alle spilrum som liste
   if (!q || q.length < 3) {
-    return NextResponse.json({ error: 'Min 3 tegn' }, { status: 400 })
+    const { data: gamesRows } = await supabaseAdmin
+      .from('games')
+      .select('id, name, invite_code, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (!gamesRows?.length) {
+      return NextResponse.json({ games: [] })
+    }
+
+    const gameIds = gamesRows.map((g) => g.id)
+    const { data: memberCounts } = await supabaseAdmin
+      .from('game_members')
+      .select('game_id')
+      .in('game_id', gameIds)
+
+    const countByGame = new Map<number, number>()
+    for (const m of memberCounts ?? []) {
+      const gid = (m as { game_id: number }).game_id
+      countByGame.set(gid, (countByGame.get(gid) ?? 0) + 1)
+    }
+
+    const games = gamesRows.map((g) => ({
+      id: g.id,
+      name: g.name,
+      invite_code: g.invite_code,
+      status: g.status,
+      member_count: countByGame.get(g.id) ?? 0,
+    }))
+
+    return NextResponse.json({ games })
   }
 
   const qUpper = q.toUpperCase()
@@ -33,7 +65,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!games?.length) {
-    return NextResponse.json({ notFound: true })
+    return NextResponse.json({ notFound: true, games: [] })
   }
 
   const game = games[0]
@@ -102,6 +134,22 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  const memberCountsForList =
+    games!.length > 1
+      ? await (async () => {
+          const { data: mc } = await supabaseAdmin
+            .from('game_members')
+            .select('game_id')
+            .in('game_id', games!.map((g) => g.id))
+          const map = new Map<number, number>()
+          for (const r of mc ?? []) {
+            const gid = (r as { game_id: number }).game_id
+            map.set(gid, (map.get(gid) ?? 0) + 1)
+          }
+          return map
+        })()
+      : new Map([[game.id, (members ?? []).length]])
+
   return NextResponse.json({
     game: {
       id: game.id,
@@ -115,5 +163,12 @@ export async function GET(req: NextRequest) {
       total_bets: totalBets,
       members: ranked,
     },
+    games: games!.map((g) => ({
+      id: g.id,
+      name: g.name,
+      invite_code: g.invite_code,
+      status: g.status,
+      member_count: memberCountsForList.get(g.id) ?? 0,
+    })),
   })
 }
