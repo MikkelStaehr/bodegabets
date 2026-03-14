@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useLiveMatchesForUser } from '@/hooks/useLiveMatches'
 import { LiveMatchesTicker } from '@/components/LiveMatchesTicker'
 
@@ -19,35 +18,43 @@ export default function LiveMatchesDashboard() {
       </div>
 
       <div className="space-y-4">
-        {items.map((item) => (
-          <Link
-            key={`${item.gameId}-${item.roundId}`}
-            href={`/games/${item.gameId}/rounds/${item.roundId}`}
-            className="block rounded-xl overflow-hidden hover:ring-2 hover:ring-forest/30 transition-all"
-          >
-            <LiveMatchesTicker
-              matches={item.matches}
-              summary={item.summary}
-              lastUpdate={lastUpdate}
-              headerTitle={
-                <span className="text-forest font-condensed">
-                  {item.gameName} · {item.roundName}
-                </span>
-              }
-              headerRight={
-                <span className="text-[10px] uppercase text-text-warm font-condensed">
-                  {item.summary.live > 0 && `${item.summary.live} live`}
-                  {item.summary.live > 0 && item.summary.halftime > 0 && ' · '}
-                  {item.summary.halftime > 0 && `${item.summary.halftime} HT`}
-                  {item.summary.finished > 0 &&
-                    (item.summary.live > 0 || item.summary.halftime > 0 ? ' · ' : '') +
-                      `${item.summary.finished} FT`}
-                </span>
-              }
-              maxMatches={5}
-            />
-          </Link>
-        ))}
+        {items.map((item) => {
+          const summary = {
+            live: item.matches.filter((m) => m.status === 'live').length,
+            halftime: item.matches.filter((m) => m.status === 'halftime').length,
+            finished: item.matches.filter((m) => m.status === 'finished').length,
+            scheduled: item.matches.filter((m) => m.status === 'scheduled').length,
+            total: item.matches.length,
+          }
+          return (
+            <div
+              key={item.leagueId}
+              className="block rounded-xl overflow-hidden"
+            >
+              <LiveMatchesTicker
+                matches={item.matches}
+                summary={summary}
+                lastUpdate={lastUpdate}
+                headerTitle={
+                  <span className="text-forest font-condensed">
+                    {item.leagueName}
+                  </span>
+                }
+                headerRight={
+                  <span className="text-[10px] uppercase text-text-warm font-condensed">
+                    {summary.live > 0 && `${summary.live} live`}
+                    {summary.live > 0 && summary.halftime > 0 && ' · '}
+                    {summary.halftime > 0 && `${summary.halftime} HT`}
+                    {summary.finished > 0 &&
+                      (summary.live > 0 || summary.halftime > 0 ? ' · ' : '') +
+                        `${summary.finished} FT`}
+                  </span>
+                }
+                maxMatches={5}
+              />
+            </div>
+          )
+        })}
       </div>
     </section>
   )
