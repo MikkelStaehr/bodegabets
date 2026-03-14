@@ -132,6 +132,28 @@ export async function GET(req: NextRequest) {
   const openIds = toMarkOpen.map((r) => r.id)
   if (openIds.length > 0) {
     await supabaseAdmin.from('rounds').update({ status: 'open' }).in('id', openIds)
+
+    // Top op betting_balance for game_members når runde åbnes
+    const seasonIdsOpening = [...new Set(toMarkOpen.map((r) => r.season_id))]
+    const { data: gameSeasonRows } = await supabaseAdmin
+      .from('game_seasons')
+      .select('game_id')
+      .in('season_id', seasonIdsOpening)
+    const gameIdsToTopUp = [...new Set((gameSeasonRows ?? []).map((g) => g.game_id))]
+    if (gameIdsToTopUp.length > 0) {
+      const { data: games } = await supabaseAdmin
+        .from('games')
+        .select('id, max_betting_balance')
+        .in('id', gameIdsToTopUp)
+      for (const game of games ?? []) {
+        const maxBal = (game as { max_betting_balance?: number }).max_betting_balance ?? 1000
+        await supabaseAdmin
+          .from('game_members')
+          .update({ betting_balance: maxBal })
+          .eq('game_id', game.id)
+          .lt('betting_balance', maxBal)
+      }
+    }
   }
 
   // 3) Sæt runder til 'closed' hvis betting_closes_at < now() men ikke alle kampe er finished

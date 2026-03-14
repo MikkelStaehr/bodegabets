@@ -67,7 +67,7 @@ export default async function RoundPage({ params }: Props) {
 
     supabase
       .from('game_members')
-      .select('earnings')
+      .select('earnings, betting_balance')
       .eq('game_id', gameId)
       .eq('user_id', user.id)
       .maybeSingle(),
@@ -202,6 +202,8 @@ export default async function RoundPage({ params }: Props) {
     )
   }
 
+  const bettingBalance = (membership as { betting_balance?: number })?.betting_balance ?? 1000
+
   return (
     <AfgivBets
       gameId={gameId}
@@ -214,7 +216,7 @@ export default async function RoundPage({ params }: Props) {
       }}
       matches={matches}
       existingBets={typedBets}
-      userPoints={1000}
+      bettingBalance={bettingBalance}
       tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}

@@ -92,7 +92,7 @@ type Props = {
   }
   matches: MatchWithOptions[]
   existingBets: Bet[]
-  userPoints: number
+  bettingBalance: number
   tickerItems: string[]
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
@@ -563,7 +563,7 @@ export default function AfgivBets({
   round,
   matches,
   existingBets,
-  userPoints,
+  bettingBalance,
   tickerItems,
   rivalryInfo = {},
   totalMatchesInRound,
@@ -728,8 +728,8 @@ export default function AfgivBets({
       const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
       return sum + main + extra
     }, 0)
-    if (openPoints > userPoints) {
-      toast(`Ikke nok point. Du har ${userPoints} pt.`, 'error')
+    if (openPoints > bettingBalance) {
+      toast(`Ikke nok credits. Du har ${bettingBalance} pt.`, 'error')
       return
     }
 
@@ -809,14 +809,31 @@ export default function AfgivBets({
               {totalMatches} kampe
             </p>
           </div>
-          <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right shrink-0">
-            <div className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
-              Deadline
+          <div className="flex gap-3 shrink-0">
+            <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right">
+              <div className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
+                Dine credits
+              </div>
+              <span
+                className={`font-condensed text-[20px] font-bold block leading-tight ${
+                  totalPoints > bettingBalance ? 'text-[#c0392b]' : 'text-[#1a3329]'
+                }`}
+              >
+                {bettingBalance - totalPoints} pt
+              </span>
+              {totalPoints > 0 && (
+                <div className="text-[10px] text-[#7a7060]">Valg: {totalPoints} pt</div>
+              )}
             </div>
-            <span className="font-condensed text-[20px] font-bold text-[#c0392b] block leading-tight">
-              {deadline.time}
-            </span>
-            <div className="text-[10px] text-[#7a7060]">{deadline.date}</div>
+            <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right">
+              <div className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
+                Deadline
+              </div>
+              <span className="font-condensed text-[20px] font-bold text-[#c0392b] block leading-tight">
+                {deadline.time}
+              </span>
+              <div className="text-[10px] text-[#7a7060]">{deadline.date}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -876,7 +893,7 @@ export default function AfgivBets({
                 userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
                 userExtraPicks={extraPicks}
                 rivalry={rivalryInfo[match.id]}
-                userPoints={userPoints}
+                userPoints={bettingBalance}
                 totalMatches={totalMatchesInRound ?? totalMatches}
               />
             )
@@ -1111,7 +1128,7 @@ export default function AfgivBets({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={openSelectionsCount === 0 || isSubmitting || isReadOnly}
+              disabled={openSelectionsCount === 0 || isSubmitting || isReadOnly || totalPoints > bettingBalance}
               className="w-full h-[42px] rounded-lg font-condensed text-[15px] font-bold tracking-widest bg-[#B8963E] text-[#1a3329] disabled:bg-[#E8E0D4] disabled:text-[#7a7060] hover:bg-[#d4aa55] hover:-translate-y-px transition-all disabled:cursor-not-allowed disabled:transform-none"
             >
               LÅS DINE VALG

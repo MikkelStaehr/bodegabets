@@ -49,10 +49,10 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   // Per-kamp deadline: hver kamp låses 30 min før kickoff (betting_closes_at blokerer ikke længere)
 
-  // Tjek at brugeren er game_member
+  // Tjek at brugeren er game_member og hent betting_balance
   const { data: member } = await supabaseAdmin
     .from('game_members')
-    .select('id')
+    .select('id, betting_balance')
     .eq('game_id', bodyGameId)
     .eq('user_id', user.id)
     .single()
@@ -60,6 +60,8 @@ export async function POST(req: NextRequest, { params }: Props) {
   if (!member) {
     return NextResponse.json({ error: 'Du er ikke med i dette spil' }, { status: 403 })
   }
+
+  const currentBalance = (member as { betting_balance?: number }).betting_balance ?? 1000
 
   // Valider indsatser (minimum 10 pt for side-bets; match_result har stake 0)
   for (const bet of bets) {
@@ -114,8 +116,18 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Indsæt nye bets: match_result bruger home_score/away_score (prediction er fjernet)
+  // Beregn total cost og tjek betting_balance
   const matchResultBets = bets.filter((b) => b.bet_type === 'match_result')
+  const totalCost = matchResultBets.reduce((sum, b) => sum + (b.stake || 100), 0)
+
+  if (currentBalance < totalCost) {
+    return NextResponse.json(
+      { error: `Ikke nok credits. Du har ${currentBalance} pt, men valgene koster ${totalCost} pt.` },
+      { status: 400 }
+    )
+  }
+
+  // Indsæt nye bets: match_result bruger home_score/away_score (prediction er fjernet)
   const rows = matchResultBets.map((b) => {
     const { home_score, away_score } = predictionToScores(b.prediction as '1' | 'X' | '2')
     return {
@@ -132,5 +144,13 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  return NextResponse.json({ ok: true, bets_submitted: rows.length })
+  // Træk cost fra betting_balance
+  const newBalance = currentBalance - totalCost
+  await supabaseAdmin
+    .from('game_members')
+    .update({ betting_balance: newBalance })
+    .eq('game_id', bodyGameId)
+    .eq('user_id', user.id)
+
+  return NextResponse.json({ ok: true, bets_submitted: rows.length, betting_balance: newBalance })
 }
