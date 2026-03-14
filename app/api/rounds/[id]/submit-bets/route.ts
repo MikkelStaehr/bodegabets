@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { predictionToScores } from '@/lib/betScores'
 import type { BetType } from '@/types'
 
 type Props = { params: Promise<{ id: string }> }
@@ -104,6 +105,8 @@ export async function POST(req: NextRequest, { params }: Props) {
       .from('bets')
       .delete()
       .eq('user_id', user.id)
+      .eq('game_id', bodyGameId)
+      .eq('round_id', roundId)
       .in('match_id', payloadMatchIds)
 
     if (deleteError) {
@@ -111,17 +114,19 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Indsæt nye bets (inkl. round_id)
-  const rows = bets.map((b) => ({
-    round_id: roundId,
-    game_id: bodyGameId,
-    match_id: b.match_id,
-    user_id: user.id,
-    bet_type: b.bet_type,
-    prediction: b.prediction,
-    stake: b.stake,
-    result: 'pending' as const,
-  }))
+  // Indsæt nye bets: match_result bruger home_score/away_score (prediction er fjernet)
+  const matchResultBets = bets.filter((b) => b.bet_type === 'match_result')
+  const rows = matchResultBets.map((b) => {
+    const { home_score, away_score } = predictionToScores(b.prediction as '1' | 'X' | '2')
+    return {
+      round_id: roundId,
+      game_id: bodyGameId,
+      match_id: b.match_id,
+      user_id: user.id,
+      home_score,
+      away_score,
+    }
+  })
 
   const { error: insertError } = await supabaseAdmin.from('bets').insert(rows)
 

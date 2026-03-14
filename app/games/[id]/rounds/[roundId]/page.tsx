@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { scoresToPrediction } from '@/lib/betScores'
 import AfgivBets from '@/components/AfgivBets'
 import { syncMatchesForRound } from '@/lib/syncMatchesForRound'
 import type { Match, Bet, Round } from '@/types'
@@ -136,7 +137,15 @@ export default async function RoundPage({ params }: Props) {
     .eq('user_id', user.id)
     .in('match_id', matchIds.length > 0 ? matchIds : [0])
 
-  const typedBets = (betsData ?? []) as Bet[]
+  // Map home_score/away_score til prediction for Bet-format
+  const typedBets: Bet[] = (betsData ?? []).map((b) => {
+    const row = b as { home_score?: number; away_score?: number; prediction?: string; [k: string]: unknown }
+    const prediction =
+      row.home_score != null && row.away_score != null
+        ? scoresToPrediction(row.home_score, row.away_score)
+        : (row.prediction ?? 'X')
+    return { ...row, prediction, bet_type: 'match_result' as const } as Bet
+  })
 
   // Hent rivalries for denne sæson (rivalries bruger tournament_id i nyt skema)
   const rivalryInfo: Record<number, { rivalry_name: string; multiplier: number }> = {}

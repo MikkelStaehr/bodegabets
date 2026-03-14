@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { betsLimiter } from '@/lib/rateLimit'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import type { BetType } from '@/types'
+import { predictionToScores } from '@/lib/betScores'
 
 type BetInput = {
   match_id: number
-  bet_type: BetType
+  bet_type: string
   prediction: string
   stake: number
 }
@@ -71,20 +71,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
   }
 
-  // Upsert alle bets
-  const rows = bets.map((b) => ({
-    user_id: user.id,
-    match_id: b.match_id,
-    game_id,
-    bet_type: b.bet_type,
-    prediction: b.prediction,
-    stake: b.stake,
-    result: 'pending' as const,
-  }))
+  // Upsert match_result bets med home_score/away_score (prediction er fjernet)
+  const matchResultBets = bets.filter((b) => b.bet_type === 'match_result')
+  const rows = matchResultBets.map((b) => {
+    const { home_score, away_score } = predictionToScores(b.prediction as '1' | 'X' | '2')
+    return {
+      user_id: user.id,
+      match_id: b.match_id,
+      game_id,
+      round_id,
+      home_score,
+      away_score,
+    }
+  })
 
   const { error: upsertError } = await supabaseAdmin
     .from('bets')
-    .upsert(rows, { onConflict: 'user_id,match_id,bet_type' })
+    .upsert(rows, { onConflict: 'user_id,match_id' })
 
   if (upsertError) {
     return NextResponse.json({ error: upsertError.message }, { status: 500 })

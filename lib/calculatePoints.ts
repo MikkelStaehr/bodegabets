@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { scoresToPrediction } from '@/lib/betScores'
 import { isBetCorrect } from './betUtils'
 
 /**
@@ -56,28 +57,22 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
       const { data: bets } = await supabaseAdmin
         .from('bets')
-        .select('id, user_id, prediction, stake, bet_type')
+        .select('id, user_id, home_score, away_score, stake')
         .eq('match_id', match.id)
         .eq('game_id', gameId)
 
       if (!bets?.length) continue
 
       for (const bet of bets) {
-        // Halvleg: skip hvis HT-scores mangler
-        if (
-          (bet.bet_type === 'halvleg' || bet.bet_type === 'halftime') &&
-          (match.home_score_ht == null || match.away_score_ht == null)
-        ) {
-          await supabaseAdmin
-            .from('bets')
-            .update({ result: 'pending', points_earned: 0 })
-            .eq('id', bet.id)
-          continue
-        }
+        const betRow = bet as { home_score?: number; away_score?: number }
+        const prediction =
+          betRow.home_score != null && betRow.away_score != null
+            ? scoresToPrediction(betRow.home_score, betRow.away_score)
+            : 'X'
 
         const correct = isBetCorrect(
-          bet.bet_type,
-          bet.prediction,
+          'match_result',
+          prediction,
           match.home_score,
           match.away_score,
           match.home_score_ht,

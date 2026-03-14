@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { scoresToPrediction } from '@/lib/betScores'
 
 export async function GET() {
   const supabase = await createServerSupabaseClient()
@@ -68,11 +69,18 @@ export async function GET() {
   if (matchIds.length > 0) {
     const { data: bets } = await supabaseAdmin
       .from('bets')
-      .select('match_id, prediction, result')
+      .select('match_id, home_score, away_score, result')
       .eq('user_id', user.id)
       .in('match_id', matchIds)
     betsByMatch = Object.fromEntries(
-      (bets ?? []).map((b) => [b.match_id, { prediction: b.prediction ?? '', result: b.result ?? null }])
+      (bets ?? []).map((b) => {
+        const row = b as { match_id: number; home_score?: number; away_score?: number; result?: string | null }
+        const prediction =
+          row.home_score != null && row.away_score != null
+            ? scoresToPrediction(row.home_score, row.away_score)
+            : ''
+        return [row.match_id, { prediction, result: row.result ?? null }]
+      })
     )
   }
 

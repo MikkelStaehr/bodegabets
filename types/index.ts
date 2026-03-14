@@ -73,6 +73,7 @@ export type Bet = {
   user_id: string
   match_id: number
   game_id: number
+  /** 1/X/2 — vises i UI; match_result lagres som home_score/away_score i DB */
   prediction: string
   bet_type: BetType
   stake: number
