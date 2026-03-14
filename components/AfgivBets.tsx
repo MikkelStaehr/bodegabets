@@ -312,6 +312,7 @@ function MatchCard({
   selectedOutcome,
   onSelect,
   disabled,
+  isLocked,
   extraBetsEnabled,
   isReadOnly,
   extraBets,
@@ -327,6 +328,7 @@ function MatchCard({
   selectedOutcome: '1' | 'X' | '2' | null
   onSelect: (outcome: '1' | 'X' | '2') => void
   disabled: boolean
+  isLocked?: boolean
   extraBetsEnabled: boolean
   isReadOnly: boolean
   extraBets: ExtraBet[]
@@ -345,7 +347,7 @@ function MatchCard({
   if (isRivalry) {
     return (
       <div
-        className="rivalry-card relative rounded-lg mb-1.5 overflow-hidden transition-all"
+        className={`rivalry-card relative rounded-lg mb-1.5 overflow-hidden transition-all ${isLocked ? 'opacity-75' : ''}`}
         style={{
           background: '#1a3329',
           border: '1.5px solid #B8963E',
@@ -380,8 +382,9 @@ function MatchCard({
               {match.away_team}
             </span>
           </div>
-          <span className="text-[10px] text-[#F2EDE4]/50 shrink-0">
-            {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
+          <span className="text-[10px] text-[#F2EDE4]/50 shrink-0 flex items-center gap-1">
+            {isLocked && <span title="Låst – kickoff inden for 30 min">🔒</span>}
+            {isFinished ? 'Færdig' : formatKickoff((match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff ?? '')}
           </span>
         </div>
 
@@ -456,7 +459,7 @@ function MatchCard({
     <div
       className={`bg-white border rounded-lg mb-1.5 overflow-hidden transition-all ${
         selectedOutcome ? 'border-[#2C4A3E] shadow-[0_0_0_1px_#2C4A3E]' : 'border-black/10'
-      }`}
+      } ${isLocked ? 'opacity-75' : ''}`}
     >
       {/* Holdnavn + tid/resultat — én linje */}
       <div className="flex items-center gap-2 px-2.5 h-10">
@@ -475,8 +478,9 @@ function MatchCard({
             {match.away_team}
           </span>
         </div>
-        <span className="text-[10px] text-[#7a7060] shrink-0">
-          {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
+        <span className="text-[10px] text-[#7a7060] shrink-0 flex items-center gap-1">
+          {isLocked && <span title="Låst – kickoff inden for 30 min">🔒</span>}
+          {isFinished ? 'Færdig' : formatKickoff((match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff ?? '')}
         </span>
       </div>
 
@@ -575,21 +579,30 @@ export default function AfgivBets({
   const [pointsError, setPointsError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const now = useMemo(() => new Date(), [])
-  const deadlinePassed = round.betting_closes_at ? now >= new Date(round.betting_closes_at) : false
-  const isReadOnly =
-    (round.status !== 'open' && round.status !== 'upcoming') || deadlinePassed
+  const isReadOnly = round.status === 'finished'
+
+  const isMatchLocked = useCallback((match: MatchWithOptions): boolean => {
+    const kickoff = (match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff
+    if (!kickoff) return false
+    const lockThreshold = new Date(Date.now() + 30 * 60 * 1000)
+    return new Date(kickoff) < lockThreshold
+  }, [])
 
   const matchBettingOpen = useCallback(
     (match: MatchWithOptions): boolean => {
-      if (round.status === 'finished') return false
+      if (isReadOnly) return false
       if (match.status === 'finished') return false
+      if (isMatchLocked(match)) return false
       return true
     },
-    [round.status, now]
+    [isReadOnly, isMatchLocked]
   )
 
   const totalMatches = matches.length
+  const openSelectionsCount = useMemo(
+    () => selections.filter((s) => !isMatchLocked(s.match)).length,
+    [selections, isMatchLocked]
+  )
   const totalPoints = selections.reduce((sum, s) => {
     const main = s.points
     const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
@@ -705,8 +718,17 @@ export default function AfgivBets({
   }
 
   async function handleSubmit() {
-    if (selections.length === 0) return
-    if (totalPoints > userPoints) {
+    const openSelections = selections.filter((s) => !isMatchLocked(s.match))
+    if (openSelections.length === 0) {
+      toast('Ingen åbne kampe at afgive bets på', 'error')
+      return
+    }
+    const openPoints = openSelections.reduce((sum, s) => {
+      const main = s.points
+      const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
+      return sum + main + extra
+    }, 0)
+    if (openPoints > userPoints) {
       toast(`Ikke nok point. Du har ${userPoints} pt.`, 'error')
       return
     }
@@ -714,13 +736,13 @@ export default function AfgivBets({
     const payload = {
       game_id: gameId,
       bets: [
-        ...selections.map((s) => ({
+        ...openSelections.map((s) => ({
           match_id: s.matchId,
           bet_type: 'match_result' as const,
           prediction: s.outcome,
           stake: s.points,
         })),
-        ...selections.flatMap((s) =>
+        ...openSelections.flatMap((s) =>
           s.extraBets.map((eb) => ({
             match_id: s.matchId,
             bet_type: eb.type,
@@ -845,6 +867,7 @@ export default function AfgivBets({
                 selectedOutcome={getSelection(match.id)?.outcome ?? null}
                 onSelect={(o) => selectOutcome(match.id, o)}
                 disabled={isReadOnly || !matchBettingOpen(match)}
+                isLocked={isMatchLocked(match)}
                 extraBetsEnabled={extraBetsEnabled}
                 isReadOnly={isReadOnly}
                 extraBets={getSelection(match.id)?.extraBets ?? []}
@@ -1088,7 +1111,7 @@ export default function AfgivBets({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={selections.length === 0 || isSubmitting || isReadOnly}
+              disabled={openSelectionsCount === 0 || isSubmitting || isReadOnly}
               className="w-full h-[42px] rounded-lg font-condensed text-[15px] font-bold tracking-widest bg-[#B8963E] text-[#1a3329] disabled:bg-[#E8E0D4] disabled:text-[#7a7060] hover:bg-[#d4aa55] hover:-translate-y-px transition-all disabled:cursor-not-allowed disabled:transform-none"
             >
               LÅS DINE VALG

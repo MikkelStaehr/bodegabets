@@ -46,9 +46,7 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Runden er ikke åben for bets' }, { status: 400 })
   }
 
-  if (round.betting_closes_at && new Date(round.betting_closes_at) < new Date()) {
-    return NextResponse.json({ error: 'Betting-deadline er overskredet' }, { status: 400 })
-  }
+  // Per-kamp deadline: hver kamp låses 30 min før kickoff (betting_closes_at blokerer ikke længere)
 
   // Tjek at brugeren er game_member
   const { data: member } = await supabaseAdmin
@@ -72,29 +70,41 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Validér at alle match_ids tilhører denne runde (matches har season_id + round_name)
+  // Validér at alle match_ids tilhører denne runde og at kickoff > now() + 30 min
   const payloadMatchIds = [...new Set(bets.map((b) => b.match_id))]
   const { data: roundMatches } = round?.season_id != null && round?.name != null
     ? await supabaseAdmin
         .from('matches')
-        .select('id')
+        .select('id, kickoff')
         .eq('season_id', round.season_id)
         .eq('round_name', round.name)
     : { data: [] }
 
-  const roundMatchIds = (roundMatches ?? []).map((m) => m.id)
-  const allValid = payloadMatchIds.every((id) => roundMatchIds.includes(id))
-  if (!allValid) {
-    return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
+  const matchById = new Map((roundMatches ?? []).map((m) => [m.id, m]))
+  const now = new Date()
+  const lockThreshold = new Date(now.getTime() + 30 * 60 * 1000)
+
+  for (const matchId of payloadMatchIds) {
+    const m = matchById.get(matchId)
+    if (!m) {
+      return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
+    }
+    const kickoff = (m as { kickoff?: string }).kickoff
+    if (kickoff && new Date(kickoff) < lockThreshold) {
+      return NextResponse.json(
+        { error: 'En eller flere kampe er låst (kickoff inden for 30 min)' },
+        { status: 400 }
+      )
+    }
   }
 
-  // Slet ALLE eksisterende bets for denne bruger i denne runde (fuld erstatning)
-  if (roundMatchIds.length > 0) {
+  // Slet kun eksisterende bets for de kampe vi erstatter (behold bets på låste kampe)
+  if (payloadMatchIds.length > 0) {
     const { error: deleteError } = await supabaseAdmin
       .from('bets')
       .delete()
       .eq('user_id', user.id)
-      .in('match_id', roundMatchIds)
+      .in('match_id', payloadMatchIds)
 
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 })
