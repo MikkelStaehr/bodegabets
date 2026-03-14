@@ -231,7 +231,7 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ status: 'open' }).in('id', openIds)
     }
 
-    // 3) Sæt betting_closes_at
+    // 3) Sæt betting_closes_at = første kamp kickoff (kun hvis ikke allerede sat)
     const toSetDeadline = rounds.filter((r) => {
       if (r.betting_closes_at) return false
       if (finishedIds.includes(r.id)) return false
@@ -240,8 +240,11 @@ app.get('/update-rounds', async (_req, res) => {
     })
     for (const r of toSetDeadline) {
       const stat = statMap[r.id]
-      const deadline = new Date(new Date(stat.minKickoff!).getTime() - 60 * 60 * 1000).toISOString()
-      await supabaseAdmin.from('rounds').update({ betting_closes_at: deadline }).eq('id', r.id)
+      await supabaseAdmin
+        .from('rounds')
+        .update({ betting_closes_at: stat!.minKickoff! })
+        .eq('id', r.id)
+        .is('betting_closes_at', null)
     }
 
     console.log(`[update-rounds] finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines: ${toSetDeadline.length}`)

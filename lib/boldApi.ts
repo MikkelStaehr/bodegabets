@@ -7,6 +7,14 @@
 
 const BOLD_API = 'https://api.bold.dk/aggregator/v1/apps/page/matches'
 
+const BOLD_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'da-DK,da;q=0.9,en;q=0.8',
+  'Referer': 'https://www.bold.dk/',
+  'Origin': 'https://www.bold.dk',
+} as const
+
 export type BoldMatchStatus =
   | 'notstarted'
   | 'inprogress'
@@ -60,16 +68,20 @@ export async function fetchBoldMatches(date: Date): Promise<BoldMatch[]> {
   const url = `${BOLD_API}?date=${dateStr}&limit=1001&page=1&has_pagination=0`
 
   const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'BodegaBets/1.0',
-      'Accept': 'application/json',
-    },
+    headers: BOLD_HEADERS,
     cache: 'no-store',
   })
 
   if (!res.ok) throw new Error(`Bold API fejl: ${res.status}`)
 
-  const data: BoldApiResponse = await res.json()
+  let text = ''
+  let data: BoldApiResponse
+  try {
+    text = await res.text()
+    data = JSON.parse(text) as BoldApiResponse
+  } catch (err) {
+    throw new Error(`Bold API JSON fejl: ${String(err)} — response: ${text?.slice(0, 500)}`)
+  }
   return data.matches ?? []
 }
 

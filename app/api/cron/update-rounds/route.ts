@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
 
   const now = new Date()
   const nowIso = now.toISOString()
+  const errors: string[] = []
 
   // Hent ALLE runder (inkl. finished) så vi kan bestemme rækkefølge per liga
   const { data: allRounds, error: roundsError } = await supabaseAdmin
@@ -22,6 +23,12 @@ export async function GET(req: NextRequest) {
     .order('id', { ascending: true })
 
   if (roundsError) {
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'update_rounds',
+      status: 'error',
+      message: `update-rounds: fetch fejl: ${roundsError.message}`,
+      metadata: { error: roundsError.message },
+    })
     return NextResponse.json({ error: roundsError.message }, { status: 500 })
   }
 
@@ -33,7 +40,13 @@ export async function GET(req: NextRequest) {
   const roundIds = rounds.map((r) => r.id)
 
   if (!roundIds.length) {
-    return NextResponse.json({ ok: true, timestamp: nowIso, finished: 0, opened: 0, message: 'Ingen aktive runder' })
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'update_rounds',
+      status: 'info',
+      message: 'update-rounds: Ingen aktive runder',
+      metadata: { rounds_checked: typedAllRounds.length },
+    })
+    return NextResponse.json({ ok: true, timestamp: nowIso, finished: 0, opened: 0, deadlines_set: 0, message: 'Ingen aktive runder' })
   }
 
   // Hent alle matches for ikke-finished runder (status + kickoff_at)
@@ -43,6 +56,12 @@ export async function GET(req: NextRequest) {
     .in('round_id', roundIds)
 
   if (statsError) {
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'update_rounds',
+      status: 'error',
+      message: `update-rounds: matches fetch fejl: ${statsError.message}`,
+      metadata: { error: statsError.message },
+    })
     return NextResponse.json({ error: statsError.message }, { status: 500 })
   }
 
@@ -119,7 +138,8 @@ export async function GET(req: NextRequest) {
 
   }
 
-  // 3) Sæt betting_closes_at = 1 time før MIN(kickoff_at) for runder hvor den er NULL
+  // 3) Sæt betting_closes_at = MIN(kickoff_at) for runder hvor den er NULL
+  //    (kickoff for første kamp = deadline for at afgive bets)
   const toSetDeadline = typedRounds.filter((r) => {
     if (r.betting_closes_at) return false
     if (finishedIds.includes(r.id)) return false
@@ -127,26 +147,51 @@ export async function GET(req: NextRequest) {
     return stat && stat.minKickoff
   })
 
+  // Fallback: for runder uden matches, hent første kickoff fra league_matches
+  const roundsWithoutMatches = typedRounds.filter(
+    (r) => !r.betting_closes_at && !finishedIds.includes(r.id) && !statMap[r.id]?.minKickoff
+  )
+  for (const r of roundsWithoutMatches) {
+    const { data: lm } = await supabaseAdmin
+      .from('league_matches')
+      .select('kickoff_at')
+      .eq('league_id', r.league_id)
+      .eq('round_name', r.name)
+      .order('kickoff_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (lm?.kickoff_at) {
+      toSetDeadline.push(r)
+      if (!statMap[r.id]) statMap[r.id] = { total: 0, finished: 0, minKickoff: null }
+      statMap[r.id].minKickoff = lm.kickoff_at
+    }
+  }
+
   for (const r of toSetDeadline) {
     const stat = statMap[r.id]
-    const deadline = new Date(new Date(stat.minKickoff!).getTime() - 60 * 60 * 1000).toISOString()
-    await supabaseAdmin
+    if (!stat?.minKickoff) continue
+    const { error } = await supabaseAdmin
       .from('rounds')
-      .update({ betting_closes_at: deadline })
+      .update({ betting_closes_at: stat.minKickoff })
       .eq('id', r.id)
+      .is('betting_closes_at', null)
+    if (error) {
+      errors.push(`betting_closes_at fejl for runde ${r.id}: ${error.message}`)
+    }
   }
 
   await supabaseAdmin
     .from('admin_logs')
     .insert({
       type: 'update_rounds',
-      status: finishedIds.length > 0 || openIds.length > 0 ? 'success' : 'info',
+      status: errors.length > 0 ? 'warning' : (finishedIds.length > 0 || openIds.length > 0 || toSetDeadline.length > 0 ? 'success' : 'info'),
       message: `update-rounds: ${finishedIds.length} finished, ${openIds.length} opened, ${toSetDeadline.length} deadlines sat`,
       metadata: {
         rounds_marked_finished: finishedIds,
         rounds_marked_open: openIds,
-        deadlines_set: toSetDeadline.map(r => r.id),
-      }
+        deadlines_set: toSetDeadline.map((r) => r.id),
+        errors: errors.length > 0 ? errors : undefined,
+      },
     })
 
   return NextResponse.json({
@@ -155,6 +200,7 @@ export async function GET(req: NextRequest) {
     rounds_marked_finished: finishedIds.length,
     rounds_marked_open: openIds.length,
     deadlines_set: toSetDeadline.length,
+    errors: errors.length > 0 ? errors : undefined,
     finished_rounds: toMarkFinished.map((r) => ({ id: r.id, name: r.name })),
     opened_rounds: toMarkOpen.map((r) => ({ id: r.id, name: r.name })),
   })

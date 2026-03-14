@@ -8,6 +8,14 @@ const supabaseAdmin = createClient(
 
 const BOLD_MATCHES_API = 'https://api.bold.dk/aggregator/v1/apps/page/matches'
 
+const BOLD_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'da-DK,da;q=0.9,en;q=0.8',
+  'Referer': 'https://www.bold.dk/',
+  'Origin': 'https://www.bold.dk',
+} as const
+
 export type SyncMatchScoresPreview = Array<{
   league_match_id: number
   home_team: string
@@ -102,7 +110,7 @@ export async function syncMatchScores(options?: {
   try {
     const url = `${BOLD_MATCHES_API}?match_ids=${boldMatchIds.join(',')}`
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'BodegaBets/1.0', 'Accept': 'application/json' },
+      headers: BOLD_HEADERS,
       cache: 'no-store',
     })
     if (!res.ok) {
@@ -110,7 +118,15 @@ export async function syncMatchScores(options?: {
       return { updated, errors }
     }
 
-    const data = (await res.json()) as { matches?: unknown[] }
+    let text = ''
+    let data: { matches?: unknown[] }
+    try {
+      text = await res.text()
+      data = JSON.parse(text) as { matches?: unknown[] }
+    } catch (err) {
+      errors.push(`Bold API JSON fejl: ${String(err)} — response: ${text?.slice(0, 500)}`)
+      return { updated, errors }
+    }
     rawBoldResponse = data
     for (const m of (data.matches ?? []) as Array<{ match?: { id: number; status_type: string; paused?: boolean; home_team?: { score: number }; away_team?: { score: number } } }>) {
       const match = m.match
