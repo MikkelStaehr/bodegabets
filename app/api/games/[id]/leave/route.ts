@@ -49,7 +49,7 @@ export async function DELETE(
     // Slet alt resterende data for spilrummet
     await supabaseAdmin.from('bets').delete().eq('game_id', gameId)
     await supabaseAdmin.from('round_scores').delete().eq('game_id', gameId)
-    await supabaseAdmin.from('game_leagues').delete().eq('game_id', gameId)
+    await supabaseAdmin.from('game_seasons').delete().eq('game_id', gameId)
     await supabaseAdmin.from('games').delete().eq('id', gameId)
     return NextResponse.json({ ok: true, deleted: true })
   }

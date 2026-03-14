@@ -11,6 +11,8 @@ export type LeagueRow = {
   last_synced_at: string | null
   bold_phase_id: number | null
   total_matches: number
+  /** season_id for sync (nyt skema) */
+  season_id?: number | null
   /** Client-side sync status tracking (not persisted in DB) */
   sync_status?: string | null
   sync_error?: string | null
@@ -191,7 +193,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
       } else {
         let msg = `${data.matches_created} kampe oprettet, ${data.matches_updated} opdateret`
         if (data.diagnostic) {
-          msg += ` · league_matches: ${data.diagnostic.league_matches_count}, runder: ${data.diagnostic.rounds_count}`
+          msg += ` · matches: ${data.diagnostic.matches_count}, runder: ${data.diagnostic.rounds_count}`
         }
         if (data.debug) {
           msg += ` · Debug: ${data.debug.rounds_matched} runder matchet, ${data.debug.rounds_skipped} sprunget over, to_insert=${data.debug.to_insert}`
@@ -224,6 +226,8 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
   }
 
   async function syncLeague(leagueId: number) {
+    const row = leagueData.find((l) => l.id === leagueId)
+    const seasonId = row?.season_id ?? leagueId
     setSyncing((s) => new Set(s).add(leagueId))
     setFeedback((f) => ({ ...f, [leagueId]: '' }))
 
@@ -231,12 +235,12 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
       const res = await fetch('/api/admin/sync-league-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ league_id: leagueId, rebuild_rounds: true }),
+        body: JSON.stringify({ season_id: seasonId }),
       })
       const data = await res.json()
       const msg = data.errors?.length
         ? `Fejl: ${data.errors[0]}`
-        : `${data.synced} kampe synket, ${data.rounds_created} runder oprettet`
+        : `${data.synced} kampe synket, ${data.rounds_upserted ?? 0} runder`
       setFeedback((f) => ({ ...f, [leagueId]: msg }))
       updateRow(leagueId, {
         sync_status:    data.errors?.length ? 'error' : 'ok',
@@ -263,7 +267,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
   const logsForLeague = (leagueId: number) =>
     logs.filter((l) => l.league_id === leagueId).slice(0, 20)
 
-  const canAutoSync = (l: LeagueRow) => !!l.bold_slug
+  const canAutoSync = (l: LeagueRow) => !!(l.bold_phase_id ?? l.bold_slug)
 
   function getVerify(id: number, defaultPhase: number | string | null) {
     return phaseVerify[id] ?? { input: defaultPhase != null ? String(defaultPhase) : '', result: null, loading: false }
@@ -275,7 +279,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
       [leagueId]: { ...getVerify(leagueId, phaseId), loading: true, result: null },
     }))
     const d = await fetch(
-      `/api/admin/leagues/verify-phase?phase_id=${encodeURIComponent(phaseId)}&league_id=${leagueId}`
+      `/api/admin/leagues/verify-phase?phase_id=${encodeURIComponent(phaseId)}&tournament_id=${leagueId}`
     ).then((r) => r.json())
     setPhaseVerify((prev) => ({
       ...prev,

@@ -34,7 +34,7 @@ export default function SyncTesterClient({ leagues }: Props) {
       dry_run: dr,
     }
     if (m === 'match' && bmId) body.bold_match_id = parseInt(bmId, 10)
-    if (m === 'fixtures' && lid) body.league_id = parseInt(String(lid), 10)
+    if (m === 'fixtures' && lid) body.season_id = parseInt(String(lid), 10)
     if (m === 'phase_info' && phaseId) body.bold_phase_id = parseInt(phaseId, 10)
 
     try {

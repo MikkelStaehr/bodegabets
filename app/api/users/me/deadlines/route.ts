@@ -19,13 +19,13 @@ export async function GET() {
   const gameIds = [...new Set((memberships ?? []).map((m) => m.game_id))]
   if (gameIds.length === 0) return NextResponse.json({ deadlines: [] })
 
-  const { data: gameLeagues } = await supabaseAdmin
-    .from('game_leagues')
-    .select('game_id, league_id')
+  const { data: gameSeasons } = await supabaseAdmin
+    .from('game_seasons')
+    .select('game_id, season_id')
     .in('game_id', gameIds)
 
-  const leagueIds = [...new Set((gameLeagues ?? []).map((gl) => gl.league_id))]
-  if (leagueIds.length === 0) return NextResponse.json({ deadlines: [] })
+  const seasonIds = [...new Set((gameSeasons ?? []).map((gs) => gs.season_id))]
+  if (seasonIds.length === 0) return NextResponse.json({ deadlines: [] })
 
   const { data: games } = await supabaseAdmin
     .from('games')
@@ -33,22 +33,22 @@ export async function GET() {
     .in('id', gameIds)
 
   const gamesById = new Map((games ?? []).map((g) => [g.id, g]))
-  const leagueIdByGame = new Map(
-    (gameLeagues ?? []).map((gl) => [gl.game_id, gl.league_id])
+  const seasonIdByGame = new Map(
+    (gameSeasons ?? []).map((gs) => [gs.game_id, gs.season_id])
   )
 
   const { data: rounds } = await supabaseAdmin
     .from('rounds')
-    .select('id, league_id, name, status, betting_closes_at')
-    .in('league_id', leagueIds)
+    .select('id, season_id, name, status, betting_closes_at')
+    .in('season_id', seasonIds)
     .neq('status', 'finished')
     .order('betting_closes_at', { ascending: true })
 
-  const roundsByLeague = new Map<number, { id: number; name: string; status: string; betting_closes_at: string | null }[]>()
+  const roundsBySeason = new Map<number, { id: number; name: string; status: string; betting_closes_at: string | null }[]>()
   for (const r of rounds ?? []) {
-    const lid = r.league_id as number
-    if (!roundsByLeague.has(lid)) roundsByLeague.set(lid, [])
-    roundsByLeague.get(lid)!.push({
+    const sid = r.season_id as number
+    if (!roundsBySeason.has(sid)) roundsBySeason.set(sid, [])
+    roundsBySeason.get(sid)!.push({
       id: r.id as number,
       name: r.name as string,
       status: r.status as string,
@@ -56,12 +56,17 @@ export async function GET() {
     })
   }
 
-  const { data: leagues } = await supabaseAdmin
-    .from('leagues')
-    .select('id, name')
-    .in('id', leagueIds)
+  const { data: seasonRows } = await supabaseAdmin
+    .from('seasons')
+    .select('id, tournament_id, tournaments(name)')
+    .in('id', seasonIds)
 
-  const leagueNameById = new Map((leagues ?? []).map((l) => [l.id, l.name]))
+  const leagueNameBySeason = new Map<number, string>()
+  for (const s of seasonRows ?? []) {
+    const t = (s as { tournaments?: { name?: string } | { name?: string }[] }).tournaments
+    const name = (Array.isArray(t) ? t[0] : t)?.name ?? 'Ukendt'
+    leagueNameBySeason.set(s.id as number, name)
+  }
 
   const now = new Date()
   const result: Array<{
@@ -78,18 +83,18 @@ export async function GET() {
     const game = gamesById.get(gameId)
     if (!game) continue
 
-    const leagueId = leagueIdByGame.get(gameId)
-    if (leagueId == null) continue
+    const seasonId = seasonIdByGame.get(gameId)
+    if (seasonId == null) continue
 
-    const leagueRounds = roundsByLeague.get(leagueId) ?? []
-    const activeRound = leagueRounds.find((r) => r.status === 'open')
-      ?? leagueRounds.find((r) => r.status === 'upcoming')
-      ?? leagueRounds[leagueRounds.length - 1]
+    const seasonRounds = roundsBySeason.get(seasonId) ?? []
+    const activeRound = seasonRounds.find((r) => r.status === 'open')
+      ?? seasonRounds.find((r) => r.status === 'upcoming')
+      ?? seasonRounds[seasonRounds.length - 1]
 
     if (!activeRound) continue
 
     const closes = activeRound.betting_closes_at ? new Date(activeRound.betting_closes_at) : null
-    const leagueName = leagueNameById.get(leagueId) ?? ''
+    const leagueName = leagueNameBySeason.get(seasonId) ?? ''
 
     let deadlineStatus: 'open' | 'closed' | 'upcoming' = 'upcoming'
     if (closes) {

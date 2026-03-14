@@ -3,16 +3,24 @@
  * Dry-run og test af Bold sync.
  *
  * Body: { mode: 'scores' | 'fixtures' | 'match' | 'phase_info',
- *         bold_match_id?: number, league_id?: number, bold_phase_id?: number, dry_run?: boolean }
+ *         bold_match_id?: number, season_id?: number, bold_phase_id?: number, dry_run?: boolean }
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { danishTimeToUtc } from '@/lib/boldApi'
+import { danishTimeToUtc } from '@/lib/dateUtils'
 import { syncMatchScores } from '@/lib/syncMatchScores'
-import { syncBoldFixtures } from '@/lib/syncLeagueMatches'
+import { syncSeasonFixtures } from '@/lib/syncLeagueMatches'
 
 const BOLD_MATCHES_API = 'https://api.bold.dk/aggregator/v1/apps/page/matches'
+
+const BOLD_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'da-DK,da;q=0.9,en;q=0.8',
+  'Referer': 'https://www.bold.dk/',
+  'Origin': 'https://www.bold.dk',
+}
 
 export const maxDuration = 60
 
@@ -21,7 +29,7 @@ function parseMatchDate(mt: { date?: string }): string | null {
   const ma = mt.date.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/)
   if (ma) {
     const [, date, h, m] = ma
-    return danishTimeToUtc(date, `${h.padStart(2, '0')}:${m}`)
+    return danishTimeToUtc(date!, `${h!.padStart(2, '0')}:${m}`)
   }
   const d = mt.date.slice(0, 10)
   return danishTimeToUtc(d, '15:00')
@@ -34,7 +42,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as {
     mode?: 'scores' | 'fixtures' | 'match' | 'phase_info'
     bold_match_id?: number
-    league_id?: number
+    season_id?: number
     bold_phase_id?: number
     dry_run?: boolean
   }
@@ -57,10 +65,7 @@ export async function POST(req: NextRequest) {
       while (true) {
         const offset = (page - 1) * limit
         const url = `${BOLD_MATCHES_API}?phase_ids=${boldPhaseId}&page=${page}&limit=${limit}&offset=${offset}`
-        const res = await fetch(url, {
-          headers: { 'User-Agent': 'BodegaBets/1.0', Accept: 'application/json' },
-          cache: 'no-store',
-        })
+        const res = await fetch(url, { headers: BOLD_HEADERS, cache: 'no-store' })
         if (!res.ok) {
           const elapsed_ms = Date.now() - start
           return NextResponse.json({ error: `Bold API ${res.status}`, elapsed_ms }, { status: 502 })
@@ -115,11 +120,8 @@ export async function POST(req: NextRequest) {
       if (!boldMatchId) {
         return NextResponse.json({ error: 'bold_match_id er påkrævet for mode=match' }, { status: 400 })
       }
-      const url = `${BOLD_MATCHES_API}?match_ids=${boldMatchId}`
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'BodegaBets/1.0', Accept: 'application/json' },
-        cache: 'no-store',
-      })
+      const url = `${BOLD_MATCHES_API}?match_ids=${boldMatchId}&page=1&limit=10&offset=0`
+      const res = await fetch(url, { headers: BOLD_HEADERS, cache: 'no-store' })
       const raw = await res.json().catch(() => ({}))
       const elapsed_ms = Date.now() - start
       return NextResponse.json({
@@ -144,30 +146,24 @@ export async function POST(req: NextRequest) {
     }
 
     if (mode === 'fixtures') {
-      const leagueId = body.league_id
-      if (!leagueId) {
-        return NextResponse.json({ error: 'league_id er påkrævet for mode=fixtures' }, { status: 400 })
+      const seasonId = body.season_id
+      if (!seasonId) {
+        return NextResponse.json({ error: 'season_id er påkrævet for mode=fixtures' }, { status: 400 })
       }
-      const { data: league } = await supabaseAdmin
-        .from('leagues')
-        .select('bold_phase_id, name')
-        .eq('id', leagueId)
+
+      const result = await syncSeasonFixtures(seasonId)
+      const elapsed_ms = Date.now() - start
+
+      const { data: season } = await supabaseAdmin
+        .from('seasons')
+        .select('bold_phase_id')
+        .eq('id', seasonId)
         .single()
 
-      if (!league?.bold_phase_id) {
-        return NextResponse.json(
-          { error: `Liga ${league?.name ?? leagueId} mangler bold_phase_id` },
-          { status: 400 }
-        )
-      }
-
-      const result = await syncBoldFixtures(leagueId, league.bold_phase_id, { dryRun })
-      const elapsed_ms = Date.now() - start
       return NextResponse.json({
         mode: 'fixtures',
-        league_id: leagueId,
-        league_name: league.name,
-        bold_phase_id: league.bold_phase_id,
+        season_id: seasonId,
+        bold_phase_id: season?.bold_phase_id,
         ...result,
         elapsed_ms,
       })

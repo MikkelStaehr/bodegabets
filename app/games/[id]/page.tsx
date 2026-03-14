@@ -71,14 +71,14 @@ export default async function GamePage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent league_id fra game_leagues junction
-  const { data: gameLeagueRow } = await supabase
-    .from('game_leagues')
-    .select('league_id')
+  // Hent season_id fra game_seasons junction
+  const { data: gameSeasonRow } = await supabase
+    .from('game_seasons')
+    .select('season_id')
     .eq('game_id', gameId)
     .limit(1)
     .maybeSingle()
-  const gameLeagueId = gameLeagueRow?.league_id as number | null ?? null
+  const gameSeasonId = gameSeasonRow?.season_id as number | null ?? null
 
   const [
     { data: rawMembers },
@@ -94,11 +94,11 @@ export default async function GamePage({ params }: Props) {
       .eq('game_id', gameId)
       .order('earnings', { ascending: false }),
 
-    gameLeagueId
+    gameSeasonId
       ? supabase
           .from('rounds')
           .select('id, name, status, betting_closes_at')
-          .eq('league_id', gameLeagueId)
+          .eq('season_id', gameSeasonId)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
 
@@ -120,11 +120,11 @@ export default async function GamePage({ params }: Props) {
       .eq('id', user.id)
       .single(),
 
-    gameLeagueId
+    gameSeasonId
       ? supabase
           .from('rounds')
           .select('id, name')
-          .eq('league_id', gameLeagueId)
+          .eq('season_id', gameSeasonId)
           .eq('status', 'finished')
           .order('betting_closes_at', { ascending: false })
           .limit(1)
@@ -134,7 +134,7 @@ export default async function GamePage({ params }: Props) {
 
   if (!myMembership) redirect('/dashboard')
 
-  const leagueId = gameLeagueId
+  const leagueId = gameSeasonId
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
   const activeRoundEarly =
@@ -144,15 +144,27 @@ export default async function GamePage({ params }: Props) {
     null
   const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string } | null) ?? null
 
-  const { data: recentMatches } = latestFinishedRound
+  const { data: recentMatchesRaw } = latestFinishedRound
     ? await supabase
         .from('matches')
-        .select('home_team, away_team, home_score, away_score, kickoff_at')
+        .select('home_team_id, away_team_id, home_score, away_score, kickoff_at, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)')
         .eq('round_id', latestFinishedRound.id)
         .not('home_score', 'is', null)
         .order('id', { ascending: true })
         .limit(6)
     : { data: [] }
+
+  const recentMatches = (recentMatchesRaw ?? []).map((m: Record<string, unknown>) => {
+    const ht = m.home_team as { name?: string } | { name?: string }[] | null
+    const at = m.away_team as { name?: string } | { name?: string }[] | null
+    return {
+      home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
+      away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
+      home_score: m.home_score,
+      away_score: m.away_score,
+      kickoff_at: m.kickoff_at,
+    }
+  })
 
   const { data: roundBets } =
     activeRoundEarly
@@ -228,20 +240,18 @@ export default async function GamePage({ params }: Props) {
       ? await Promise.all([
           prevRound
             ? supabase
-                .from('league_matches')
+                .from('matches')
                 .select('kickoff_at')
-                .eq('league_id', leagueId)
-                .eq('round_name', prevRound.name)
+                .eq('round_id', prevRound.id)
                 .order('kickoff_at', { ascending: false })
                 .limit(1)
                 .maybeSingle()
             : Promise.resolve({ data: null }),
           nextRound
             ? supabase
-                .from('league_matches')
+                .from('matches')
                 .select('kickoff_at')
-                .eq('league_id', leagueId)
-                .eq('round_name', nextRound.name)
+                .eq('round_id', nextRound.id)
                 .order('kickoff_at', { ascending: true })
                 .limit(1)
                 .maybeSingle()

@@ -19,7 +19,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
   // 1. Hent finished matches for runden
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status')
+    .select('id, home_score, away_score, home_score_ht, away_score_ht, status')
     .eq('round_id', roundId)
     .eq('status', 'finished')
 

@@ -25,7 +25,6 @@
     "../lib/calculatePoints.ts",
     "../lib/betUtils.ts",
     "../lib/betTypes.ts",
-    "../lib/boldApi.ts",
     "../lib/teamNameNormalizer.ts"
   ]
 }

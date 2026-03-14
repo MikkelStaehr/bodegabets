@@ -19,18 +19,18 @@ export async function GET() {
   const gameIds = [...new Set((memberships ?? []).map((m) => m.game_id))]
   if (gameIds.length === 0) return NextResponse.json({ leagues: [] })
 
-  const { data: gameLeagues } = await supabaseAdmin
-    .from('game_leagues')
-    .select('league_id')
+  const { data: gameSeasons } = await supabaseAdmin
+    .from('game_seasons')
+    .select('season_id')
     .in('game_id', gameIds)
 
-  const leagueIds = [...new Set((gameLeagues ?? []).map((gl) => gl.league_id))]
-  if (leagueIds.length === 0) return NextResponse.json({ leagues: [] })
+  const seasonIds = [...new Set((gameSeasons ?? []).map((gs) => gs.season_id))]
+  if (seasonIds.length === 0) return NextResponse.json({ leagues: [] })
 
   const { data: rounds } = await supabaseAdmin
     .from('rounds')
-    .select('id, league_id')
-    .in('league_id', leagueIds)
+    .select('id, season_id')
+    .in('season_id', seasonIds)
     .in('status', ['open', 'active', 'upcoming'])
 
   const roundIds = (rounds ?? []).map((r) => r.id)
@@ -42,7 +42,13 @@ export async function GET() {
 
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, round_id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at')
+    .select(`
+      id, round_id, home_team_id, away_team_id,
+      home_score, away_score, home_score_ht, away_score_ht,
+      status, kickoff_at,
+      home_team:teams!home_team_id(name),
+      away_team:teams!away_team_id(name)
+    `)
     .in('round_id', roundIds)
     .in('status', ['live', 'halftime', 'finished', 'scheduled'])
     .gte('kickoff_at', since.toISOString())
@@ -66,25 +72,45 @@ export async function GET() {
   const roundIdsFromMatches = [...new Set((matches ?? []).map((m) => m.round_id))]
   const { data: roundRows } = await supabaseAdmin
     .from('rounds')
-    .select('id, league_id')
+    .select('id, season_id')
     .in('id', roundIdsFromMatches)
-  const leagueIdsFromRounds = [...new Set((roundRows ?? []).map((r) => r.league_id))]
-  const { data: leagueRows } = leagueIdsFromRounds.length > 0
-    ? await supabaseAdmin.from('leagues').select('id, name').in('id', leagueIdsFromRounds)
+
+  const seasonIdsFromRounds = [...new Set((roundRows ?? []).map((r) => r.season_id))]
+  const { data: seasonRows } = seasonIdsFromRounds.length > 0
+    ? await supabaseAdmin
+        .from('seasons')
+        .select('id, tournament_id, tournaments(name)')
+        .in('id', seasonIdsFromRounds)
     : { data: [] }
-  const leagueNameById = new Map((leagueRows ?? []).map((l) => [l.id, l.name]))
-  const leagueIdByRound = new Map((roundRows ?? []).map((r) => [r.id, r.league_id]))
+
+  const leagueNameBySeason = new Map<number, string>()
+  const tournamentIdBySeason = new Map<number, number>()
+  for (const s of seasonRows ?? []) {
+    const t = (s as { tournaments?: { name?: string } | { name?: string }[]; tournament_id?: number }).tournaments
+    const name = (Array.isArray(t) ? t[0] : t)?.name ?? 'Ukendt'
+    leagueNameBySeason.set(s.id as number, name)
+    tournamentIdBySeason.set(s.id as number, (s as { tournament_id?: number }).tournament_id ?? 0)
+  }
+  const seasonIdByRound = new Map((roundRows ?? []).map((r) => [r.id, r.season_id]))
 
   const byLeague: Record<number, { league_id: number; league_name: string; matches: unknown[] }> = {}
   for (const m of matches ?? []) {
-    const leagueId = leagueIdByRound.get(m.round_id) ?? 0
-    const leagueName = leagueNameById.get(leagueId) ?? 'Ukendt'
+    const seasonId = seasonIdByRound.get(m.round_id) ?? 0
+    const leagueName = leagueNameBySeason.get(seasonId) ?? 'Ukendt'
+    const tournamentId = tournamentIdBySeason.get(seasonId) ?? seasonId
 
-    if (!byLeague[leagueId]) {
-      byLeague[leagueId] = { league_id: leagueId, league_name: leagueName, matches: [] }
+    const ht = (m as { home_team?: { name?: string } | { name?: string }[] }).home_team
+    const at = (m as { away_team?: { name?: string } | { name?: string }[] }).away_team
+    const home_team = (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—'
+    const away_team = (Array.isArray(at) ? at[0] : at)?.name ?? '—'
+
+    if (!byLeague[tournamentId]) {
+      byLeague[tournamentId] = { league_id: tournamentId, league_name: leagueName, matches: [] }
     }
-    byLeague[leagueId].matches.push({
+    byLeague[tournamentId].matches.push({
       ...m,
+      home_team,
+      away_team,
       bet: betsByMatch[m.id] ?? null,
     })
   }

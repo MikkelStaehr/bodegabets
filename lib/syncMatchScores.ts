@@ -1,3 +1,9 @@
+/**
+ * syncMatchScores.ts — nyt skema (matches, seasons, rounds)
+ *
+ * Synkroniserer kun kampe der er live eller snart (scheduled med kickoff inden 24t).
+ */
+
 import { createClient } from '@supabase/supabase-js'
 import { calculateRoundPoints } from '@/lib/calculatePoints'
 
@@ -17,13 +23,10 @@ const BOLD_HEADERS = {
 } as const
 
 export type SyncMatchScoresPreview = Array<{
-  league_match_id: number
-  home_team: string
-  away_team: string
+  match_id: number
   home_score: number
   away_score: number
   status: string
-  matches_status: string
 }>
 
 export async function syncMatchScores(options?: {
@@ -35,84 +38,75 @@ export async function syncMatchScores(options?: {
   let updated = 0
   const preview: SyncMatchScoresPreview = []
 
-  // 1. Find kampe der skal synkes:
-  // - Fra matches: status live/scheduled/halftime (uanset tid – fanger sen-aften kampe)
-  // - Eller league_matches: kickoff indenfor 18 timer, ikke finished (bredere tidsvindue)
   const now = new Date()
-  const eighteenHoursAgo = new Date(now.getTime() - 18 * 60 * 60 * 1000)
+  const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000)
+  const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
-  let activeMatches: Array<{ id: number; bold_match_id: number | null; league_id: number; home_team: string; away_team: string; status: string }> = []
+  let activeMatches: Array<{ id: number; bold_match_id: number; season_id: number; round_id: number | null }> = []
 
   if (boldMatchId != null) {
     const { data, error } = await supabaseAdmin
-      .from('league_matches')
-      .select('id, bold_match_id, league_id, home_team, away_team, status')
+      .from('matches')
+      .select('id, bold_match_id, season_id, round_id')
       .eq('bold_match_id', boldMatchId)
     if (error) {
       errors.push(`Fetch fejl: ${error.message}`)
       return { updated, errors }
     }
-    activeMatches = data ?? []
+    activeMatches = (data ?? []).map((m) => ({ ...m, round_id: m.round_id ?? null }))
   } else {
-    // Hent league_match_ids fra matches med status live/scheduled/halftime
-    const { data: matchRows } = await supabaseAdmin
+    const { data: liveData } = await supabaseAdmin
       .from('matches')
-      .select('league_match_id')
-      .in('status', ['live', 'scheduled', 'halftime'])
-    const liveMatchIds = [...new Set((matchRows ?? []).map((r) => r.league_match_id).filter((id): id is number => id != null))]
+      .select('id, bold_match_id, season_id, round_id')
+      .in('status', ['live', 'halftime'])
 
-    // Hent league_matches: enten fra live-match-ids ELLER kickoff indenfor 18 timer
-    const byLiveMatch =
-      liveMatchIds.length > 0
-        ? await supabaseAdmin
-            .from('league_matches')
-            .select('id, bold_match_id, league_id, home_team, away_team, status')
-            .in('id', liveMatchIds)
-        : { data: [] as typeof activeMatches, error: null }
-    const byTimeWindow = await supabaseAdmin
-      .from('league_matches')
-      .select('id, bold_match_id, league_id, home_team, away_team, status')
-      .neq('status', 'finished')
-      .lte('kickoff_at', now.toISOString())
-      .gte('kickoff_at', eighteenHoursAgo.toISOString())
-
-    const fetchError = byLiveMatch.error ?? byTimeWindow.error
-    if (fetchError) {
-      errors.push(`Fetch fejl: ${fetchError.message}`)
-      return { updated, errors }
-    }
+    const { data: scheduledData } = await supabaseAdmin
+      .from('matches')
+      .select('id, bold_match_id, season_id, round_id')
+      .eq('status', 'scheduled')
+      .gte('kickoff_at', threeHoursAgo.toISOString())
+      .lte('kickoff_at', twentyFourHoursLater.toISOString())
 
     const seen = new Set<number>()
-    for (const m of [...(byLiveMatch.data ?? []), ...(byTimeWindow.data ?? [])]) {
-      if (!seen.has(m.id)) {
-        seen.add(m.id)
-        activeMatches.push(m)
-      }
+    for (const m of [...(liveData ?? []), ...(scheduledData ?? [])]) {
+      if (seen.has(m.id)) continue
+      seen.add(m.id)
+      activeMatches.push({
+        id: m.id,
+        bold_match_id: m.bold_match_id,
+        season_id: m.season_id,
+        round_id: m.round_id ?? null,
+      })
     }
   }
 
-  if (!activeMatches?.length) {
+  if (!activeMatches.length) {
     console.log('[syncMatchScores] Ingen aktive kampe lige nu')
     return { updated, errors }
   }
 
-  console.log(`[syncMatchScores] ${activeMatches.length} aktive kampe at tjekke`)
+  const boldMatchIds = new Set(activeMatches.map((m) => m.bold_match_id))
 
-  const boldMatchIds = activeMatches
-    .map((m) => m.bold_match_id)
-    .filter((id): id is number => id != null)
+  const { data: seasons } = await supabaseAdmin
+    .from('seasons')
+    .select('id, bold_phase_id')
+    .in('id', [...new Set(activeMatches.map((m) => m.season_id))])
+    .not('bold_phase_id', 'is', null)
 
-  if (!boldMatchIds.length) return { updated, errors }
+  const phaseIds = (seasons ?? []).map((s) => s.bold_phase_id).filter((id): id is number => id != null)
+
+  if (!phaseIds.length) {
+    errors.push('Ingen sæsoner med bold_phase_id for aktive kampe')
+    return { updated, errors }
+  }
 
   const boldMatchMap = new Map<number, { home_score: number; away_score: number; status: string }>()
   let rawBoldResponse: unknown = null
 
   try {
-    const url = `${BOLD_MATCHES_API}?match_ids=${boldMatchIds.join(',')}`
-    const res = await fetch(url, {
-      headers: BOLD_HEADERS,
-      cache: 'no-store',
-    })
+    const url = `${BOLD_MATCHES_API}?phase_ids=${phaseIds.join(',')}&page=1&limit=1000&offset=0`
+    const res = await fetch(url, { headers: BOLD_HEADERS, cache: 'no-store' })
+
     if (!res.ok) {
       errors.push(`Bold API fejl: ${res.status} ${res.statusText}`)
       return { updated, errors }
@@ -127,10 +121,13 @@ export async function syncMatchScores(options?: {
       errors.push(`Bold API JSON fejl: ${String(err)} — response: ${text?.slice(0, 500)}`)
       return { updated, errors }
     }
+
     rawBoldResponse = data
-    for (const m of (data.matches ?? []) as Array<{ match?: { id: number; status_type: string; paused?: boolean; home_team?: { score: number }; away_team?: { score: number } } }>) {
+    const matchesRaw = Array.isArray(data) ? data : ((data as { matches?: unknown[] }).matches ?? (data as { data?: unknown[] }).data ?? [])
+
+    for (const m of (matchesRaw ?? []) as Array<{ match?: { id: number; status_type: string; paused?: boolean; home_team?: { score: number }; away_team?: { score: number } } }>) {
       const match = m.match
-      if (!match) continue
+      if (!match || !boldMatchIds.has(match.id)) continue
 
       const status = match.status_type === 'finished'
         ? 'finished'
@@ -156,20 +153,15 @@ export async function syncMatchScores(options?: {
 
   const finishedRoundIds = new Set<number>()
 
-  // Opdater kun de kampe der har nye scores
   for (const match of activeMatches) {
-    if (!match.bold_match_id) continue
     const boldData = boldMatchMap.get(match.bold_match_id)
     if (!boldData) continue
 
     preview.push({
-      league_match_id: match.id,
-      home_team: match.home_team,
-      away_team: match.away_team,
+      match_id: match.id,
       home_score: boldData.home_score,
       away_score: boldData.away_score,
       status: boldData.status,
-      matches_status: matchesStatus(boldData.status),
     })
 
     if (dryRun) {
@@ -177,17 +169,18 @@ export async function syncMatchScores(options?: {
       continue
     }
 
-    const { data: currentMatches } = await supabaseAdmin
+    const { data: currentMatch } = await supabaseAdmin
       .from('matches')
       .select('status, round_id')
-      .eq('league_match_id', match.id)
+      .eq('id', match.id)
+      .single()
 
     const { error } = await supabaseAdmin
-      .from('league_matches')
+      .from('matches')
       .update({
         home_score: boldData.home_score,
         away_score: boldData.away_score,
-        status: boldData.status,
+        status: matchesStatus(boldData.status),
         updated_at: new Date().toISOString(),
       })
       .eq('id', match.id)
@@ -196,21 +189,8 @@ export async function syncMatchScores(options?: {
       errors.push(`Opdatering fejlede for kamp ${match.id}: ${error.message}`)
     } else {
       updated++
-      await supabaseAdmin
-        .from('matches')
-        .update({
-          home_score: boldData.home_score,
-          away_score: boldData.away_score,
-          status: matchesStatus(boldData.status),
-        })
-        .eq('league_match_id', match.id)
-
-      if (boldData.status === 'finished') {
-        for (const m of currentMatches ?? []) {
-          if (m.status !== 'finished' && m.round_id != null) {
-            finishedRoundIds.add(m.round_id)
-          }
-        }
+      if (boldData.status === 'finished' && currentMatch?.round_id && currentMatch.status !== 'finished') {
+        finishedRoundIds.add(currentMatch.round_id)
       }
     }
   }

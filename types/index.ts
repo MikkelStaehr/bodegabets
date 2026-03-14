@@ -43,7 +43,8 @@ export type GameMember = {
 
 export type Round = {
   id: number
-  league_id: number
+  league_id?: number
+  season_id?: number
   name: string
   betting_closes_at: string | null
   status: 'upcoming' | 'open' | 'closed' | 'finished'

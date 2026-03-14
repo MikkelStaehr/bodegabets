@@ -90,7 +90,7 @@ export default function NewGameForm({ leagues }: Props) {
     const res  = await fetch('/api/games/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), league_id: parseInt(leagueId) }),
+      body: JSON.stringify({ name: name.trim(), season_id: parseInt(leagueId) }),
     })
     const data = await res.json()
 

@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const phaseId = searchParams.get('phase_id')
-  const leagueId = searchParams.get('league_id')
+  const tournamentId = searchParams.get('tournament_id') ?? searchParams.get('league_id')
 
   if (!phaseId) return NextResponse.json({ error: 'phase_id påkrævet' }, { status: 400 })
 
@@ -42,13 +42,15 @@ export async function GET(request: NextRequest) {
     const maxDate = dates.length ? new Date(dates[dates.length - 1]).toISOString().slice(0, 10) : null
 
     let currentPhaseId: string | null = null
-    if (leagueId) {
-      const { data: league } = await supabaseAdmin
-        .from('leagues')
+    if (tournamentId) {
+      const { data: season } = await supabaseAdmin
+        .from('seasons')
         .select('bold_phase_id')
-        .eq('id', leagueId)
+        .eq('tournament_id', tournamentId)
+        .eq('is_active', true)
+        .limit(1)
         .single()
-      currentPhaseId = league?.bold_phase_id != null ? String(league.bold_phase_id) : null
+      currentPhaseId = season?.bold_phase_id != null ? String(season.bold_phase_id) : null
     }
 
     return NextResponse.json({

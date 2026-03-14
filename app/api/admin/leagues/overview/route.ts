@@ -15,43 +15,64 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { data: leagues } = await supabaseAdmin
-    .from('leagues')
+  const { data: tournaments } = await supabaseAdmin
+    .from('tournaments')
     .select('id, name, country')
     .order('name')
 
-  if (!leagues?.length) {
+  if (!tournaments?.length) {
     return NextResponse.json({ leagues: [] })
   }
 
-  const leagueIds = leagues.map((l) => l.id as number)
+  const tournamentIds = tournaments.map((t) => t.id as number)
 
-  // 1. All rounds, all active games via game_leagues — in parallel
+  // Hent aktive sæsoner per turnering
+  const { data: seasons } = await supabaseAdmin
+    .from('seasons')
+    .select('id, tournament_id')
+    .in('tournament_id', tournamentIds)
+    .eq('is_active', true)
+
+  const seasonIds = (seasons ?? []).map((s) => s.id as number)
+
   const [
     { data: allRounds },
-    { data: gameLeagueRows },
+    { data: gameSeasonRows },
   ] = await Promise.all([
+    seasonIds.length
+      ? supabaseAdmin
+          .from('rounds')
+          .select('id, name, status, betting_closes_at, season_id')
+          .in('season_id', seasonIds)
+          .order('betting_closes_at', { ascending: true })
+      : { data: [] },
     supabaseAdmin
-      .from('rounds')
-      .select('id, name, status, betting_closes_at, league_id')
-      .in('league_id', leagueIds)
-      .order('betting_closes_at', { ascending: true }),
-    supabaseAdmin
-      .from('game_leagues')
-      .select('game_id, league_id')
-      .in('league_id', leagueIds),
+      .from('game_seasons')
+      .select('game_id, season_id')
+      .in('season_id', seasonIds),
   ])
 
-  // Count active games per league
-  const gameIdsByLeague = new Map<number, number[]>()
-  for (const gl of gameLeagueRows ?? []) {
-    const lid = gl.league_id as number
-    if (!gameIdsByLeague.has(lid)) gameIdsByLeague.set(lid, [])
-    gameIdsByLeague.get(lid)!.push(gl.game_id as number)
+  // Count active games per tournament (via season)
+  const seasonByTournament = new Map<number, number[]>()
+  for (const s of seasons ?? []) {
+    const tid = s.tournament_id as number
+    if (!seasonByTournament.has(tid)) seasonByTournament.set(tid, [])
+    seasonByTournament.get(tid)!.push(s.id as number)
   }
 
-  // Check which games are active
-  const allGameIds = [...new Set((gameLeagueRows ?? []).map((gl) => gl.game_id as number))]
+  const gameIdsByTournament = new Map<number, number[]>()
+  for (const gs of gameSeasonRows ?? []) {
+    const sid = gs.season_id as number
+    for (const [tid, sids] of seasonByTournament) {
+      if (sids.includes(sid)) {
+        if (!gameIdsByTournament.has(tid)) gameIdsByTournament.set(tid, [])
+        gameIdsByTournament.get(tid)!.push(gs.game_id as number)
+        break
+      }
+    }
+  }
+
+  const allGameIds = [...new Set((gameSeasonRows ?? []).map((gs) => gs.game_id as number))]
   const { data: activeGameRows } = allGameIds.length
     ? await supabaseAdmin
         .from('games')
@@ -62,21 +83,19 @@ export async function GET(req: NextRequest) {
 
   const activeGameSet = new Set((activeGameRows ?? []).map((g) => g.id as number))
 
-  const activeRoomsByLeague = new Map<number, number>()
-  for (const [lid, gids] of gameIdsByLeague) {
+  const activeRoomsByTournament = new Map<number, number>()
+  for (const [tid, gids] of gameIdsByTournament) {
     const count = gids.filter((gid) => activeGameSet.has(gid)).length
-    if (count > 0) activeRoomsByLeague.set(lid, count)
+    if (count > 0) activeRoomsByTournament.set(tid, count)
   }
 
-  // Determine "current round" per league: first open/upcoming round, or latest finished
-  const roundsByLeague = new Map<number, typeof allRounds>()
+  const roundsBySeason = new Map<number, typeof allRounds>()
   for (const r of allRounds ?? []) {
-    const lid = r.league_id as number
-    if (!roundsByLeague.has(lid)) roundsByLeague.set(lid, [])
-    roundsByLeague.get(lid)!.push(r)
+    const sid = r.season_id as number
+    if (!roundsBySeason.has(sid)) roundsBySeason.set(sid, [])
+    roundsBySeason.get(sid)!.push(r)
   }
 
-  // 2. All match counts per round in one query
   const allRoundIds = (allRounds ?? []).map((r) => r.id as number)
   const { data: allMatches } = allRoundIds.length
     ? await supabaseAdmin
@@ -94,24 +113,24 @@ export async function GET(req: NextRequest) {
     matchIdsByRound.get(rid)!.push(m.id as number)
   }
 
-  // 3. Bets counts for current rounds only (one query)
   const currentRoundIds: number[] = []
-  const currentRoundByLeague = new Map<number, { id: number; name: string; status: string; betting_closes_at: string | null; match_count: number }>()
-  for (const league of leagues) {
-    const lid = league.id as number
-    const leagueRounds = roundsByLeague.get(lid) ?? []
-    // Current = first open round, or first upcoming
-    const current = leagueRounds.find((r) => r.status === 'open')
-      ?? leagueRounds.find((r) => r.status === 'upcoming')
-    if (current) {
-      currentRoundIds.push(current.id as number)
-      currentRoundByLeague.set(lid, {
-        id: current.id as number,
-        name: current.name as string,
-        status: current.status as string,
-        betting_closes_at: current.betting_closes_at as string | null,
-        match_count: matchCountByRound.get(current.id as number) ?? 0,
-      })
+  const currentRoundBySeason = new Map<number, { id: number; name: string; status: string; betting_closes_at: string | null; match_count: number }>()
+  for (const tid of tournamentIds) {
+    const sids = seasonByTournament.get(tid) ?? []
+    for (const sid of sids) {
+      const seasonRounds = roundsBySeason.get(sid) ?? []
+      const current = seasonRounds.find((r) => r.status === 'open')
+        ?? seasonRounds.find((r) => r.status === 'upcoming')
+      if (current) {
+        currentRoundIds.push(current.id as number)
+        currentRoundBySeason.set(sid, {
+          id: current.id as number,
+          name: current.name as string,
+          status: current.status as string,
+          betting_closes_at: current.betting_closes_at as string | null,
+          match_count: matchCountByRound.get(current.id as number) ?? 0,
+        })
+      }
     }
   }
 
@@ -134,66 +153,61 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Assemble response
-  const result = leagues.map((league) => {
-    const leagueId = league.id as number
-    const activeRooms = activeRoomsByLeague.get(leagueId) ?? 0
+  const result = tournaments.map((tournament) => {
+    const tid = tournament.id as number
+    const sids = seasonByTournament.get(tid) ?? []
+    const activeRooms = activeRoomsByTournament.get(tid) ?? 0
 
-    const rounds = (roundsByLeague.get(leagueId) ?? [])
-      .map((r) => ({
-        id: r.id as number,
-        name: r.name as string,
-        status: r.status as string,
-        betting_closes_at: r.betting_closes_at as string | null,
-        league_id: r.league_id as number,
-        match_count: matchCountByRound.get(r.id as number) ?? 0,
-      }))
-
-    const finished = rounds.filter((r) => r.status === 'finished')
-
-    const crInfo = currentRoundByLeague.get(leagueId)
-
-    const upcoming = rounds.filter((r) => r.status === 'upcoming' && r.id !== crInfo?.id)
-
-    let currentRound: RoundInfo | null = null
     let totalBets = 0
-    if (crInfo) {
-      const matchIds = matchIdsByRound.get(crInfo.id) ?? []
-      totalBets = matchIds.reduce((sum, mid) => sum + (betCountByMatch.get(mid) ?? 0), 0)
-      currentRound = {
-        id: crInfo.id,
-        name: crInfo.name,
-        kickoff_date: crInfo.betting_closes_at ?? '',
-        status: crInfo.status,
-        matchCount: crInfo.match_count,
-        betsCount: totalBets,
+    let currentRound: RoundInfo | null = null
+    let previousRound: RoundInfo | null = null
+    let nextRound: RoundInfo | null = null
+
+    for (const sid of sids) {
+      const crInfo = currentRoundBySeason.get(sid)
+      if (crInfo) {
+        const matchIds = matchIdsByRound.get(crInfo.id) ?? []
+        totalBets += matchIds.reduce((sum, mid) => sum + (betCountByMatch.get(mid) ?? 0), 0)
+        currentRound = {
+          id: crInfo.id,
+          name: crInfo.name,
+          kickoff_date: crInfo.betting_closes_at ?? '',
+          status: crInfo.status,
+          matchCount: crInfo.match_count,
+          betsCount: matchIds.reduce((sum, mid) => sum + (betCountByMatch.get(mid) ?? 0), 0),
+        }
+      }
+
+      const seasonRounds = roundsBySeason.get(sid) ?? []
+      const finished = seasonRounds.filter((r) => r.status === 'finished')
+      const upcoming = seasonRounds.filter((r) => r.status === 'upcoming' && r.id !== currentRound?.id)
+
+      if (finished.length && !previousRound) {
+        const last = finished[finished.length - 1]
+        previousRound = {
+          id: last.id as number,
+          name: last.name as string,
+          kickoff_date: (last.betting_closes_at as string) ?? '',
+          status: last.status as string,
+          matchCount: matchCountByRound.get(last.id as number) ?? 0,
+        }
+      }
+      if (upcoming.length && !nextRound) {
+        const first = upcoming[0]
+        nextRound = {
+          id: first.id as number,
+          name: first.name as string,
+          kickoff_date: (first.betting_closes_at as string) ?? '',
+          status: first.status as string,
+          matchCount: matchCountByRound.get(first.id as number) ?? 0,
+        }
       }
     }
 
-    const previousRound: RoundInfo | null = finished.length
-      ? {
-          id: finished[finished.length - 1].id,
-          name: finished[finished.length - 1].name,
-          kickoff_date: finished[finished.length - 1].betting_closes_at ?? '',
-          status: finished[finished.length - 1].status,
-          matchCount: finished[finished.length - 1].match_count,
-        }
-      : null
-
-    const nextRound: RoundInfo | null = upcoming.length
-      ? {
-          id: upcoming[0].id,
-          name: upcoming[0].name,
-          kickoff_date: upcoming[0].betting_closes_at ?? '',
-          status: upcoming[0].status,
-          matchCount: upcoming[0].match_count,
-        }
-      : null
-
     return {
-      id: leagueId,
-      name: league.name as string,
-      country: (league.country as string) ?? '',
+      id: tid,
+      name: tournament.name as string,
+      country: (tournament.country as string) ?? '',
       activeRooms,
       totalBets,
       previousRound,

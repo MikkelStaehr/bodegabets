@@ -110,24 +110,24 @@ app.get('/sync-fixtures', async (_req, res) => {
     const totals = results.reduce(
       (acc, r) => ({
         synced: acc.synced + r.synced,
-        rounds_created: acc.rounds_created + r.rounds_created,
+        rounds_upserted: acc.rounds_upserted + r.rounds_upserted,
         matches_created: acc.matches_created + r.matches_created,
         matches_updated: acc.matches_updated + r.matches_updated,
       }),
-      { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0 }
+      { synced: 0, rounds_upserted: 0, matches_created: 0, matches_updated: 0 }
     )
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'sync_fixtures',
       status: totals.synced > 0 ? 'success' : 'info',
-      message: `sync-fixtures: ${results.length} leagues, ${totals.matches_created} created, ${totals.matches_updated} updated`,
-      metadata: { leagues_synced: results.length, ...totals },
+      message: `sync-fixtures: ${results.length} sæsoner, ${totals.matches_created} created, ${totals.matches_updated} updated`,
+      metadata: { seasons_synced: results.length, ...totals },
     })
 
     res.json({
       ok: true,
       synced_at: new Date().toISOString(),
-      leagues_synced: results.length,
+      seasons_synced: results.length,
       ...totals,
       details: results,
     })
@@ -151,7 +151,7 @@ app.get('/update-rounds', async (_req, res) => {
 
     const { data: allRounds, error: roundsError } = await supabaseAdmin
       .from('rounds')
-      .select('id, name, status, betting_closes_at, league_id')
+      .select('id, name, status, betting_closes_at, season_id')
       .order('id', { ascending: true })
 
     if (roundsError) {
@@ -159,7 +159,7 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
-    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; league_id: number }
+    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; season_id: number }
     const typedAllRounds = (allRounds ?? []) as RoundRow[]
     const rounds = typedAllRounds.filter((r) => r.status !== 'finished')
     const roundIds = rounds.map((r) => r.id)
@@ -202,26 +202,26 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ status: 'finished' }).in('id', finishedIds)
     }
 
-    // Gruppér per liga
-    const roundsByLeague = new Map<number, RoundRow[]>()
+    // Gruppér per sæson
+    const roundsBySeason = new Map<number, RoundRow[]>()
     for (const r of typedAllRounds) {
-      if (!roundsByLeague.has(r.league_id)) roundsByLeague.set(r.league_id, [])
-      roundsByLeague.get(r.league_id)!.push(r)
+      if (!roundsBySeason.has(r.season_id)) roundsBySeason.set(r.season_id, [])
+      roundsBySeason.get(r.season_id)!.push(r)
     }
 
-    // 2) Åbn næste upcoming runde per liga
+    // 2) Åbn næste upcoming runde per sæson
     const toMarkOpen = rounds.filter((r) => {
       if (r.status !== 'upcoming') return false
       if (finishedIds.includes(r.id)) return false
-      const leagueRounds = roundsByLeague.get(r.league_id) ?? []
+      const seasonRounds = roundsBySeason.get(r.season_id) ?? []
       const effectiveStatus = (rd: RoundRow) => finishedIds.includes(rd.id) ? 'finished' : rd.status
-      const hasActiveRound = leagueRounds.some(
+      const hasActiveRound = seasonRounds.some(
         (rd) => rd.id !== r.id && (effectiveStatus(rd) === 'open' || effectiveStatus(rd) === 'closed')
       )
       if (hasActiveRound) return false
-      const idx = leagueRounds.findIndex((rd) => rd.id === r.id)
+      const idx = seasonRounds.findIndex((rd) => rd.id === r.id)
       if (idx > 0) {
-        const prev = leagueRounds[idx - 1]
+        const prev = seasonRounds[idx - 1]
         if (effectiveStatus(prev) !== 'finished') return false
       }
       return true
@@ -341,7 +341,7 @@ app.get('/send-reminders', async (_req, res) => {
 
     const { data: rounds } = await supabaseAdmin
       .from('rounds')
-      .select('id, name, league_id, betting_closes_at')
+      .select('id, name, season_id, betting_closes_at')
       .neq('status', 'finished')
       .gt('betting_closes_at', now.toISOString())
       .lte('betting_closes_at', sixHoursLater.toISOString())
@@ -359,14 +359,14 @@ app.get('/send-reminders', async (_req, res) => {
         (new Date(round.betting_closes_at!).getTime() - now.getTime()) / (1000 * 60 * 60)
       )
 
-      const { data: gameLeagueRows } = await supabaseAdmin
-        .from('game_leagues')
+      const { data: gameSeasonRows } = await supabaseAdmin
+        .from('game_seasons')
         .select('game_id')
-        .eq('league_id', round.league_id)
+        .eq('season_id', round.season_id)
 
-      const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
-      const { data: games } = gameIdsForLeague.length
-        ? await supabaseAdmin.from('games').select('id, name').in('id', gameIdsForLeague)
+      const gameIdsForSeason = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
+      const { data: games } = gameIdsForSeason.length
+        ? await supabaseAdmin.from('games').select('id, name').in('id', gameIdsForSeason)
         : { data: [] as { id: number; name: string }[] }
 
       if (!games?.length) continue

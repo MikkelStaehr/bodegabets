@@ -17,10 +17,7 @@ export default async function DashboardPage() {
     .from('game_members')
     .select(`
       game_id, earnings,
-      games(
-        id, name, status, invite_code,
-        game_leagues(leagues(name, bold_slug))
-      )
+      games(id, name, status, invite_code)
     `)
     .eq('user_id', user.id)
     .order('joined_at', { ascending: false })
@@ -40,33 +37,45 @@ export default async function DashboardPage() {
     memberCounts[row.game_id] = (memberCounts[row.game_id] ?? 0) + 1
   }
 
-  // Hent rounds via game_leagues (rounds tilhører ligaer)
-  const { data: gameLeagues } = await supabaseAdmin
-    .from('game_leagues')
-    .select('game_id, league_id')
+  // Hent rounds via game_seasons (rounds tilhører sæsoner)
+  const { data: gameSeasons } = await supabaseAdmin
+    .from('game_seasons')
+    .select('game_id, season_id')
     .in('game_id', gameIds)
-  const leagueIds = [...new Set((gameLeagues ?? []).map((gl: { league_id: number }) => gl.league_id))]
-  const leagueIdByGame = new Map((gameLeagues ?? []).map((gl: { game_id: number; league_id: number }) => [gl.game_id, gl.league_id]))
+  const seasonIds = [...new Set((gameSeasons ?? []).map((gs: { season_id: number }) => gs.season_id))]
+  const seasonIdByGame = new Map((gameSeasons ?? []).map((gs: { game_id: number; season_id: number }) => [gs.game_id, gs.season_id]))
 
-  const { data: rounds } = leagueIds.length > 0
+  const { data: rounds } = seasonIds.length > 0
     ? await supabaseAdmin
         .from('rounds')
-        .select('id, league_id, name, status, betting_closes_at')
-        .in('league_id', leagueIds)
+        .select('id, season_id, name, status, betting_closes_at')
+        .in('season_id', seasonIds)
         .neq('status', 'finished')
         .order('betting_closes_at', { ascending: false })
     : { data: [] }
 
-  const roundsByLeague = new Map<number, { id: number; name: string; status: string; betting_closes_at: string | null }[]>()
+  const roundsBySeason = new Map<number, { id: number; name: string; status: string; betting_closes_at: string | null }[]>()
   for (const r of rounds ?? []) {
-    const lid = r.league_id as number
-    if (!roundsByLeague.has(lid)) roundsByLeague.set(lid, [])
-    roundsByLeague.get(lid)!.push({
+    const sid = r.season_id as number
+    if (!roundsBySeason.has(sid)) roundsBySeason.set(sid, [])
+    roundsBySeason.get(sid)!.push({
       id: r.id as number,
       name: r.name as string,
       status: r.status as string,
       betting_closes_at: r.betting_closes_at as string | null,
     })
+  }
+
+  const { data: seasonRows } = seasonIds.length > 0
+    ? await supabaseAdmin
+        .from('seasons')
+        .select('id, tournament_id, tournaments(name)')
+        .in('id', seasonIds)
+    : { data: [] }
+  const leagueNameBySeason = new Map<number, string>()
+  for (const s of seasonRows ?? []) {
+    const t = (s as { tournaments?: { name?: string } | { name?: string }[] }).tournaments
+    leagueNameBySeason.set(s.id as number, (Array.isArray(t) ? t[0] : t)?.name ?? '')
   }
 
   // Beregn rank per game (fra earnings)
@@ -87,16 +96,16 @@ export default async function DashboardPage() {
     rankByGame.set(gid, idx >= 0 ? idx + 1 : 0)
   }
 
-  const activeRoundIds = [...roundsByLeague.values()].flat().map((r) => r.id)
+  const activeRoundIds = [...roundsBySeason.values()].flat().map((r) => r.id)
   const { data: userBets } = activeRoundIds.length > 0
     ? await supabaseAdmin.from('bets').select('round_id').eq('user_id', user.id).in('round_id', activeRoundIds)
     : { data: [] }
   const roundsWithBets = new Set((userBets ?? []).map((b: { round_id: number }) => b.round_id))
 
   const games = (memberships ?? []).map((m: Record<string, unknown>) => {
-    const g = m.games as { id: number; name: string; status: string; invite_code: string; game_leagues?: { leagues?: { name: string } }[] } | undefined
-    const leagueId = leagueIdByGame.get(m.game_id as number)
-    const leagueRounds = leagueId ? roundsByLeague.get(leagueId) ?? [] : []
+    const g = m.games as { id: number; name: string; status: string; invite_code: string } | undefined
+    const seasonId = seasonIdByGame.get(m.game_id as number)
+    const leagueRounds = seasonId ? roundsBySeason.get(seasonId) ?? [] : []
     const activeRound = leagueRounds.find((r) => r.status === 'open')
       ?? leagueRounds.find((r) => r.status === 'upcoming')
       ?? leagueRounds[0]
@@ -107,7 +116,7 @@ export default async function DashboardPage() {
       name: g?.name ?? '',
       status: g?.status ?? 'active',
       invite_code: g?.invite_code ?? '',
-      league_name: (g?.game_leagues as { leagues?: { name: string } }[] | undefined)?.[0]?.leagues?.name ?? '',
+      league_name: seasonId ? leagueNameBySeason.get(seasonId) ?? '' : '',
       rank: rankByGame.get(m.game_id as number) ?? null,
       member_count: memberCounts[m.game_id as number] ?? 1,
       active_round: activeRound
