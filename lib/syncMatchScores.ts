@@ -201,9 +201,17 @@ export async function syncMatchScores(options?: {
     }
   }
 
-  for (const roundId of finishedRoundIds) {
-    console.log(`[syncMatchScores] Kamp finished → trigger calculateRoundPoints(${roundId})`)
-    await calculateRoundPoints(roundId)
+  if (finishedRoundIds.size > 0 && !dryRun) {
+    for (const roundId of finishedRoundIds) {
+      console.log(`[syncMatchScores] Kamp finished → trigger calculateRoundPoints(${roundId})`)
+      await calculateRoundPoints(roundId)
+    }
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'calculate_points',
+      status: 'success',
+      message: `syncMatchScores: ${finishedRoundIds.size} runder beregnet efter færdige kampe`,
+      metadata: { round_ids: [...finishedRoundIds] },
+    })
   }
 
   console.log(`[syncMatchScores] ${updated} kampe opdateret${dryRun ? ' (dry-run)' : ''}`)

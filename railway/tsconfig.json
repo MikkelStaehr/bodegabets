@@ -24,7 +24,6 @@
     "../lib/syncLeagueMatches.ts",
     "../lib/calculatePoints.ts",
     "../lib/betUtils.ts",
-    "../lib/betTypes.ts",
-    "../lib/teamNameNormalizer.ts"
+    "../lib/betTypes.ts"
   ]
 }

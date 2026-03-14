@@ -232,7 +232,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
     setFeedback((f) => ({ ...f, [leagueId]: '' }))
 
     try {
-      const res = await fetch('/api/admin/sync-league-client', {
+      const res = await fetch('/api/admin/sync-league', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ season_id: seasonId }),

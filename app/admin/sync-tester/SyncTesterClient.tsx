@@ -38,10 +38,21 @@ export default function SyncTesterClient({ leagues }: Props) {
     if (m === 'phase_info' && phaseId) body.bold_phase_id = parseInt(phaseId, 10)
 
     try {
-      const res = await fetch('/api/admin/sync-test', {
+      if (m !== 'fixtures') {
+        setResult({ error: 'Kun fixtures-mode understøttes. Brug Ligaer-tab til sync.' })
+        setLoading(false)
+        return
+      }
+      const sid = lid ? parseInt(String(lid), 10) : null
+      if (!sid) {
+        setResult({ error: 'Vælg en liga' })
+        setLoading(false)
+        return
+      }
+      const res = await fetch('/api/admin/sync-league', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ season_id: sid }),
       })
       const data = await res.json()
       setResult(data)

@@ -6,8 +6,6 @@ import LigaerTab from './tabs/LigaerTab'
 import SpilrumTab from './tabs/SpilrumTab'
 import { AdminUsersTab } from './tabs/AdminUsersTab'
 import LogsTab from './tabs/LogsTab'
-import { LiveTestTab } from './tabs/LiveTestTab'
-
 const NAV = [
   { section: 'Oversigt', items: [
     { id: 'overblik',  label: 'Overblik',   dot: '#B8963E' },
@@ -18,12 +16,9 @@ const NAV = [
     { id: 'spilrum',   label: 'Spilrum',     dot: null },
     { id: 'brugere',   label: 'Brugere',     dot: null },
   ]},
-  { section: 'Udvikling', items: [
-    { id: 'live-test', label: 'Live test',   dot: '#C0392B' },
-  ]},
 ] as const
 
-type TabId = 'overblik' | 'logs' | 'ligaer' | 'spilrum' | 'brugere' | 'live-test'
+type TabId = 'overblik' | 'logs' | 'ligaer' | 'spilrum' | 'brugere'
 
 export default function AdminShell({ initialTab, adminSecret }: { initialTab: string, adminSecret?: string }) {
   const [active, setActive] = useState<TabId>((initialTab as TabId) || 'overblik')
@@ -90,7 +85,6 @@ export default function AdminShell({ initialTab, adminSecret }: { initialTab: st
         {active === 'spilrum'   && <SpilrumTab />}
         {active === 'brugere'   && <AdminUsersTab adminSecret={adminSecret ?? ''} />}
         {active === 'logs'      && <LogsTab />}
-        {active === 'live-test' && <LiveTestTab />}
       </div>
     </div>
   )
