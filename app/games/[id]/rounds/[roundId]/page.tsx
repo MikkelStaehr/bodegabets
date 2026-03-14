@@ -56,7 +56,6 @@ export default async function RoundPage({ params }: Props) {
   const [
     { data: round },
     { data: membership },
-    { data: rawMatches },
   ] = await Promise.all([
     supabase
       .from('rounds')
@@ -71,18 +70,22 @@ export default async function RoundPage({ params }: Props) {
       .eq('game_id', gameId)
       .eq('user_id', user.id)
       .maybeSingle(),
-
-    supabase
-      .from('matches')
-      .select(`
-        id, round_id, home_team_id, away_team_id, kickoff_at,
-        home_score, away_score, home_score_ht, away_score_ht, status,
-        home_team:teams!home_team_id(name),
-        away_team:teams!away_team_id(name)
-      `)
-      .eq('round_id', roundIdNum)
-      .order('kickoff_at', { ascending: true }),
   ])
+
+  // Matches har round_name + season_id (ikke round_id). Join via round.
+  const { data: rawMatches } = round?.season_id != null && round?.name != null
+    ? await supabase
+        .from('matches')
+        .select(`
+          id, home_team_id, away_team_id, kickoff,
+          home_score, away_score, home_score_ht, away_score_ht, status,
+          home_team:teams!home_team_id(name),
+          away_team:teams!away_team_id(name)
+        `)
+        .eq('season_id', round.season_id)
+        .eq('round_name', round.name)
+        .order('kickoff', { ascending: true })
+    : { data: [] }
 
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
@@ -94,21 +97,23 @@ export default async function RoundPage({ params }: Props) {
       ...m,
       home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
       away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
+      kickoff_at: m.kickoff ?? m.kickoff_at,
     } as unknown as MatchRow
   })
 
-  if (matches.length === 0) {
+  if (matches.length === 0 && round) {
     await syncMatchesForRound(gameId, roundIdNum)
     const { data: matchesRetry } = await supabase
       .from('matches')
       .select(`
-        id, round_id, kickoff_at,
+        id, kickoff,
         home_score, away_score, home_score_ht, away_score_ht, status,
         home_team:teams!home_team_id(name),
         away_team:teams!away_team_id(name)
       `)
-      .eq('round_id', roundIdNum)
-      .order('kickoff_at', { ascending: true })
+      .eq('season_id', round.season_id)
+      .eq('round_name', round.name)
+      .order('kickoff', { ascending: true })
     matches = ((matchesRetry ?? []) as Array<Record<string, unknown>>).map((m) => {
       const ht = m.home_team as { name?: string } | { name?: string }[] | null
       const at = m.away_team as { name?: string } | { name?: string }[] | null
@@ -116,6 +121,7 @@ export default async function RoundPage({ params }: Props) {
         ...m,
         home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
         away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
+        kickoff_at: m.kickoff ?? m.kickoff_at,
       } as unknown as MatchRow
     })
   }

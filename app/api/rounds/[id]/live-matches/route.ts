@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Tjek at brugeren har adgang til runden (medlem af et spilrum i sæsonen)
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('season_id')
+    .select('season_id, name')
     .eq('id', roundId)
     .single()
 
@@ -50,14 +50,15 @@ export async function GET(req: NextRequest, { params }: Props) {
     .select(`
       id, home_team_id, away_team_id,
       home_score, away_score, home_score_ht, away_score_ht,
-      status, kickoff_at,
+      status, kickoff,
       home_team:teams!home_team_id(name),
       away_team:teams!away_team_id(name)
     `)
-    .eq('round_id', roundId)
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
     .in('status', ['live', 'halftime', 'finished'])
-    .gte('kickoff_at', since.toISOString())
-    .order('kickoff_at', { ascending: true })
+    .gte('kickoff', since.toISOString())
+    .order('kickoff', { ascending: true })
     .limit(50)
 
   // Filtrér fremtidige kampe — status live/finished kræver kickoff i fortiden
@@ -70,7 +71,10 @@ export async function GET(req: NextRequest, { params }: Props) {
       home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
       away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
     }
-  }).filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
+  }).filter((m) => {
+    const k = (m as { kickoff?: string; kickoff_at?: string }).kickoff ?? (m as { kickoff?: string; kickoff_at?: string }).kickoff_at
+    return k && k <= nowIso
+  })
 
   const live = matchList.filter((m) => m.status === 'live').length
   const halftime = matchList.filter((m) => m.status === 'halftime').length

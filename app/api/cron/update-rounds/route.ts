@@ -3,7 +3,7 @@
  * Railway (railway/index.ts) er den primære cron-kilde via node-cron (dagligt 08:00 UTC).
  * Kan trigges manuelt via POST /api/admin/run-cron { cron: 'update-rounds' }.
  *
- * Nyt skema: rounds har season_id, matches har round_id.
+ * Matches har season_id + round_name (ikke round_id). Join via rounds.season_id, rounds.name.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -49,10 +49,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, timestamp: nowIso, finished: 0, opened: 0, closed: 0, message: 'Ingen aktive runder' })
   }
 
+  // Matches har season_id + round_name. Hent alle matches for disse sæsoner og gruppér per (season_id, round_name)
+  const seasonIds = [...new Set(rounds.map((r) => r.season_id))]
   const { data: matchRows, error: statsError } = await supabaseAdmin
     .from('matches')
-    .select('round_id, status, kickoff_at')
-    .in('round_id', roundIds)
+    .select('season_id, round_name, status, kickoff')
+    .in('season_id', seasonIds)
 
   if (statsError) {
     await supabaseAdmin.from('admin_logs').insert({
@@ -64,17 +66,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: statsError.message }, { status: 500 })
   }
 
-  type MatchRow = { round_id: number; status: string; kickoff_at: string | null }
-  const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
+  type MatchRow = { season_id: number; round_name: string; status: string; kickoff: string | null }
+  const statsBySeasonRound = new Map<string, { total: number; finished: number; minKickoff: string | null }>()
   for (const m of (matchRows ?? []) as MatchRow[]) {
-    if (!statMap[m.round_id]) statMap[m.round_id] = { total: 0, finished: 0, minKickoff: null }
-    statMap[m.round_id].total++
-    if (m.status === 'finished') statMap[m.round_id].finished++
-    if (m.kickoff_at) {
-      if (!statMap[m.round_id].minKickoff || m.kickoff_at < statMap[m.round_id].minKickoff!) {
-        statMap[m.round_id].minKickoff = m.kickoff_at
-      }
+    const key = `${m.season_id}|${m.round_name}`
+    const entry = statsBySeasonRound.get(key) ?? { total: 0, finished: 0, minKickoff: null }
+    entry.total++
+    if (m.status === 'finished') entry.finished++
+    if (m.kickoff) {
+      if (!entry.minKickoff || m.kickoff < entry.minKickoff) entry.minKickoff = m.kickoff
     }
+    statsBySeasonRound.set(key, entry)
+  }
+
+  const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
+  for (const r of rounds) {
+    const key = `${r.season_id}|${r.name}`
+    statMap[r.id] = statsBySeasonRound.get(key) ?? { total: 0, finished: 0, minKickoff: null }
   }
 
   const typedRounds = rounds as RoundRow[]

@@ -96,21 +96,26 @@ export async function GET(req: NextRequest) {
     roundsBySeason.get(sid)!.push(r)
   }
 
-  const allRoundIds = (allRounds ?? []).map((r) => r.id as number)
-  const { data: allMatches } = allRoundIds.length
+  const { data: allMatches } = seasonIds.length
     ? await supabaseAdmin
         .from('matches')
-        .select('id, round_id')
-        .in('round_id', allRoundIds)
+        .select('id, season_id, round_name')
+        .in('season_id', seasonIds)
     : { data: [] }
 
   const matchCountByRound = new Map<number, number>()
   const matchIdsByRound = new Map<number, number[]>()
+  const roundBySeasonName = new Map<string, number>()
+  for (const r of allRounds ?? []) {
+    roundBySeasonName.set(`${(r as { season_id: number }).season_id}|${(r as { name: string }).name}`, (r as { id: number }).id)
+  }
   for (const m of allMatches ?? []) {
-    const rid = m.round_id as number
-    matchCountByRound.set(rid, (matchCountByRound.get(rid) ?? 0) + 1)
-    if (!matchIdsByRound.has(rid)) matchIdsByRound.set(rid, [])
-    matchIdsByRound.get(rid)!.push(m.id as number)
+    const rid = roundBySeasonName.get(`${(m as { season_id: number }).season_id}|${(m as { round_name: string }).round_name}`)
+    if (rid != null) {
+      matchCountByRound.set(rid, (matchCountByRound.get(rid) ?? 0) + 1)
+      if (!matchIdsByRound.has(rid)) matchIdsByRound.set(rid, [])
+      matchIdsByRound.get(rid)!.push((m as { id: number }).id)
+    }
   }
 
   const currentRoundIds: number[] = []

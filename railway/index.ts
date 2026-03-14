@@ -169,27 +169,32 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
+    const seasonIds = [...new Set(rounds.map((r) => r.season_id))]
     const { data: matchRows, error: statsError } = await supabaseAdmin
       .from('matches')
-      .select('round_id, status, kickoff_at')
-      .in('round_id', roundIds)
+      .select('season_id, round_name, status, kickoff')
+      .in('season_id', seasonIds)
 
     if (statsError) {
       res.status(500).json({ error: statsError.message })
       return
     }
 
-    type MatchRow = { round_id: number; status: string; kickoff_at: string | null }
-    const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
+    type MatchRow = { season_id: number; round_name: string; status: string; kickoff: string | null }
+    const statsBySeasonRound = new Map<string, { total: number; finished: number; minKickoff: string | null }>()
     for (const m of (matchRows ?? []) as MatchRow[]) {
-      if (!statMap[m.round_id]) statMap[m.round_id] = { total: 0, finished: 0, minKickoff: null }
-      statMap[m.round_id].total++
-      if (m.status === 'finished') statMap[m.round_id].finished++
-      if (m.kickoff_at) {
-        if (!statMap[m.round_id].minKickoff || m.kickoff_at < statMap[m.round_id].minKickoff!) {
-          statMap[m.round_id].minKickoff = m.kickoff_at
-        }
+      const key = `${m.season_id}|${m.round_name}`
+      const entry = statsBySeasonRound.get(key) ?? { total: 0, finished: 0, minKickoff: null }
+      entry.total++
+      if (m.status === 'finished') entry.finished++
+      if (m.kickoff) {
+        if (!entry.minKickoff || m.kickoff < entry.minKickoff) entry.minKickoff = m.kickoff
       }
+      statsBySeasonRound.set(key, entry)
+    }
+    const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
+    for (const r of rounds) {
+      statMap[r.id] = statsBySeasonRound.get(`${r.season_id}|${r.name}`) ?? { total: 0, finished: 0, minKickoff: null }
     }
 
     // 1) Markér runder som 'finished'
@@ -294,10 +299,18 @@ app.get('/calculate-points', async (_req, res) => {
       const roundIds = [...new Set((betRounds ?? []).map((b) => b.round_id as number))]
 
       for (const roundId of roundIds) {
+        const { data: round } = await supabaseAdmin
+          .from('rounds')
+          .select('season_id, name')
+          .eq('id', roundId)
+          .single()
+        if (!round?.season_id || !round?.name) continue
+
         const { data: matches } = await supabaseAdmin
           .from('matches')
           .select('id, status')
-          .eq('round_id', roundId)
+          .eq('season_id', round.season_id)
+          .eq('round_name', round.name)
 
         const allFinished = matches?.every((m) => m.status === 'finished')
         if (!allFinished) continue

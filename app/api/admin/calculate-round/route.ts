@@ -15,12 +15,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'round_id og game_id er påkrævet' }, { status: 400 })
   }
 
-  // Tjek at runden har færdige kampe
-  const { data: matchRows } = await supabaseAdmin
-    .from('matches')
-    .select('id')
-    .eq('round_id', round_id)
-    .eq('status', 'finished')
+  // Tjek at runden har færdige kampe (matches har season_id + round_name)
+  const { data: round } = await supabaseAdmin
+    .from('rounds')
+    .select('season_id, name')
+    .eq('id', round_id)
+    .single()
+  if (!round) return NextResponse.json({ error: 'Runde ikke fundet' }, { status: 404 })
+
+  const { data: matchRows } = round.season_id != null && round.name != null
+    ? await supabaseAdmin
+        .from('matches')
+        .select('id')
+        .eq('season_id', round.season_id)
+        .eq('round_name', round.name)
+        .eq('status', 'finished')
+    : { data: [] }
 
   if (!matchRows?.length) {
     return NextResponse.json(

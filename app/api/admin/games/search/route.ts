@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
     seasonId
       ? supabaseAdmin
           .from('rounds')
-          .select('id, name, status')
+          .select('id, name, status, season_id')
           .eq('season_id', seasonId)
           .order('betting_closes_at', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -119,8 +119,9 @@ export async function GET(req: NextRequest) {
 
   let totalBets = 0
   const roundForBets = currentRoundMatch ?? (rounds ?? []).find((r: { status: string }) => r.status === 'open')
-  if (roundForBets) {
-    const { data: matchRows } = await supabaseAdmin.from('matches').select('id').eq('round_id', roundForBets.id)
+  if (roundForBets && (roundForBets as { season_id?: number; name?: string }).season_id != null && (roundForBets as { season_id?: number; name?: string }).name != null) {
+    const r = roundForBets as { id: number; season_id: number; name: string }
+    const { data: matchRows } = await supabaseAdmin.from('matches').select('id').eq('season_id', r.season_id).eq('round_name', r.name)
     const matchIds = (matchRows ?? []).map((m: { id: number }) => m.id)
     const { count } = matchIds.length
       ? await supabaseAdmin.from('bets').select('*', { count: 'exact', head: true }).in('match_id', matchIds)

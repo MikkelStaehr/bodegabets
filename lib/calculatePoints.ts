@@ -16,11 +16,19 @@ import { isBetCorrect } from './betUtils'
 export async function calculateRoundPoints(roundId: number): Promise<void> {
   console.log(`[calculateRoundPoints] START roundId=${roundId}`)
 
-  // 1. Hent finished matches for runden
+  const { data: round } = await supabaseAdmin
+    .from('rounds')
+    .select('season_id, name')
+    .eq('id', roundId)
+    .single()
+  if (!round?.season_id || !round?.name) return
+
+  // 1. Hent finished matches for runden (matches har season_id + round_name)
   const { data: matches } = await supabaseAdmin
     .from('matches')
     .select('id, home_score, away_score, home_score_ht, away_score_ht, status')
-    .eq('round_id', roundId)
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
     .eq('status', 'finished')
 
   if (!matches?.length) {

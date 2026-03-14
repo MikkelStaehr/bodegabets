@@ -44,23 +44,21 @@ export async function GET(_req: NextRequest, { params }: Props) {
     return NextResponse.json([])
   }
 
-  // Hent match_count per runde (matches har round_id)
-  const roundIds = roundList.map((r) => r.id)
+  // Hent match_count per runde (matches har season_id + round_name)
   const { data: matchRows } = await supabaseAdmin
     .from('matches')
-    .select('round_id')
-    .in('round_id', roundIds)
+    .select('season_id, round_name')
+    .in('season_id', seasonIds)
 
-  const matchCountByRoundId: Record<number, number> = {}
+  const countBySeasonRound = new Map<string, number>()
   for (const row of matchRows ?? []) {
-    if (row.round_id != null) {
-      matchCountByRoundId[row.round_id] = (matchCountByRoundId[row.round_id] ?? 0) + 1
-    }
+    const key = `${row.season_id}|${row.round_name}`
+    countBySeasonRound.set(key, (countBySeasonRound.get(key) ?? 0) + 1)
   }
 
   const roundsWithMatchCount = roundList.map((r) => ({
     ...r,
-    match_count: matchCountByRoundId[r.id] ?? 0,
+    match_count: countBySeasonRound.get(`${r.season_id}|${r.name}`) ?? 0,
   }))
 
   return NextResponse.json(roundsWithMatchCount)

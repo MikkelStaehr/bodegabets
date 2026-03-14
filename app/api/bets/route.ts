@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   // Tjek at runden er åben
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('status')
+    .select('status, season_id, name')
     .eq('id', round_id)
     .single()
 
@@ -56,13 +56,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Du er ikke med i dette spil' }, { status: 403 })
   }
 
-  // Validér at alle match_ids tilhører denne runde
+  // Validér at alle match_ids tilhører denne runde (matches har season_id + round_name)
   const matchIds = [...new Set(bets.map((b) => b.match_id))]
-  const { data: matches } = await supabaseAdmin
-    .from('matches')
-    .select('id')
-    .eq('round_id', round_id)
-    .in('id', matchIds)
+  const { data: matches } = round.season_id != null && round.name != null
+    ? await supabaseAdmin
+        .from('matches')
+        .select('id')
+        .eq('season_id', round.season_id)
+        .eq('round_name', round.name)
+        .in('id', matchIds)
+    : { data: [] }
 
   if (!matches || matches.length !== matchIds.length) {
     return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })

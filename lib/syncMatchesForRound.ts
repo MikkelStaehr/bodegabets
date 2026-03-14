@@ -21,5 +21,5 @@ export async function syncMatchesForRound(
   if (!round?.season_id) return
 
   // I nyt skema er matches allerede synkroniseret af syncLeagueMatches.
-  // Ingen handling nødvendig — matches har round_id og tilhører runden.
+  // Ingen handling nødvendig — matches matcher runden via season_id + round_name.
 }

@@ -29,12 +29,11 @@ export async function GET() {
 
   const { data: rounds } = await supabaseAdmin
     .from('rounds')
-    .select('id, season_id')
+    .select('id, season_id, name')
     .in('season_id', seasonIds)
     .in('status', ['open', 'active', 'upcoming'])
 
-  const roundIds = (rounds ?? []).map((r) => r.id)
-  if (roundIds.length === 0) return NextResponse.json({ leagues: [] })
+  if (!rounds?.length) return NextResponse.json({ leagues: [] })
 
   const now = new Date()
   const soon = new Date(now.getTime() + 3 * 60 * 60 * 1000)
@@ -43,20 +42,28 @@ export async function GET() {
   const { data: matches } = await supabaseAdmin
     .from('matches')
     .select(`
-      id, round_id, home_team_id, away_team_id,
+      id, season_id, round_name, home_team_id, away_team_id,
       home_score, away_score, home_score_ht, away_score_ht,
-      status, kickoff_at,
+      status, kickoff,
       home_team:teams!home_team_id(name),
       away_team:teams!away_team_id(name)
     `)
-    .in('round_id', roundIds)
+    .in('season_id', seasonIds)
     .in('status', ['live', 'halftime', 'finished', 'scheduled'])
-    .gte('kickoff_at', since.toISOString())
-    .lte('kickoff_at', soon.toISOString())
-    .order('kickoff_at', { ascending: true })
+    .gte('kickoff', since.toISOString())
+    .lte('kickoff', soon.toISOString())
+    .order('kickoff', { ascending: true })
     .limit(50)
 
-  const matchIds = (matches ?? []).map((m) => m.id)
+  const roundBySeasonName = new Map<string, { id: number; season_id: number }>()
+  for (const r of rounds) {
+    roundBySeasonName.set(`${r.season_id}|${r.name}`, { id: r.id, season_id: r.season_id })
+  }
+  const relevantMatches = (matches ?? []).filter((m) =>
+    roundBySeasonName.has(`${(m as { season_id: number }).season_id}|${(m as { round_name: string }).round_name}`)
+  )
+
+  const matchIds = relevantMatches.map((m) => m.id)
   let betsByMatch: Record<number, { prediction: string; result: string | null }> = {}
   if (matchIds.length > 0) {
     const { data: bets } = await supabaseAdmin
@@ -69,7 +76,10 @@ export async function GET() {
     )
   }
 
-  const roundIdsFromMatches = [...new Set((matches ?? []).map((m) => m.round_id))]
+  const roundIdsFromMatches = [...new Set(relevantMatches.map((m) => {
+    const r = roundBySeasonName.get(`${(m as { season_id: number }).season_id}|${(m as { round_name: string }).round_name}`)
+    return r?.id ?? 0
+  }))].filter((id) => id !== 0)
   const { data: roundRows } = await supabaseAdmin
     .from('rounds')
     .select('id, season_id')
@@ -94,8 +104,9 @@ export async function GET() {
   const seasonIdByRound = new Map((roundRows ?? []).map((r) => [r.id, r.season_id]))
 
   const byLeague: Record<number, { league_id: number; league_name: string; matches: unknown[] }> = {}
-  for (const m of matches ?? []) {
-    const seasonId = seasonIdByRound.get(m.round_id) ?? 0
+  for (const m of relevantMatches) {
+    const roundInfo = roundBySeasonName.get(`${(m as { season_id: number }).season_id}|${(m as { round_name: string }).round_name}`)
+    const seasonId = roundInfo?.season_id ?? 0
     const leagueName = leagueNameBySeason.get(seasonId) ?? 'Ukendt'
     const tournamentId = tournamentIdBySeason.get(seasonId) ?? seasonId
 

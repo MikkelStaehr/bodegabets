@@ -23,10 +23,18 @@ function mapStatus(statusType: string): LiveScoreResult['status'] {
 }
 
 export async function getLiveScores(roundId: number): Promise<LiveScoreResult[]> {
+  const { data: round } = await supabaseAdmin
+    .from('rounds')
+    .select('season_id, name')
+    .eq('id', roundId)
+    .single()
+  if (!round?.season_id || !round?.name) return []
+
   const { data: matchRows } = await supabaseAdmin
     .from('matches')
     .select('id, bold_match_id')
-    .eq('round_id', roundId)
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
     .not('bold_match_id', 'is', null)
 
   if (!matchRows?.length) return []

@@ -33,11 +33,19 @@ export async function GET(req: NextRequest) {
     const roundIds = [...new Set((betRounds ?? []).map((b) => b.round_id as number))]
 
     for (const roundId of roundIds) {
-      // Tjek om alle kampe i runden er finished
+      const { data: round } = await supabaseAdmin
+        .from('rounds')
+        .select('season_id, name')
+        .eq('id', roundId)
+        .single()
+      if (!round?.season_id || !round?.name) continue
+
+      // Tjek om alle kampe i runden er finished (matches har season_id + round_name)
       const { data: matches } = await supabaseAdmin
         .from('matches')
         .select('id, status')
-        .eq('round_id', roundId)
+        .eq('season_id', round.season_id)
+        .eq('round_name', round.name)
 
       const allFinished = matches?.every((m) => m.status === 'finished')
       if (!allFinished) continue
