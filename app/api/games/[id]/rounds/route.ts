@@ -32,7 +32,7 @@ export async function GET(_req: NextRequest, { params }: Props) {
     .from('rounds')
     .select('*')
     .in('season_id', seasonIds)
-    .order('name', { ascending: true })
+    .order('betting_closes_at', { ascending: true })
 
   if (roundsError) {
     console.error('[api/games/[id]/rounds]', roundsError.message)

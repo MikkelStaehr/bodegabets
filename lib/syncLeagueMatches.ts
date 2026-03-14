@@ -51,9 +51,12 @@ function parseKickoff(dateStr: string): string {
   return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
 }
 
+/** Bold status_type: "notstarted" | "inprogress" | "halftime" | "finished" */
 function mapStatus(statusType: string, statusShort?: string): 'scheduled' | 'live' | 'halftime' | 'finished' {
   if (statusType === 'finished') return 'finished'
+  if (statusType === 'halftime') return 'halftime'
   if (statusType === 'inprogress') return statusShort === 'HT' ? 'halftime' : 'live'
+  if (statusType === 'notstarted') return 'scheduled'
   return 'scheduled'
 }
 
@@ -198,13 +201,14 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
 
         const kickoffAt = parseKickoff(mt.date)
         const roundName = mt.round?.trim() || 'Ukendt runde'
-        const homeScore = mt.home_team?.score ?? null
-        const awayScore = mt.away_team?.score ?? null
-        const hasScores = homeScore != null && awayScore != null
 
         let status = mapStatus(mt.status_type, mt.status_short)
-        if (status === 'scheduled' && hasScores) status = 'finished'
         if (new Date(kickoffAt) > new Date() && status !== 'scheduled') status = 'scheduled'
+
+        // Bold returnerer 0-0 for ikke-startede kampe — sæt NULL for scheduled så brugerne ikke forvirres
+        const homeScore = status === 'scheduled' ? null : (mt.home_team?.score ?? null)
+        const awayScore = status === 'scheduled' ? null : (mt.away_team?.score ?? null)
+        const hasScores = homeScore != null && awayScore != null
 
         if (!roundData.has(roundName)) {
           roundData.set(roundName, { minKickoff: kickoffAt })

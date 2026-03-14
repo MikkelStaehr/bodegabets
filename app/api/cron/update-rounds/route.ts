@@ -87,10 +87,12 @@ export async function GET(req: NextRequest) {
 
   const typedRounds = rounds as RoundRow[]
 
-  // 1) Markér runder som 'finished' hvis alle kampe har status = 'finished'
+  // 1) Markér runder som 'finished' hvis forbi betting_closes_at OG alle kampe er 'finished'
   const toMarkFinished = typedRounds.filter((r) => {
     const stat = statMap[r.id]
-    return stat && stat.total > 0 && stat.finished === stat.total
+    if (!stat || stat.total === 0 || stat.finished !== stat.total) return false
+    const closes = r.betting_closes_at ? new Date(r.betting_closes_at) : null
+    return closes != null && closes < now
   })
 
   const finishedIds = toMarkFinished.map((r) => r.id)
