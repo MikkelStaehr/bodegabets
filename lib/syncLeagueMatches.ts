@@ -74,6 +74,8 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
     return []
   }
 
+  console.log('[syncLeagueMatches] DEBUG 1: Antal sæsoner fundet:', seasons.length)
+
   const results: SyncResult[] = []
 
   for (const season of seasons ?? []) {
@@ -99,16 +101,17 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
         const url = `${BOLD_MATCHES_API}?phase_ids=${boldPhaseId}&page=${page}&limit=${limit}&offset=${offset}`
         const res = await fetch(url, { headers: BOLD_HEADERS, cache: 'no-store' })
 
+        const resText = await res.text()
+        console.log(`[syncLeagueMatches] DEBUG 2: Bold API page=${page} status=${res.status} response_preview=${resText.slice(0, 200)}`)
+
         if (!res.ok) {
-          const text = await res.text()
-          result.errors.push(`Bold API ${res.status}: ${text.slice(0, 200)}`)
+          result.errors.push(`Bold API ${res.status}: ${resText.slice(0, 200)}`)
           break
         }
 
-        let text = ''
+        let text = resText
         let data: { matches?: BoldMatchItem[]; total_page_count?: number }
         try {
-          text = await res.text()
           data = JSON.parse(text) as { matches?: BoldMatchItem[]; total_page_count?: number }
         } catch (err) {
           result.errors.push(`Bold API JSON fejl: ${String(err)} — ${text?.slice(0, 300)}`)
@@ -117,6 +120,15 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
 
         const pageMatches = data.matches ?? []
         allMatches.push(...pageMatches)
+
+        if (page === 1) {
+          console.log('[syncLeagueMatches] DEBUG 2b: Response top-level keys:', Object.keys(data))
+          if (pageMatches.length > 0) {
+            console.log('[syncLeagueMatches] DEBUG 2b: Rå response-struktur for første kamp:', JSON.stringify(pageMatches[0], null, 2))
+          } else {
+            console.log('[syncLeagueMatches] DEBUG 2b: Ingen kampe i response — fuld data:', JSON.stringify(data, null, 2).slice(0, 1500))
+          }
+        }
 
         if (page === 1 && data.total_page_count != null) {
           totalPageCount = typeof data.total_page_count === 'number'
@@ -127,6 +139,8 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
         if (page >= totalPageCount || page > 20) break
         page++
       }
+
+      console.log('[syncLeagueMatches] DEBUG 3: Antal kampe i Bold response:', allMatches.length)
 
       if (allMatches.length === 0) {
         results.push(result)
@@ -162,7 +176,7 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
         home_team_id: number
         away_team_id: number
         round_name: string
-        kickoff_at: string
+        kickoff: string
         home_score: number | null
         away_score: number | null
         status: string
@@ -204,7 +218,7 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
           home_team_id: homeTeamId,
           away_team_id: awayTeamId,
           round_name: roundName,
-          kickoff_at: kickoffAt,
+          kickoff: kickoffAt,
           home_score: hasScores ? homeScore : null,
           away_score: hasScores ? awayScore : null,
           status,
@@ -240,31 +254,21 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
         result.rounds_upserted = roundsToUpsert.length
       }
 
-      const { data: rounds } = await supabaseAdmin
-        .from('rounds')
-        .select('id, name')
-        .eq('season_id', season.id)
+      const matchRows = toUpsert.map((r) => ({
+        season_id: r.season_id,
+        home_team_id: r.home_team_id,
+        away_team_id: r.away_team_id,
+        round_name: r.round_name,
+        kickoff: r.kickoff,
+        home_score: r.home_score,
+        away_score: r.away_score,
+        status: r.status,
+        bold_match_id: r.bold_match_id,
+        updated_at: new Date().toISOString(),
+      }))
 
-      const roundIdByName = new Map((rounds ?? []).map((r) => [r.name, r.id]))
-
-      const matchRows = toUpsert
-        .map((r) => {
-          const roundId = roundIdByName.get(r.round_name)
-          return {
-            season_id: r.season_id,
-            round_id: roundId ?? null,
-            home_team_id: r.home_team_id,
-            away_team_id: r.away_team_id,
-            round_name: r.round_name,
-            kickoff_at: r.kickoff_at,
-            home_score: r.home_score,
-            away_score: r.away_score,
-            status: r.status,
-            bold_match_id: r.bold_match_id,
-            updated_at: new Date().toISOString(),
-          }
-        })
-        .filter((r) => r.round_id != null)
+      console.log('[syncLeagueMatches] DEBUG 4: Før match upsert — første kamp:', matchRows[0] ?? 'INGEN (matchRows tom)')
+      console.log('[syncLeagueMatches] DEBUG 4b: matchRows.length=', matchRows.length, 'toUpsert.length=', toUpsert.length)
 
       for (const row of matchRows) {
         const existed = existingByBoldId.has(row.bold_match_id)
@@ -281,6 +285,7 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
         }
       }
 
+      console.log('[syncLeagueMatches] DEBUG 5: Efter upsert — inserted=', result.matches_created, 'updated=', result.matches_updated, 'synced=', result.synced)
       console.log(`[syncLeagueMatches] sæson ${season.id}: ${result.synced} kampe, ${result.matches_created} nye, ${result.matches_updated} opdateret, ${result.rounds_upserted} runder`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

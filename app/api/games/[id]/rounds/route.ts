@@ -4,32 +4,64 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 type Props = { params: Promise<{ id: string }> }
 
-/** GET /api/games/[id]/rounds — returnerer antal runder for spilrummet (via league_id) */
+/** GET /api/games/[id]/rounds — returnerer runder med match_count for spilrummet.
+ * Join-sti: games → game_seasons → seasons → rounds
+ */
 export async function GET(_req: NextRequest, { params }: Props) {
   const { id } = await params
   const gameId = parseInt(id)
   if (isNaN(gameId)) {
-    return NextResponse.json({ count: 0 })
+    return NextResponse.json([])
   }
 
   const supabase = await createServerSupabaseClient()
 
-  // Hent season_id via game_seasons junction table
-  const { data: gameSeason } = await supabase
+  // Hent season_ids via game_seasons junction (et spil kan have flere sæsoner)
+  const { data: gameSeasons } = await supabase
     .from('game_seasons')
     .select('season_id')
     .eq('game_id', gameId)
-    .limit(1)
-    .single()
 
-  if (!gameSeason?.season_id) {
-    return NextResponse.json({ count: 0 })
+  const seasonIds = (gameSeasons ?? []).map((gs) => gs.season_id).filter((id) => id != null)
+  if (seasonIds.length === 0) {
+    return NextResponse.json([])
   }
 
-  const { count } = await supabase
+  // Hent runder for disse sæsoner
+  const { data: rounds, error: roundsError } = await supabase
     .from('rounds')
-    .select('id', { count: 'exact', head: true })
-    .eq('season_id', gameSeason.season_id)
+    .select('*')
+    .in('season_id', seasonIds)
+    .order('name', { ascending: true })
 
-  return NextResponse.json({ count: count ?? 0 })
+  if (roundsError) {
+    console.error('[api/games/[id]/rounds]', roundsError.message)
+    return NextResponse.json([])
+  }
+
+  const roundList = rounds ?? []
+  if (roundList.length === 0) {
+    return NextResponse.json([])
+  }
+
+  // Hent match_count per runde (matches har round_id)
+  const roundIds = roundList.map((r) => r.id)
+  const { data: matchRows } = await supabaseAdmin
+    .from('matches')
+    .select('round_id')
+    .in('round_id', roundIds)
+
+  const matchCountByRoundId: Record<number, number> = {}
+  for (const row of matchRows ?? []) {
+    if (row.round_id != null) {
+      matchCountByRoundId[row.round_id] = (matchCountByRoundId[row.round_id] ?? 0) + 1
+    }
+  }
+
+  const roundsWithMatchCount = roundList.map((r) => ({
+    ...r,
+    match_count: matchCountByRoundId[r.id] ?? 0,
+  }))
+
+  return NextResponse.json(roundsWithMatchCount)
 }

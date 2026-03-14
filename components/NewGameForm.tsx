@@ -73,7 +73,7 @@ export default function NewGameForm({ leagues }: Props) {
     try {
       const res  = await fetch(`/api/games/${id}/rounds`)
       const data = await res.json()
-      if (data.count > 0) { setSyncState('done'); router.push(`/games/${id}`); return }
+      if (Array.isArray(data) && data.length > 0) { setSyncState('done'); router.push(`/games/${id}`); return }
     } catch { /* ignore */ }
     setPollAttempts(attempt + 1)
     setTimeout(() => poll(id, attempt + 1), 2000)
