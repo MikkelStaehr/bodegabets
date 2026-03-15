@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Match, Bet } from '@/types'
@@ -585,8 +585,13 @@ export default function AfgivBets({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pointsError, setPointsError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [showPanel, setShowPanel] = useState(false)
 
   const isReadOnly = round.status === 'finished'
+
+  useEffect(() => {
+    setShowPanel(existingBets.length === 0)
+  }, [existingBets.length])
 
   const isMatchLocked = useCallback((match: MatchWithOptions): boolean => {
     const kickoff = (match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff
@@ -618,6 +623,13 @@ export default function AfgivBets({
   const progressPct = totalMatches > 0 ? (selections.length / totalMatches) * 100 : 0
   const effectiveFastPoints = isManuel ? customPoints : fastPoints
   const extraBetsEnabled = true
+  const totalExistingStake = existingBets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
+  const totalNewStake = selections.reduce((sum, s) => {
+    const main = s.points ?? 0
+    const extra = s.extraBets.reduce((es, eb) => es + (eb.points ?? 0), 0)
+    return sum + main + extra
+  }, 0)
+  const previewBalance = Math.max(0, bettingBalance + totalExistingStake - totalNewStake)
 
   const getSelection = (matchId: number) => selections.find((s) => s.matchId === matchId)
 
@@ -886,7 +898,7 @@ export default function AfgivBets({
                   Dine credits
                 </p>
                 <p className="font-condensed text-[22px] font-bold text-[#1a3329] leading-tight">
-                  {Math.max(0, bettingBalance)} pt
+                  {showPanel ? previewBalance : Math.max(0, bettingBalance)} pt
                 </p>
               </div>
               <div className="text-right">
@@ -907,7 +919,29 @@ export default function AfgivBets({
             </div>
           )}
 
-          {/* Dine valg panel */}
+          {/* Dine valg — kompakt eller fuldt panel */}
+          {!showPanel && !isReadOnly && existingBets.length > 0 ? (
+            <div
+              className="flex justify-between items-center py-3 px-4 bg-white border border-black/10 rounded-lg"
+              style={{ borderColor: '#e5e7eb' }}
+            >
+              <div>
+                <p className="text-[13px] font-semibold text-[#1a3329]">
+                  {existingBets.filter((b) => b.bet_type === 'match_result').length} valg afgivet
+                </p>
+                <p className="text-[12px] text-[#888]">
+                  {totalExistingStake} pt brugt · {Math.max(0, bettingBalance)} pt tilbage
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPanel(true)}
+                className="font-condensed text-[12px] font-bold text-[#2C4A3E] px-3 py-2 border border-[#2C4A3E] rounded hover:bg-[#2C4A3E]/10 transition-colors"
+              >
+                Ændr valg
+              </button>
+            </div>
+          ) : (
           <div
             className={`
               flex flex-col bg-white overflow-hidden
@@ -935,9 +969,20 @@ export default function AfgivBets({
             className="flex items-center justify-between px-3.5 py-3 border-b border-black/10 shrink-0 cursor-pointer md:cursor-default"
             onClick={() => window.innerWidth <= 700 && setDrawerOpen((o) => !o)}
           >
-            <span className="font-condensed text-sm font-bold text-[#1a3329] tracking-widest uppercase">
-              🎯 Dine valg
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-condensed text-sm font-bold text-[#1a3329] tracking-widest uppercase">
+                🎯 Dine valg
+              </span>
+              {!isReadOnly && existingBets.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowPanel(false)}
+                  className="text-[11px] font-semibold text-[#7a7060] hover:text-[#1a3329]"
+                >
+                  Luk
+                </button>
+              )}
+            </div>
             <span className="font-condensed text-[22px] font-extrabold text-[#B8963E] leading-none">
               {selections.length}
             </span>
@@ -1150,6 +1195,7 @@ export default function AfgivBets({
             )}
           </div>
         </div>
+          )}
         </div>
       </div>
 
