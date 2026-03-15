@@ -14,6 +14,8 @@ export default function OverblikTab() {
   const [pings, setPings] = useState<any[]>([])
   const [running, setRunning] = useState<string | null>(null)
   const [runResult, setRunResult] = useState<string | null>(null)
+  const [syncPhasesRunning, setSyncPhasesRunning] = useState(false)
+  const [syncPhasesResult, setSyncPhasesResult] = useState<{ checked: number; updated: number; results: { tournament: string; old_phase_id: number; new_phase_id: number | null; status: string }[] } | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/status').then(r => r.json()).then(setStatus)
@@ -35,6 +37,20 @@ export default function OverblikTab() {
       setRunResult('Fejl')
     }
     setRunning(null)
+  }
+
+  async function checkSeasonSync() {
+    setSyncPhasesRunning(true)
+    setSyncPhasesResult(null)
+    try {
+      const res = await fetch('/api/admin/leagues/sync-phases')
+      const d = await res.json()
+      if (res.ok) setSyncPhasesResult(d)
+      else setSyncPhasesResult({ checked: 0, updated: 0, results: [] })
+    } catch {
+      setSyncPhasesResult({ checked: 0, updated: 0, results: [] })
+    }
+    setSyncPhasesRunning(false)
   }
 
   const boldOk = (status?.boldApi?.errorCount ?? 1) === 0
@@ -91,6 +107,43 @@ export default function OverblikTab() {
           {runResult && (
             <div style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#2C7A50', padding: '8px 12px', background: 'rgba(44,122,80,0.06)', borderRadius: '3px' }}>
               ✓ {runResult}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', background: '#fff', border: '1px solid rgba(44,74,62,0.1)', borderRadius: '3px', marginTop: '8px' }}>
+            <div>
+              <div style={{ fontFamily: 'sans-serif', fontSize: '12px', fontWeight: 700, color: '#2C4A3E' }}>Tjek sæsonskifte</div>
+              <div style={{ fontFamily: 'sans-serif', fontSize: '10px', color: '#8C8C78', marginTop: '2px' }}>Opdater bold_phase_id ved sæsonskifte</div>
+            </div>
+            <button
+              onClick={checkSeasonSync}
+              disabled={syncPhasesRunning}
+              style={{
+                fontFamily: 'sans-serif',
+                fontSize: '9px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                background: 'transparent',
+                border: '1px solid rgba(44,74,62,0.2)',
+                color: '#2C4A3E',
+                padding: '3px 8px',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                flexShrink: 0,
+                opacity: syncPhasesRunning ? 0.5 : 1,
+              }}
+            >
+              {syncPhasesRunning ? '…' : 'Tjek'}
+            </button>
+          </div>
+          {syncPhasesResult && (
+            <div style={{ fontFamily: 'sans-serif', fontSize: '11px', color: '#2C4A3E', padding: '10px 12px', background: 'rgba(44,74,62,0.04)', borderRadius: '3px', marginTop: '6px' }}>
+              <div style={{ fontWeight: 700, marginBottom: '6px' }}>Tjekket: {syncPhasesResult.checked} · Opdateret: {syncPhasesResult.updated}</div>
+              {syncPhasesResult.results.map((r, i) => (
+                <div key={i} style={{ fontSize: '10px', color: '#8C8C78', marginTop: '4px' }}>
+                  {r.tournament}: phase {r.old_phase_id} → {r.new_phase_id ?? '—'} ({r.status})
+                </div>
+              ))}
             </div>
           )}
         </div>

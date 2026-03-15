@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Match, Bet } from '@/types'
 import { BET_TYPE_LABELS } from '@/lib/betTypes'
+import { scoresToPrediction } from '@/lib/betScores'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
 import GameTicker from '@/components/GameTicker'
@@ -165,9 +166,7 @@ function firstWord(s: string) {
 /** Compute the correct 1/X/2 result for a finished match */
 function getCorrectOutcome(match: Match): '1' | 'X' | '2' | null {
   if (match.status !== 'finished' || match.home_score == null || match.away_score == null) return null
-  if (match.home_score > match.away_score) return '1'
-  if (match.home_score < match.away_score) return '2'
-  return 'X'
+  return scoresToPrediction(match.home_score, match.away_score)
 }
 
 function ExtraBets({
@@ -257,7 +256,7 @@ function ExtraBets({
                       if (isUserCorrect) {
                         btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E] text-white'
                       } else if (isUserPick) {
-                        btnClass = 'bg-[#27ae60] border-[#27ae60] text-white'
+                        btnClass = 'bg-[#E8E0D4] border-[#c0392b]/40 border-[2px] text-[#7a7060]'
                       } else {
                         btnClass = 'bg-[#F2EDE4] border-[#B8963E] border-[2.5px] text-[#7a7060]'
                       }
@@ -401,7 +400,7 @@ function MatchCard({
               if (isUserCorrect) {
                 btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
               } else if (isUserPick) {
-                btnClass = 'bg-[#27ae60] border-[#27ae60]'
+                btnClass = 'bg-[#3d2e1f] border-[#c0392b]/50 border-[2px]'
               } else {
                 btnClass = 'bg-[#2C4A3E] border-[#B8963E] border-[2.5px]'
               }
@@ -492,15 +491,15 @@ function MatchCard({
           const isCorrect = isFinished && correctOutcome === o
           const isUserCorrect = isUserPick && isCorrect
 
-          // Finished match result styling
+          // Finished match result styling — grøn kun hvis valg er korrekt
           let btnClass: string
           if (isFinished && (isUserPick || isCorrect)) {
             if (isUserCorrect) {
               // User picked correctly: green bg + gold border
               btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
             } else if (isUserPick) {
-              // User picked wrong: green bg
-              btnClass = 'bg-[#27ae60] border-[#27ae60]'
+              // User picked wrong: neutral/red — IKKE grøn
+              btnClass = 'bg-[#E8E0D4] border-[#c0392b]/40 border-[2px]'
             } else {
               // Correct result user didn't pick: gold border on neutral bg
               btnClass = 'bg-[#F2EDE4] border-[#B8963E] border-[2.5px]'
