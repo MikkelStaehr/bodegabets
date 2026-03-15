@@ -318,6 +318,7 @@ function MatchCard({
   onExtraChange,
   fastPoints,
   userPrediction,
+  userStake,
   userExtraPicks,
   rivalry,
   userPoints,
@@ -334,6 +335,7 @@ function MatchCard({
   onExtraChange: (matchId: number, extras: ExtraBet[]) => void
   fastPoints: number
   userPrediction: '1' | 'X' | '2' | null
+  userStake: number | null
   userExtraPicks: Record<string, string>
   rivalry?: RivalryInfo
   userPoints: number
@@ -383,6 +385,9 @@ function MatchCard({
           </div>
           <span className="text-[10px] text-[#F2EDE4]/50 shrink-0 flex items-center gap-1">
             {isLocked && <span title="Låst – kickoff inden for 30 min">🔒</span>}
+            {userStake != null && (
+              <span className="font-condensed font-bold text-[#B8963E] text-[10px]">{userStake} pt</span>
+            )}
             {isFinished ? 'Færdig' : formatKickoff((match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff ?? '')}
           </span>
         </div>
@@ -479,6 +484,9 @@ function MatchCard({
         </div>
         <span className="text-[10px] text-[#7a7060] shrink-0 flex items-center gap-1">
           {isLocked && <span title="Låst – kickoff inden for 30 min">🔒</span>}
+          {userStake != null && (
+            <span className="font-condensed font-bold text-[#2C4A3E] text-[10px]">{userStake} pt</span>
+          )}
           {isFinished ? 'Færdig' : formatKickoff((match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff ?? '')}
         </span>
       </div>
@@ -774,16 +782,6 @@ export default function AfgivBets({
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
-      {/* Nav — fuld bredde */}
-      <nav className="bg-[#1a3329] h-[52px] flex items-center px-4 gap-3 sticky top-0 z-[100]">
-        <Link href={`/games/${gameId}`} className="text-[rgba(242,237,228,0.5)] text-xl">
-          ‹
-        </Link>
-        <span className="font-condensed text-lg font-bold text-[#F2EDE4] tracking-wide">
-          Bodega Bets
-        </span>
-      </nav>
-
       {/* Ticker — fuld bredde */}
       {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
 
@@ -798,6 +796,7 @@ export default function AfgivBets({
       <div className="w-full bg-white border-b border-black/10">
         <div className="max-w-[960px] mx-auto px-4 py-3 flex items-start justify-between gap-3">
           <div>
+            <Link href={`/games/${gameId}`} className="text-[13px] text-[#888] no-underline block mb-2">← Tilbage til spilrum</Link>
             <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase mb-1">
               {gameName} · {round.name}
             </p>
@@ -890,6 +889,7 @@ export default function AfgivBets({
                 onExtraChange={updateExtraBets}
                 fastPoints={effectiveFastPoints}
                 userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
+                userStake={matchBet?.stake ?? getSelection(match.id)?.points ?? null}
                 userExtraPicks={extraPicks}
                 rivalry={rivalryInfo[match.id]}
                 userPoints={bettingBalance}

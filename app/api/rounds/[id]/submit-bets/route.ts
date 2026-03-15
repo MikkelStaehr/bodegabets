@@ -127,9 +127,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     )
   }
 
-  // Indsæt nye bets: match_result bruger home_score/away_score (prediction er fjernet)
+  // Indsæt nye bets: match_result bruger home_score/away_score + stake
   const rows = matchResultBets.map((b) => {
     const { home_score, away_score } = predictionToScores(b.prediction as '1' | 'X' | '2')
+    const stake = Math.max(10, b.stake ?? 100)
     return {
       round_id: roundId,
       game_id: bodyGameId,
@@ -137,6 +138,7 @@ export async function POST(req: NextRequest, { params }: Props) {
       user_id: user.id,
       home_score,
       away_score,
+      stake,
     }
   })
 
