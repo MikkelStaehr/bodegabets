@@ -794,52 +794,24 @@ export default function AfgivBets({
 
       {/* Page header — fuld bredde, indhold centeret */}
       <div className="w-full bg-white border-b border-black/10">
-        <div className="max-w-[960px] mx-auto px-4 py-3 flex items-start justify-between gap-3">
-          <div>
-            <Link href={`/games/${gameId}`} className="text-[13px] text-[#888] no-underline block mb-2">← Tilbage til spilrum</Link>
-            <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase mb-1">
-              {gameName} · {round.name}
-            </p>
-            <h1 className="font-condensed text-[32px] font-extrabold text-[#1a3329] leading-none">
-              Afgiv dine valg
-            </h1>
-            <p className="text-[11px] text-[#7a7060] mt-1">
-              {totalMatches} kampe
-            </p>
-          </div>
-          <div className="flex gap-3 shrink-0">
-            <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right">
-              <div className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
-                Dine credits
-              </div>
-              <span
-                className={`font-condensed text-[20px] font-bold block leading-tight ${
-                  totalPoints > bettingBalance ? 'text-[#c0392b]' : 'text-[#1a3329]'
-                }`}
-              >
-                {bettingBalance - totalPoints} pt
-              </span>
-              {totalPoints > 0 && (
-                <div className="text-[10px] text-[#7a7060]">Valg: {totalPoints} pt</div>
-              )}
-            </div>
-            <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right">
-              <div className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
-                Deadline
-              </div>
-              <span className="font-condensed text-[20px] font-bold text-[#c0392b] block leading-tight">
-                {deadline.time}
-              </span>
-              <div className="text-[10px] text-[#7a7060]">{deadline.date}</div>
-            </div>
-          </div>
+        <div className="max-w-[960px] mx-auto px-4 py-3">
+          <Link href={`/games/${gameId}`} className="text-[13px] text-[#888] no-underline block mb-2">← Tilbage til spilrum</Link>
+          <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase mb-1">
+            {gameName} · {round.name}
+          </p>
+          <h1 className="font-condensed text-[32px] font-extrabold text-[#1a3329] leading-none">
+            Afgiv dine valg
+          </h1>
+          <p className="text-[11px] text-[#7a7060] mt-1">
+            {totalMatches} kampe
+          </p>
         </div>
       </div>
 
-      {/* Centeret split-layout */}
-      <div className="max-w-[960px] mx-auto grid grid-cols-1 md:grid-cols-[1fr_290px]">
-        {/* Venstre — kampe */}
-        <div className="py-3.5 px-5 pb-28 md:pb-24 border-r-0 md:border-r border-black/10">
+      {/* Centeret split-layout — flex så sticky virker */}
+      <div className="max-w-[960px] mx-auto flex flex-col md:flex-row gap-0" style={{ alignItems: 'flex-start' }}>
+        {/* Venstre — kampe (scroller normalt) */}
+        <div className="w-full md:flex-1 py-3.5 px-5 pb-28 md:pb-24 border-r-0 md:border-r border-black/10 min-w-0">
           <div className="mb-4">
             <LiveMatches
               roundId={roundId}
@@ -899,29 +871,66 @@ export default function AfgivBets({
           })}
         </div>
 
-        {/* Højre — Dine valg */}
+        {/* Højre — sticky panel (altid synligt) */}
         <div
-          className={`
-            md:sticky md:top-[52px] md:h-[calc(100vh-82px)] flex flex-col bg-white overflow-hidden
-            fixed bottom-0 left-0 right-0 z-90
-            max-h-[70vh] md:max-h-none
-            border-t-2 border-[#2C4A3E] md:border-t-0 md:border-l border-black/10
-            shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:shadow-none
-            rounded-t-[14px] md:rounded-none
-            transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
-            ${drawerOpen ? 'translate-y-0' : 'translate-y-[calc(100%-56px)] md:translate-y-0'}
-          `}
+          className="w-full md:w-[290px] shrink-0"
+          style={{ position: 'sticky', top: 16, alignSelf: 'flex-start' }}
         >
-          {/* Drawer-handle på mobil */}
-          <button
-            type="button"
-            onClick={() => setDrawerOpen((o) => !o)}
-            className="md:hidden w-full py-2 flex justify-center shrink-0"
-          >
-            <span className="w-8 h-0.5 bg-black/10 rounded block" />
-          </button>
+          {/* Credits boks øverst */}
+          {!isReadOnly && (
+            <div
+              className="bg-white border border-black/10 rounded-lg px-4 py-4 mb-3 flex justify-between gap-3"
+            >
+              <div>
+                <p className="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7a7060] mb-1">
+                  Dine credits
+                </p>
+                <p className="font-condensed text-[22px] font-bold text-[#1a3329] leading-tight">
+                  {Math.max(0, bettingBalance)} pt
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7a7060] mb-1">
+                  Deadline
+                </p>
+                <p
+                  className={`font-condensed text-[22px] font-bold leading-tight ${
+                    round.betting_closes_at && new Date(round.betting_closes_at) < new Date()
+                      ? 'text-[#c0392b]'
+                      : 'text-[#1a3329]'
+                  }`}
+                >
+                  {deadline.time}
+                </p>
+                <p className="text-[10px] text-[#7a7060] mt-0.5">{deadline.date}</p>
+              </div>
+            </div>
+          )}
 
-          {/* Header */}
+          {/* Dine valg panel */}
+          <div
+            className={`
+              flex flex-col bg-white overflow-hidden
+              md:max-h-[calc(100vh-120px)]
+              border-t-2 md:border-t border-[#2C4A3E] md:border border-black/10
+              fixed bottom-0 left-0 right-0 z-90 md:relative md:z-auto
+              max-h-[70vh] md:max-h-none
+              shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:shadow-none
+              rounded-t-[14px] md:rounded-lg
+              transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
+              ${drawerOpen ? 'translate-y-0' : 'translate-y-[calc(100%-56px)] md:translate-y-0'}
+            `}
+          >
+            {/* Drawer-handle på mobil */}
+            <button
+              type="button"
+              onClick={() => setDrawerOpen((o) => !o)}
+              className="md:hidden w-full py-2 flex justify-center shrink-0"
+            >
+              <span className="w-8 h-0.5 bg-black/10 rounded block" />
+            </button>
+
+            {/* Header */}
           <div
             className="flex items-center justify-between px-3.5 py-3 border-b border-black/10 shrink-0 cursor-pointer md:cursor-default"
             onClick={() => window.innerWidth <= 700 && setDrawerOpen((o) => !o)}
@@ -1140,6 +1149,7 @@ export default function AfgivBets({
               </div>
             )}
           </div>
+        </div>
         </div>
       </div>
 
