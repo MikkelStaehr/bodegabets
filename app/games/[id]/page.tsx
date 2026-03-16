@@ -85,7 +85,14 @@ export default async function GamePage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent league_id fra game_leagues junction
+  // Hent season_ids fra game_seasons junction
+  const { data: gameSeasons } = await supabase
+    .from('game_seasons')
+    .select('season_id')
+    .eq('game_id', gameId)
+  const seasonIds = (gameSeasons ?? []).map((gs) => gs.season_id as number)
+
+  // Hent league_id fra game_leagues (til liga-navn)
   const { data: gameLeagueRow } = await supabase
     .from('game_leagues')
     .select('league_id')
@@ -109,11 +116,11 @@ export default async function GamePage({ params }: Props) {
       .eq('game_id', gameId)
       .order('earnings', { ascending: false }),
 
-    gameLeagueId
+    seasonIds.length > 0
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at')
-          .eq('league_id', gameLeagueId)
+          .select('id, name, status, betting_closes_at, season_id')
+          .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
 
@@ -135,11 +142,11 @@ export default async function GamePage({ params }: Props) {
       .eq('id', user.id)
       .single(),
 
-    gameLeagueId
+    seasonIds.length > 0
       ? supabase
           .from('rounds')
           .select('id, name')
-          .eq('league_id', gameLeagueId)
+          .in('season_id', seasonIds)
           .eq('status', 'finished')
           .order('betting_closes_at', { ascending: false })
           .limit(1)
