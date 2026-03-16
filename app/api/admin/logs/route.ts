@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const VALID_TYPES = ['cron_sync', 'bold_api', 'point_calc', 'user_action']
+const VALID_TYPES = ['sync_scores', 'sync_fixtures', 'update_rounds', 'calculate_points', 'send_reminders', 'railway_ping', 'bold_api', 'point_calc', 'user_action']
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)

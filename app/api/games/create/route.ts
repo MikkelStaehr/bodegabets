@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { createGameLimiter } from '@/lib/rateLimit'
 
 export const maxDuration = 30
 
@@ -16,17 +17,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { name, league_id } = body as {
-    name: string
-    league_id: number
+  const limit = createGameLimiter(user.id)
+  if (!limit.ok) {
+    return NextResponse.json({ error: 'For mange forsøg — prøv igen om lidt' }, { status: 429 })
   }
+
+  const body = await req.json()
+  const { name, season_id } = body as {
+    name: string
+    season_id: number
+    league_id?: number
+  }
+  const sid = season_id ?? (body as { league_id?: number }).league_id
 
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Navn er påkrævet' }, { status: 400 })
   }
-  if (!league_id) {
-    return NextResponse.json({ error: 'Liga er påkrævet' }, { status: 400 })
+  if (name.trim().length > 50) {
+    return NextResponse.json({ error: 'Navn må max være 50 tegn' }, { status: 400 })
+  }
+  if (!sid) {
+    return NextResponse.json({ error: 'Sæson er påkrævet' }, { status: 400 })
   }
 
   // Sikr at brugerens profil eksisterer (FK games.host_id → profiles.id)
@@ -75,8 +86,8 @@ export async function POST(req: NextRequest) {
 
   // Link game to league via junction table
   const { error: linkError } = await supabaseAdmin
-    .from('game_leagues')
-    .insert({ game_id: game.id, league_id })
+    .from('game_seasons')
+    .insert({ game_id: game.id, season_id: sid })
 
   if (linkError) {
     return NextResponse.json({ error: linkError.message }, { status: 500 })
@@ -91,18 +102,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: memberError.message }, { status: 500 })
   }
 
-  // Tjek at der eksisterer runder for denne liga
+  // Tjek at der eksisterer runder for denne sæson
   const { count: roundCount } = await supabaseAdmin
     .from('rounds')
     .select('*', { count: 'exact', head: true })
-    .eq('league_id', league_id)
+    .eq('season_id', sid)
 
   return NextResponse.json({
     ok: true,
     game_id: game.id,
     invite_code: game.invite_code,
     warning: (roundCount ?? 0) === 0
-      ? 'Ingen runder fundet for denne liga. Synk liga via admin → Liga Hub først.'
+      ? 'Ingen runder fundet for denne sæson. Synk via admin → Liga Hub først.'
       : null,
   })
 }

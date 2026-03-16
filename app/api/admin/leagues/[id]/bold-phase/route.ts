@@ -13,10 +13,10 @@ export async function PATCH(
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { id: leagueIdParam } = await params
-  const leagueId = parseInt(leagueIdParam, 10)
-  if (isNaN(leagueId)) {
-    return NextResponse.json({ error: 'Ugyldig league id' }, { status: 400 })
+  const { id: idParam } = await params
+  const targetId = parseInt(idParam, 10)
+  if (isNaN(targetId)) {
+    return NextResponse.json({ error: 'Ugyldig id' }, { status: 400 })
   }
 
   let body: { bold_phase_id: number }
@@ -34,10 +34,26 @@ export async function PATCH(
     )
   }
 
+  // bold_phase_id er nu på seasons — opdater aktiv sæson for denne turnering
+  const { data: season } = await supabaseAdmin
+    .from('seasons')
+    .select('id')
+    .eq('tournament_id', targetId)
+    .eq('is_active', true)
+    .limit(1)
+    .single()
+
+  if (!season) {
+    return NextResponse.json(
+      { error: 'Ingen aktiv sæson fundet for turneringen' },
+      { status: 404 }
+    )
+  }
+
   const { error } = await supabaseAdmin
-    .from('leagues')
+    .from('seasons')
     .update({ bold_phase_id })
-    .eq('id', leagueId)
+    .eq('id', season.id)
 
   if (error) {
     console.error('[admin/leagues/bold-phase] PATCH', error)

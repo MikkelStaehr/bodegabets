@@ -10,14 +10,16 @@ export type LiveMatch = {
   away_score: number | null
   home_score_ht: number | null
   away_score_ht: number | null
-  status: 'live' | 'halftime' | 'finished'
+  status: 'live' | 'halftime' | 'finished' | 'scheduled'
   kickoff_at: string
+  bet?: { prediction: string; result: string | null } | null
 }
 
 export type LiveSummary = {
   live: number
   halftime: number
   finished: number
+  scheduled: number
   total: number
 }
 
@@ -26,7 +28,7 @@ export function useLiveMatches(
   enabled = true
 ) {
   const [matches, setMatches] = useState<LiveMatch[]>([])
-  const [summary, setSummary] = useState<LiveSummary>({ live: 0, halftime: 0, finished: 0, total: 0 })
+  const [summary, setSummary] = useState<LiveSummary>({ live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   const fetchLive = useCallback(async () => {
@@ -36,7 +38,7 @@ export function useLiveMatches(
       if (res.ok) {
         const json = await res.json()
         setMatches(json.matches ?? [])
-        setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, total: 0 })
+        setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
         setLastUpdate(new Date())
       }
     } catch {
@@ -56,13 +58,9 @@ export function useLiveMatches(
 // ─── Brugerens live kampe (alle aktive spil) ──────────────────────────────────
 
 export type LiveMatchesForUserItem = {
-  gameId: number
-  gameName: string
-  leagueName: string | null
-  roundId: number
-  roundName: string
+  leagueId: number
+  leagueName: string
   matches: LiveMatch[]
-  summary: LiveSummary
 }
 
 export function useLiveMatchesForUser(enabled = true) {
@@ -75,11 +73,12 @@ export function useLiveMatchesForUser(enabled = true) {
       const res = await fetch('/api/users/me/live-matches')
       if (res.ok) {
         const json = await res.json()
-        const raw = json.items ?? []
+        const raw = json.leagues ?? []
         setItems(
-          raw.map((item: { gameId: number; gameName: string; leagueName: string | null; roundId: number; roundName: string; matches: unknown[]; summary: LiveSummary }) => ({
-            ...item,
-            matches: (item.matches ?? []) as LiveMatch[],
+          raw.map((league: { league_id: number; league_name: string; matches: unknown[] }) => ({
+            leagueId: league.league_id,
+            leagueName: league.league_name,
+            matches: (league.matches ?? []) as LiveMatch[],
           }))
         )
         setLastUpdate(new Date())

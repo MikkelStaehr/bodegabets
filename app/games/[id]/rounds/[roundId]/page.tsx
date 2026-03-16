@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { scoresToPrediction } from '@/lib/betScores'
 import AfgivBets from '@/components/AfgivBets'
 import { syncMatchesForRound } from '@/lib/syncMatchesForRound'
 import type { Match, Bet, Round } from '@/types'
@@ -44,60 +45,86 @@ export default async function RoundPage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent league_id fra game_leagues junction
-  const { data: gameLeagueRow } = await supabase
-    .from('game_leagues')
-    .select('league_id')
+  // Hent season_id fra game_seasons junction
+  const { data: gameSeasonRow } = await supabase
+    .from('game_seasons')
+    .select('season_id')
     .eq('game_id', gameId)
     .limit(1)
     .maybeSingle()
-  const leagueId = gameLeagueRow?.league_id as number | undefined
+  const seasonId = gameSeasonRow?.season_id as number | undefined
 
   const [
     { data: round },
     { data: membership },
-    { data: rawMatches },
   ] = await Promise.all([
     supabase
       .from('rounds')
-      .select('id, name, status, betting_closes_at, league_id')
+      .select('id, name, status, betting_closes_at, season_id')
       .eq('id', roundIdNum)
-      .eq('league_id', leagueId!)
+      .eq('season_id', seasonId!)
       .single(),
 
     supabase
       .from('game_members')
-      .select('earnings')
+      .select('earnings, betting_balance')
       .eq('game_id', gameId)
       .eq('user_id', user.id)
       .maybeSingle(),
-
-    supabase
-      .from('matches')
-      .select(`
-        id, round_id, home_team, away_team, kickoff_at,
-        home_score, away_score, home_score_ht, away_score_ht, status
-      `)
-      .eq('round_id', roundIdNum)
-      .order('kickoff_at', { ascending: true }),
   ])
+
+  // Matches har round_name + season_id (ikke round_id). Join via round.
+  const { data: rawMatches } = round?.season_id != null && round?.name != null
+    ? await supabase
+        .from('matches')
+        .select(`
+          id, home_team_id, away_team_id, kickoff,
+          home_score, away_score, home_score_ht, away_score_ht, status,
+          home_team:teams!home_team_id(name),
+          away_team:teams!away_team_id(name)
+        `)
+        .eq('season_id', round.season_id)
+        .eq('round_name', round.name)
+        .order('kickoff', { ascending: true })
+    : { data: [] }
 
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
 
-  let matches = (rawMatches ?? []) as unknown as MatchRow[]
+  let matches = ((rawMatches ?? []) as Array<Record<string, unknown>>).map((m) => {
+    const ht = m.home_team as { name?: string } | { name?: string }[] | null
+    const at = m.away_team as { name?: string } | { name?: string }[] | null
+    return {
+      ...m,
+      home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
+      away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
+      kickoff_at: m.kickoff ?? m.kickoff_at,
+    } as unknown as MatchRow
+  })
 
-  if (matches.length === 0) {
-    await syncMatchesForRound(supabaseAdmin, gameId, roundIdNum)
+  if (matches.length === 0 && round) {
+    await syncMatchesForRound(gameId, roundIdNum)
     const { data: matchesRetry } = await supabase
       .from('matches')
       .select(`
-        id, round_id, home_team, away_team, kickoff_at,
-        home_score, away_score, home_score_ht, away_score_ht, status
+        id, kickoff,
+        home_score, away_score, home_score_ht, away_score_ht, status,
+        home_team:teams!home_team_id(name),
+        away_team:teams!away_team_id(name)
       `)
-      .eq('round_id', roundIdNum)
-      .order('kickoff_at', { ascending: true })
-    matches = (matchesRetry ?? []) as unknown as MatchRow[]
+      .eq('season_id', round.season_id)
+      .eq('round_name', round.name)
+      .order('kickoff', { ascending: true })
+    matches = ((matchesRetry ?? []) as Array<Record<string, unknown>>).map((m) => {
+      const ht = m.home_team as { name?: string } | { name?: string }[] | null
+      const at = m.away_team as { name?: string } | { name?: string }[] | null
+      return {
+        ...m,
+        home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
+        away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
+        kickoff_at: m.kickoff ?? m.kickoff_at,
+      } as unknown as MatchRow
+    })
   }
 
   const typedRound = round as unknown as Round
@@ -110,26 +137,42 @@ export default async function RoundPage({ params }: Props) {
     .eq('user_id', user.id)
     .in('match_id', matchIds.length > 0 ? matchIds : [0])
 
-  const typedBets = (betsData ?? []) as Bet[]
+  // Map home_score/away_score til prediction for Bet-format
+  const typedBets: Bet[] = (betsData ?? []).map((b) => {
+    const row = b as { home_score?: number; away_score?: number; prediction?: string; [k: string]: unknown }
+    const prediction =
+      row.home_score != null && row.away_score != null
+        ? scoresToPrediction(row.home_score, row.away_score)
+        : (row.prediction ?? 'X')
+    return { ...row, prediction, bet_type: 'match_result' as const } as Bet
+  })
 
-  // Hent rivalries for denne liga
+  // Hent rivalries for denne sæson (rivalries bruger tournament_id i nyt skema)
   const rivalryInfo: Record<number, { rivalry_name: string; multiplier: number }> = {}
-  if (leagueId) {
-    const { data: rivalries } = await supabase
-      .from('rivalries')
-      .select('home_team, away_team, rivalry_name, multiplier')
-      .eq('league_id', leagueId)
+  if (seasonId) {
+    const { data: seasonRow } = await supabase
+      .from('seasons')
+      .select('tournament_id')
+      .eq('id', seasonId)
+      .single()
+    const tournamentId = seasonRow?.tournament_id
+    if (tournamentId) {
+      const { data: rivalries } = await supabase
+        .from('rivalries')
+        .select('home_team, away_team, rivalry_name, multiplier')
+        .eq('tournament_id', tournamentId)
 
-    if (rivalries) {
-      const rivalryLookup = new Map<string, { rivalry_name: string; multiplier: number }>()
-      for (const r of rivalries) {
-        const info = { rivalry_name: r.rivalry_name, multiplier: Number(r.multiplier) }
-        rivalryLookup.set(`${r.home_team}|${r.away_team}`, info)
-        rivalryLookup.set(`${r.away_team}|${r.home_team}`, info)
-      }
-      for (const m of matches) {
-        const rivalry = rivalryLookup.get(`${m.home_team}|${m.away_team}`)
-        if (rivalry) rivalryInfo[m.id] = rivalry
+      if (rivalries) {
+        const rivalryLookup = new Map<string, { rivalry_name: string; multiplier: number }>()
+        for (const r of rivalries) {
+          const info = { rivalry_name: r.rivalry_name, multiplier: Number(r.multiplier) }
+          rivalryLookup.set(`${r.home_team}|${r.away_team}`, info)
+          rivalryLookup.set(`${r.away_team}|${r.home_team}`, info)
+        }
+        for (const m of matches) {
+          const rivalry = rivalryLookup.get(`${m.home_team}|${m.away_team}`)
+          if (rivalry) rivalryInfo[m.id] = rivalry
+        }
       }
     }
   }
@@ -159,6 +202,8 @@ export default async function RoundPage({ params }: Props) {
     )
   }
 
+  const bettingBalance = (membership as { betting_balance?: number })?.betting_balance ?? 1000
+
   return (
     <AfgivBets
       gameId={gameId}
@@ -171,7 +216,7 @@ export default async function RoundPage({ params }: Props) {
       }}
       matches={matches}
       existingBets={typedBets}
-      userPoints={1000}
+      bettingBalance={bettingBalance}
       tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}

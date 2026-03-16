@@ -1,9 +1,10 @@
 import { redirect, notFound } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
+import LeaveGameButton from '@/components/games/LeaveGameButton'
 import RoundSlider from '@/components/games/RoundSlider'
 import type { Game, Round, RoundScore } from '@/types'
 
@@ -45,10 +46,11 @@ function formatDate(iso: string) {
 // Beregn dynamisk rundestatus baseret på betting_closes_at og DB-status
 function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'active' | 'finished' {
   if (round.status === 'finished') return 'finished'
+  if (round.status === 'upcoming') return 'upcoming'
   if (!round.betting_closes_at) return 'upcoming'
   const closes = new Date(round.betting_closes_at)
-  if (closes > now) return 'open'     // bets accepteres stadig
-  return 'active'                      // kampe i gang, ikke alle færdige
+  if (closes > now) return 'open'
+  return 'active'
 }
 
 export default async function GamePage({ params }: Props) {
@@ -69,14 +71,14 @@ export default async function GamePage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent league_id fra game_leagues junction
-  const { data: gameLeagueRow } = await supabase
-    .from('game_leagues')
-    .select('league_id')
+  // Hent season_id fra game_seasons junction
+  const { data: gameSeasonRow } = await supabase
+    .from('game_seasons')
+    .select('season_id')
     .eq('game_id', gameId)
     .limit(1)
     .maybeSingle()
-  const gameLeagueId = gameLeagueRow?.league_id as number | null ?? null
+  const gameSeasonId = gameSeasonRow?.season_id as number | null ?? null
 
   const [
     { data: rawMembers },
@@ -92,11 +94,11 @@ export default async function GamePage({ params }: Props) {
       .eq('game_id', gameId)
       .order('earnings', { ascending: false }),
 
-    gameLeagueId
+    gameSeasonId
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at')
-          .eq('league_id', gameLeagueId)
+          .select('id, name, status, betting_closes_at, season_id')
+          .eq('season_id', gameSeasonId)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
 
@@ -118,11 +120,11 @@ export default async function GamePage({ params }: Props) {
       .eq('id', user.id)
       .single(),
 
-    gameLeagueId
+    gameSeasonId
       ? supabase
           .from('rounds')
-          .select('id, name')
-          .eq('league_id', gameLeagueId)
+          .select('id, name, season_id')
+          .eq('season_id', gameSeasonId)
           .eq('status', 'finished')
           .order('betting_closes_at', { ascending: false })
           .limit(1)
@@ -132,7 +134,7 @@ export default async function GamePage({ params }: Props) {
 
   if (!myMembership) redirect('/dashboard')
 
-  const leagueId = gameLeagueId
+  const leagueId = gameSeasonId
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
   const activeRoundEarly =
@@ -140,49 +142,63 @@ export default async function GamePage({ params }: Props) {
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'active') ??
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'upcoming') ??
     null
-  const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string } | null) ?? null
+  const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string; season_id?: number } | null) ?? null
 
-  const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
-    latestFinishedRound
-      ? supabase
-          .from('matches')
-          .select('home_team, away_team, home_score, away_score, kickoff_at')
-          .eq('round_id', latestFinishedRound.id)
-          .not('home_score', 'is', null)
-          .order('id', { ascending: true })
-          .limit(6)
-      : Promise.resolve({ data: [] }),
+  const latestRoundWithSeason =
+    latestFinishedRound?.season_id != null
+      ? latestFinishedRound
+      : latestFinishedRound && rounds
+        ? (rounds as { id: number; name: string; season_id?: number }[]).find((r) => r.id === latestFinishedRound.id)
+        : null
+  const { data: recentMatchesRaw } = latestRoundWithSeason?.season_id != null && latestRoundWithSeason?.name != null
+    ? await supabase
+        .from('matches')
+        .select('home_team_id, away_team_id, home_score, away_score, kickoff, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)')
+        .eq('season_id', latestRoundWithSeason.season_id)
+        .eq('round_name', latestRoundWithSeason.name)
+        .not('home_score', 'is', null)
+        .order('id', { ascending: true })
+        .limit(6)
+    : { data: [] }
 
-    activeRoundEarly
-      ? supabase
-          .from('matches')
-          .select('id')
-          .eq('round_id', activeRoundEarly.id)
-      : Promise.resolve({ data: [] }),
-  ])
+  const recentMatches = (recentMatchesRaw ?? []).map((m: Record<string, unknown>) => {
+    const ht = m.home_team as { name?: string } | { name?: string }[] | null
+    const at = m.away_team as { name?: string } | { name?: string }[] | null
+    return {
+      home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
+      away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
+      home_score: m.home_score,
+      away_score: m.away_score,
+      kickoff_at: m.kickoff ?? m.kickoff_at,
+    }
+  })
 
-  // Bets har ikke round_id — hent via match_ids
-  const activeMatchIds = (activeRoundMatches ?? []).map((m: { id: number }) => m.id)
   const { data: roundBets } =
-    activeMatchIds.length > 0
-      ? await supabase
+    activeRoundEarly
+      ? await supabaseAdmin
           .from('bets')
           .select('id, user_id')
           .eq('game_id', gameId)
-          .in('match_id', activeMatchIds)
+          .eq('round_id', activeRoundEarly.id)
       : { data: [] as { id: number; user_id: string }[] }
 
-  const typedRoundsForMatchCount = (rounds ?? []) as Round[]
-  const { data: matchCountRows } =
-    typedRoundsForMatchCount.length > 0
-      ? await supabase
-          .from('matches')
-          .select('round_id')
-          .in('round_id', typedRoundsForMatchCount.map((r) => r.id))
-      : { data: [] as { round_id: number }[] }
+  const typedRoundsForMatchCount = (rounds ?? []) as (Round & { season_id?: number })[]
   const matchCountByRound: Record<number, number> = {}
-  for (const row of matchCountRows ?? []) {
-    matchCountByRound[row.round_id] = (matchCountByRound[row.round_id] ?? 0) + 1
+  if (typedRoundsForMatchCount.length > 0 && gameSeasonId != null) {
+    const { data: matchCountRows } = await supabase
+      .from('matches')
+      .select('season_id, round_name')
+      .eq('season_id', gameSeasonId)
+    const countBySeasonRound = new Map<string, number>()
+    for (const row of matchCountRows ?? []) {
+      const key = `${row.season_id}|${row.round_name}`
+      countBySeasonRound.set(key, (countBySeasonRound.get(key) ?? 0) + 1)
+    }
+    for (const r of typedRoundsForMatchCount) {
+      if (r.season_id != null && r.name != null) {
+        matchCountByRound[r.id] = countBySeasonRound.get(`${r.season_id}|${r.name}`) ?? 0
+      }
+    }
   }
 
   const typedGame = game as Game
@@ -232,34 +248,40 @@ export default async function GamePage({ params }: Props) {
   const prevRound = activeRoundIndex > 0 ? sortedRounds[activeRoundIndex - 1] : null
   const nextRound = activeRoundIndex >= 0 && activeRoundIndex < sortedRounds.length - 1 ? sortedRounds[activeRoundIndex + 1] : null
 
+  const prevRoundWithSeason = prevRound && rounds
+    ? (rounds as { id: number; name: string; season_id?: number }[]).find((r) => r.id === prevRound.id)
+    : null
+  const nextRoundWithSeason = nextRound && rounds
+    ? (rounds as { id: number; name: string; season_id?: number }[]).find((r) => r.id === nextRound.id)
+    : null
   const [{ data: prevRoundKickoff }, { data: nextRoundKickoff }] =
     leagueId != null
       ? await Promise.all([
-          prevRound
+          prevRoundWithSeason?.season_id != null && prevRoundWithSeason?.name != null
             ? supabase
-                .from('league_matches')
-                .select('kickoff_at')
-                .eq('league_id', leagueId)
-                .eq('round_name', prevRound.name)
-                .order('kickoff_at', { ascending: false })
+                .from('matches')
+                .select('kickoff')
+                .eq('season_id', prevRoundWithSeason.season_id)
+                .eq('round_name', prevRoundWithSeason.name)
+                .order('kickoff', { ascending: false })
                 .limit(1)
                 .maybeSingle()
             : Promise.resolve({ data: null }),
-          nextRound
+          nextRoundWithSeason?.season_id != null && nextRoundWithSeason?.name != null
             ? supabase
-                .from('league_matches')
-                .select('kickoff_at')
-                .eq('league_id', leagueId)
-                .eq('round_name', nextRound.name)
-                .order('kickoff_at', { ascending: true })
+                .from('matches')
+                .select('kickoff')
+                .eq('season_id', nextRoundWithSeason.season_id)
+                .eq('round_name', nextRoundWithSeason.name)
+                .order('kickoff', { ascending: true })
                 .limit(1)
                 .maybeSingle()
             : Promise.resolve({ data: null }),
         ])
       : [{ data: null }, { data: null }]
 
-  const prevRoundDate = (prevRoundKickoff as { kickoff_at?: string } | null)?.kickoff_at ?? null
-  const nextRoundDate = (nextRoundKickoff as { kickoff_at?: string } | null)?.kickoff_at ?? null
+  const prevRoundDate = (prevRoundKickoff as { kickoff?: string } | null)?.kickoff ?? null
+  const nextRoundDate = (nextRoundKickoff as { kickoff?: string } | null)?.kickoff ?? null
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
 
@@ -382,6 +404,8 @@ export default async function GamePage({ params }: Props) {
               </div>
             ))}
           </div>
+
+          <LeaveGameButton gameId={gameId} isHost={typedGame.host_id === user.id} />
         </div>
       </div>
 

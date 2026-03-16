@@ -9,7 +9,10 @@ export type LeagueRow = {
   bold_slug: string | null
   fixturedownload_slug: string | null
   last_synced_at: string | null
+  bold_phase_id: number | null
   total_matches: number
+  /** season_id for sync (nyt skema) */
+  season_id?: number | null
   /** Client-side sync status tracking (not persisted in DB) */
   sync_status?: string | null
   sync_error?: string | null
@@ -129,6 +132,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
   const [rebuildResult, setRebuildResult] = useState<string | null>(null)
   const [addingWorldCup, setAddingWorldCup] = useState(false)
   const [addWorldCupError, setAddWorldCupError] = useState<string | null>(null)
+  const [phaseVerify, setPhaseVerify] = useState<Record<number, { input: string; result: any; loading: boolean }>>({})
 
   const hasWorldCup = leagueData.some(
     (l) => l.name?.toLowerCase().includes('world cup')
@@ -160,6 +164,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
           bold_slug: L.bold_slug,
           fixturedownload_slug: null,
           last_synced_at: null,
+          bold_phase_id: null,
           total_matches: 0,
         }])
         router.refresh()
@@ -188,7 +193,7 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
       } else {
         let msg = `${data.matches_created} kampe oprettet, ${data.matches_updated} opdateret`
         if (data.diagnostic) {
-          msg += ` · league_matches: ${data.diagnostic.league_matches_count}, runder: ${data.diagnostic.rounds_count}`
+          msg += ` · matches: ${data.diagnostic.matches_count}, runder: ${data.diagnostic.rounds_count}`
         }
         if (data.debug) {
           msg += ` · Debug: ${data.debug.rounds_matched} runder matchet, ${data.debug.rounds_skipped} sprunget over, to_insert=${data.debug.to_insert}`
@@ -221,19 +226,21 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
   }
 
   async function syncLeague(leagueId: number) {
+    const row = leagueData.find((l) => l.id === leagueId)
+    const seasonId = row?.season_id ?? leagueId
     setSyncing((s) => new Set(s).add(leagueId))
     setFeedback((f) => ({ ...f, [leagueId]: '' }))
 
     try {
-      const res = await fetch('/api/admin/sync-league-client', {
+      const res = await fetch('/api/admin/sync-league', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ league_id: leagueId, rebuild_rounds: true }),
+        body: JSON.stringify({ season_id: seasonId }),
       })
       const data = await res.json()
       const msg = data.errors?.length
         ? `Fejl: ${data.errors[0]}`
-        : `${data.synced} kampe synket, ${data.rounds_created} runder oprettet`
+        : `${data.synced} kampe synket, ${data.rounds_upserted ?? 0} runder`
       setFeedback((f) => ({ ...f, [leagueId]: msg }))
       updateRow(leagueId, {
         sync_status:    data.errors?.length ? 'error' : 'ok',
@@ -260,7 +267,34 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
   const logsForLeague = (leagueId: number) =>
     logs.filter((l) => l.league_id === leagueId).slice(0, 20)
 
-  const canAutoSync = (l: LeagueRow) => !!l.bold_slug
+  const canAutoSync = (l: LeagueRow) => !!(l.bold_phase_id ?? l.bold_slug)
+
+  function getVerify(id: number, defaultPhase: number | string | null) {
+    return phaseVerify[id] ?? { input: defaultPhase != null ? String(defaultPhase) : '', result: null, loading: false }
+  }
+
+  async function verifyPhase(leagueId: number, phaseId: string) {
+    setPhaseVerify((prev) => ({
+      ...prev,
+      [leagueId]: { ...getVerify(leagueId, phaseId), loading: true, result: null },
+    }))
+    const d = await fetch(
+      `/api/admin/leagues/verify-phase?phase_id=${encodeURIComponent(phaseId)}&tournament_id=${leagueId}`
+    ).then((r) => r.json())
+    setPhaseVerify((prev) => ({
+      ...prev,
+      [leagueId]: { input: phaseId, result: d, loading: false },
+    }))
+  }
+
+  function formatPhaseDateRange(min: string | null, max: string | null) {
+    if (!min || !max) return '—'
+    const fmt = (s: string) => {
+      const d = new Date(s)
+      return d.toLocaleDateString('da-DK', { month: 'short', year: 'numeric' })
+    }
+    return `${fmt(min)} – ${fmt(max)}`
+  }
 
   // ── Stats til header ────────────────────────────────────────────────────────
   const lastSyncedAll = leagueData
@@ -517,6 +551,52 @@ export default function LeagueHubClient({ leagues, logs }: Props) {
                             {feedback[league.id]}
                           </div>
                         )}
+                        <div className="mt-2 flex flex-col gap-1.5">
+                          <div className="flex gap-1.5 items-center flex-wrap">
+                            <input
+                              value={getVerify(league.id, league.bold_phase_id).input}
+                              onChange={(e) =>
+                                setPhaseVerify((prev) => ({
+                                  ...prev,
+                                  [league.id]: {
+                                    ...getVerify(league.id, league.bold_phase_id),
+                                    input: e.target.value,
+                                  },
+                                }))
+                              }
+                              placeholder="phase_id"
+                              className="font-mono text-xs px-2.5 py-1.5 border border-border rounded-sm w-28 bg-white text-primary focus:outline-none focus:ring-1 focus:ring-forest"
+                            />
+                            <button
+                              onClick={() => verifyPhase(league.id, getVerify(league.id, league.bold_phase_id).input)}
+                              disabled={getVerify(league.id, league.bold_phase_id).loading || !getVerify(league.id, league.bold_phase_id).input}
+                              className="font-condensed text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 border border-border rounded-sm bg-transparent text-forest hover:bg-forest/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {getVerify(league.id, league.bold_phase_id).loading ? '…' : 'Verificér'}
+                            </button>
+                            {(() => {
+                              const v = getVerify(league.id, league.bold_phase_id)
+                              if (!v.result) return null
+                              if (v.result.error) {
+                                return (
+                                  <span className="font-body text-xs text-vintage-red">✗ {v.result.error}</span>
+                                )
+                              }
+                              const warn = v.result.matches < 50
+                              return (
+                                <span
+                                  className={`font-body text-xs ${warn ? 'text-gold' : 'text-forest'}`}
+                                >
+                                  {warn ? '⚠' : '✓'} {v.result.matches} kampe ·{' '}
+                                  {formatPhaseDateRange(v.result.min_date, v.result.max_date)}
+                                  {v.result.is_current && (
+                                    <span className="ml-1.5 text-text-warm">(aktiv)</span>
+                                  )}
+                                </span>
+                              )
+                            })()}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <span className="font-condensed text-xs text-text-warm uppercase tracking-wide">{source}</span>

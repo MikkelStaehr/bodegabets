@@ -9,11 +9,22 @@ export default async function NewGamePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: leagues } = await supabase
-    .from('leagues')
-    .select('id, name, country, is_active, fixturedownload_slug, bold_slug')
+  const { data: seasons } = await supabase
+    .from('seasons')
+    .select('id, name, tournament_id, tournaments(name, country)')
     .eq('is_active', true)
+    .not('bold_phase_id', 'is', null)
     .order('name', { ascending: true })
+
+  const leagues = (seasons ?? []).map((s) => {
+    const t = (s as { tournaments?: { name?: string; country?: string } | { name?: string; country?: string }[] }).tournaments
+    const tn = Array.isArray(t) ? t[0] : t
+    return {
+      id: s.id,
+      name: (s as { name?: string }).name ?? tn?.name ?? 'Ukendt',
+      country: tn?.country ?? 'World',
+    }
+  })
 
   return (
     <div className="min-h-screen bg-cream">

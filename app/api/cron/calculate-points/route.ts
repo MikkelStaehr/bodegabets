@@ -1,12 +1,17 @@
+/**
+ * MANUEL FALLBACK — køres ikke automatisk.
+ * Points beregnes event-drevet fra syncMatchScores.ts når en kamp skifter til 'finished'.
+ * Kan trigges manuelt via POST /api/admin/run-cron { cron: 'calculate-points' }.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
+import { requireCronAuth } from '@/lib/cronAuth'
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const authError = requireCronAuth(req.headers.get('authorization'))
+  if (authError) return authError
 
   // Find aktive games
   const { data: activeGames } = await supabaseAdmin
@@ -28,11 +33,19 @@ export async function GET(req: NextRequest) {
     const roundIds = [...new Set((betRounds ?? []).map((b) => b.round_id as number))]
 
     for (const roundId of roundIds) {
-      // Tjek om alle kampe i runden er finished
+      const { data: round } = await supabaseAdmin
+        .from('rounds')
+        .select('season_id, name')
+        .eq('id', roundId)
+        .single()
+      if (!round?.season_id || !round?.name) continue
+
+      // Tjek om alle kampe i runden er finished (matches har season_id + round_name)
       const { data: matches } = await supabaseAdmin
         .from('matches')
         .select('id, status')
-        .eq('round_id', roundId)
+        .eq('season_id', round.season_id)
+        .eq('round_name', round.name)
 
       const allFinished = matches?.every((m) => m.status === 'finished')
       if (!allFinished) continue
@@ -48,7 +61,7 @@ export async function GET(req: NextRequest) {
   await supabaseAdmin
     .from('admin_logs')
     .insert({
-      type: 'cron_sync',
+      type: 'calculate_points',
       status: processed > 0 ? 'success' : 'info',
       message: `calculate-points: ${processed} rounds processed, ${updated} profiles updated`,
       metadata: {

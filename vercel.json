@@ -1,9 +1,1 @@
-{
-  "crons": [
-    { "path": "/api/cron/sync-fixtures", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/sync-scores",        "schedule": "0 3 * * *" },
-    { "path": "/api/cron/update-rounds",      "schedule": "0 8 * * *" },
-    { "path": "/api/cron/calculate-points",   "schedule": "0 9 * * *" },
-    { "path": "/api/cron/send-reminders",     "schedule": "0 10 * * *" }
-  ]
-}
+{}

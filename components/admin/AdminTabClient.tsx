@@ -131,6 +131,7 @@ export default function AdminTabClient({
             bold_slug: l.bold_slug,
             fixturedownload_slug: l.fixturedownload_slug ?? null,
             last_synced_at: l.last_synced_at ?? null,
+            bold_phase_id: (l as { bold_phase_id?: number | null }).bold_phase_id ?? null,
             total_matches: l.total_matches ?? 0,
           }))}
           logs={syncLogs}

@@ -1,19 +1,9 @@
 /**
  * Admin-auth for API route handlers.
- * Understøtter både session (cookies) og Bearer token (ADMIN_SECRET).
- * Session-baseret auth bruger getSession() som fungerer bedre i route handlers.
+ * Auth sker udelukkende via Supabase session (cookies).
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? '')
-  .split(',')
-  .map((e) => e.trim())
-  .filter(Boolean)
-
-function isBearerAuthorized(req: NextRequest): boolean {
-  return req.headers.get('authorization') === `Bearer ${process.env.ADMIN_SECRET}`
-}
 
 /**
  * Tjekker om request er fra admin.
@@ -22,16 +12,10 @@ function isBearerAuthorized(req: NextRequest): boolean {
 export async function requireAdmin(
   req: NextRequest
 ): Promise<{ ok: boolean; response: NextResponse<unknown> }> {
-  // 1. Bearer token (cron, scripts, backwards compat)
-  if (isBearerAuthorized(req)) {
-    return { ok: true, response: NextResponse.json({ ok: true }) }
-  }
-
-  // 2. Session fra cookies (browser, admin panel)
   const supabase = await createServerSupabaseClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user }, error } = await supabase.auth.getUser()
 
-  if (!session?.user) {
+  if (error || !user) {
     return {
       ok: false,
       response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
@@ -41,13 +25,10 @@ export async function requireAdmin(
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('is_admin')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .maybeSingle()
 
-  const isAdmin =
-    profile?.is_admin === true || ADMIN_EMAILS.includes(session.user.email ?? '')
-
-  if (!isAdmin) {
+  if (!profile?.is_admin) {
     return {
       ok: false,
       response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
