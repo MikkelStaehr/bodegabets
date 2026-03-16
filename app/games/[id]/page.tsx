@@ -111,7 +111,7 @@ export default async function GamePage({ params }: Props) {
     seasonIds.length > 0
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at, season_id, league_id')
+          .select('id, name, status, betting_closes_at, season_id')
           .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
           .then((res) => {
@@ -156,16 +156,21 @@ export default async function GamePage({ params }: Props) {
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
 
-  // Hent per-runde liga-info (round.league_id → league name → abbreviation)
-  const uniqueLeagueIds = [...new Set(typedRoundsEarly.map((r) => r.league_id).filter(Boolean))]
-  const { data: leagueRows } =
-    uniqueLeagueIds.length > 0
-      ? await supabase.from('leagues').select('id, name').in('id', uniqueLeagueIds)
-      : { data: [] as { id: number; name: string }[] }
-  const leagueMap = new Map<number, { abbr: string; type: 'league' | 'cup' }>()
-  for (const l of leagueRows ?? []) {
-    leagueMap.set(l.id, getLeagueAbbr(l.name))
+  // Hent liga-info via seasons → tournaments
+  const uniqueSeasonIds = [...new Set(typedRoundsEarly.map((r) => r.season_id).filter(Boolean))]
+  const { data: seasonTournaments } =
+    uniqueSeasonIds.length > 0
+      ? await supabase
+          .from('seasons')
+          .select('id, tournament_id, tournaments:tournament_id(id, name)')
+          .in('id', uniqueSeasonIds)
+      : { data: [] as { id: number; tournament_id: number; tournaments: { id: number; name: string } }[] }
+  const seasonLeagueMap = new Map<number, { abbr: string; type: 'league' | 'cup' }>()
+  for (const s of seasonTournaments ?? []) {
+    const t = s.tournaments as unknown as { id: number; name: string } | null
+    if (t) seasonLeagueMap.set(s.id, getLeagueAbbr(t.name))
   }
+  const defaultLeagueInfo = seasonLeagueMap.values().next().value ?? { abbr: '??', type: 'league' as const }
 
   const activeRoundEarly =
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'open') ??
@@ -267,7 +272,7 @@ export default async function GamePage({ params }: Props) {
       : { data: [] as CalendarMatch[] }
 
   const allMatches = (allMatchesRaw ?? []) as CalendarMatch[]
-  const leagueInfo = getLeagueAbbr((leagueRows as { id: number; name: string }[] | null)?.[0]?.name ?? 'League')
+  const leagueInfo = defaultLeagueInfo
 
   // Hent brugerens bets for alle runder (til ActiveRounds)
   const allMatchIds = allMatches.map((m) => m.id)
@@ -321,8 +326,8 @@ export default async function GamePage({ params }: Props) {
     betting_closes_at: r.betting_closes_at,
     totalMatches: matchCountByRound[r.id] ?? 0,
     userBets: userBetsByRound[r.id] ?? 0,
-    leagueAbbr: leagueMap.get(r.league_id)?.abbr ?? leagueInfo.abbr,
-    leagueType: leagueMap.get(r.league_id)?.type ?? leagueInfo.type,
+    leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
+    leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
   }))
 
   console.log('ACTIVE ROUNDS:', activeRoundRows)
@@ -463,8 +468,8 @@ export default async function GamePage({ params }: Props) {
               name: r.name,
               computedStatus: r.computedStatus,
               betting_closes_at: r.betting_closes_at,
-              leagueAbbr: leagueMap.get(r.league_id)?.abbr ?? leagueInfo.abbr,
-              leagueType: leagueMap.get(r.league_id)?.type ?? leagueInfo.type,
+              leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
+              leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
             })) as CalendarRound[]}
             gameId={gameId}
             betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
