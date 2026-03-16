@@ -103,9 +103,8 @@ export default function CalendarSlider({
       isToday: boolean
       hasLive: boolean
       hasMatches: boolean
-      tag: string | null
-      tagType: 'league' | 'cup' | null
-      tagLogoUrl: string | null
+      logoUrl: string | null
+      roundNum: string | null
     }> = []
 
     for (let i = 1; i <= count; i++) {
@@ -114,17 +113,15 @@ export default function CalendarSlider({
       const dayMatches = matchesByDate.get(key) ?? []
       const hasLive = dayMatches.some((m) => m.status === 'live' || m.status === 'halftime')
 
-      let tag: string | null = null
-      let tagType: 'league' | 'cup' | null = null
-      let tagLogoUrl: string | null = null
+      let logoUrl: string | null = null
+      let roundNum: string | null = null
       if (dayMatches.length > 0) {
         const match = dayMatches[0]
         const lookupKey = `${match.season_id}-${match.round_name}`
         const round = roundByName.get(lookupKey)
         if (round) {
-          tag = `${round.leagueAbbr} · ${getRoundNum(round.name)}`
-          tagType = round.leagueType
-          tagLogoUrl = round.logo_url ?? null
+          logoUrl = round.logo_url ?? null
+          roundNum = getRoundNum(round.name)
         }
       }
 
@@ -136,9 +133,8 @@ export default function CalendarSlider({
         isToday: key === todayKey,
         hasLive,
         hasMatches: dayMatches.length > 0,
-        tag,
-        tagType,
-        tagLogoUrl,
+        logoUrl,
+        roundNum,
       })
     }
     return days
@@ -168,10 +164,8 @@ export default function CalendarSlider({
     <div>
       <style>{`
         @media (min-width: 768px) {
-          .cal-day-btn { min-width: 56px !important; padding: 12px 8px 6px !important; }
+          .cal-day-btn { min-width: 56px !important; padding: 10px 8px 8px !important; }
           .cal-day-num { font-size: 18px !important; }
-          .cal-day-tag { font-size: 9px !important; padding: 2px 6px !important; }
-          .cal-day-tag-empty { height: 15px !important; }
         }
       `}</style>
       {/* Calendar container */}
@@ -253,8 +247,8 @@ export default function CalendarSlider({
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 2,
-                  padding: '6px 8px 4px',
+                  gap: 3,
+                  padding: '6px 8px 6px',
                   minWidth: 44,
                   borderRadius: 8,
                   border: 'none',
@@ -264,6 +258,7 @@ export default function CalendarSlider({
                   flexShrink: 0,
                 }}
               >
+                {/* Day name */}
                 <span
                   style={{
                     fontSize: 9,
@@ -275,6 +270,23 @@ export default function CalendarSlider({
                 >
                   {day.dayName}
                 </span>
+
+                {/* Tournament logo — only on match days */}
+                {day.hasMatches && day.logoUrl && (
+                  <img
+                    src={day.logoUrl}
+                    alt=""
+                    style={{
+                      width: 28,
+                      height: 28,
+                      objectFit: 'contain',
+                      opacity: day.isPast && !isSelected ? 0.35 : 1,
+                      filter: isSelected ? 'brightness(0) invert(1)' : 'none',
+                    }}
+                  />
+                )}
+
+                {/* Date number */}
                 <span
                   className="cal-day-num"
                   style={{
@@ -287,71 +299,28 @@ export default function CalendarSlider({
                 >
                   {day.dayNum}
                 </span>
-                {day.tag ? (
-                  day.tagLogoUrl ? (
-                    <img
-                      src={day.tagLogoUrl}
-                      alt={day.tag}
-                      className="cal-day-tag"
-                      style={{ width: 16, height: 16, objectFit: 'contain' }}
-                    />
-                  ) : (
-                    <span
-                      className="cal-day-tag"
-                      style={{
-                        fontSize: 7,
-                        fontWeight: 600,
-                        padding: '1px 4px',
-                        borderRadius: 3,
-                        background: isSelected
-                          ? 'rgba(255,255,255,0.2)'
-                          : day.tagType === 'cup'
-                            ? 'rgba(184,150,62,0.15)'
-                            : 'rgba(44,74,62,0.1)',
-                        color: isSelected
-                          ? '#fff'
-                          : day.tagType === 'cup'
-                            ? '#8B6914'
-                            : '#2C4A3E',
-                        fontFamily: "'Barlow Condensed', sans-serif",
-                        whiteSpace: 'nowrap',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      {day.tag}
-                    </span>
-                  )
-                ) : (
-                  <span className="cal-day-tag-empty" style={{ height: 12 }} />
+
+                {/* Round number badge — only on match days */}
+                {day.hasMatches && day.roundNum && (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      background: isSelected ? 'rgba(255,255,255,0.15)' : '#F2EDE4',
+                      color: isSelected ? 'rgba(255,255,255,0.8)' : '#9E9486',
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {day.roundNum}
+                  </span>
                 )}
               </button>
             )
           })}
         </div>
-      </div>
-
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 12, padding: '8px 16px', flexWrap: 'wrap' }}>
-        {[
-          { color: '#2C4A3E', label: 'Kommende' },
-          { color: '#C0B8B0', label: 'Tidligere' },
-          { color: '#e53935', label: 'Live' },
-        ].map(({ color, label }) => (
-          <div
-            key={label}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 10,
-              color: '#9E9486',
-              fontFamily: "'Barlow', sans-serif",
-            }}
-          >
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-            {label}
-          </div>
-        ))}
       </div>
 
       {/* Selected day content */}
