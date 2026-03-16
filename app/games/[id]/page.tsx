@@ -261,50 +261,67 @@ export default async function GamePage({ params }: Props) {
     .pop() ?? null
 
   // Hent alle kampe for kalender-slider
-  const allRoundIds = sortedRounds.map((r) => r.id)
-  type RawMatch = { id: number; round_id: number; home_team: string; away_team: string; home_score: number | null; away_score: number | null; kickoff_at: string; status: string }
+  type RawMatch = {
+    id: number
+    kickoff: string
+    status: string
+    result: string | null
+    round_name: string
+    season_id: number
+    home_score: number | null
+    away_score: number | null
+    home_team: { id: number; name: string }
+    away_team: { id: number; name: string }
+  }
   const { data: allMatchesRaw } =
-    allRoundIds.length > 0
+    seasonIds.length > 0
       ? await supabase
           .from('matches')
-          .select('id, round_id, home_team, away_team, home_score, away_score, kickoff_at, status')
-          .in('round_id', allRoundIds)
-          .order('kickoff_at', { ascending: true })
+          .select(`
+            id, kickoff, status, result,
+            round_name, season_id,
+            home_score, away_score,
+            home_team:teams!home_team_id(id, name),
+            away_team:teams!away_team_id(id, name)
+          `)
+          .in('season_id', seasonIds)
+          .order('kickoff', { ascending: true })
       : { data: [] as RawMatch[] }
-
-  // Build round_id → { name, season_id } lookup for mapping matches
-  const roundInfoById = new Map<number, { name: string; season_id: number }>()
-  for (const r of sortedRounds) {
-    if (r.season_id) roundInfoById.set(r.id, { name: r.name, season_id: r.season_id })
-  }
 
   const typedRawMatches = (allMatchesRaw ?? []) as RawMatch[]
 
+  // Build season_id+round_name → round.id lookup for bets/counts
+  const roundIdByKey = new Map<string, number>()
+  for (const r of sortedRounds) {
+    if (r.season_id) roundIdByKey.set(`${r.season_id}-${r.name}`, r.id)
+  }
+
   // Match → round_id lookup for bets
   const matchRoundMap = new Map<number, number>()
-  for (const m of typedRawMatches) matchRoundMap.set(m.id, m.round_id)
+  for (const m of typedRawMatches) {
+    const rid = roundIdByKey.get(`${m.season_id}-${m.round_name}`)
+    if (rid != null) matchRoundMap.set(m.id, rid)
+  }
 
   // Match count per round
   const matchCountByRound: Record<number, number> = {}
   for (const m of typedRawMatches) {
-    matchCountByRound[m.round_id] = (matchCountByRound[m.round_id] ?? 0) + 1
+    const rid = roundIdByKey.get(`${m.season_id}-${m.round_name}`)
+    if (rid != null) matchCountByRound[rid] = (matchCountByRound[rid] ?? 0) + 1
   }
 
-  // Map to CalendarMatch (with round_name + season_id instead of round_id)
-  const allMatches: CalendarMatch[] = typedRawMatches.map((m) => {
-    const ri = roundInfoById.get(m.round_id)
-    return {
-      id: m.id,
-      kickoff_at: m.kickoff_at,
-      status: m.status,
-      round_name: ri?.name ?? '',
-      season_id: ri?.season_id ?? 0,
-      home_team: m.home_team,
-      away_team: m.away_team,
-      home_score: m.home_score,
-      away_score: m.away_score,
-    }
-  })
+  // Map to CalendarMatch
+  const allMatches: CalendarMatch[] = typedRawMatches.map((m) => ({
+    id: m.id,
+    kickoff_at: m.kickoff,
+    status: m.status,
+    round_name: m.round_name,
+    season_id: m.season_id,
+    home_team: m.home_team?.name ?? '',
+    away_team: m.away_team?.name ?? '',
+    home_score: m.home_score,
+    away_score: m.away_score,
+  }))
 
   const leagueInfo = defaultLeagueInfo
 
