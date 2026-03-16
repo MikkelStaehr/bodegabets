@@ -111,7 +111,7 @@ export default async function GamePage({ params }: Props) {
     seasonIds.length > 0
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at, season_id')
+          .select('id, name, status, betting_closes_at, season_id, bet_open')
           .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
           .then((res) => {
@@ -290,20 +290,7 @@ export default async function GamePage({ params }: Props) {
   const matchRoundMap = new Map<number, number>()
   for (const m of allMatches) matchRoundMap.set(m.id, m.round_id)
 
-  // Byg Set af round_ids der har fremtidige eller igangværende kampe
-  const roundsWithFutureMatches = new Set(
-    allMatches
-      .filter((m) => new Date(m.kickoff_at) > now || m.status === 'live' || m.status === 'halftime')
-      .map((m) => m.round_id)
-  )
-  // En runde er aktiv hvis: ikke finished OG (betting åben ELLER har fremtidige kampe)
-  const openRounds = sortedRounds.filter((r) =>
-    r.computedStatus !== 'finished' &&
-    (
-      (r.betting_closes_at !== null && new Date(r.betting_closes_at) > now) ||
-      roundsWithFutureMatches.has(r.id)
-    )
-  )
+  const openRounds = sortedRounds.filter((r) => r.bet_open === true)
 
   // Debug: log hvilke runder der sendes til ActiveRounds
   console.log('[ActiveRounds] openRounds:', openRounds.map((r) => ({

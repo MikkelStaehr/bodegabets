@@ -48,6 +48,7 @@ export type Round = {
   name: string
   betting_closes_at: string | null
   status: 'upcoming' | 'open' | 'closed' | 'finished'
+  bet_open: boolean
   created_at: string
 }
 
