@@ -71,8 +71,6 @@ export default async function RoundPage({ params }: Props) {
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
 
-  console.log('ROUND:', round?.id, round?.name, round?.season_id)
-
   // Step 2: Hent matches via season_id + round_name med team joins
   const matchSelect = `
     id, kickoff, status, result,
@@ -113,9 +111,6 @@ export default async function RoundPage({ params }: Props) {
     .eq('season_id', round.season_id)
     .eq('round_name', round.name)
     .order('kickoff', { ascending: true })
-
-  console.log('MATCHES COUNT:', rawMatches?.length)
-  console.log('MATCHES ERROR:', matchesError)
 
   let matches = (rawMatches ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
 
