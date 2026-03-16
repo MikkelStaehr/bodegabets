@@ -14,21 +14,21 @@ export async function GET(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Ugyldigt round_id' }, { status: 400 })
   }
 
-  // Tjek at brugeren har adgang til runden (medlem af et spilrum i ligaen)
+  // Tjek at runden eksisterer
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('league_id')
+    .select('season_id')
     .eq('id', roundId)
     .single()
 
   if (!round) return NextResponse.json({ error: 'Runde ikke fundet' }, { status: 404 })
 
-  // Find games i denne liga via game_leagues og tjek om brugeren er medlem af mindst ét
-  const { data: gameLeagueRows } = await supabaseAdmin
-    .from('game_leagues')
+  // Tjek at brugeren er medlem af et spil med denne season
+  const { data: gameSeasonRows } = await supabaseAdmin
+    .from('game_seasons')
     .select('game_id')
-    .eq('league_id', round.league_id)
-  const gameIds = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
+    .eq('season_id', round.season_id)
+  const gameIds = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
 
   let membership = null
   if (gameIds.length > 0) {
