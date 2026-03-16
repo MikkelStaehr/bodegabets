@@ -87,19 +87,12 @@ export default async function GamePage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent league_id fra game_leagues
-  const { data: gameLeagueRow, error: gameLeagueError } = await supabase
-    .from('game_leagues')
-    .select('league_id')
+  // Hent season_ids fra game_seasons
+  const { data: gameSeasons } = await supabase
+    .from('game_seasons')
+    .select('season_id')
     .eq('game_id', gameId)
-    .limit(1)
-    .maybeSingle()
-  const gameLeagueId = gameLeagueRow?.league_id as number | null ?? null
-
-  console.log('GAME ID:', gameId)
-  console.log('GAME LEAGUE ROW:', gameLeagueRow)
-  console.log('GAME LEAGUE ERROR:', gameLeagueError)
-  console.log('GAME LEAGUE ID:', gameLeagueId)
+  const seasonIds = (gameSeasons ?? []).map(gs => gs.season_id as number)
 
   const [
     { data: rawMembers },
@@ -108,7 +101,6 @@ export default async function GamePage({ params }: Props) {
     { data: myMembership },
     { data: profile },
     { data: latestFinishedRoundByStatus },
-    { data: leagueRow },
   ] = await Promise.all([
     supabase
       .from('game_members')
@@ -116,14 +108,15 @@ export default async function GamePage({ params }: Props) {
       .eq('game_id', gameId)
       .order('earnings', { ascending: false }),
 
-    gameLeagueId
+    seasonIds.length > 0
       ? supabase
           .from('rounds')
           .select('id, name, status, betting_closes_at, season_id, league_id')
-          .eq('league_id', gameLeagueId)
+          .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
           .then((res) => {
-            console.log('ROUNDS DATA COUNT:', res.data?.length)
+            console.log('SEASON IDS:', seasonIds)
+            console.log('ROUNDS COUNT:', res.data?.length)
             console.log('ROUNDS ERROR:', res.error)
             return res
           })
@@ -147,23 +140,15 @@ export default async function GamePage({ params }: Props) {
       .eq('id', user.id)
       .single(),
 
-    gameLeagueId
+    seasonIds.length > 0
       ? supabase
           .from('rounds')
           .select('id, name')
-          .eq('league_id', gameLeagueId)
+          .in('season_id', seasonIds)
           .eq('status', 'finished')
           .order('betting_closes_at', { ascending: false })
           .limit(1)
           .maybeSingle()
-      : Promise.resolve({ data: null }),
-
-    gameLeagueId
-      ? supabase
-          .from('leagues')
-          .select('name')
-          .eq('id', gameLeagueId)
-          .single()
       : Promise.resolve({ data: null }),
   ])
 
@@ -282,7 +267,7 @@ export default async function GamePage({ params }: Props) {
       : { data: [] as CalendarMatch[] }
 
   const allMatches = (allMatchesRaw ?? []) as CalendarMatch[]
-  const leagueInfo = getLeagueAbbr((leagueRow as { name: string } | null)?.name ?? 'League')
+  const leagueInfo = getLeagueAbbr((leagueRows as { id: number; name: string }[] | null)?.[0]?.name ?? 'League')
 
   // Hent brugerens bets for alle runder (til ActiveRounds)
   const allMatchIds = allMatches.map((m) => m.id)
