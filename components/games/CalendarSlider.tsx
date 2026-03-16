@@ -172,6 +172,14 @@ export default function CalendarSlider({
 
   return (
     <div>
+      <style>{`
+        @media (min-width: 768px) {
+          .cal-day-btn { min-width: 56px !important; padding: 12px 8px 6px !important; }
+          .cal-day-num { font-size: 18px !important; }
+          .cal-day-tag { font-size: 9px !important; padding: 2px 6px !important; }
+          .cal-day-tag-empty { height: 15px !important; }
+        }
+      `}</style>
       {/* Calendar container */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EDE8E0', borderRadius: '2px 2px 0 0' }}>
         {/* Header */}
@@ -246,6 +254,7 @@ export default function CalendarSlider({
                 key={day.key}
                 ref={isSelected ? selectedDayRef : undefined}
                 onClick={() => setSelectedDate(day.key)}
+                className="cal-day-btn"
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -273,6 +282,7 @@ export default function CalendarSlider({
                   {day.dayName}
                 </span>
                 <span
+                  className="cal-day-num"
                   style={{
                     fontSize: 16,
                     fontWeight: 700,
@@ -285,6 +295,7 @@ export default function CalendarSlider({
                 </span>
                 {day.tag ? (
                   <span
+                    className="cal-day-tag"
                     style={{
                       fontSize: 7,
                       fontWeight: 600,
@@ -308,7 +319,7 @@ export default function CalendarSlider({
                     {day.tag}
                   </span>
                 ) : (
-                  <span style={{ height: 12 }} />
+                  <span className="cal-day-tag-empty" style={{ height: 12 }} />
                 )}
               </button>
             )
