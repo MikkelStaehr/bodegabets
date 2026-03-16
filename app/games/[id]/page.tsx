@@ -114,12 +114,6 @@ export default async function GamePage({ params }: Props) {
           .select('id, name, status, betting_closes_at, season_id, bet_open')
           .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
-          .then((res) => {
-            console.log('SEASON IDS:', seasonIds)
-            console.log('ROUNDS COUNT:', res.data?.length)
-            console.log('ROUNDS ERROR:', res.error)
-            return res
-          })
       : Promise.resolve({ data: [] }),
 
     supabase
@@ -239,14 +233,6 @@ export default async function GamePage({ params }: Props) {
     return numA - numB
   })
 
-  console.log('ALL ROUNDS:', sortedRounds.map(r => ({
-    id: r.id,
-    name: r.name,
-    dbStatus: r.status,
-    computedStatus: r.computedStatus,
-    betting_closes_at: r.betting_closes_at
-  })))
-
   const finishedRounds = sortedRounds.filter((r) => r.computedStatus === 'finished')
 
   const activeRound =
@@ -339,17 +325,6 @@ export default async function GamePage({ params }: Props) {
 
   const openRounds = sortedRounds.filter((r) => r.bet_open === true)
 
-  // Debug: log hvilke runder der sendes til ActiveRounds
-  console.log('[ActiveRounds] openRounds:', openRounds.map((r) => ({
-    id: r.id,
-    name: r.name,
-    status: r.status,
-    computedStatus: r.computedStatus,
-    betting_closes_at: r.betting_closes_at,
-    closes_in_hours: r.betting_closes_at
-      ? ((new Date(r.betting_closes_at).getTime() - now.getTime()) / (1000 * 60 * 60)).toFixed(1)
-      : null,
-  })))
   const userBetsByRound: Record<number, number> = {}
   for (const b of allUserBets ?? []) {
     const roundId = matchRoundMap.get(b.match_id)
@@ -366,8 +341,6 @@ export default async function GamePage({ params }: Props) {
     leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
     leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
   }))
-
-  console.log('ACTIVE ROUNDS:', activeRoundRows)
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
 
