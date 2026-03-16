@@ -31,6 +31,9 @@ function MatchRow({ match }: { match: LiveMatch }) {
       {/* Hold + score */}
       <div className="flex-1 flex items-center justify-between min-w-0">
         <div className="flex items-center gap-2 min-w-0">
+          {match.home_team_logo && (
+            <img src={match.home_team_logo} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} className="shrink-0" />
+          )}
           <span
             className={`text-[12px] truncate font-['Barlow_Condensed'] font-semibold
             ${isFinished ? 'text-[#7a7060]' : 'text-[#1a3329]'}`}
@@ -43,6 +46,9 @@ function MatchRow({ match }: { match: LiveMatch }) {
           >
             {match.home_score ?? 0}–{match.away_score ?? 0}
           </span>
+          {match.away_team_logo && (
+            <img src={match.away_team_logo} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} className="shrink-0" />
+          )}
           <span
             className={`text-[12px] truncate font-['Barlow_Condensed'] font-semibold
             ${isFinished ? 'text-[#7a7060]' : 'text-[#1a3329]'}`}

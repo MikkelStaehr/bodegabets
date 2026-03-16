@@ -49,7 +49,9 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at')
+    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at,
+      home_team_ref:teams!home_team_id(logo_url),
+      away_team_ref:teams!away_team_id(logo_url)`)
     .eq('round_id', roundId)
     .in('status', ['live', 'halftime', 'finished'])
     .gte('kickoff_at', since.toISOString())
@@ -58,7 +60,21 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   // Filtrér fremtidige kampe — status live/finished kræver kickoff i fortiden
   const nowIso = new Date().toISOString()
-  const matchList = (matches ?? []).filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
+  const matchList = (matches ?? [])
+    .filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
+    .map((m) => ({
+      id: m.id,
+      home_team: m.home_team,
+      away_team: m.away_team,
+      home_score: m.home_score,
+      away_score: m.away_score,
+      home_score_ht: m.home_score_ht,
+      away_score_ht: m.away_score_ht,
+      status: m.status,
+      kickoff_at: m.kickoff_at,
+      home_team_logo: (m.home_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
+      away_team_logo: (m.away_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
+    }))
 
   const live = matchList.filter((m) => m.status === 'live').length
   const halftime = matchList.filter((m) => m.status === 'halftime').length
