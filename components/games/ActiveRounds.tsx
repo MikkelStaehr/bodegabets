@@ -10,6 +10,7 @@ export type ActiveRoundRow = {
   userBets: number
   leagueAbbr: string
   leagueType: 'league' | 'cup'
+  logo_url?: string | null
 }
 
 interface ActiveRoundsProps {
@@ -103,23 +104,31 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
             }}
           >
             {/* Liga-tag */}
-            <span
-              style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontSize: 9,
-                fontWeight: 700,
-                padding: '2px 6px',
-                borderRadius: 4,
-                background: tagColors.bg,
-                color: tagColors.color,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-            >
-              {round.leagueAbbr}
-            </span>
+            {round.logo_url ? (
+              <img
+                src={round.logo_url}
+                alt={round.leagueAbbr}
+                style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
+              />
+            ) : (
+              <span
+                style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: tagColors.bg,
+                  color: tagColors.color,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                {round.leagueAbbr}
+              </span>
+            )}
 
             {/* Round name + subtitle */}
             <div style={{ flex: 1, minWidth: 0 }}>

@@ -23,6 +23,7 @@ export type CalendarRound = {
   betting_closes_at: string | null
   leagueAbbr: string
   leagueType: 'league' | 'cup'
+  logo_url?: string | null
 }
 
 interface CalendarSliderProps {
@@ -104,6 +105,7 @@ export default function CalendarSlider({
       hasMatches: boolean
       tag: string | null
       tagType: 'league' | 'cup' | null
+      tagLogoUrl: string | null
     }> = []
 
     for (let i = 1; i <= count; i++) {
@@ -114,6 +116,7 @@ export default function CalendarSlider({
 
       let tag: string | null = null
       let tagType: 'league' | 'cup' | null = null
+      let tagLogoUrl: string | null = null
       if (dayMatches.length > 0) {
         const match = dayMatches[0]
         const lookupKey = `${match.season_id}-${match.round_name}`
@@ -121,6 +124,7 @@ export default function CalendarSlider({
         if (round) {
           tag = `${round.leagueAbbr} · ${getRoundNum(round.name)}`
           tagType = round.leagueType
+          tagLogoUrl = round.logo_url ?? null
         }
       }
 
@@ -134,6 +138,7 @@ export default function CalendarSlider({
         hasMatches: dayMatches.length > 0,
         tag,
         tagType,
+        tagLogoUrl,
       })
     }
     return days
@@ -283,30 +288,39 @@ export default function CalendarSlider({
                   {day.dayNum}
                 </span>
                 {day.tag ? (
-                  <span
-                    className="cal-day-tag"
-                    style={{
-                      fontSize: 7,
-                      fontWeight: 600,
-                      padding: '1px 4px',
-                      borderRadius: 3,
-                      background: isSelected
-                        ? 'rgba(255,255,255,0.2)'
-                        : day.tagType === 'cup'
-                          ? 'rgba(184,150,62,0.15)'
-                          : 'rgba(44,74,62,0.1)',
-                      color: isSelected
-                        ? '#fff'
-                        : day.tagType === 'cup'
-                          ? '#8B6914'
-                          : '#2C4A3E',
-                      fontFamily: "'Barlow Condensed', sans-serif",
-                      whiteSpace: 'nowrap',
-                      letterSpacing: '0.02em',
-                    }}
-                  >
-                    {day.tag}
-                  </span>
+                  day.tagLogoUrl ? (
+                    <img
+                      src={day.tagLogoUrl}
+                      alt={day.tag}
+                      className="cal-day-tag"
+                      style={{ width: 16, height: 16, objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <span
+                      className="cal-day-tag"
+                      style={{
+                        fontSize: 7,
+                        fontWeight: 600,
+                        padding: '1px 4px',
+                        borderRadius: 3,
+                        background: isSelected
+                          ? 'rgba(255,255,255,0.2)'
+                          : day.tagType === 'cup'
+                            ? 'rgba(184,150,62,0.15)'
+                            : 'rgba(44,74,62,0.1)',
+                        color: isSelected
+                          ? '#fff'
+                          : day.tagType === 'cup'
+                            ? '#8B6914'
+                            : '#2C4A3E',
+                        fontFamily: "'Barlow Condensed', sans-serif",
+                        whiteSpace: 'nowrap',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      {day.tag}
+                    </span>
+                  )
                 ) : (
                   <span className="cal-day-tag-empty" style={{ height: 12 }} />
                 )}

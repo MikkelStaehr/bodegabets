@@ -156,13 +156,13 @@ export default async function GamePage({ params }: Props) {
     uniqueSeasonIds.length > 0
       ? await supabase
           .from('seasons')
-          .select('id, tournament_id, tournaments:tournament_id(id, name)')
+          .select('id, tournament_id, tournaments:tournament_id(id, name, logo_url)')
           .in('id', uniqueSeasonIds)
-      : { data: [] as { id: number; tournament_id: number; tournaments: { id: number; name: string } }[] }
-  const seasonLeagueMap = new Map<number, { abbr: string; type: 'league' | 'cup' }>()
+      : { data: [] as { id: number; tournament_id: number; tournaments: { id: number; name: string; logo_url: string | null } }[] }
+  const seasonLeagueMap = new Map<number, { abbr: string; type: 'league' | 'cup'; logo_url: string | null }>()
   for (const s of seasonTournaments ?? []) {
-    const t = s.tournaments as unknown as { id: number; name: string } | null
-    if (t) seasonLeagueMap.set(s.id, getLeagueAbbr(t.name))
+    const t = s.tournaments as unknown as { id: number; name: string; logo_url: string | null } | null
+    if (t) seasonLeagueMap.set(s.id, { ...getLeagueAbbr(t.name), logo_url: t.logo_url ?? null })
   }
   const defaultLeagueInfo = seasonLeagueMap.values().next().value ?? { abbr: '??', type: 'league' as const }
 
@@ -340,6 +340,7 @@ export default async function GamePage({ params }: Props) {
     userBets: userBetsByRound[r.id] ?? 0,
     leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
     leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
+    logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
   }))
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
@@ -481,6 +482,7 @@ export default async function GamePage({ params }: Props) {
               betting_closes_at: r.betting_closes_at,
               leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
               leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
+              logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
             })) as CalendarRound[]}
             gameId={gameId}
             betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
