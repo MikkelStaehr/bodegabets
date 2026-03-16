@@ -96,6 +96,8 @@ export default async function GamePage({ params }: Props) {
     .maybeSingle()
   const gameLeagueId = gameLeagueRow?.league_id as number | null ?? null
 
+  console.log('GAME LEAGUE ID:', gameLeagueId)
+
   const [
     { data: rawMembers },
     { data: rounds },
@@ -117,6 +119,11 @@ export default async function GamePage({ params }: Props) {
           .select('id, name, status, betting_closes_at, season_id, league_id')
           .eq('league_id', gameLeagueId)
           .order('created_at', { ascending: true })
+          .then((res) => {
+            console.log('ROUNDS DATA COUNT:', res.data?.length)
+            console.log('ROUNDS ERROR:', res.error)
+            return res
+          })
       : Promise.resolve({ data: [] }),
 
     supabase
