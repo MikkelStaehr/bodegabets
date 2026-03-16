@@ -319,7 +319,7 @@ app.get('/send-reminders', async (_req, res) => {
 
     const { data: rounds } = await supabaseAdmin
       .from('rounds')
-      .select('id, name, league_id, betting_closes_at')
+      .select('id, name, season_id, betting_closes_at')
       .neq('status', 'finished')
       .gt('betting_closes_at', now.toISOString())
       .lte('betting_closes_at', sixHoursLater.toISOString())
@@ -337,12 +337,12 @@ app.get('/send-reminders', async (_req, res) => {
         (new Date(round.betting_closes_at!).getTime() - now.getTime()) / (1000 * 60 * 60)
       )
 
-      const { data: gameLeagueRows } = await supabaseAdmin
-        .from('game_leagues')
+      const { data: gameSeasonRows } = await supabaseAdmin
+        .from('game_seasons')
         .select('game_id')
-        .eq('league_id', round.league_id)
+        .eq('season_id', round.season_id)
 
-      const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
+      const gameIdsForLeague = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
       const { data: games } = gameIdsForLeague.length
         ? await supabaseAdmin.from('games').select('id, name').in('id', gameIdsForLeague)
         : { data: [] as { id: number; name: string }[] }

@@ -26,32 +26,54 @@ export async function GET(req: NextRequest) {
 
   const leagueIds = leagues.map((l) => l.id as number)
 
-  // 1. All rounds, all active games via game_leagues — in parallel
+  // Find seasons for these leagues (tournaments)
+  const { data: seasonRows } = await supabaseAdmin
+    .from('seasons')
+    .select('id, tournament_id')
+    .in('tournament_id', leagueIds)
+
+  const seasonToLeague = new Map<number, number>()
+  const seasonIdsByLeague = new Map<number, number[]>()
+  for (const s of seasonRows ?? []) {
+    const tid = s.tournament_id as number
+    const sid = s.id as number
+    seasonToLeague.set(sid, tid)
+    if (!seasonIdsByLeague.has(tid)) seasonIdsByLeague.set(tid, [])
+    seasonIdsByLeague.get(tid)!.push(sid)
+  }
+  const allSeasonIds = (seasonRows ?? []).map((s) => s.id as number)
+
+  // 1. All rounds, all active games via game_seasons — in parallel
   const [
     { data: allRounds },
-    { data: gameLeagueRows },
+    { data: gameSeasonRows },
   ] = await Promise.all([
-    supabaseAdmin
-      .from('rounds')
-      .select('id, name, status, betting_closes_at, league_id')
-      .in('league_id', leagueIds)
-      .order('betting_closes_at', { ascending: true }),
-    supabaseAdmin
-      .from('game_leagues')
-      .select('game_id, league_id')
-      .in('league_id', leagueIds),
+    allSeasonIds.length
+      ? supabaseAdmin
+          .from('rounds')
+          .select('id, name, status, betting_closes_at, season_id')
+          .in('season_id', allSeasonIds)
+          .order('betting_closes_at', { ascending: true })
+      : Promise.resolve({ data: [] as { id: number; name: string; status: string; betting_closes_at: string | null; season_id: number }[] }),
+    allSeasonIds.length
+      ? supabaseAdmin
+          .from('game_seasons')
+          .select('game_id, season_id')
+          .in('season_id', allSeasonIds)
+      : Promise.resolve({ data: [] as { game_id: number; season_id: number }[] }),
   ])
 
-  // Count active games per league
+  // Count active games per league (via season → tournament mapping)
   const gameIdsByLeague = new Map<number, number[]>()
-  for (const gl of gameLeagueRows ?? []) {
-    const lid = gl.league_id as number
+  for (const gs of gameSeasonRows ?? []) {
+    const lid = seasonToLeague.get(gs.season_id as number)
+    if (lid == null) continue
     if (!gameIdsByLeague.has(lid)) gameIdsByLeague.set(lid, [])
-    gameIdsByLeague.get(lid)!.push(gl.game_id as number)
+    gameIdsByLeague.get(lid)!.push(gs.game_id as number)
   }
 
   // Check which games are active
-  const allGameIds = [...new Set((gameLeagueRows ?? []).map((gl) => gl.game_id as number))]
+  const allGameIds = [...new Set((gameSeasonRows ?? []).map((gs) => gs.game_id as number))]
   const { data: activeGameRows } = allGameIds.length
     ? await supabaseAdmin
         .from('games')
@@ -71,7 +93,8 @@ export async function GET(req: NextRequest) {
   // Determine "current round" per league: first open/upcoming round, or latest finished
   const roundsByLeague = new Map<number, typeof allRounds>()
   for (const r of allRounds ?? []) {
-    const lid = r.league_id as number
+    const lid = seasonToLeague.get(r.season_id as number)
+    if (lid == null) continue
     if (!roundsByLeague.has(lid)) roundsByLeague.set(lid, [])
     roundsByLeague.get(lid)!.push(r)
   }
@@ -145,7 +168,7 @@ export async function GET(req: NextRequest) {
         name: r.name as string,
         status: r.status as string,
         betting_closes_at: r.betting_closes_at as string | null,
-        league_id: r.league_id as number,
+        season_id: r.season_id as number,
         match_count: matchCountByRound.get(r.id as number) ?? 0,
       }))
 

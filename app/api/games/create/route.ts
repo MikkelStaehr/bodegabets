@@ -73,10 +73,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: gameError.message }, { status: 500 })
   }
 
-  // Link game to league via junction table
+  // Link game to season via junction table
   const { error: linkError } = await supabaseAdmin
-    .from('game_leagues')
-    .insert({ game_id: game.id, league_id })
+    .from('game_seasons')
+    .insert({ game_id: game.id, season_id: league_id })
 
   if (linkError) {
     return NextResponse.json({ error: linkError.message }, { status: 500 })

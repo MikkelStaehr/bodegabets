@@ -22,27 +22,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Spilrum ikke fundet' }, { status: 404 })
   }
 
-  // Hent league_id via game_leagues junction table
-  const { data: gameLeague } = await supabaseAdmin
-    .from('game_leagues')
-    .select('league_id')
+  // Hent season_id via game_seasons junction table
+  const { data: gameSeason } = await supabaseAdmin
+    .from('game_seasons')
+    .select('season_id')
     .eq('game_id', game_id)
     .limit(1)
     .single()
 
-  if (!gameLeague?.league_id) {
-    return NextResponse.json({ error: 'Liga ikke fundet for spilrum' }, { status: 404 })
+  if (!gameSeason?.season_id) {
+    return NextResponse.json({ error: 'Season ikke fundet for spilrum' }, { status: 404 })
   }
 
-  const leagueId = gameLeague.league_id
+  const leagueId = gameSeason.season_id
   const result = await buildLeagueRounds(leagueId)
 
   // Hvis ingen matches blev oprettet, hent diagnostic
   let diagnostic: { league_matches_count?: number; rounds_count?: number } | null = null
   if (result.matches_created === 0 && result.matches_updated === 0) {
     const [lmRes, rRes] = await Promise.all([
-      supabaseAdmin.from('league_matches').select('*', { count: 'exact', head: true }).eq('league_id', leagueId),
-      supabaseAdmin.from('rounds').select('*', { count: 'exact', head: true }).eq('league_id', leagueId),
+      supabaseAdmin.from('league_matches').select('*', { count: 'exact', head: true }).eq('season_id', leagueId),
+      supabaseAdmin.from('rounds').select('*', { count: 'exact', head: true }).eq('season_id', leagueId),
     ])
     diagnostic = {
       league_matches_count: lmRes.count ?? 0,

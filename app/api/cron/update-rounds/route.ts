@@ -17,14 +17,14 @@ export async function GET(req: NextRequest) {
   // Hent ALLE runder (inkl. finished) så vi kan bestemme rækkefølge per liga
   const { data: allRounds, error: roundsError } = await supabaseAdmin
     .from('rounds')
-    .select('id, name, status, betting_closes_at, league_id')
+    .select('id, name, status, betting_closes_at, season_id')
     .order('id', { ascending: true })
 
   if (roundsError) {
     return NextResponse.json({ error: roundsError.message }, { status: 500 })
   }
 
-  type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; league_id: number }
+  type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; season_id: number }
   const typedAllRounds = (allRounds ?? []) as RoundRow[]
 
   // Ikke-finished runder er dem vi skal arbejde med
@@ -79,8 +79,8 @@ export async function GET(req: NextRequest) {
   // Gruppér alle runder per liga i id-rækkefølge
   const roundsByLeague = new Map<number, RoundRow[]>()
   for (const r of typedAllRounds) {
-    if (!roundsByLeague.has(r.league_id)) roundsByLeague.set(r.league_id, [])
-    roundsByLeague.get(r.league_id)!.push(r)
+    if (!roundsByLeague.has(r.season_id)) roundsByLeague.set(r.season_id, [])
+    roundsByLeague.get(r.season_id)!.push(r)
   }
 
   // 2) Åbn næste upcoming runde per liga hvis:
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     if (r.status !== 'upcoming') return false
     if (finishedIds.includes(r.id)) return false
 
-    const leagueRounds = roundsByLeague.get(r.league_id) ?? []
+    const leagueRounds = roundsByLeague.get(r.season_id) ?? []
 
     // Tjek at ingen anden runde i ligaen er open/closed (med finished-korrektion)
     const effectiveStatus = (rd: RoundRow) => finishedIds.includes(rd.id) ? 'finished' : rd.status

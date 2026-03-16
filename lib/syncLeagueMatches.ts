@@ -580,7 +580,7 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
 // ─── 4. Kort-interval cron: kun Bold resultater (live/halftime/finished) ────────
 
 export async function runSyncResultsOnly(): Promise<SyncResult[]> {
-  // Hent league_ids fra aktive spilrum via game_leagues junction
+  // Hent league_ids fra aktive spilrum via game_seasons → seasons → tournaments
   const { data: activeGames } = await supabaseAdmin
     .from('games')
     .select('id')
@@ -589,14 +589,23 @@ export async function runSyncResultsOnly(): Promise<SyncResult[]> {
   if (!activeGames?.length) return []
 
   const gameIds = activeGames.map((g) => g.id)
-  const { data: gameLeagueRows } = await supabaseAdmin
-    .from('game_leagues')
-    .select('league_id')
+  const { data: gameSeasonRows } = await supabaseAdmin
+    .from('game_seasons')
+    .select('season_id')
     .in('game_id', gameIds)
 
-  if (!gameLeagueRows?.length) return []
+  if (!gameSeasonRows?.length) return []
 
-  const leagueIds = [...new Set(gameLeagueRows.map((gl) => gl.league_id as number))]
+  const seasonIds = [...new Set(gameSeasonRows.map((gs) => gs.season_id as number))]
+
+  const { data: seasonRows } = await supabaseAdmin
+    .from('seasons')
+    .select('tournament_id')
+    .in('id', seasonIds)
+
+  if (!seasonRows?.length) return []
+
+  const leagueIds = [...new Set(seasonRows.map((s) => s.tournament_id as number))]
 
   const { data: leagues } = await supabaseAdmin
     .from('leagues')

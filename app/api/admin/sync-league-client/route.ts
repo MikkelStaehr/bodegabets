@@ -34,12 +34,21 @@ export async function POST(req: NextRequest) {
   let rounds_created = 0, matches_created = 0, matches_updated = 0
 
   if (rebuild_rounds) {
-    const { data: gameLeagueRows } = await supabaseAdmin
-      .from('game_leagues')
-      .select('game_id')
-      .eq('league_id', league_id)
+    // Find seasons for this league, then find games via game_seasons
+    const { data: seasonRows } = await supabaseAdmin
+      .from('seasons')
+      .select('id')
+      .eq('tournament_id', league_id)
+    const seasonIds = (seasonRows ?? []).map((s: { id: number }) => s.id)
 
-    const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
+    const { data: gameSeasonRows } = seasonIds.length
+      ? await supabaseAdmin
+          .from('game_seasons')
+          .select('game_id')
+          .in('season_id', seasonIds)
+      : { data: [] as { game_id: number }[] }
+
+    const gameIdsForLeague = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
 
     const { data: games } = gameIdsForLeague.length
       ? await supabaseAdmin
