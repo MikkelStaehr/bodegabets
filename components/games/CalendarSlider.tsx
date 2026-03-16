@@ -92,10 +92,6 @@ export default function CalendarSlider({
   const selectedDayRef = useRef<HTMLButtonElement>(null)
 
   const daysInMonth = useMemo(() => {
-    console.log('ROUNDS TIL KALENDER:', rounds.slice(0, 3))
-    console.log('MATCHES TIL KALENDER:', matches.slice(0, 3))
-    console.log('ROUNDBYNAME KEYS:', [...roundByName.keys()].slice(0, 5))
-
     const { year, month } = viewMonth
     const count = new Date(year, month + 1, 0).getDate()
     const days: Array<{
@@ -121,13 +117,6 @@ export default function CalendarSlider({
       if (dayMatches.length > 0) {
         const match = dayMatches[0]
         const lookupKey = `${match.season_id}-${match.round_name}`
-        console.log('DAG MED KAMPE:', {
-          date: key,
-          matchCount: dayMatches.length,
-          firstMatch: dayMatches[0],
-          lookupKey,
-          roundLookup: roundByName.get(lookupKey),
-        })
         const round = roundByName.get(lookupKey)
         if (round) {
           tag = `${round.leagueAbbr} · ${getRoundNum(round.name)}`
