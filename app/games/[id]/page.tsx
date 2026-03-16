@@ -277,9 +277,13 @@ export default async function GamePage({ params }: Props) {
   const matchRoundMap = new Map<number, number>()
   for (const m of allMatches) matchRoundMap.set(m.id, m.round_id)
 
-  // Byg ActiveRoundRows: open/active runder med bet/match counts
+  // Byg ActiveRoundRows: kun runder hvor betting stadig er åben
+  const nowIso = now.toISOString()
   const openRounds = sortedRounds.filter(
-    (r) => r.computedStatus === 'open' || r.computedStatus === 'active'
+    (r) =>
+      r.betting_closes_at !== null &&
+      r.betting_closes_at > nowIso &&
+      (r.status === 'open' || r.status === 'active')
   )
   const matchCountByRound: Record<number, number> = {}
   for (const m of allMatches) {
