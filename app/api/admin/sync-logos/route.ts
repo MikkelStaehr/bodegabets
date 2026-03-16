@@ -24,26 +24,26 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  // Hent alle leagues med bold_slug
-  const { data: leagues, error: leaguesErr } = await supabaseAdmin
-    .from('leagues')
-    .select('id, name, bold_slug')
+  // Hent alle tournaments med bold_slug
+  const { data: tournaments, error: tournamentsErr } = await supabaseAdmin
+    .from('tournaments')
+    .select('id, bold_id, bold_slug, name')
     .not('bold_slug', 'is', null)
 
-  if (leaguesErr) {
-    return NextResponse.json({ error: leaguesErr.message }, { status: 500 })
+  if (tournamentsErr) {
+    return NextResponse.json({ error: tournamentsErr.message }, { status: 500 })
   }
 
-  if (!leagues || leagues.length === 0) {
-    return NextResponse.json({ error: 'Ingen leagues med bold_slug fundet' }, { status: 404 })
+  if (!tournaments || tournaments.length === 0) {
+    return NextResponse.json({ error: 'Ingen tournaments med bold_slug fundet' }, { status: 404 })
   }
 
   let tournamentsUpdated = 0
   let teamsUpdated = 0
   const results: Array<{ tournament: string; slug: string; teams_count: number; error?: string }> = []
 
-  for (const league of leagues) {
-    const slug = league.bold_slug as string
+  for (const tournament of tournaments) {
+    const slug = tournament.bold_slug as string
 
     try {
       const res = await fetch(`${BOLD_TOURNAMENT_API}?slug=${encodeURIComponent(slug)}`, {
@@ -55,19 +55,19 @@ export async function POST(req: NextRequest) {
       })
 
       if (!res.ok) {
-        results.push({ tournament: league.name, slug, teams_count: 0, error: `HTTP ${res.status}` })
+        results.push({ tournament: tournament.name, slug, teams_count: 0, error: `HTTP ${res.status}` })
         continue
       }
 
       const data: BoldTournamentResponse = await res.json()
 
-      // Opdater turnering/league logo
+      // Opdater turnering logo
       if (data.tournament?.image_name) {
         const logoUrl = `${BOLD_CDN}/${data.tournament.image_name}`
         const { error } = await supabaseAdmin
-          .from('leagues')
+          .from('tournaments')
           .update({ logo_url: logoUrl })
-          .eq('id', league.id)
+          .eq('id', tournament.id)
 
         if (!error) tournamentsUpdated++
       }
@@ -94,10 +94,10 @@ export async function POST(req: NextRequest) {
       }
 
       teamsUpdated += teamCount
-      results.push({ tournament: league.name, slug, teams_count: teamCount })
+      results.push({ tournament: tournament.name, slug, teams_count: teamCount })
     } catch (err) {
       results.push({
-        tournament: league.name,
+        tournament: tournament.name,
         slug,
         teams_count: 0,
         error: err instanceof Error ? err.message : 'Ukendt fejl',
