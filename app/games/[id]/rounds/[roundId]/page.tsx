@@ -51,14 +51,11 @@ export default async function RoundPage({ params }: Props) {
     .eq('game_id', gameId)
   const seasonIds = (gameSeasons ?? []).map(gs => gs.season_id as number)
 
-  const [
-    { data: round },
-    { data: membership },
-    { data: rawMatches },
-  ] = await Promise.all([
+  // Step 1: Hent round og membership parallelt
+  const [{ data: round }, { data: membership }] = await Promise.all([
     supabase
       .from('rounds')
-      .select('id, name, status, betting_closes_at, season_id')
+      .select('id, name, season_id, status, betting_closes_at, bet_open')
       .eq('id', roundIdNum)
       .in('season_id', seasonIds.length > 0 ? seasonIds : [0])
       .single(),
@@ -69,19 +66,21 @@ export default async function RoundPage({ params }: Props) {
       .eq('game_id', gameId)
       .eq('user_id', user.id)
       .maybeSingle(),
-
-    supabase
-      .from('matches')
-      .select(`
-        id, round_id, home_team, away_team, kickoff_at,
-        home_score, away_score, home_score_ht, away_score_ht, status
-      `)
-      .eq('round_id', roundIdNum)
-      .order('kickoff_at', { ascending: true }),
   ])
 
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
+
+  // Step 2: Hent matches med season_id + round_name (kræver round data)
+  const { data: rawMatches } = await supabase
+    .from('matches')
+    .select(`
+      id, home_team, away_team, kickoff_at,
+      home_score, away_score, home_score_ht, away_score_ht, status
+    `)
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
+    .order('kickoff_at', { ascending: true })
 
   let matches = (rawMatches ?? []) as unknown as MatchRow[]
 
@@ -90,10 +89,11 @@ export default async function RoundPage({ params }: Props) {
     const { data: matchesRetry } = await supabase
       .from('matches')
       .select(`
-        id, round_id, home_team, away_team, kickoff_at,
+        id, home_team, away_team, kickoff_at,
         home_score, away_score, home_score_ht, away_score_ht, status
       `)
-      .eq('round_id', roundIdNum)
+      .eq('season_id', round.season_id)
+      .eq('round_name', round.name)
       .order('kickoff_at', { ascending: true })
     matches = (matchesRetry ?? []) as unknown as MatchRow[]
   }
