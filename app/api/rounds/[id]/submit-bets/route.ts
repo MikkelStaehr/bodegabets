@@ -114,5 +114,15 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
+  // Opdater round_members.betting_balance = 1000 - total stake
+  // (bets er fuld erstatning, så vi regner fra max balance)
+  const totalStake = bets.reduce((sum, b) => sum + b.stake, 0)
+  await supabaseAdmin
+    .from('round_members')
+    .update({ betting_balance: 1000 - totalStake })
+    .eq('user_id', user.id)
+    .eq('round_id', roundId)
+    .eq('game_id', bodyGameId)
+
   return NextResponse.json({ ok: true, bets_submitted: rows.length })
 }

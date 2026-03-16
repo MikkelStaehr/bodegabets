@@ -100,6 +100,17 @@ export default async function RoundPage({ params }: Props) {
     matches = (matchesRetry ?? []) as unknown as MatchRow[]
   }
 
+  // Hent betting_balance fra round_members
+  const { data: roundMember } = await supabase
+    .from('round_members')
+    .select('betting_balance')
+    .eq('user_id', user.id)
+    .eq('round_id', roundIdNum)
+    .eq('game_id', gameId)
+    .single()
+
+  const bettingBalance = roundMember?.betting_balance ?? 0
+
   const typedRound = round as unknown as Round
   const matchIds = matches.map((m) => m.id)
 
@@ -171,7 +182,7 @@ export default async function RoundPage({ params }: Props) {
       }}
       matches={matches}
       existingBets={typedBets}
-      userPoints={1000}
+      userPoints={bettingBalance}
       tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}

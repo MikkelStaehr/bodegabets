@@ -77,14 +77,51 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  console.log(`[cron/update-bet-open] ${nowIso} — bet_open=true for ${idsToOpen.length} runder: [${idsToOpen.join(', ')}]`)
+  // 5) Opret round_members med 1000 pt for alle spillere i relevante spilrum
+  let roundMembersCreated = 0
+  const roundsToProvision = rounds.filter((r) => idsToOpen.includes(r.id))
+
+  for (const round of roundsToProvision) {
+    // Find alle game_ids der har denne season
+    const { data: gameSeasonRows } = await supabaseAdmin
+      .from('game_seasons')
+      .select('game_id')
+      .eq('season_id', round.season_id)
+
+    const gameIds = (gameSeasonRows ?? []).map((gs: { game_id: number }) => gs.game_id)
+    if (gameIds.length === 0) continue
+
+    // Find alle game_members i disse spilrum
+    const { data: members } = await supabaseAdmin
+      .from('game_members')
+      .select('user_id, game_id')
+      .in('game_id', gameIds)
+
+    // Upsert round_members for hver spiller
+    for (const member of members ?? []) {
+      await supabaseAdmin
+        .from('round_members')
+        .upsert(
+          {
+            user_id: member.user_id,
+            round_id: round.id,
+            game_id: member.game_id,
+            betting_balance: 1000,
+          },
+          { onConflict: 'user_id,round_id,game_id' }
+        )
+      roundMembersCreated++
+    }
+  }
+
+  console.log(`[cron/update-bet-open] ${nowIso} — bet_open=true for ${idsToOpen.length} runder: [${idsToOpen.join(', ')}], round_members created: ${roundMembersCreated}`)
 
   await supabaseAdmin.from('admin_logs').insert({
     type: 'update_bet_open',
     status: 'success',
-    message: `bet_open opdateret: ${idsToOpen.length} runder åbnet`,
-    metadata: { round_ids: idsToOpen, timestamp: nowIso },
+    message: `bet_open opdateret: ${idsToOpen.length} runder åbnet, ${roundMembersCreated} round_members oprettet`,
+    metadata: { round_ids: idsToOpen, round_members_created: roundMembersCreated, timestamp: nowIso },
   })
 
-  return NextResponse.json({ updated: true, timestamp: nowIso, rounds_opened: idsToOpen })
+  return NextResponse.json({ updated: true, timestamp: nowIso, rounds_opened: idsToOpen, round_members_created: roundMembersCreated })
 }
