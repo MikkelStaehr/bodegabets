@@ -5,18 +5,20 @@ import Link from 'next/link'
 
 export type CalendarMatch = {
   id: number
-  round_id: number
+  kickoff_at: string
+  status: string
+  round_name: string
+  season_id: number
   home_team: string
   away_team: string
   home_score: number | null
   away_score: number | null
-  kickoff_at: string
-  status: string
 }
 
 export type CalendarRound = {
   id: number
   name: string
+  season_id: number
   computedStatus: 'upcoming' | 'open' | 'active' | 'finished'
   betting_closes_at: string | null
   leagueAbbr: string
@@ -64,9 +66,9 @@ export default function CalendarSlider({
     return map
   }, [matches])
 
-  const roundById = useMemo(() => {
-    const map = new Map<number, CalendarRound>()
-    for (const r of rounds) map.set(r.id, r)
+  const roundByName = useMemo(() => {
+    const map = new Map<string, CalendarRound>()
+    for (const r of rounds) map.set(`${r.season_id}-${r.name}`, r)
     return map
   }, [rounds])
 
@@ -113,7 +115,8 @@ export default function CalendarSlider({
       let tag: string | null = null
       let tagType: 'league' | 'cup' | null = null
       if (dayMatches.length > 0) {
-        const round = roundById.get(dayMatches[0].round_id)
+        const match = dayMatches[0]
+        const round = roundByName.get(`${match.season_id}-${match.round_name}`)
         if (round) {
           tag = `${round.leagueAbbr} · ${getRoundNum(round.name)}`
           tagType = round.leagueType
@@ -133,16 +136,18 @@ export default function CalendarSlider({
       })
     }
     return days
-  }, [viewMonth, matchesByDate, roundById, todayKey])
+  }, [viewMonth, matchesByDate, roundByName, todayKey])
 
   useEffect(() => {
     selectedDayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [selectedDate, viewMonth])
 
   const selectedMatches = matchesByDate.get(selectedDate) ?? []
-  const selectedRoundId = selectedMatches[0]?.round_id ?? null
-  const selectedRound = selectedRoundId ? roundById.get(selectedRoundId) ?? null : null
-  const isActiveRoundSelected = selectedRoundId === activeRoundId
+  const selectedFirstMatch = selectedMatches[0] ?? null
+  const selectedRound = selectedFirstMatch
+    ? roundByName.get(`${selectedFirstMatch.season_id}-${selectedFirstMatch.round_name}`) ?? null
+    : null
+  const isActiveRoundSelected = selectedRound?.id === activeRoundId
 
   const prevMonth = () =>
     setViewMonth((prev) =>
