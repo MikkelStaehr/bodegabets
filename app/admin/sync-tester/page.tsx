@@ -15,18 +15,11 @@ export default async function SyncTesterPage() {
 
   if (!profile?.is_admin) redirect('/dashboard')
 
-  const { data: seasons } = await supabaseAdmin
-    .from('seasons')
-    .select('id, name, bold_phase_id, tournament_id, tournaments(name)')
-    .eq('is_active', true)
+  const { data: leagues } = await supabaseAdmin
+    .from('leagues')
+    .select('id, name, bold_phase_id')
     .not('bold_phase_id', 'is', null)
     .order('name')
-
-  const leagues = (seasons ?? []).map((s) => {
-    const t = (s as { tournaments?: { name?: string } | { name?: string }[] }).tournaments
-    const name = (Array.isArray(t) ? t[0] : t)?.name ?? (s as { name?: string }).name ?? 'Ukendt'
-    return { id: s.id, name, bold_phase_id: (s as { bold_phase_id?: number }).bold_phase_id }
-  })
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">

@@ -1,11 +1,11 @@
 import { redirect, notFound } from 'next/navigation'
-import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
-import LeaveGameButton from '@/components/games/LeaveGameButton'
-import RoundSlider from '@/components/games/RoundSlider'
+import CalendarSlider from '@/components/games/CalendarSlider'
+import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
 import type { Game, Round, RoundScore } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -46,11 +46,25 @@ function formatDate(iso: string) {
 // Beregn dynamisk rundestatus baseret på betting_closes_at og DB-status
 function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'active' | 'finished' {
   if (round.status === 'finished') return 'finished'
-  if (round.status === 'upcoming') return 'upcoming'
   if (!round.betting_closes_at) return 'upcoming'
   const closes = new Date(round.betting_closes_at)
-  if (closes > now) return 'open'
-  return 'active'
+  if (closes > now) return 'open'     // bets accepteres stadig
+  return 'active'                      // kampe i gang, ikke alle færdige
+}
+
+function getLeagueAbbr(name: string): { abbr: string; type: 'league' | 'cup' } {
+  const lower = name.toLowerCase()
+  if (lower.includes('premier league')) return { abbr: 'PL', type: 'league' }
+  if (lower.includes('champions league')) return { abbr: 'UCL', type: 'cup' }
+  if (lower.includes('europa league')) return { abbr: 'UEL', type: 'cup' }
+  if (lower.includes('conference league')) return { abbr: 'UECL', type: 'cup' }
+  if (lower.includes('superliga')) return { abbr: 'SL', type: 'league' }
+  if (lower.includes('la liga') || lower.includes('laliga')) return { abbr: 'LL', type: 'league' }
+  if (lower.includes('bundesliga')) return { abbr: 'BL', type: 'league' }
+  if (lower.includes('serie a')) return { abbr: 'SA', type: 'league' }
+  if (lower.includes('ligue 1')) return { abbr: 'L1', type: 'league' }
+  const words = name.split(/\s+/)
+  return { abbr: words.map((w) => w[0]).join('').toUpperCase().slice(0, 3), type: 'league' }
 }
 
 export default async function GamePage({ params }: Props) {
@@ -71,14 +85,14 @@ export default async function GamePage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent season_id fra game_seasons junction
-  const { data: gameSeasonRow } = await supabase
-    .from('game_seasons')
-    .select('season_id')
+  // Hent league_id fra game_leagues junction
+  const { data: gameLeagueRow } = await supabase
+    .from('game_leagues')
+    .select('league_id')
     .eq('game_id', gameId)
     .limit(1)
     .maybeSingle()
-  const gameSeasonId = gameSeasonRow?.season_id as number | null ?? null
+  const gameLeagueId = gameLeagueRow?.league_id as number | null ?? null
 
   const [
     { data: rawMembers },
@@ -87,6 +101,7 @@ export default async function GamePage({ params }: Props) {
     { data: myMembership },
     { data: profile },
     { data: latestFinishedRoundByStatus },
+    { data: leagueRow },
   ] = await Promise.all([
     supabase
       .from('game_members')
@@ -94,11 +109,11 @@ export default async function GamePage({ params }: Props) {
       .eq('game_id', gameId)
       .order('earnings', { ascending: false }),
 
-    gameSeasonId
+    gameLeagueId
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at, season_id')
-          .eq('season_id', gameSeasonId)
+          .select('id, name, status, betting_closes_at')
+          .eq('league_id', gameLeagueId)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
 
@@ -120,21 +135,27 @@ export default async function GamePage({ params }: Props) {
       .eq('id', user.id)
       .single(),
 
-    gameSeasonId
+    gameLeagueId
       ? supabase
           .from('rounds')
-          .select('id, name, season_id')
-          .eq('season_id', gameSeasonId)
+          .select('id, name')
+          .eq('league_id', gameLeagueId)
           .eq('status', 'finished')
           .order('betting_closes_at', { ascending: false })
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+
+    gameLeagueId
+      ? supabase
+          .from('leagues')
+          .select('name')
+          .eq('id', gameLeagueId)
+          .single()
+      : Promise.resolve({ data: null }),
   ])
 
   if (!myMembership) redirect('/dashboard')
-
-  const leagueId = gameSeasonId
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
   const activeRoundEarly =
@@ -142,64 +163,37 @@ export default async function GamePage({ params }: Props) {
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'active') ??
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'upcoming') ??
     null
-  const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string; season_id?: number } | null) ?? null
+  const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string } | null) ?? null
 
-  const latestRoundWithSeason =
-    latestFinishedRound?.season_id != null
-      ? latestFinishedRound
-      : latestFinishedRound && rounds
-        ? (rounds as { id: number; name: string; season_id?: number }[]).find((r) => r.id === latestFinishedRound.id)
-        : null
-  const { data: recentMatchesRaw } = latestRoundWithSeason?.season_id != null && latestRoundWithSeason?.name != null
-    ? await supabase
-        .from('matches')
-        .select('home_team_id, away_team_id, home_score, away_score, kickoff, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)')
-        .eq('season_id', latestRoundWithSeason.season_id)
-        .eq('round_name', latestRoundWithSeason.name)
-        .not('home_score', 'is', null)
-        .order('id', { ascending: true })
-        .limit(6)
-    : { data: [] }
+  const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
+    latestFinishedRound
+      ? supabase
+          .from('matches')
+          .select('home_team, away_team, home_score, away_score, kickoff_at')
+          .eq('round_id', latestFinishedRound.id)
+          .not('home_score', 'is', null)
+          .order('id', { ascending: true })
+          .limit(6)
+      : Promise.resolve({ data: [] }),
 
-  const recentMatches = (recentMatchesRaw ?? []).map((m: Record<string, unknown>) => {
-    const ht = m.home_team as { name?: string } | { name?: string }[] | null
-    const at = m.away_team as { name?: string } | { name?: string }[] | null
-    return {
-      home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
-      away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
-      home_score: m.home_score,
-      away_score: m.away_score,
-      kickoff_at: m.kickoff ?? m.kickoff_at,
-    }
-  })
-
-  const { data: roundBets } =
     activeRoundEarly
-      ? await supabaseAdmin
+      ? supabase
+          .from('matches')
+          .select('id')
+          .eq('round_id', activeRoundEarly.id)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  // Bets har ikke round_id — hent via match_ids
+  const activeMatchIds = (activeRoundMatches ?? []).map((m: { id: number }) => m.id)
+  const { data: roundBets } =
+    activeMatchIds.length > 0
+      ? await supabase
           .from('bets')
           .select('id, user_id')
           .eq('game_id', gameId)
-          .eq('round_id', activeRoundEarly.id)
+          .in('match_id', activeMatchIds)
       : { data: [] as { id: number; user_id: string }[] }
-
-  const typedRoundsForMatchCount = (rounds ?? []) as (Round & { season_id?: number })[]
-  const matchCountByRound: Record<number, number> = {}
-  if (typedRoundsForMatchCount.length > 0 && gameSeasonId != null) {
-    const { data: matchCountRows } = await supabase
-      .from('matches')
-      .select('season_id, round_name')
-      .eq('season_id', gameSeasonId)
-    const countBySeasonRound = new Map<string, number>()
-    for (const row of matchCountRows ?? []) {
-      const key = `${row.season_id}|${row.round_name}`
-      countBySeasonRound.set(key, (countBySeasonRound.get(key) ?? 0) + 1)
-    }
-    for (const r of typedRoundsForMatchCount) {
-      if (r.season_id != null && r.name != null) {
-        matchCountByRound[r.id] = countBySeasonRound.get(`${r.season_id}|${r.name}`) ?? 0
-      }
-    }
-  }
 
   const typedGame = game as Game
   const members = (rawMembers ?? []) as unknown as MemberRow[]
@@ -244,44 +238,19 @@ export default async function GamePage({ params }: Props) {
     .filter((r) => r.computedStatus === 'finished')
     .pop() ?? null
 
-  const activeRoundIndex = activeRound ? sortedRounds.findIndex((r) => r.id === activeRound.id) : -1
-  const prevRound = activeRoundIndex > 0 ? sortedRounds[activeRoundIndex - 1] : null
-  const nextRound = activeRoundIndex >= 0 && activeRoundIndex < sortedRounds.length - 1 ? sortedRounds[activeRoundIndex + 1] : null
+  // Hent alle kampe for kalender-slider
+  const allRoundIds = sortedRounds.map((r) => r.id)
+  const { data: allMatchesRaw } =
+    allRoundIds.length > 0
+      ? await supabase
+          .from('matches')
+          .select('id, round_id, home_team, away_team, home_score, away_score, kickoff_at, status')
+          .in('round_id', allRoundIds)
+          .order('kickoff_at', { ascending: true })
+      : { data: [] as CalendarMatch[] }
 
-  const prevRoundWithSeason = prevRound && rounds
-    ? (rounds as { id: number; name: string; season_id?: number }[]).find((r) => r.id === prevRound.id)
-    : null
-  const nextRoundWithSeason = nextRound && rounds
-    ? (rounds as { id: number; name: string; season_id?: number }[]).find((r) => r.id === nextRound.id)
-    : null
-  const [{ data: prevRoundKickoff }, { data: nextRoundKickoff }] =
-    leagueId != null
-      ? await Promise.all([
-          prevRoundWithSeason?.season_id != null && prevRoundWithSeason?.name != null
-            ? supabase
-                .from('matches')
-                .select('kickoff')
-                .eq('season_id', prevRoundWithSeason.season_id)
-                .eq('round_name', prevRoundWithSeason.name)
-                .order('kickoff', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-            : Promise.resolve({ data: null }),
-          nextRoundWithSeason?.season_id != null && nextRoundWithSeason?.name != null
-            ? supabase
-                .from('matches')
-                .select('kickoff')
-                .eq('season_id', nextRoundWithSeason.season_id)
-                .eq('round_name', nextRoundWithSeason.name)
-                .order('kickoff', { ascending: true })
-                .limit(1)
-                .maybeSingle()
-            : Promise.resolve({ data: null }),
-        ])
-      : [{ data: null }, { data: null }]
-
-  const prevRoundDate = (prevRoundKickoff as { kickoff?: string } | null)?.kickoff ?? null
-  const nextRoundDate = (nextRoundKickoff as { kickoff?: string } | null)?.kickoff ?? null
+  const allMatches = (allMatchesRaw ?? []) as CalendarMatch[]
+  const leagueInfo = getLeagueAbbr((leagueRow as { name: string } | null)?.name ?? 'League')
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
 
@@ -404,38 +373,27 @@ export default async function GamePage({ params }: Props) {
               </div>
             ))}
           </div>
-
-          <LeaveGameButton gameId={gameId} isHost={typedGame.host_id === user.id} />
         </div>
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 80px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-        {/* Runder — RoundSlider med borders */}
-        <section className="border-t border-b border-[#d4cec4] py-6">
-          <p className="text-xs tracking-widest text-[#7a7060] font-['Barlow_Condensed'] uppercase px-5 mb-4">
-            Runder
-          </p>
-          <RoundSlider
-            rounds={sortedRounds}
-            activeRound={
-              activeRound
-                ? {
-                    id: activeRound.id,
-                    name: activeRound.name,
-                    round_status: activeRound.computedStatus,
-                    betting_closes_at: activeRound.betting_closes_at,
-                    first_kickoff: null,
-                    next_kickoff: null,
-                  }
-                : null
-            }
-            betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
+        {/* Kalender-slider */}
+        <section className="border-t border-b border-[#d4cec4] py-0">
+          <CalendarSlider
+            matches={allMatches}
+            rounds={sortedRounds.map((r) => ({
+              id: r.id,
+              name: r.name,
+              computedStatus: r.computedStatus,
+              betting_closes_at: r.betting_closes_at,
+            })) as CalendarRound[]}
             gameId={gameId}
-            matchCountByRound={matchCountByRound}
-            prevRoundDate={prevRoundDate}
-            nextRoundDate={nextRoundDate}
+            betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
+            activeRoundId={activeRound?.id ?? null}
+            leagueAbbr={leagueInfo.abbr}
+            leagueType={leagueInfo.type}
           />
           {activeRound && (
             <ActiveRoundLiveTicker

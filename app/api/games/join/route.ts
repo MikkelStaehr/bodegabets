@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import { joinGameLimiter } from '@/lib/rateLimit'
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
@@ -10,19 +9,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
   }
 
-  const limit = joinGameLimiter(user.id)
-  if (!limit.ok) {
-    return NextResponse.json({ error: 'For mange forsøg — prøv igen om lidt' }, { status: 429 })
-  }
-
   const body = await req.json()
   const { invite_code } = body as { invite_code: string }
 
   if (!invite_code?.trim()) {
     return NextResponse.json({ error: 'Invitationskode er påkrævet' }, { status: 400 })
-  }
-  if (invite_code.trim().length > 10) {
-    return NextResponse.json({ error: 'Ugyldig invitationskode' }, { status: 400 })
   }
 
   const { data: game, error: gameError } = await supabaseAdmin

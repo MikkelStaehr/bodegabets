@@ -1,7 +1,8 @@
 /**
  * getLiveScores.ts
  * Henter live scores fra Bold API for alle kampe i en runde.
- * Nyt skema: matches har bold_match_id direkte.
+ *
+ * Bruger league_matches.bold_match_id direkte til at hente scores fra Bold API.
  */
 
 import { supabaseAdmin } from '@/lib/supabase'
@@ -9,7 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 const BOLD_API = 'https://api.bold.dk/aggregator/v1/apps/page/matches'
 
 export type LiveScoreResult = {
-  match_id: number
+  league_match_id: number
   home_score: number | null
   away_score: number | null
   status: 'scheduled' | 'live' | 'finished'
@@ -23,34 +24,41 @@ function mapStatus(statusType: string): LiveScoreResult['status'] {
 }
 
 export async function getLiveScores(roundId: number): Promise<LiveScoreResult[]> {
-  const { data: round } = await supabaseAdmin
-    .from('rounds')
-    .select('season_id, name')
-    .eq('id', roundId)
-    .single()
-  if (!round?.season_id || !round?.name) return []
-
+  // 1. Hent matches for round_id (med league_match_id)
   const { data: matchRows } = await supabaseAdmin
     .from('matches')
-    .select('id, bold_match_id')
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
-    .not('bold_match_id', 'is', null)
+    .select('id, league_match_id')
+    .eq('round_id', roundId)
+    .not('league_match_id', 'is', null)
 
   if (!matchRows?.length) return []
 
-  const boldMatchIds = (matchRows as { bold_match_id: number }[])
-    .map((r) => r.bold_match_id)
+  const leagueMatchIds = (matchRows as { league_match_id: number }[])
+    .map((r) => r.league_match_id)
+    .filter((id): id is number => id != null)
+
+  // 2. Hent league_matches med bold_match_id
+  const { data: leagueMatches } = await supabaseAdmin
+    .from('league_matches')
+    .select('id, bold_match_id')
+    .in('id', leagueMatchIds)
+    .not('bold_match_id', 'is', null)
+
+  if (!leagueMatches?.length) return []
+
+  const boldMatchIds = leagueMatches
+    .map((lm) => (lm as { bold_match_id: number }).bold_match_id)
     .filter((id): id is number => id != null)
 
   if (!boldMatchIds.length) return []
 
-  const matchByBoldId = new Map<number, number>()
-  for (const m of matchRows) {
-    const boldId = (m as { bold_match_id: number }).bold_match_id
-    if (boldId != null) matchByBoldId.set(boldId, m.id)
+  const lmByBoldId = new Map<number, number>()
+  for (const lm of leagueMatches) {
+    const boldId = (lm as { bold_match_id: number }).bold_match_id
+    if (boldId != null) lmByBoldId.set(boldId, lm.id)
   }
 
+  // 3. Hent scores fra Bold API via match_ids
   try {
     const url = `${BOLD_API}?match_ids=${boldMatchIds.join(',')}`
     const res = await fetch(url, {
@@ -67,14 +75,14 @@ export async function getLiveScores(roundId: number): Promise<LiveScoreResult[]>
       const match = m.match
       if (!match) continue
 
-      const matchId = matchByBoldId.get(match.id)
-      if (!matchId) continue
+      const leagueMatchId = lmByBoldId.get(match.id)
+      if (!leagueMatchId) continue
 
       const status = mapStatus(match.status_type)
       if (status === 'scheduled') continue
 
       results.push({
-        match_id: matchId,
+        league_match_id: leagueMatchId,
         home_score: match.home_team?.score ?? null,
         away_score: match.away_team?.score ?? null,
         status,

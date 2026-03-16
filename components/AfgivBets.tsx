@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Match, Bet } from '@/types'
 import { BET_TYPE_LABELS } from '@/lib/betTypes'
-import { scoresToPrediction } from '@/lib/betScores'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
 import GameTicker from '@/components/GameTicker'
@@ -93,7 +92,7 @@ type Props = {
   }
   matches: MatchWithOptions[]
   existingBets: Bet[]
-  bettingBalance: number
+  userPoints: number
   tickerItems: string[]
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
@@ -166,7 +165,9 @@ function firstWord(s: string) {
 /** Compute the correct 1/X/2 result for a finished match */
 function getCorrectOutcome(match: Match): '1' | 'X' | '2' | null {
   if (match.status !== 'finished' || match.home_score == null || match.away_score == null) return null
-  return scoresToPrediction(match.home_score, match.away_score)
+  if (match.home_score > match.away_score) return '1'
+  if (match.home_score < match.away_score) return '2'
+  return 'X'
 }
 
 function ExtraBets({
@@ -256,7 +257,7 @@ function ExtraBets({
                       if (isUserCorrect) {
                         btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E] text-white'
                       } else if (isUserPick) {
-                        btnClass = 'bg-[#E8E0D4] border-[#c0392b]/40 border-[2px] text-[#7a7060]'
+                        btnClass = 'bg-[#27ae60] border-[#27ae60] text-white'
                       } else {
                         btnClass = 'bg-[#F2EDE4] border-[#B8963E] border-[2.5px] text-[#7a7060]'
                       }
@@ -311,14 +312,12 @@ function MatchCard({
   selectedOutcome,
   onSelect,
   disabled,
-  isLocked,
   extraBetsEnabled,
   isReadOnly,
   extraBets,
   onExtraChange,
   fastPoints,
   userPrediction,
-  userStake,
   userExtraPicks,
   rivalry,
   userPoints,
@@ -328,14 +327,12 @@ function MatchCard({
   selectedOutcome: '1' | 'X' | '2' | null
   onSelect: (outcome: '1' | 'X' | '2') => void
   disabled: boolean
-  isLocked?: boolean
   extraBetsEnabled: boolean
   isReadOnly: boolean
   extraBets: ExtraBet[]
   onExtraChange: (matchId: number, extras: ExtraBet[]) => void
   fastPoints: number
   userPrediction: '1' | 'X' | '2' | null
-  userStake: number | null
   userExtraPicks: Record<string, string>
   rivalry?: RivalryInfo
   userPoints: number
@@ -348,7 +345,7 @@ function MatchCard({
   if (isRivalry) {
     return (
       <div
-        className={`rivalry-card relative rounded-lg mb-1.5 overflow-hidden transition-all ${isLocked ? 'opacity-75' : ''}`}
+        className="rivalry-card relative rounded-lg mb-1.5 overflow-hidden transition-all"
         style={{
           background: '#1a3329',
           border: '1.5px solid #B8963E',
@@ -383,12 +380,8 @@ function MatchCard({
               {match.away_team}
             </span>
           </div>
-          <span className="text-[10px] text-[#F2EDE4]/50 shrink-0 flex items-center gap-1">
-            {isLocked && <span title="Låst – kickoff inden for 30 min">🔒</span>}
-            {userStake != null && (
-              <span className="font-condensed font-bold text-[#B8963E] text-[10px]">{userStake} pt</span>
-            )}
-            {isFinished ? 'Færdig' : formatKickoff((match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff ?? '')}
+          <span className="text-[10px] text-[#F2EDE4]/50 shrink-0">
+            {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
           </span>
         </div>
 
@@ -405,7 +398,7 @@ function MatchCard({
               if (isUserCorrect) {
                 btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
               } else if (isUserPick) {
-                btnClass = 'bg-[#3d2e1f] border-[#c0392b]/50 border-[2px]'
+                btnClass = 'bg-[#27ae60] border-[#27ae60]'
               } else {
                 btnClass = 'bg-[#2C4A3E] border-[#B8963E] border-[2.5px]'
               }
@@ -463,7 +456,7 @@ function MatchCard({
     <div
       className={`bg-white border rounded-lg mb-1.5 overflow-hidden transition-all ${
         selectedOutcome ? 'border-[#2C4A3E] shadow-[0_0_0_1px_#2C4A3E]' : 'border-black/10'
-      } ${isLocked ? 'opacity-75' : ''}`}
+      }`}
     >
       {/* Holdnavn + tid/resultat — én linje */}
       <div className="flex items-center gap-2 px-2.5 h-10">
@@ -482,12 +475,8 @@ function MatchCard({
             {match.away_team}
           </span>
         </div>
-        <span className="text-[10px] text-[#7a7060] shrink-0 flex items-center gap-1">
-          {isLocked && <span title="Låst – kickoff inden for 30 min">🔒</span>}
-          {userStake != null && (
-            <span className="font-condensed font-bold text-[#2C4A3E] text-[10px]">{userStake} pt</span>
-          )}
-          {isFinished ? 'Færdig' : formatKickoff((match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff ?? '')}
+        <span className="text-[10px] text-[#7a7060] shrink-0">
+          {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
         </span>
       </div>
 
@@ -499,15 +488,15 @@ function MatchCard({
           const isCorrect = isFinished && correctOutcome === o
           const isUserCorrect = isUserPick && isCorrect
 
-          // Finished match result styling — grøn kun hvis valg er korrekt
+          // Finished match result styling
           let btnClass: string
           if (isFinished && (isUserPick || isCorrect)) {
             if (isUserCorrect) {
               // User picked correctly: green bg + gold border
               btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
             } else if (isUserPick) {
-              // User picked wrong: neutral/red — IKKE grøn
-              btnClass = 'bg-[#E8E0D4] border-[#c0392b]/40 border-[2px]'
+              // User picked wrong: green bg
+              btnClass = 'bg-[#27ae60] border-[#27ae60]'
             } else {
               // Correct result user didn't pick: gold border on neutral bg
               btnClass = 'bg-[#F2EDE4] border-[#B8963E] border-[2.5px]'
@@ -570,13 +559,16 @@ export default function AfgivBets({
   round,
   matches,
   existingBets,
-  bettingBalance,
+  userPoints,
   tickerItems,
   rivalryInfo = {},
   totalMatchesInRound,
 }: Props) {
   const router = useRouter()
   const { toast } = useToast()
+
+  // DEBUG: bekræft at existingBets ankommer til komponenten
+  console.log('[AfgivBets] existingBets:', existingBets)
 
   const [selections, setSelections] = useState<BetEntry[]>(() => initSelections(matches, existingBets))
   const [fastPoints, setFastPoints] = useState(100)
@@ -585,36 +577,22 @@ export default function AfgivBets({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pointsError, setPointsError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [showPanel, setShowPanel] = useState(false)
 
-  const isReadOnly = round.status === 'finished'
-
-  useEffect(() => {
-    setShowPanel(existingBets.length === 0)
-  }, [existingBets.length])
-
-  const isMatchLocked = useCallback((match: MatchWithOptions): boolean => {
-    const kickoff = (match as { kickoff_at?: string; kickoff?: string }).kickoff_at ?? (match as { kickoff_at?: string; kickoff?: string }).kickoff
-    if (!kickoff) return false
-    const lockThreshold = new Date(Date.now() + 30 * 60 * 1000)
-    return new Date(kickoff) < lockThreshold
-  }, [])
+  const now = useMemo(() => new Date(), [])
+  const deadlinePassed = round.betting_closes_at ? now >= new Date(round.betting_closes_at) : false
+  const isReadOnly =
+    (round.status !== 'open' && round.status !== 'upcoming') || deadlinePassed
 
   const matchBettingOpen = useCallback(
     (match: MatchWithOptions): boolean => {
-      if (isReadOnly) return false
+      if (round.status === 'finished') return false
       if (match.status === 'finished') return false
-      if (isMatchLocked(match)) return false
       return true
     },
-    [isReadOnly, isMatchLocked]
+    [round.status, now]
   )
 
   const totalMatches = matches.length
-  const openSelectionsCount = useMemo(
-    () => selections.filter((s) => !isMatchLocked(s.match)).length,
-    [selections, isMatchLocked]
-  )
   const totalPoints = selections.reduce((sum, s) => {
     const main = s.points
     const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
@@ -623,13 +601,6 @@ export default function AfgivBets({
   const progressPct = totalMatches > 0 ? (selections.length / totalMatches) * 100 : 0
   const effectiveFastPoints = isManuel ? customPoints : fastPoints
   const extraBetsEnabled = true
-  const totalExistingStake = existingBets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  const totalNewStake = selections.reduce((sum, s) => {
-    const main = s.points ?? 0
-    const extra = s.extraBets.reduce((es, eb) => es + (eb.points ?? 0), 0)
-    return sum + main + extra
-  }, 0)
-  const previewBalance = Math.max(0, bettingBalance + totalExistingStake - totalNewStake)
 
   const getSelection = (matchId: number) => selections.find((s) => s.matchId === matchId)
 
@@ -737,31 +708,22 @@ export default function AfgivBets({
   }
 
   async function handleSubmit() {
-    const openSelections = selections.filter((s) => !isMatchLocked(s.match))
-    if (openSelections.length === 0) {
-      toast('Ingen åbne kampe at afgive bets på', 'error')
-      return
-    }
-    const openPoints = openSelections.reduce((sum, s) => {
-      const main = s.points
-      const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
-      return sum + main + extra
-    }, 0)
-    if (openPoints > bettingBalance) {
-      toast(`Ikke nok credits. Du har ${bettingBalance} pt.`, 'error')
+    if (selections.length === 0) return
+    if (totalPoints > userPoints) {
+      toast(`Ikke nok point. Du har ${userPoints} pt.`, 'error')
       return
     }
 
     const payload = {
       game_id: gameId,
       bets: [
-        ...openSelections.map((s) => ({
+        ...selections.map((s) => ({
           match_id: s.matchId,
           bet_type: 'match_result' as const,
           prediction: s.outcome,
           stake: s.points,
         })),
-        ...openSelections.flatMap((s) =>
+        ...selections.flatMap((s) =>
           s.extraBets.map((eb) => ({
             match_id: s.matchId,
             bet_type: eb.type,
@@ -794,6 +756,16 @@ export default function AfgivBets({
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
+      {/* Nav — fuld bredde */}
+      <nav className="bg-[#1a3329] h-[52px] flex items-center px-4 gap-3 sticky top-0 z-[100]">
+        <Link href={`/games/${gameId}`} className="text-[rgba(242,237,228,0.5)] text-xl">
+          ‹
+        </Link>
+        <span className="font-condensed text-lg font-bold text-[#F2EDE4] tracking-wide">
+          Bodega Bets
+        </span>
+      </nav>
+
       {/* Ticker — fuld bredde */}
       {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
 
@@ -806,24 +778,34 @@ export default function AfgivBets({
 
       {/* Page header — fuld bredde, indhold centeret */}
       <div className="w-full bg-white border-b border-black/10">
-        <div className="max-w-[960px] mx-auto px-4 py-3">
-          <Link href={`/games/${gameId}`} className="text-[13px] text-[#888] no-underline block mb-2">← Tilbage til spilrum</Link>
-          <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase mb-1">
-            {gameName} · {round.name}
-          </p>
-          <h1 className="font-condensed text-[32px] font-extrabold text-[#1a3329] leading-none">
-            Afgiv dine valg
-          </h1>
-          <p className="text-[11px] text-[#7a7060] mt-1">
-            {totalMatches} kampe
-          </p>
+        <div className="max-w-[960px] mx-auto px-4 py-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase mb-1">
+              {gameName} · {round.name}
+            </p>
+            <h1 className="font-condensed text-[32px] font-extrabold text-[#1a3329] leading-none">
+              Afgiv dine valg
+            </h1>
+            <p className="text-[11px] text-[#7a7060] mt-1">
+              {totalMatches} kampe
+            </p>
+          </div>
+          <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right shrink-0">
+            <div className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
+              Deadline
+            </div>
+            <span className="font-condensed text-[20px] font-bold text-[#c0392b] block leading-tight">
+              {deadline.time}
+            </span>
+            <div className="text-[10px] text-[#7a7060]">{deadline.date}</div>
+          </div>
         </div>
       </div>
 
-      {/* Centeret split-layout — flex så sticky virker */}
-      <div className="max-w-[960px] mx-auto flex flex-col md:flex-row gap-0" style={{ alignItems: 'flex-start' }}>
-        {/* Venstre — kampe (scroller normalt) */}
-        <div className="w-full md:flex-1 py-3.5 px-5 pb-28 md:pb-24 border-r-0 md:border-r border-black/10 min-w-0">
+      {/* Centeret split-layout */}
+      <div className="max-w-[960px] mx-auto grid grid-cols-1 md:grid-cols-[1fr_290px]">
+        {/* Venstre — kampe */}
+        <div className="py-3.5 px-5 pb-28 md:pb-24 border-r-0 md:border-r border-black/10">
           <div className="mb-4">
             <LiveMatches
               roundId={roundId}
@@ -866,123 +848,51 @@ export default function AfgivBets({
                 selectedOutcome={getSelection(match.id)?.outcome ?? null}
                 onSelect={(o) => selectOutcome(match.id, o)}
                 disabled={isReadOnly || !matchBettingOpen(match)}
-                isLocked={isMatchLocked(match)}
                 extraBetsEnabled={extraBetsEnabled}
                 isReadOnly={isReadOnly}
                 extraBets={getSelection(match.id)?.extraBets ?? []}
                 onExtraChange={updateExtraBets}
                 fastPoints={effectiveFastPoints}
                 userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
-                userStake={matchBet?.stake ?? getSelection(match.id)?.points ?? null}
                 userExtraPicks={extraPicks}
                 rivalry={rivalryInfo[match.id]}
-                userPoints={bettingBalance}
+                userPoints={userPoints}
                 totalMatches={totalMatchesInRound ?? totalMatches}
               />
             )
           })}
         </div>
 
-        {/* Højre — sticky panel (altid synligt) */}
+        {/* Højre — Dine valg */}
         <div
-          className="w-full md:w-[290px] shrink-0"
-          style={{ position: 'sticky', top: 16, alignSelf: 'flex-start' }}
+          className={`
+            md:sticky md:top-[52px] md:h-[calc(100vh-82px)] flex flex-col bg-white overflow-hidden
+            fixed bottom-0 left-0 right-0 z-90
+            max-h-[70vh] md:max-h-none
+            border-t-2 border-[#2C4A3E] md:border-t-0 md:border-l border-black/10
+            shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:shadow-none
+            rounded-t-[14px] md:rounded-none
+            transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
+            ${drawerOpen ? 'translate-y-0' : 'translate-y-[calc(100%-56px)] md:translate-y-0'}
+          `}
         >
-          {/* Credits boks øverst */}
-          {!isReadOnly && (
-            <div
-              className="bg-white border border-black/10 rounded-lg px-4 py-4 mb-3 flex justify-between gap-3"
-            >
-              <div>
-                <p className="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7a7060] mb-1">
-                  Dine credits
-                </p>
-                <p className="font-condensed text-[22px] font-bold text-[#1a3329] leading-tight">
-                  {showPanel ? previewBalance : Math.max(0, bettingBalance)} pt
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7a7060] mb-1">
-                  Deadline
-                </p>
-                <p
-                  className={`font-condensed text-[22px] font-bold leading-tight ${
-                    round.betting_closes_at && new Date(round.betting_closes_at) < new Date()
-                      ? 'text-[#c0392b]'
-                      : 'text-[#1a3329]'
-                  }`}
-                >
-                  {deadline.time}
-                </p>
-                <p className="text-[10px] text-[#7a7060] mt-0.5">{deadline.date}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Dine valg — kompakt eller fuldt panel */}
-          {!showPanel && !isReadOnly && existingBets.length > 0 ? (
-            <div
-              className="flex justify-between items-center py-3 px-4 bg-white border border-black/10 rounded-lg"
-              style={{ borderColor: '#e5e7eb' }}
-            >
-              <div>
-                <p className="text-[13px] font-semibold text-[#1a3329]">
-                  {existingBets.filter((b) => b.bet_type === 'match_result').length} valg afgivet
-                </p>
-                <p className="text-[12px] text-[#888]">
-                  {totalExistingStake} pt brugt · {Math.max(0, bettingBalance)} pt tilbage
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPanel(true)}
-                className="font-condensed text-[12px] font-bold text-[#2C4A3E] px-3 py-2 border border-[#2C4A3E] rounded hover:bg-[#2C4A3E]/10 transition-colors"
-              >
-                Ændr valg
-              </button>
-            </div>
-          ) : (
-          <div
-            className={`
-              flex flex-col bg-white overflow-hidden
-              md:max-h-[calc(100vh-120px)]
-              border-t-2 md:border-t border-[#2C4A3E] md:border border-black/10
-              fixed bottom-0 left-0 right-0 z-90 md:relative md:z-auto
-              max-h-[70vh] md:max-h-none
-              shadow-[0_-8px_32px_rgba(0,0,0,0.15)] md:shadow-none
-              rounded-t-[14px] md:rounded-lg
-              transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
-              ${drawerOpen ? 'translate-y-0' : 'translate-y-[calc(100%-56px)] md:translate-y-0'}
-            `}
+          {/* Drawer-handle på mobil */}
+          <button
+            type="button"
+            onClick={() => setDrawerOpen((o) => !o)}
+            className="md:hidden w-full py-2 flex justify-center shrink-0"
           >
-            {/* Drawer-handle på mobil */}
-            <button
-              type="button"
-              onClick={() => setDrawerOpen((o) => !o)}
-              className="md:hidden w-full py-2 flex justify-center shrink-0"
-            >
-              <span className="w-8 h-0.5 bg-black/10 rounded block" />
-            </button>
+            <span className="w-8 h-0.5 bg-black/10 rounded block" />
+          </button>
 
-            {/* Header */}
+          {/* Header */}
           <div
             className="flex items-center justify-between px-3.5 py-3 border-b border-black/10 shrink-0 cursor-pointer md:cursor-default"
             onClick={() => window.innerWidth <= 700 && setDrawerOpen((o) => !o)}
           >
-            <div className="flex items-center gap-2">
-              <span className="font-condensed text-sm font-bold text-[#1a3329] tracking-widest uppercase">
-                🎯 Dine valg
-              </span>
-              {!isReadOnly && existingBets.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowPanel(false)}
-                  className="text-[11px] font-semibold text-[#7a7060] hover:text-[#1a3329]"
-                >
-                  Luk
-                </button>
-              )}
-            </div>
+            <span className="font-condensed text-sm font-bold text-[#1a3329] tracking-widest uppercase">
+              🎯 Dine valg
+            </span>
             <span className="font-condensed text-[22px] font-extrabold text-[#B8963E] leading-none">
               {selections.length}
             </span>
@@ -1181,7 +1091,7 @@ export default function AfgivBets({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={openSelectionsCount === 0 || isSubmitting || isReadOnly || totalPoints > bettingBalance}
+              disabled={selections.length === 0 || isSubmitting || isReadOnly}
               className="w-full h-[42px] rounded-lg font-condensed text-[15px] font-bold tracking-widest bg-[#B8963E] text-[#1a3329] disabled:bg-[#E8E0D4] disabled:text-[#7a7060] hover:bg-[#d4aa55] hover:-translate-y-px transition-all disabled:cursor-not-allowed disabled:transform-none"
             >
               LÅS DINE VALG
@@ -1194,8 +1104,6 @@ export default function AfgivBets({
               </div>
             )}
           </div>
-        </div>
-          )}
         </div>
       </div>
 

@@ -15,9 +15,6 @@ function StatusBadge({ status }: { status: LiveMatch['status'] }) {
   if (status === 'finished') return (
     <span className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wide">Slut</span>
   )
-  if (status === 'scheduled') return (
-    <span className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wide">Kommende</span>
-  )
   return null
 }
 
@@ -25,12 +22,11 @@ function MatchRow({ match }: { match: LiveMatch }) {
   const isLive = match.status === 'live'
   const isHalftime = match.status === 'halftime'
   const isFinished = match.status === 'finished'
-  const isScheduled = match.status === 'scheduled'
 
   return (
     <div
       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg
-      ${isLive ? 'bg-red-500/8' : isHalftime ? 'bg-amber-500/8' : isScheduled ? 'bg-black/4' : 'bg-black/4'}`}
+      ${isLive ? 'bg-red-500/8' : isHalftime ? 'bg-amber-500/8' : 'bg-black/4'}`}
     >
       {/* Hold + score */}
       <div className="flex-1 flex items-center justify-between min-w-0">
@@ -45,7 +41,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
             className={`font-['Barlow_Condensed'] text-[15px] font-black tabular-nums
             ${isLive ? 'text-red-600' : isHalftime ? 'text-amber-600' : 'text-[#1a3329]'}`}
           >
-            {isScheduled ? '–' : `${match.home_score ?? 0}–${match.away_score ?? 0}`}
+            {match.home_score ?? 0}–{match.away_score ?? 0}
           </span>
           <span
             className={`text-[12px] truncate font-['Barlow_Condensed'] font-semibold
@@ -86,16 +82,10 @@ export function LiveMatchesTicker({
   if (matches.length === 0) return null
 
   const hasLive = summary.live > 0 || summary.halftime > 0
-  const liveCount = summary.live + summary.halftime
-  const scheduledCount = summary.scheduled ?? 0
 
   const defaultTitle = hasLive
-    ? `${liveCount} kamp${liveCount !== 1 ? 'e' : ''} live`
-    : summary.finished > 0
-      ? `${summary.finished} kamp${summary.finished !== 1 ? 'e' : ''} afsluttet`
-      : scheduledCount > 0
-        ? `${scheduledCount} kommende kamp${scheduledCount !== 1 ? 'e' : ''}`
-        : `${summary.total} kamp${summary.total !== 1 ? 'e' : ''}`
+    ? `${summary.live + summary.halftime} kamp${summary.live + summary.halftime !== 1 ? 'e' : ''} live`
+    : `${summary.finished} kamp${summary.finished !== 1 ? 'e' : ''} afsluttet`
 
   const defaultRight = lastUpdate ? (
     <span className="text-[9px] text-[#7a7060]">
