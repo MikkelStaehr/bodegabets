@@ -52,12 +52,13 @@ function formatRelative(iso: string | null): string {
   if (mins < 60) return `${mins} min siden`
   if (hours < 24) return `${hours} t siden`
   if (days < 7) return `${days} d siden`
-  return d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+  return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
 }
 
 function formatTime(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('da-DK', {
+    timeZone: 'Europe/Copenhagen',
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
@@ -178,6 +179,7 @@ function MatchList({
                 </td>
                 <td className="py-2.5 text-warm-gray">
                   {new Date(match.kickoff_at).toLocaleDateString('da-DK', {
+                    timeZone: 'Europe/Copenhagen',
                     weekday: 'short',
                     day: 'numeric',
                     month: 'short',
@@ -240,6 +242,7 @@ function LeagueOverblikCard({
                 <p className="font-body text-[12px] text-warm-gray">
                   {round.kickoff_date
                     ? new Date(round.kickoff_date).toLocaleDateString('da-DK', {
+                        timeZone: 'Europe/Copenhagen',
                         weekday: 'short',
                         day: 'numeric',
                         month: 'short',

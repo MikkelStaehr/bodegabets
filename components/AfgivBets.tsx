@@ -138,9 +138,10 @@ function formatKickoff(iso: string) {
   const d = new Date(iso)
   const isMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
   if (isMidnight) {
-    return d.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' })
+    return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'short', day: 'numeric', month: 'short' })
   }
   return d.toLocaleString('da-DK', {
+    timeZone: 'Europe/Copenhagen',
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -153,8 +154,8 @@ function formatDeadline(iso: string | null) {
   if (!iso) return { time: '—', date: '' }
   const d = new Date(iso)
   return {
-    time: d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }),
-    date: d.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' }),
+    time: d.toLocaleTimeString('da-DK', { timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit' }),
+    date: d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'short', day: 'numeric', month: 'short' }),
   }
 }
 

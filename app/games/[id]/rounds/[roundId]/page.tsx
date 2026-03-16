@@ -16,9 +16,10 @@ function formatDate(iso: string | null) {
   const d = new Date(iso)
   const isMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
   if (isMidnight) {
-    return d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+    return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
   }
   return d.toLocaleString('da-DK', {
+    timeZone: 'Europe/Copenhagen',
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
