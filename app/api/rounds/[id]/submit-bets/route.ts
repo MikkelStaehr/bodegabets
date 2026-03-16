@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Tjek at runden stadig er åben
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('status, betting_closes_at')
+    .select('name, season_id, status, betting_closes_at')
     .eq('id', roundId)
     .single()
 
@@ -72,12 +72,13 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Validér at alle match_ids tilhører denne runde
+  // Validér at alle match_ids tilhører denne runde (via season_id + round_name)
   const payloadMatchIds = [...new Set(bets.map((b) => b.match_id))]
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
     .select('id')
-    .eq('round_id', roundId)
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
 
   const roundMatchIds = (roundMatches ?? []).map((m) => m.id)
   const allValid = payloadMatchIds.every((id) => roundMatchIds.includes(id))
