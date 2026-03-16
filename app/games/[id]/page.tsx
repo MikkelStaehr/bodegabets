@@ -290,14 +290,20 @@ export default async function GamePage({ params }: Props) {
   const matchRoundMap = new Map<number, number>()
   for (const m of allMatches) matchRoundMap.set(m.id, m.round_id)
 
-  // Byg ActiveRoundRows: kun runder hvor betting lukker inden for 7 dage
-  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const openRounds = sortedRounds.filter(
-    (r) =>
-      r.betting_closes_at !== null &&
-      new Date(r.betting_closes_at) > now &&
-      new Date(r.betting_closes_at) <= in7days
-  )
+  // Byg ActiveRoundRows: runder der ikke er finished og har kampe der ikke er startet eller er i gang
+  const matchesByRound = new Map<number, CalendarMatch[]>()
+  for (const m of allMatches) {
+    const arr = matchesByRound.get(m.round_id) ?? []
+    arr.push(m)
+    matchesByRound.set(m.round_id, arr)
+  }
+  const openRounds = sortedRounds.filter((r) => {
+    if (r.computedStatus === 'finished') return false
+    const roundMatches = matchesByRound.get(r.id) ?? []
+    return roundMatches.some(
+      (m) => new Date(m.kickoff_at) > now || m.status === 'live' || m.status === 'halftime'
+    )
+  })
 
   // Debug: log hvilke runder der sendes til ActiveRounds
   console.log('[ActiveRounds] openRounds:', openRounds.map((r) => ({
