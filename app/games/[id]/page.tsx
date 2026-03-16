@@ -92,6 +92,8 @@ export default async function GamePage({ params }: Props) {
     .from('game_seasons')
     .select('season_id')
     .eq('game_id', gameId)
+  console.log('GAME ID:', gameId)
+  console.log('GAME SEASONS:', gameSeasons)
   const seasonIds = (gameSeasons ?? []).map((gs) => gs.season_id as number)
 
   // Hent league_id fra game_leagues (til liga-navn)
