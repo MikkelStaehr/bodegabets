@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { calculateRoundPoints } from '@/lib/calculatePoints'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -151,6 +152,8 @@ export async function syncMatchScores(options?: {
   const matchesStatus = (s: string) =>
     s === 'finished' ? 'finished' : s === 'halftime' ? 'halftime' : 'live'
 
+  const finishedRoundIds = new Set<number>()
+
   for (const match of activeMatches) {
     const boldData = boldMatchMap.get(match.bold_match_id)
     if (!boldData) continue
@@ -172,6 +175,13 @@ export async function syncMatchScores(options?: {
       continue
     }
 
+    // Pre-fetch current status to detect finished-transition
+    const { data: currentMatch } = await supabaseAdmin
+      .from('matches')
+      .select('status')
+      .eq('id', match.id)
+      .single()
+
     const { error } = await supabaseAdmin
       .from('matches')
       .update({
@@ -187,6 +197,26 @@ export async function syncMatchScores(options?: {
       errors.push(`Opdatering fejlede for kamp ${match.id}: ${error.message}`)
     } else {
       updated++
+      // Kamp skiftet til finished → find round_id og trigger pointberegning
+      if (status === 'finished' && currentMatch?.status !== 'finished') {
+        const { data: round } = await supabaseAdmin
+          .from('rounds')
+          .select('id')
+          .eq('season_id', match.season_id)
+          .eq('name', match.round_name)
+          .single()
+        if (round?.id) finishedRoundIds.add(round.id)
+      }
+    }
+  }
+
+  // Kør calculateRoundPoints for runder med nyligt færdige kampe
+  for (const roundId of finishedRoundIds) {
+    try {
+      console.log(`[syncMatchScores] Kamp finished → calculateRoundPoints(${roundId})`)
+      await calculateRoundPoints(roundId)
+    } catch (e) {
+      errors.push(`calculateRoundPoints fejl for runde ${roundId}: ${e}`)
     }
   }
 
@@ -220,6 +250,50 @@ export async function syncMatchScores(options?: {
 
       if (updateErr) {
         errors.push(`Catch-up update fejl for match ${m.id}: ${updateErr.message}`)
+      }
+    }
+  }
+
+  // ─── Catch-up: find finished rounds without point calculation ─────────────
+  // Finder runder hvor alle kampe er finished med result, men round_scores mangler
+  const { data: finishedWithResult, error: catchupError } = await supabaseAdmin
+    .from('matches')
+    .select('season_id, round_name')
+    .eq('status', 'finished')
+    .not('result', 'is', null)
+
+  if (catchupError) {
+    errors.push(`Catch-up rounds fetch fejl: ${catchupError.message}`)
+  } else if (finishedWithResult?.length) {
+    // Unikke season_id + round_name kombinationer
+    const roundKeys = new Set(finishedWithResult.map((m) => `${m.season_id}::${m.round_name}`))
+
+    for (const key of roundKeys) {
+      const [seasonIdStr, roundName] = key.split('::')
+      const seasonId = parseInt(seasonIdStr, 10)
+
+      const { data: round } = await supabaseAdmin
+        .from('rounds')
+        .select('id')
+        .eq('season_id', seasonId)
+        .eq('name', roundName)
+        .single()
+
+      if (!round?.id || finishedRoundIds.has(round.id)) continue
+
+      // Tjek om round_scores allerede eksisterer for denne runde
+      const { count } = await supabaseAdmin
+        .from('round_scores')
+        .select('id', { count: 'exact', head: true })
+        .eq('round_id', round.id)
+
+      if (count && count > 0) continue
+
+      try {
+        console.log(`[syncMatchScores] Catch-up: calculateRoundPoints(${round.id}) for ${roundName}`)
+        await calculateRoundPoints(round.id)
+      } catch (e) {
+        errors.push(`Catch-up calculateRoundPoints fejl for runde ${round.id}: ${e}`)
       }
     }
   }
