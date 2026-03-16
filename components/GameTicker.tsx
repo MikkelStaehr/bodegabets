@@ -63,6 +63,7 @@ export default function GameTicker({ items }: Props) {
       {/* Dato til højre */}
       <div className="ml-auto shrink-0 pl-6 pr-4 text-[11px] text-white/60 font-medium">
         {new Date().toLocaleDateString('da-DK', {
+          timeZone: 'Europe/Copenhagen',
           weekday: 'short',
           day: 'numeric',
           month: 'short',

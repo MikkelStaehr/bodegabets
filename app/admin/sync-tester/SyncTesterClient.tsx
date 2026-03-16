@@ -239,6 +239,7 @@ export default function SyncTesterClient({ leagues }: Props) {
                   <span className="font-semibold text-[#1a3329]">
                     {result.first_match_date
                       ? new Date(result.first_match_date as string).toLocaleDateString('da-DK', {
+                          timeZone: 'Europe/Copenhagen',
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
@@ -251,6 +252,7 @@ export default function SyncTesterClient({ leagues }: Props) {
                   <span className="font-semibold text-[#1a3329]">
                     {result.last_match_date
                       ? new Date(result.last_match_date as string).toLocaleDateString('da-DK', {
+                          timeZone: 'Europe/Copenhagen',
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
@@ -276,7 +278,7 @@ export default function SyncTesterClient({ leagues }: Props) {
                         <span className="text-[#7a7060]">
                           {r.match_count} kampe
                           {r.first_kickoff && r.last_kickoff && (
-                            <> · {new Date(r.first_kickoff).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })} – {new Date(r.last_kickoff).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })}</>
+                            <> · {new Date(r.first_kickoff).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })} – {new Date(r.last_kickoff).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })}</>
                           )}
                         </span>
                       </div>

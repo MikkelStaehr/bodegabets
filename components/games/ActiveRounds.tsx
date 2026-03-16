@@ -180,6 +180,7 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
                 }}
               >
                 {deadline.toLocaleString('da-DK', {
+                  timeZone: 'Europe/Copenhagen',
                   day: 'numeric',
                   month: 'short',
                   hour: '2-digit',

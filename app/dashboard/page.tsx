@@ -297,7 +297,7 @@ export default async function DashboardPage() {
       .map((r) => r.betting_closes_at!)
       .sort()[0]
     if (!future) return null
-    return new Date(future).toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    return new Date(future).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   })()
 
   return (
@@ -309,7 +309,7 @@ export default async function DashboardPage() {
             <p className="text-[11px] font-semibold text-[#7a7060] uppercase tracking-widest mb-1">Velkommen tilbage</p>
             <h1 className="font-['Playfair_Display'] text-4xl font-bold text-[#1a3329]">{profile?.username ?? 'Spiller'}</h1>
             <p className="text-[13px] text-[#7a7060] mt-1">
-              {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
           </div>
           <Link href="/games/new" className="shrink-0 flex items-center gap-2 bg-[#2C4A3E] text-white font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-widest px-5 py-3 rounded-xl hover:bg-[#1a3329] transition-colors">
