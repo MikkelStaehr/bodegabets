@@ -290,12 +290,13 @@ export default async function GamePage({ params }: Props) {
   const matchRoundMap = new Map<number, number>()
   for (const m of allMatches) matchRoundMap.set(m.id, m.round_id)
 
-  // Byg ActiveRoundRows: kun runder hvor betting stadig er åben
+  // Byg ActiveRoundRows: kun runder hvor betting lukker inden for 7 dage
+  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const openRounds = sortedRounds.filter(
     (r) =>
       r.betting_closes_at !== null &&
       new Date(r.betting_closes_at) > now &&
-      (r.computedStatus === 'open' || r.computedStatus === 'active' || r.computedStatus === 'upcoming')
+      new Date(r.betting_closes_at) <= in7days
   )
 
   // Debug: log hvilke runder der sendes til ActiveRounds
