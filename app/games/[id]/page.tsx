@@ -6,6 +6,8 @@ import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
 import CalendarSlider from '@/components/games/CalendarSlider'
 import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
+import ActiveRounds from '@/components/games/ActiveRounds'
+import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -85,7 +87,14 @@ export default async function GamePage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent league_id fra game_leagues junction
+  // Hent season_ids fra game_seasons junction
+  const { data: gameSeasons } = await supabase
+    .from('game_seasons')
+    .select('season_id')
+    .eq('game_id', gameId)
+  const seasonIds = (gameSeasons ?? []).map((gs) => gs.season_id as number)
+
+  // Hent league_id fra game_leagues (til liga-navn)
   const { data: gameLeagueRow } = await supabase
     .from('game_leagues')
     .select('league_id')
@@ -109,11 +118,11 @@ export default async function GamePage({ params }: Props) {
       .eq('game_id', gameId)
       .order('earnings', { ascending: false }),
 
-    gameLeagueId
+    seasonIds.length > 0
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at')
-          .eq('league_id', gameLeagueId)
+          .select('id, name, status, betting_closes_at, season_id')
+          .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
 
@@ -135,11 +144,11 @@ export default async function GamePage({ params }: Props) {
       .eq('id', user.id)
       .single(),
 
-    gameLeagueId
+    seasonIds.length > 0
       ? supabase
           .from('rounds')
           .select('id, name')
-          .eq('league_id', gameLeagueId)
+          .in('season_id', seasonIds)
           .eq('status', 'finished')
           .order('betting_closes_at', { ascending: false })
           .limit(1)
@@ -251,6 +260,47 @@ export default async function GamePage({ params }: Props) {
 
   const allMatches = (allMatchesRaw ?? []) as CalendarMatch[]
   const leagueInfo = getLeagueAbbr((leagueRow as { name: string } | null)?.name ?? 'League')
+
+  // Hent brugerens bets for alle runder (til ActiveRounds)
+  const allMatchIds = allMatches.map((m) => m.id)
+  const { data: allUserBets } =
+    allMatchIds.length > 0
+      ? await supabase
+          .from('bets')
+          .select('id, match_id')
+          .eq('game_id', gameId)
+          .eq('user_id', user.id)
+          .in('match_id', allMatchIds)
+      : { data: [] as { id: number; match_id: number }[] }
+
+  // Match → round_id lookup for bets
+  const matchRoundMap = new Map<number, number>()
+  for (const m of allMatches) matchRoundMap.set(m.id, m.round_id)
+
+  // Byg ActiveRoundRows: open/active runder med bet/match counts
+  const openRounds = sortedRounds.filter(
+    (r) => r.computedStatus === 'open' || r.computedStatus === 'active'
+  )
+  const matchCountByRound: Record<number, number> = {}
+  for (const m of allMatches) {
+    matchCountByRound[m.round_id] = (matchCountByRound[m.round_id] ?? 0) + 1
+  }
+  const userBetsByRound: Record<number, number> = {}
+  for (const b of allUserBets ?? []) {
+    const roundId = matchRoundMap.get(b.match_id)
+    if (roundId != null) {
+      userBetsByRound[roundId] = (userBetsByRound[roundId] ?? 0) + 1
+    }
+  }
+  const activeRoundRows: ActiveRoundRow[] = openRounds.map((r) => ({
+    id: r.id,
+    name: r.name,
+    betting_closes_at: r.betting_closes_at,
+    totalMatches: matchCountByRound[r.id] ?? 0,
+    userBets: userBetsByRound[r.id] ?? 0,
+    leagueAbbr: leagueInfo.abbr,
+    leagueType: leagueInfo.type,
+  }))
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
 
@@ -402,6 +452,9 @@ export default async function GamePage({ params }: Props) {
             />
           )}
         </section>
+
+        {/* Aktive betting runder */}
+        <ActiveRounds rounds={activeRoundRows} gameId={gameId} />
 
         {sortedRounds.length === 0 && (
           <div style={{ border: '1px dashed #C8BEA8', borderRadius: 2, padding: '48px 16px', textAlign: 'center', color: '#6b6b6b', fontFamily: "'Barlow', sans-serif", fontSize: 14 }}>
