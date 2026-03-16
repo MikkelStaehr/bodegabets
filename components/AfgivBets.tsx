@@ -365,14 +365,16 @@ function MatchCard({
         </div>
 
         {/* Holdnavn + tid/resultat */}
-        <div className="flex items-center gap-2 px-2.5 h-10">
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            {match.home_team_logo && (
-              <img src={match.home_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
-            )}
-            <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate max-w-[100px]">
-              {match.home_team}
-            </span>
+        <div className="px-2.5 pt-1">
+          <div className="flex items-center justify-between gap-2 h-10">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+              <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate" style={{ maxWidth: 120 }}>
+                {match.home_team}
+              </span>
+              {match.home_team_logo && (
+                <img src={match.home_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
+              )}
+            </div>
             {isFinished && match.home_score != null && match.away_score != null ? (
               <span className="font-condensed font-bold text-[13px] text-[#F2EDE4]/60 shrink-0">
                 {match.home_score} – {match.away_score}
@@ -380,16 +382,20 @@ function MatchCard({
             ) : (
               <span className="text-[9px] text-[#F2EDE4]/50 font-semibold shrink-0">vs</span>
             )}
-            {match.away_team_logo && (
-              <img src={match.away_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
-            )}
-            <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate max-w-[100px]">
-              {match.away_team}
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              {match.away_team_logo && (
+                <img src={match.away_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
+              )}
+              <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate" style={{ maxWidth: 120 }}>
+                {match.away_team}
+              </span>
+            </div>
+          </div>
+          <div className="text-center">
+            <span className="text-[10px] text-[#F2EDE4]/50">
+              {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
             </span>
           </div>
-          <span className="text-[10px] text-[#F2EDE4]/50 shrink-0">
-            {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
-          </span>
         </div>
 
         {/* 1-X-2 med guld border */}
@@ -465,15 +471,17 @@ function MatchCard({
         selectedOutcome ? 'border-[#2C4A3E] shadow-[0_0_0_1px_#2C4A3E]' : 'border-black/10'
       }`}
     >
-      {/* Holdnavn + tid/resultat — én linje */}
-      <div className="flex items-center gap-2 px-2.5 h-10">
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          {match.home_team_logo && (
-            <img src={match.home_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
-          )}
-          <span className="font-condensed font-bold text-[15px] text-[#1a3329] truncate max-w-[100px]">
-            {match.home_team}
-          </span>
+      {/* Holdnavn + tid/resultat — centreret layout */}
+      <div className="px-2.5 pt-1">
+        <div className="flex items-center justify-between gap-2 h-10">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+            <span className="font-condensed font-bold text-[15px] text-[#1a3329] truncate" style={{ maxWidth: 120 }}>
+              {match.home_team}
+            </span>
+            {match.home_team_logo && (
+              <img src={match.home_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
+            )}
+          </div>
           {isFinished && match.home_score != null && match.away_score != null ? (
             <span className="font-condensed font-bold text-[13px] text-[#7a7060] shrink-0">
               {match.home_score} – {match.away_score}
@@ -481,16 +489,20 @@ function MatchCard({
           ) : (
             <span className="text-[9px] text-[#7a7060] font-semibold shrink-0">vs</span>
           )}
-          {match.away_team_logo && (
-            <img src={match.away_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
-          )}
-          <span className="font-condensed font-bold text-[15px] truncate max-w-[100px]">
-            {match.away_team}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            {match.away_team_logo && (
+              <img src={match.away_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
+            )}
+            <span className="font-condensed font-bold text-[15px] text-[#1a3329] truncate" style={{ maxWidth: 120 }}>
+              {match.away_team}
+            </span>
+          </div>
+        </div>
+        <div className="text-center">
+          <span className="text-[10px] text-[#7a7060]">
+            {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
           </span>
         </div>
-        <span className="text-[10px] text-[#7a7060] shrink-0">
-          {isFinished ? 'Færdig' : formatKickoff(match.kickoff_at)}
-        </span>
       </div>
 
       {/* 1-X-2 */}
