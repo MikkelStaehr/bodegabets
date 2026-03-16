@@ -71,31 +71,58 @@ export default async function RoundPage({ params }: Props) {
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
 
-  // Step 2: Hent matches med season_id + round_name (kræver round data)
+  // Step 2: Hent matches via season_id + round_name med team joins
+  const matchSelect = `
+    id, kickoff, status, result,
+    home_score, away_score,
+    home_team:teams!matches_home_team_id_fkey(id, name),
+    away_team:teams!matches_away_team_id_fkey(id, name)
+  `
+
+  type RawMatch = {
+    id: number
+    kickoff: string | null
+    status: string
+    result: string | null
+    home_score: number | null
+    away_score: number | null
+    home_team: { id: number; name: string } | null
+    away_team: { id: number; name: string } | null
+  }
+
+  function toMatchRow(raw: RawMatch): MatchRow {
+    return {
+      id: raw.id,
+      home_team: raw.home_team?.name ?? 'Ukendt',
+      away_team: raw.away_team?.name ?? 'Ukendt',
+      kickoff_at: raw.kickoff ?? '',
+      home_score: raw.home_score,
+      away_score: raw.away_score,
+      home_score_ht: null,
+      away_score_ht: null,
+      status: raw.status as MatchRow['status'],
+      round_id: roundIdNum,
+    }
+  }
+
   const { data: rawMatches } = await supabase
     .from('matches')
-    .select(`
-      id, home_team, away_team, kickoff_at,
-      home_score, away_score, home_score_ht, away_score_ht, status
-    `)
+    .select(matchSelect)
     .eq('season_id', round.season_id)
     .eq('round_name', round.name)
-    .order('kickoff_at', { ascending: true })
+    .order('kickoff', { ascending: true })
 
-  let matches = (rawMatches ?? []) as unknown as MatchRow[]
+  let matches = (rawMatches ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
 
   if (matches.length === 0) {
     await syncMatchesForRound(supabaseAdmin, gameId, roundIdNum)
     const { data: matchesRetry } = await supabase
       .from('matches')
-      .select(`
-        id, home_team, away_team, kickoff_at,
-        home_score, away_score, home_score_ht, away_score_ht, status
-      `)
+      .select(matchSelect)
       .eq('season_id', round.season_id)
       .eq('round_name', round.name)
-      .order('kickoff_at', { ascending: true })
-    matches = (matchesRetry ?? []) as unknown as MatchRow[]
+      .order('kickoff', { ascending: true })
+    matches = (matchesRetry ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
   }
 
   // Hent betting_balance fra round_members
