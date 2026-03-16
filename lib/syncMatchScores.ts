@@ -214,6 +214,28 @@ export async function syncMatchScores(options?: {
     })
   }
 
+  // Ekstra check: runder hvor alle kampe allerede er finished fra forrige sync
+  if (!dryRun) {
+    const { data: roundsNeedingCalc, error: rpcError } = await supabaseAdmin.rpc('get_rounds_needing_calc')
+    if (rpcError) {
+      console.warn('[syncMatchScores] get_rounds_needing_calc RPC fejl:', rpcError.message)
+    } else {
+      const ids = (roundsNeedingCalc ?? []).map((r: { id: number }) => r.id).filter((id: number) => !finishedRoundIds.has(id))
+      if (ids.length > 0) {
+        for (const roundId of ids) {
+          console.log(`[syncMatchScores] Alle kampe finished → trigger calculateRoundPoints(${roundId})`)
+          await calculateRoundPoints(roundId)
+        }
+        await supabaseAdmin.from('admin_logs').insert({
+          type: 'calculate_points',
+          status: 'success',
+          message: `syncMatchScores: ${ids.length} runder (alle kampe allerede finished) beregnet`,
+          metadata: { round_ids: ids },
+        })
+      }
+    }
+  }
+
   console.log(`[syncMatchScores] ${updated} kampe opdateret${dryRun ? ' (dry-run)' : ''}`)
 
   if (dryRun) {
