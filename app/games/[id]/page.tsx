@@ -121,7 +121,7 @@ export default async function GamePage({ params }: Props) {
     seasonIds.length > 0
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at, season_id')
+          .select('id, name, status, betting_closes_at, season_id, league_id')
           .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -167,6 +167,18 @@ export default async function GamePage({ params }: Props) {
   if (!myMembership) redirect('/dashboard')
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
+
+  // Hent per-runde liga-info (round.league_id → league name → abbreviation)
+  const uniqueLeagueIds = [...new Set(typedRoundsEarly.map((r) => r.league_id).filter(Boolean))]
+  const { data: leagueRows } =
+    uniqueLeagueIds.length > 0
+      ? await supabase.from('leagues').select('id, name').in('id', uniqueLeagueIds)
+      : { data: [] as { id: number; name: string }[] }
+  const leagueMap = new Map<number, { abbr: string; type: 'league' | 'cup' }>()
+  for (const l of leagueRows ?? []) {
+    leagueMap.set(l.id, getLeagueAbbr(l.name))
+  }
+
   const activeRoundEarly =
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'open') ??
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'active') ??
@@ -278,13 +290,24 @@ export default async function GamePage({ params }: Props) {
   for (const m of allMatches) matchRoundMap.set(m.id, m.round_id)
 
   // Byg ActiveRoundRows: kun runder hvor betting stadig er åben
-  const nowIso = now.toISOString()
   const openRounds = sortedRounds.filter(
     (r) =>
       r.betting_closes_at !== null &&
-      r.betting_closes_at > nowIso &&
-      (r.status === 'open' || r.status === 'active' || r.status === 'upcoming')
+      new Date(r.betting_closes_at) > now &&
+      (r.computedStatus === 'open' || r.computedStatus === 'active' || r.computedStatus === 'upcoming')
   )
+
+  // Debug: log hvilke runder der sendes til ActiveRounds
+  console.log('[ActiveRounds] openRounds:', openRounds.map((r) => ({
+    id: r.id,
+    name: r.name,
+    status: r.status,
+    computedStatus: r.computedStatus,
+    betting_closes_at: r.betting_closes_at,
+    closes_in_hours: r.betting_closes_at
+      ? ((new Date(r.betting_closes_at).getTime() - now.getTime()) / (1000 * 60 * 60)).toFixed(1)
+      : null,
+  })))
   const matchCountByRound: Record<number, number> = {}
   for (const m of allMatches) {
     matchCountByRound[m.round_id] = (matchCountByRound[m.round_id] ?? 0) + 1
@@ -302,8 +325,8 @@ export default async function GamePage({ params }: Props) {
     betting_closes_at: r.betting_closes_at,
     totalMatches: matchCountByRound[r.id] ?? 0,
     userBets: userBetsByRound[r.id] ?? 0,
-    leagueAbbr: leagueInfo.abbr,
-    leagueType: leagueInfo.type,
+    leagueAbbr: leagueMap.get(r.league_id)?.abbr ?? leagueInfo.abbr,
+    leagueType: leagueMap.get(r.league_id)?.type ?? leagueInfo.type,
   }))
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
@@ -442,12 +465,12 @@ export default async function GamePage({ params }: Props) {
               name: r.name,
               computedStatus: r.computedStatus,
               betting_closes_at: r.betting_closes_at,
+              leagueAbbr: leagueMap.get(r.league_id)?.abbr ?? leagueInfo.abbr,
+              leagueType: leagueMap.get(r.league_id)?.type ?? leagueInfo.type,
             })) as CalendarRound[]}
             gameId={gameId}
             betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
             activeRoundId={activeRound?.id ?? null}
-            leagueAbbr={leagueInfo.abbr}
-            leagueType={leagueInfo.type}
           />
           {activeRound && (
             <ActiveRoundLiveTicker

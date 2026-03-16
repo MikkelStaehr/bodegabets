@@ -19,6 +19,8 @@ export type CalendarRound = {
   name: string
   computedStatus: 'upcoming' | 'open' | 'active' | 'finished'
   betting_closes_at: string | null
+  leagueAbbr: string
+  leagueType: 'league' | 'cup'
 }
 
 interface CalendarSliderProps {
@@ -27,8 +29,6 @@ interface CalendarSliderProps {
   gameId: number
   betsCount: number
   activeRoundId: number | null
-  leagueAbbr: string
-  leagueType: 'league' | 'cup'
 }
 
 const DAY_NAMES_DA = ['søn', 'man', 'tir', 'ons', 'tor', 'fre', 'lør']
@@ -52,8 +52,6 @@ export default function CalendarSlider({
   gameId,
   betsCount,
   activeRoundId,
-  leagueAbbr,
-  leagueType,
 }: CalendarSliderProps) {
   const matchesByDate = useMemo(() => {
     const map = new Map<string, CalendarMatch[]>()
@@ -103,6 +101,7 @@ export default function CalendarSlider({
       hasLive: boolean
       hasMatches: boolean
       tag: string | null
+      tagType: 'league' | 'cup' | null
     }> = []
 
     for (let i = 1; i <= count; i++) {
@@ -112,9 +111,13 @@ export default function CalendarSlider({
       const hasLive = dayMatches.some((m) => m.status === 'live' || m.status === 'halftime')
 
       let tag: string | null = null
+      let tagType: 'league' | 'cup' | null = null
       if (dayMatches.length > 0) {
         const round = roundById.get(dayMatches[0].round_id)
-        tag = round ? `${leagueAbbr} · ${getRoundNum(round.name)}` : leagueAbbr
+        if (round) {
+          tag = `${round.leagueAbbr} · ${getRoundNum(round.name)}`
+          tagType = round.leagueType
+        }
       }
 
       days.push({
@@ -126,10 +129,11 @@ export default function CalendarSlider({
         hasLive,
         hasMatches: dayMatches.length > 0,
         tag,
+        tagType,
       })
     }
     return days
-  }, [viewMonth, matchesByDate, roundById, leagueAbbr, todayKey])
+  }, [viewMonth, matchesByDate, roundById, todayKey])
 
   useEffect(() => {
     selectedDayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
@@ -148,11 +152,6 @@ export default function CalendarSlider({
     setViewMonth((prev) =>
       prev.month === 11 ? { year: prev.year + 1, month: 0 } : { year: prev.year, month: prev.month + 1 }
     )
-
-  const tagColors =
-    leagueType === 'cup'
-      ? { bg: 'rgba(184,150,62,0.15)', color: '#8B6914' }
-      : { bg: 'rgba(44,74,62,0.1)', color: '#2C4A3E' }
 
   return (
     <div>
@@ -274,8 +273,16 @@ export default function CalendarSlider({
                       fontWeight: 600,
                       padding: '1px 4px',
                       borderRadius: 3,
-                      background: isSelected ? 'rgba(255,255,255,0.2)' : tagColors.bg,
-                      color: isSelected ? '#fff' : tagColors.color,
+                      background: isSelected
+                        ? 'rgba(255,255,255,0.2)'
+                        : day.tagType === 'cup'
+                          ? 'rgba(184,150,62,0.15)'
+                          : 'rgba(44,74,62,0.1)',
+                      color: isSelected
+                        ? '#fff'
+                        : day.tagType === 'cup'
+                          ? '#8B6914'
+                          : '#2C4A3E',
                       fontFamily: "'Barlow Condensed', sans-serif",
                       whiteSpace: 'nowrap',
                       letterSpacing: '0.02em',
