@@ -262,6 +262,7 @@ export default async function GamePage({ params }: Props) {
 
   // Hent alle kampe for kalender-slider
   const allRoundIds = sortedRounds.map((r) => r.id)
+  type RawMatch = { id: number; round_id: number; home_team: string; away_team: string; home_score: number | null; away_score: number | null; kickoff_at: string; status: string }
   const { data: allMatchesRaw } =
     allRoundIds.length > 0
       ? await supabase
@@ -269,9 +270,42 @@ export default async function GamePage({ params }: Props) {
           .select('id, round_id, home_team, away_team, home_score, away_score, kickoff_at, status')
           .in('round_id', allRoundIds)
           .order('kickoff_at', { ascending: true })
-      : { data: [] as CalendarMatch[] }
+      : { data: [] as RawMatch[] }
 
-  const allMatches = (allMatchesRaw ?? []) as CalendarMatch[]
+  // Build round_id → { name, season_id } lookup for mapping matches
+  const roundInfoById = new Map<number, { name: string; season_id: number }>()
+  for (const r of sortedRounds) {
+    if (r.season_id) roundInfoById.set(r.id, { name: r.name, season_id: r.season_id })
+  }
+
+  const typedRawMatches = (allMatchesRaw ?? []) as RawMatch[]
+
+  // Match → round_id lookup for bets
+  const matchRoundMap = new Map<number, number>()
+  for (const m of typedRawMatches) matchRoundMap.set(m.id, m.round_id)
+
+  // Match count per round
+  const matchCountByRound: Record<number, number> = {}
+  for (const m of typedRawMatches) {
+    matchCountByRound[m.round_id] = (matchCountByRound[m.round_id] ?? 0) + 1
+  }
+
+  // Map to CalendarMatch (with round_name + season_id instead of round_id)
+  const allMatches: CalendarMatch[] = typedRawMatches.map((m) => {
+    const ri = roundInfoById.get(m.round_id)
+    return {
+      id: m.id,
+      kickoff_at: m.kickoff_at,
+      status: m.status,
+      round_name: ri?.name ?? '',
+      season_id: ri?.season_id ?? 0,
+      home_team: m.home_team,
+      away_team: m.away_team,
+      home_score: m.home_score,
+      away_score: m.away_score,
+    }
+  })
+
   const leagueInfo = defaultLeagueInfo
 
   // Hent brugerens bets for alle runder (til ActiveRounds)
@@ -286,10 +320,6 @@ export default async function GamePage({ params }: Props) {
           .in('match_id', allMatchIds)
       : { data: [] as { id: number; match_id: number }[] }
 
-  // Match → round_id lookup for bets
-  const matchRoundMap = new Map<number, number>()
-  for (const m of allMatches) matchRoundMap.set(m.id, m.round_id)
-
   const openRounds = sortedRounds.filter((r) => r.bet_open === true)
 
   // Debug: log hvilke runder der sendes til ActiveRounds
@@ -303,10 +333,6 @@ export default async function GamePage({ params }: Props) {
       ? ((new Date(r.betting_closes_at).getTime() - now.getTime()) / (1000 * 60 * 60)).toFixed(1)
       : null,
   })))
-  const matchCountByRound: Record<number, number> = {}
-  for (const m of allMatches) {
-    matchCountByRound[m.round_id] = (matchCountByRound[m.round_id] ?? 0) + 1
-  }
   const userBetsByRound: Record<number, number> = {}
   for (const b of allUserBets ?? []) {
     const roundId = matchRoundMap.get(b.match_id)
@@ -460,6 +486,7 @@ export default async function GamePage({ params }: Props) {
             rounds={sortedRounds.map((r) => ({
               id: r.id,
               name: r.name,
+              season_id: r.season_id ?? 0,
               computedStatus: r.computedStatus,
               betting_closes_at: r.betting_closes_at,
               leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
