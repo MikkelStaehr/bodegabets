@@ -14,31 +14,33 @@ export async function GET(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Ugyldigt round_id' }, { status: 400 })
   }
 
-  // Tjek at runden eksisterer
+  // Hent runden med season_id
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('season_id')
+    .select('id, name, season_id')
     .eq('id', roundId)
     .single()
 
   if (!round) return NextResponse.json({ error: 'Runde ikke fundet' }, { status: 404 })
 
-  // Tjek at brugeren er medlem af et spil med denne season
-  const { data: gameSeasonRows } = await supabaseAdmin
-    .from('game_seasons')
+  // Tjek membership via game_seasons
+  const { data: userGameIds } = await supabaseAdmin
+    .from('game_members')
     .select('game_id')
-    .eq('season_id', round.season_id)
-  const gameIds = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
+    .eq('user_id', user.id)
+
+  const memberGameIds = (userGameIds ?? []).map((g: { game_id: number }) => g.game_id)
 
   let membership = null
-  if (gameIds.length > 0) {
-    const { data: membershipRows } = await supabaseAdmin
-      .from('game_members')
-      .select('user_id')
-      .in('game_id', gameIds)
-      .eq('user_id', user.id)
+  if (memberGameIds.length > 0) {
+    const { data: match } = await supabaseAdmin
+      .from('game_seasons')
+      .select('game_id')
+      .eq('season_id', round.season_id)
+      .in('game_id', memberGameIds)
       .limit(1)
-    membership = membershipRows?.[0] ?? null
+      .maybeSingle()
+    membership = match
   }
   if (!membership) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
