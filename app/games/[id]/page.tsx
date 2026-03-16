@@ -4,7 +4,8 @@ import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
-import RoundSlider from '@/components/games/RoundSlider'
+import CalendarSlider from '@/components/games/CalendarSlider'
+import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
 import type { Game, Round, RoundScore } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -51,6 +52,21 @@ function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'act
   return 'active'                      // kampe i gang, ikke alle færdige
 }
 
+function getLeagueAbbr(name: string): { abbr: string; type: 'league' | 'cup' } {
+  const lower = name.toLowerCase()
+  if (lower.includes('premier league')) return { abbr: 'PL', type: 'league' }
+  if (lower.includes('champions league')) return { abbr: 'UCL', type: 'cup' }
+  if (lower.includes('europa league')) return { abbr: 'UEL', type: 'cup' }
+  if (lower.includes('conference league')) return { abbr: 'UECL', type: 'cup' }
+  if (lower.includes('superliga')) return { abbr: 'SL', type: 'league' }
+  if (lower.includes('la liga') || lower.includes('laliga')) return { abbr: 'LL', type: 'league' }
+  if (lower.includes('bundesliga')) return { abbr: 'BL', type: 'league' }
+  if (lower.includes('serie a')) return { abbr: 'SA', type: 'league' }
+  if (lower.includes('ligue 1')) return { abbr: 'L1', type: 'league' }
+  const words = name.split(/\s+/)
+  return { abbr: words.map((w) => w[0]).join('').toUpperCase().slice(0, 3), type: 'league' }
+}
+
 export default async function GamePage({ params }: Props) {
   const { id } = await params
   const gameId = parseInt(id)
@@ -85,6 +101,7 @@ export default async function GamePage({ params }: Props) {
     { data: myMembership },
     { data: profile },
     { data: latestFinishedRoundByStatus },
+    { data: leagueRow },
   ] = await Promise.all([
     supabase
       .from('game_members')
@@ -128,11 +145,17 @@ export default async function GamePage({ params }: Props) {
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+
+    gameLeagueId
+      ? supabase
+          .from('leagues')
+          .select('name')
+          .eq('id', gameLeagueId)
+          .single()
+      : Promise.resolve({ data: null }),
   ])
 
   if (!myMembership) redirect('/dashboard')
-
-  const leagueId = gameLeagueId
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
   const activeRoundEarly =
@@ -171,19 +194,6 @@ export default async function GamePage({ params }: Props) {
           .eq('game_id', gameId)
           .in('match_id', activeMatchIds)
       : { data: [] as { id: number; user_id: string }[] }
-
-  const typedRoundsForMatchCount = (rounds ?? []) as Round[]
-  const { data: matchCountRows } =
-    typedRoundsForMatchCount.length > 0
-      ? await supabase
-          .from('matches')
-          .select('round_id')
-          .in('round_id', typedRoundsForMatchCount.map((r) => r.id))
-      : { data: [] as { round_id: number }[] }
-  const matchCountByRound: Record<number, number> = {}
-  for (const row of matchCountRows ?? []) {
-    matchCountByRound[row.round_id] = (matchCountByRound[row.round_id] ?? 0) + 1
-  }
 
   const typedGame = game as Game
   const members = (rawMembers ?? []) as unknown as MemberRow[]
@@ -228,38 +238,19 @@ export default async function GamePage({ params }: Props) {
     .filter((r) => r.computedStatus === 'finished')
     .pop() ?? null
 
-  const activeRoundIndex = activeRound ? sortedRounds.findIndex((r) => r.id === activeRound.id) : -1
-  const prevRound = activeRoundIndex > 0 ? sortedRounds[activeRoundIndex - 1] : null
-  const nextRound = activeRoundIndex >= 0 && activeRoundIndex < sortedRounds.length - 1 ? sortedRounds[activeRoundIndex + 1] : null
+  // Hent alle kampe for kalender-slider
+  const allRoundIds = sortedRounds.map((r) => r.id)
+  const { data: allMatchesRaw } =
+    allRoundIds.length > 0
+      ? await supabase
+          .from('matches')
+          .select('id, round_id, home_team, away_team, home_score, away_score, kickoff_at, status')
+          .in('round_id', allRoundIds)
+          .order('kickoff_at', { ascending: true })
+      : { data: [] as CalendarMatch[] }
 
-  const [{ data: prevRoundKickoff }, { data: nextRoundKickoff }] =
-    leagueId != null
-      ? await Promise.all([
-          prevRound
-            ? supabase
-                .from('league_matches')
-                .select('kickoff_at')
-                .eq('league_id', leagueId)
-                .eq('round_name', prevRound.name)
-                .order('kickoff_at', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-            : Promise.resolve({ data: null }),
-          nextRound
-            ? supabase
-                .from('league_matches')
-                .select('kickoff_at')
-                .eq('league_id', leagueId)
-                .eq('round_name', nextRound.name)
-                .order('kickoff_at', { ascending: true })
-                .limit(1)
-                .maybeSingle()
-            : Promise.resolve({ data: null }),
-        ])
-      : [{ data: null }, { data: null }]
-
-  const prevRoundDate = (prevRoundKickoff as { kickoff_at?: string } | null)?.kickoff_at ?? null
-  const nextRoundDate = (nextRoundKickoff as { kickoff_at?: string } | null)?.kickoff_at ?? null
+  const allMatches = (allMatchesRaw ?? []) as CalendarMatch[]
+  const leagueInfo = getLeagueAbbr((leagueRow as { name: string } | null)?.name ?? 'League')
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
 
@@ -388,30 +379,21 @@ export default async function GamePage({ params }: Props) {
       {/* ── Content ──────────────────────────────────────────────────────────── */}
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 80px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-        {/* Runder — RoundSlider med borders */}
-        <section className="border-t border-b border-[#d4cec4] py-6">
-          <p className="text-xs tracking-widest text-[#7a7060] font-['Barlow_Condensed'] uppercase px-5 mb-4">
-            Runder
-          </p>
-          <RoundSlider
-            rounds={sortedRounds}
-            activeRound={
-              activeRound
-                ? {
-                    id: activeRound.id,
-                    name: activeRound.name,
-                    round_status: activeRound.computedStatus,
-                    betting_closes_at: activeRound.betting_closes_at,
-                    first_kickoff: null,
-                    next_kickoff: null,
-                  }
-                : null
-            }
-            betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
+        {/* Kalender-slider */}
+        <section className="border-t border-b border-[#d4cec4] py-0">
+          <CalendarSlider
+            matches={allMatches}
+            rounds={sortedRounds.map((r) => ({
+              id: r.id,
+              name: r.name,
+              computedStatus: r.computedStatus,
+              betting_closes_at: r.betting_closes_at,
+            })) as CalendarRound[]}
             gameId={gameId}
-            matchCountByRound={matchCountByRound}
-            prevRoundDate={prevRoundDate}
-            nextRoundDate={nextRoundDate}
+            betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
+            activeRoundId={activeRound?.id ?? null}
+            leagueAbbr={leagueInfo.abbr}
+            leagueType={leagueInfo.type}
           />
           {activeRound && (
             <ActiveRoundLiveTicker
