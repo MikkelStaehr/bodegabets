@@ -301,7 +301,7 @@ export default async function GamePage({ params }: Props) {
     if (r.computedStatus === 'finished') return false
     const roundMatches = matchesByRound.get(r.id) ?? []
     return roundMatches.some(
-      (m) => new Date(m.kickoff_at) > now || m.status === 'live' || m.status === 'halftime'
+      (m) => new Date(m.kickoff_at) > now || m.status === 'live' || m.status === 'halftime' || m.status === 'scheduled'
     )
   })
 

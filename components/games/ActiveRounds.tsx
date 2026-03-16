@@ -82,6 +82,7 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
       {rounds.map((round, idx) => {
         const hasBets = round.userBets > 0
         const deadline = round.betting_closes_at ? new Date(round.betting_closes_at) : null
+        const bettingOpen = deadline !== null && deadline > now
         const hoursLeft = deadline ? (deadline.getTime() - now.getTime()) / (1000 * 60 * 60) : null
         const isUrgent = hoursLeft !== null && hoursLeft > 0 && hoursLeft <= 24
 
@@ -201,20 +202,24 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
                 textDecoration: 'none',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
-                ...(hasBets
+                ...(bettingOpen
                   ? {
-                      background: 'rgba(158,148,134,0.12)',
-                      color: '#6b6b6b',
-                      border: '1px solid #EDE8E0',
-                    }
-                  : {
                       background: '#2C4A3E',
                       color: '#F2EDE4',
                       border: '1px solid #2C4A3E',
+                    }
+                  : {
+                      background: 'rgba(158,148,134,0.12)',
+                      color: '#6b6b6b',
+                      border: '1px solid #EDE8E0',
                     }),
               }}
             >
-              {hasBets ? 'Ændr bets' : 'Afgiv bets →'}
+              {bettingOpen
+                ? 'Afgiv bets →'
+                : hasBets
+                  ? 'Se resultater →'
+                  : 'Se live →'}
             </Link>
           </div>
         )
