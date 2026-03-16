@@ -283,7 +283,7 @@ export default async function GamePage({ params }: Props) {
     (r) =>
       r.betting_closes_at !== null &&
       r.betting_closes_at > nowIso &&
-      (r.status === 'open' || r.status === 'active')
+      (r.status === 'open' || r.status === 'active' || r.status === 'upcoming')
   )
   const matchCountByRound: Record<number, number> = {}
   for (const m of allMatches) {
