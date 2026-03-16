@@ -127,6 +127,12 @@ export default async function GamePage({ params }: Props) {
           .select('id, name, status, betting_closes_at, season_id, league_id')
           .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
+          .then((res) => {
+            console.log('ROUNDS QUERY seasonIds:', seasonIds)
+            console.log('ROUNDS DATA:', res.data)
+            console.log('ROUNDS ERROR:', res.error)
+            return res
+          })
       : Promise.resolve({ data: [] }),
 
     supabase
