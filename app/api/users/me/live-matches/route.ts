@@ -47,29 +47,29 @@ export async function GET() {
 
     if (!game) continue
 
-    // Hent league_id via game_leagues junction table
-    const { data: gameLeague } = await supabaseAdmin
-      .from('game_leagues')
-      .select('league_id')
+    // Hent season_id via game_seasons junction table
+    const { data: gameSeason } = await supabaseAdmin
+      .from('game_seasons')
+      .select('season_id')
       .eq('game_id', gameId)
       .limit(1)
       .single()
 
-    const leagueId = gameLeague?.league_id
-    if (!leagueId) continue
+    const seasonId = gameSeason?.season_id
+    if (!seasonId) continue
 
-    // Hent league name
-    const { data: league } = await supabaseAdmin
-      .from('leagues')
-      .select('name')
-      .eq('id', leagueId)
+    // Hent league/tournament name via season
+    const { data: season } = await supabaseAdmin
+      .from('seasons')
+      .select('tournaments:tournament_id(name)')
+      .eq('id', seasonId)
       .single()
-    const leagueName = league?.name ?? null
+    const leagueName = (season?.tournaments as unknown as { name: string } | null)?.name ?? null
 
     const { data: rounds } = await supabaseAdmin
       .from('rounds')
       .select('id, name, status, betting_closes_at')
-      .eq('league_id', leagueId)
+      .eq('season_id', seasonId)
       .order('created_at', { ascending: true })
 
     const typedRounds = (rounds ?? []) as { id: number; name: string; status: string; betting_closes_at: string | null }[]

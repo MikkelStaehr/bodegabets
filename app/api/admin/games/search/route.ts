@@ -39,23 +39,23 @@ export async function GET(req: NextRequest) {
   const game = games[0]
   const gameId = game.id as number
 
-  // Hent league_id via game_leagues junction table
-  const { data: gameLeague } = await supabaseAdmin
-    .from('game_leagues')
-    .select('league_id')
+  // Hent season_id via game_seasons junction table
+  const { data: gameSeason } = await supabaseAdmin
+    .from('game_seasons')
+    .select('season_id')
     .eq('game_id', gameId)
     .limit(1)
     .single()
 
-  const leagueId = gameLeague?.league_id as number | null
+  const seasonId = gameSeason?.season_id as number | null
 
   const [
     { data: league },
     { data: members },
     { data: rounds },
   ] = await Promise.all([
-    leagueId
-      ? supabaseAdmin.from('leagues').select('name').eq('id', leagueId).single()
+    seasonId
+      ? supabaseAdmin.from('seasons').select('tournaments:tournament_id(name)').eq('id', seasonId).single()
       : Promise.resolve({ data: null }),
     supabaseAdmin
       .from('game_members')
@@ -64,11 +64,11 @@ export async function GET(req: NextRequest) {
         profile:profiles(username)
       `)
       .eq('game_id', gameId),
-    leagueId
+    seasonId
       ? supabaseAdmin
           .from('rounds')
           .select('id, name, status')
-          .eq('league_id', leagueId)
+          .eq('season_id', seasonId)
           .order('betting_closes_at', { ascending: true })
       : Promise.resolve({ data: [] }),
   ])
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
       invite_code: game.invite_code,
       status: game.status,
       created_at: game.created_at,
-      league_name: (league as { name?: string })?.name ?? '—',
+      league_name: (league as { tournaments?: { name?: string } | null })?.tournaments?.name ?? '—',
       member_count: (members ?? []).length,
       current_round_name: currentRoundName,
       total_bets: totalBets,
