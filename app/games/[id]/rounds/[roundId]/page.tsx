@@ -44,14 +44,12 @@ export default async function RoundPage({ params }: Props) {
 
   if (!game) notFound()
 
-  // Hent league_id fra game_leagues junction
-  const { data: gameLeagueRow } = await supabase
-    .from('game_leagues')
-    .select('league_id')
+  // Hent season_ids for dette game via game_seasons
+  const { data: gameSeasons } = await supabase
+    .from('game_seasons')
+    .select('season_id')
     .eq('game_id', gameId)
-    .limit(1)
-    .maybeSingle()
-  const leagueId = gameLeagueRow?.league_id as number | undefined
+  const seasonIds = (gameSeasons ?? []).map(gs => gs.season_id as number)
 
   const [
     { data: round },
@@ -60,9 +58,9 @@ export default async function RoundPage({ params }: Props) {
   ] = await Promise.all([
     supabase
       .from('rounds')
-      .select('id, name, status, betting_closes_at, league_id')
+      .select('id, name, status, betting_closes_at, season_id')
       .eq('id', roundIdNum)
-      .eq('league_id', leagueId!)
+      .in('season_id', seasonIds.length > 0 ? seasonIds : [0])
       .single(),
 
     supabase
@@ -123,24 +121,35 @@ export default async function RoundPage({ params }: Props) {
 
   const typedBets = (betsData ?? []) as Bet[]
 
-  // Hent rivalries for denne liga
+  // Hent rivalries via season → tournament → league
   const rivalryInfo: Record<number, { rivalry_name: string; multiplier: number }> = {}
-  if (leagueId) {
-    const { data: rivalries } = await supabase
-      .from('rivalries')
-      .select('home_team, away_team, rivalry_name, multiplier')
-      .eq('league_id', leagueId)
+  if (round.season_id) {
+    // Hent tournament_id fra seasons
+    const { data: season } = await supabase
+      .from('seasons')
+      .select('tournament_id')
+      .eq('id', round.season_id)
+      .single()
 
-    if (rivalries) {
-      const rivalryLookup = new Map<string, { rivalry_name: string; multiplier: number }>()
-      for (const r of rivalries) {
-        const info = { rivalry_name: r.rivalry_name, multiplier: Number(r.multiplier) }
-        rivalryLookup.set(`${r.home_team}|${r.away_team}`, info)
-        rivalryLookup.set(`${r.away_team}|${r.home_team}`, info)
-      }
-      for (const m of matches) {
-        const rivalry = rivalryLookup.get(`${m.home_team}|${m.away_team}`)
-        if (rivalry) rivalryInfo[m.id] = rivalry
+    // Brug tournament_id som league_id (de mapper 1:1 i rivalries)
+    const tournamentId = season?.tournament_id
+    if (tournamentId) {
+      const { data: rivalries } = await supabase
+        .from('rivalries')
+        .select('home_team, away_team, rivalry_name, multiplier')
+        .eq('league_id', tournamentId)
+
+      if (rivalries) {
+        const rivalryLookup = new Map<string, { rivalry_name: string; multiplier: number }>()
+        for (const r of rivalries) {
+          const info = { rivalry_name: r.rivalry_name, multiplier: Number(r.multiplier) }
+          rivalryLookup.set(`${r.home_team}|${r.away_team}`, info)
+          rivalryLookup.set(`${r.away_team}|${r.home_team}`, info)
+        }
+        for (const m of matches) {
+          const rivalry = rivalryLookup.get(`${m.home_team}|${m.away_team}`)
+          if (rivalry) rivalryInfo[m.id] = rivalry
+        }
       }
     }
   }
