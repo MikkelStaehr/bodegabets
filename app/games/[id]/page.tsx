@@ -246,6 +246,14 @@ export default async function GamePage({ params }: Props) {
     return numA - numB
   })
 
+  console.log('ALL ROUNDS:', sortedRounds.map(r => ({
+    id: r.id,
+    name: r.name,
+    dbStatus: r.status,
+    computedStatus: r.computedStatus,
+    betting_closes_at: r.betting_closes_at
+  })))
+
   const finishedRounds = sortedRounds.filter((r) => r.computedStatus === 'finished')
 
   const activeRound =
@@ -328,6 +336,8 @@ export default async function GamePage({ params }: Props) {
     leagueAbbr: leagueMap.get(r.league_id)?.abbr ?? leagueInfo.abbr,
     leagueType: leagueMap.get(r.league_id)?.type ?? leagueInfo.type,
   }))
+
+  console.log('ACTIVE ROUNDS:', activeRoundRows)
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
 
