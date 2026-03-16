@@ -87,7 +87,9 @@ export async function GET() {
 
     const { data: allMatches } = await supabaseAdmin
       .from('matches')
-      .select('id, round_id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at')
+      .select(`id, round_id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at,
+        home_team_ref:teams!home_team_id(logo_url),
+        away_team_ref:teams!away_team_id(logo_url)`)
       .in('round_id', openRoundIds)
       .in('status', ['live', 'halftime', 'finished'])
       .gte('kickoff_at', since.toISOString())
@@ -95,9 +97,22 @@ export async function GET() {
       .limit(100)
 
     // Find nyeste runde der har kampe med kickoff i fortiden
-    const pastMatches = (allMatches ?? []).filter(
-      (m) => m.kickoff_at && m.kickoff_at <= nowIso
-    )
+    const pastMatches = (allMatches ?? [])
+      .filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
+      .map((m) => ({
+        id: m.id,
+        round_id: m.round_id,
+        home_team: m.home_team,
+        away_team: m.away_team,
+        home_score: m.home_score,
+        away_score: m.away_score,
+        home_score_ht: m.home_score_ht,
+        away_score_ht: m.away_score_ht,
+        status: m.status,
+        kickoff_at: m.kickoff_at,
+        home_team_logo: (m.home_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
+        away_team_logo: (m.away_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
+      }))
 
     const byRound = new Map<number, typeof pastMatches>()
     for (const m of pastMatches) {

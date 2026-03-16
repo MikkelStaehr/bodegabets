@@ -367,6 +367,9 @@ function MatchCard({
         {/* Holdnavn + tid/resultat */}
         <div className="flex items-center gap-2 px-2.5 h-10">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            {match.home_team_logo && (
+              <img src={match.home_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
+            )}
             <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate max-w-[100px]">
               {match.home_team}
             </span>
@@ -376,6 +379,9 @@ function MatchCard({
               </span>
             ) : (
               <span className="text-[9px] text-[#F2EDE4]/50 font-semibold shrink-0">vs</span>
+            )}
+            {match.away_team_logo && (
+              <img src={match.away_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
             )}
             <span className="font-condensed font-bold text-[15px] text-[#F2EDE4] truncate max-w-[100px]">
               {match.away_team}
@@ -462,6 +468,9 @@ function MatchCard({
       {/* Holdnavn + tid/resultat — én linje */}
       <div className="flex items-center gap-2 px-2.5 h-10">
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          {match.home_team_logo && (
+            <img src={match.home_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
+          )}
           <span className="font-condensed font-bold text-[15px] text-[#1a3329] truncate max-w-[100px]">
             {match.home_team}
           </span>
@@ -471,6 +480,9 @@ function MatchCard({
             </span>
           ) : (
             <span className="text-[9px] text-[#7a7060] font-semibold shrink-0">vs</span>
+          )}
+          {match.away_team_logo && (
+            <img src={match.away_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
           )}
           <span className="font-condensed font-bold text-[15px] truncate max-w-[100px]">
             {match.away_team}

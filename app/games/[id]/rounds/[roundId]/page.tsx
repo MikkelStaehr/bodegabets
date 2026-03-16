@@ -76,8 +76,8 @@ export default async function RoundPage({ params }: Props) {
   const matchSelect = `
     id, kickoff, status, result,
     home_score, away_score,
-    home_team:teams!home_team_id(id, name),
-    away_team:teams!away_team_id(id, name)
+    home_team:teams!home_team_id(id, name, logo_url),
+    away_team:teams!away_team_id(id, name, logo_url)
   `
 
   type RawMatch = {
@@ -87,8 +87,8 @@ export default async function RoundPage({ params }: Props) {
     result: string | null
     home_score: number | null
     away_score: number | null
-    home_team: { id: number; name: string } | null
-    away_team: { id: number; name: string } | null
+    home_team: { id: number; name: string; logo_url: string | null } | null
+    away_team: { id: number; name: string; logo_url: string | null } | null
   }
 
   function toMatchRow(raw: RawMatch): MatchRow {
@@ -102,6 +102,8 @@ export default async function RoundPage({ params }: Props) {
       home_score_ht: null,
       away_score_ht: null,
       status: raw.status as MatchRow['status'],
+      home_team_logo: raw.home_team?.logo_url ?? null,
+      away_team_logo: raw.away_team?.logo_url ?? null,
       round_id: roundIdNum,
     }
   }

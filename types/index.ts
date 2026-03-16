@@ -63,6 +63,8 @@ export type Match = {
   home_score_ht: number | null
   away_score_ht: number | null
   status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'cancelled'
+  home_team_logo: string | null
+  away_team_logo: string | null
   sofascore_event_id?: string | null
   league_match_id?: number | null
 }
