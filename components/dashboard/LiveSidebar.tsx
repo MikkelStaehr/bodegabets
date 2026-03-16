@@ -54,7 +54,6 @@ export default function LiveSidebar({
     live: uniqueMatches.filter((m) => m.status === 'live').length,
     halftime: uniqueMatches.filter((m) => m.status === 'halftime').length,
     finished: uniqueMatches.filter((m) => m.status === 'finished').length,
-    scheduled: uniqueMatches.filter((m) => m.status === 'scheduled').length,
     total: uniqueMatches.length,
   }), [uniqueMatches])
 

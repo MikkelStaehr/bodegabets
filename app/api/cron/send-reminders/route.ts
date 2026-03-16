@@ -1,13 +1,6 @@
-/**
- * MANUEL FALLBACK — køres ikke automatisk.
- * Railway (railway/index.ts) er den primære cron-kilde via node-cron (dagligt 10:00 UTC).
- * Kan trigges manuelt via POST /api/admin/run-cron { cron: 'send-reminders' }.
- */
-
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { supabaseAdmin } from '@/lib/supabase'
-import { requireCronAuth } from '@/lib/cronAuth'
 
 function getWebPush() {
   webpush.setVapidDetails(
@@ -19,8 +12,10 @@ function getWebPush() {
 }
 
 export async function GET(req: NextRequest) {
-  const authError = requireCronAuth(req.headers.get('authorization'))
-  if (authError) return authError
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const now = new Date()
   const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000)
@@ -28,7 +23,7 @@ export async function GET(req: NextRequest) {
   // Find rounds with deadline within next 6 hours
   const { data: rounds } = await supabaseAdmin
     .from('rounds')
-    .select('id, name, season_id, betting_closes_at')
+    .select('id, name, league_id, betting_closes_at')
     .neq('status', 'finished')
     .gt('betting_closes_at', now.toISOString())
     .lte('betting_closes_at', sixHoursLater.toISOString())
@@ -45,18 +40,18 @@ export async function GET(req: NextRequest) {
       (new Date(round.betting_closes_at!).getTime() - now.getTime()) / (1000 * 60 * 60)
     )
 
-    // Find games using this season via game_seasons junction table
-    const { data: gameSeasonRows } = await supabaseAdmin
-      .from('game_seasons')
+    // Find games using this league via game_leagues junction table
+    const { data: gameLeagueRows } = await supabaseAdmin
+      .from('game_leagues')
       .select('game_id')
-      .eq('season_id', round.season_id)
+      .eq('league_id', round.league_id)
 
-    const gameIdsForSeason = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
-    const { data: games } = gameIdsForSeason.length
+    const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
+    const { data: games } = gameIdsForLeague.length
       ? await supabaseAdmin
           .from('games')
           .select('id, name')
-          .in('id', gameIdsForSeason)
+          .in('id', gameIdsForLeague)
       : { data: [] as { id: number; name: string }[] }
 
     if (!games?.length) continue
@@ -122,7 +117,7 @@ export async function GET(req: NextRequest) {
   await supabaseAdmin
     .from('admin_logs')
     .insert({
-      type: 'send_reminders',
+      type: 'cron_sync',
       status: totalSent > 0 ? 'success' : 'info',
       message: `send-reminders: ${totalSent} sent, ${totalFailed} failed`,
       metadata: { sent: totalSent, failed: totalFailed, rounds: rounds.length },

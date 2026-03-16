@@ -14,21 +14,21 @@ export async function GET(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Ugyldigt round_id' }, { status: 400 })
   }
 
-  // Tjek at brugeren har adgang til runden (medlem af et spilrum i sæsonen)
+  // Tjek at brugeren har adgang til runden (medlem af et spilrum i ligaen)
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('season_id, name')
+    .select('league_id')
     .eq('id', roundId)
     .single()
 
   if (!round) return NextResponse.json({ error: 'Runde ikke fundet' }, { status: 404 })
 
-  // Find games i denne sæson via game_seasons og tjek om brugeren er medlem af mindst ét
-  const { data: gameSeasonRows } = await supabaseAdmin
-    .from('game_seasons')
+  // Find games i denne liga via game_leagues og tjek om brugeren er medlem af mindst ét
+  const { data: gameLeagueRows } = await supabaseAdmin
+    .from('game_leagues')
     .select('game_id')
-    .eq('season_id', round.season_id)
-  const gameIds = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
+    .eq('league_id', round.league_id)
+  const gameIds = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
 
   let membership = null
   if (gameIds.length > 0) {
@@ -47,34 +47,16 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select(`
-      id, home_team_id, away_team_id,
-      home_score, away_score, home_score_ht, away_score_ht,
-      status, kickoff,
-      home_team:teams!home_team_id(name),
-      away_team:teams!away_team_id(name)
-    `)
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
+    .select('id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at')
+    .eq('round_id', roundId)
     .in('status', ['live', 'halftime', 'finished'])
-    .gte('kickoff', since.toISOString())
-    .order('kickoff', { ascending: true })
+    .gte('kickoff_at', since.toISOString())
+    .order('kickoff_at', { ascending: true })
     .limit(50)
 
   // Filtrér fremtidige kampe — status live/finished kræver kickoff i fortiden
   const nowIso = new Date().toISOString()
-  const matchList = (matches ?? []).map((m) => {
-    const ht = (m as { home_team?: { name?: string } | { name?: string }[] }).home_team
-    const at = (m as { away_team?: { name?: string } | { name?: string }[] }).away_team
-    return {
-      ...m,
-      home_team: (Array.isArray(ht) ? ht[0] : ht)?.name ?? '—',
-      away_team: (Array.isArray(at) ? at[0] : at)?.name ?? '—',
-    }
-  }).filter((m) => {
-    const k = (m as { kickoff?: string; kickoff_at?: string }).kickoff ?? (m as { kickoff?: string; kickoff_at?: string }).kickoff_at
-    return k && k <= nowIso
-  })
+  const matchList = (matches ?? []).filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
 
   const live = matchList.filter((m) => m.status === 'live').length
   const halftime = matchList.filter((m) => m.status === 'halftime').length

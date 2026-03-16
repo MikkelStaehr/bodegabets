@@ -3,39 +3,34 @@
 import { useState, useEffect } from 'react'
 import { registerServiceWorker, subscribeToPush, getExistingSubscription } from '@/lib/pushNotifications'
 
+const DISMISSED_KEY = 'bodega_push_dismissed'
+
 export default function PushNotificationBanner() {
   const [visible, setVisible] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
 
   useEffect(() => {
+    // Don't show if already dismissed, not supported, or already subscribed
     if (typeof window === 'undefined') return
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return
+    if (localStorage.getItem(DISMISSED_KEY)) return
+    if (Notification.permission === 'granted') {
+      // Check if already subscribed on server
+      checkServerSubscription()
+      return
+    }
     if (Notification.permission === 'denied') return
-    checkShouldShow()
+
+    setVisible(true)
   }, [])
 
-  async function checkShouldShow() {
+  async function checkServerSubscription() {
     try {
-      // Tjek server-side om brugeren har dismissed eller er subscribed
-      const [dismissedRes, subscriptionRes] = await Promise.all([
-        fetch('/api/push-dismissed'),
-        fetch('/api/push-subscription'),
-      ])
-      const { push_dismissed } = await dismissedRes.json()
-      const { subscribed } = await subscriptionRes.json()
-
-      if (push_dismissed || subscribed) return
-      setVisible(true)
+      const res = await fetch('/api/push-subscription')
+      const { subscribed } = await res.json()
+      if (!subscribed) setVisible(true)
     } catch {
-      // Ignorer fejl — vis ikke banneret ved netværksfejl
-    }
-  }
-
-  async function markDismissed() {
-    try {
-      await fetch('/api/push-dismissed', { method: 'POST' })
-    } catch {
-      // Best effort
+      // Ignore errors
     }
   }
 
@@ -44,7 +39,7 @@ export default function PushNotificationBanner() {
 
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') {
-      await markDismissed()
+      localStorage.setItem(DISMISSED_KEY, '1')
       setVisible(false)
       setSubscribing(false)
       return
@@ -56,6 +51,7 @@ export default function PushNotificationBanner() {
       return
     }
 
+    // Check for existing subscription first
     let subscription = await getExistingSubscription(registration)
     if (!subscription) {
       subscription = await subscribeToPush(registration)
@@ -69,13 +65,13 @@ export default function PushNotificationBanner() {
       })
     }
 
-    await markDismissed()
+    localStorage.setItem(DISMISSED_KEY, '1')
     setVisible(false)
     setSubscribing(false)
   }
 
-  async function handleDismiss() {
-    await markDismissed()
+  function handleDismiss() {
+    localStorage.setItem(DISMISSED_KEY, '1')
     setVisible(false)
   }
 

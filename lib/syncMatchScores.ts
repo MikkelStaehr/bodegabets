@@ -5,7 +5,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { calculateRoundPoints } from '@/lib/calculatePoints'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,6 +26,7 @@ export type SyncMatchScoresPreview = Array<{
   home_score: number
   away_score: number
   status: string
+  result: string
 }>
 
 export async function syncMatchScores(options?: {
@@ -151,17 +151,20 @@ export async function syncMatchScores(options?: {
   const matchesStatus = (s: string) =>
     s === 'finished' ? 'finished' : s === 'halftime' ? 'halftime' : 'live'
 
-  const finishedRoundIds = new Set<number>()
-
   for (const match of activeMatches) {
     const boldData = boldMatchMap.get(match.bold_match_id)
     if (!boldData) continue
+
+    const status = matchesStatus(boldData.status)
+    const result = boldData.home_score > boldData.away_score ? '1'
+      : boldData.home_score === boldData.away_score ? 'X' : '2'
 
     preview.push({
       match_id: match.id,
       home_score: boldData.home_score,
       away_score: boldData.away_score,
-      status: boldData.status,
+      status,
+      result,
     })
 
     if (dryRun) {
@@ -169,18 +172,13 @@ export async function syncMatchScores(options?: {
       continue
     }
 
-    const { data: currentMatch } = await supabaseAdmin
-      .from('matches')
-      .select('status')
-      .eq('id', match.id)
-      .single()
-
     const { error } = await supabaseAdmin
       .from('matches')
       .update({
         home_score: boldData.home_score,
         away_score: boldData.away_score,
-        status: matchesStatus(boldData.status),
+        status,
+        result,
         updated_at: new Date().toISOString(),
       })
       .eq('id', match.id)
@@ -189,50 +187,6 @@ export async function syncMatchScores(options?: {
       errors.push(`Opdatering fejlede for kamp ${match.id}: ${error.message}`)
     } else {
       updated++
-      if (boldData.status === 'finished' && currentMatch?.status !== 'finished') {
-        const { data: round } = await supabaseAdmin
-          .from('rounds')
-          .select('id')
-          .eq('season_id', match.season_id)
-          .eq('name', match.round_name)
-          .single()
-        if (round?.id) finishedRoundIds.add(round.id)
-      }
-    }
-  }
-
-  if (finishedRoundIds.size > 0 && !dryRun) {
-    for (const roundId of finishedRoundIds) {
-      console.log(`[syncMatchScores] Kamp finished → trigger calculateRoundPoints(${roundId})`)
-      await calculateRoundPoints(roundId)
-    }
-    await supabaseAdmin.from('admin_logs').insert({
-      type: 'calculate_points',
-      status: 'success',
-      message: `syncMatchScores: ${finishedRoundIds.size} runder beregnet efter færdige kampe`,
-      metadata: { round_ids: [...finishedRoundIds] },
-    })
-  }
-
-  // Ekstra check: runder hvor alle kampe allerede er finished fra forrige sync
-  if (!dryRun) {
-    const { data: roundsNeedingCalc, error: rpcError } = await supabaseAdmin.rpc('get_rounds_needing_calc')
-    if (rpcError) {
-      console.warn('[syncMatchScores] get_rounds_needing_calc RPC fejl:', rpcError.message)
-    } else {
-      const ids = (roundsNeedingCalc ?? []).map((r: { id: number }) => r.id).filter((id: number) => !finishedRoundIds.has(id))
-      if (ids.length > 0) {
-        for (const roundId of ids) {
-          console.log(`[syncMatchScores] Alle kampe finished → trigger calculateRoundPoints(${roundId})`)
-          await calculateRoundPoints(roundId)
-        }
-        await supabaseAdmin.from('admin_logs').insert({
-          type: 'calculate_points',
-          status: 'success',
-          message: `syncMatchScores: ${ids.length} runder (alle kampe allerede finished) beregnet`,
-          metadata: { round_ids: ids },
-        })
-      }
     }
   }
 
@@ -245,7 +199,7 @@ export async function syncMatchScores(options?: {
   // ─── Catch-up: find finished matches missing result ───────────────────────
   const { data: missedMatches, error: missedError } = await supabaseAdmin
     .from('matches')
-    .select('id, round_id, home_score, away_score')
+    .select('id, home_score, away_score')
     .eq('status', 'finished')
     .is('result', null)
     .not('home_score', 'is', null)
@@ -255,7 +209,6 @@ export async function syncMatchScores(options?: {
   } else if (missedMatches?.length) {
     console.log(`[syncMatchScores] Catch-up: ${missedMatches.length} finished kampe mangler result`)
 
-    const roundIds = new Set<number>()
     for (const m of missedMatches) {
       const result = m.home_score > m.away_score ? '1'
         : m.home_score === m.away_score ? 'X' : '2'
@@ -267,17 +220,6 @@ export async function syncMatchScores(options?: {
 
       if (updateErr) {
         errors.push(`Catch-up update fejl for match ${m.id}: ${updateErr.message}`)
-      } else if (m.round_id) {
-        roundIds.add(m.round_id)
-      }
-    }
-
-    for (const roundId of roundIds) {
-      try {
-        console.log(`[syncMatchScores] Catch-up: calculateRoundPoints for runde ${roundId}`)
-        await calculateRoundPoints(roundId)
-      } catch (e) {
-        errors.push(`Catch-up calculateRoundPoints fejl for runde ${roundId}: ${e}`)
       }
     }
   }

@@ -1,5 +1,4 @@
 import { supabaseAdmin } from '@/lib/supabase'
-import { scoresToPrediction } from '@/lib/betScores'
 import { isBetCorrect } from './betUtils'
 
 /**
@@ -17,24 +16,19 @@ import { isBetCorrect } from './betUtils'
 export async function calculateRoundPoints(roundId: number): Promise<void> {
   console.log(`[calculateRoundPoints] START roundId=${roundId}`)
 
-  const { data: round } = await supabaseAdmin
-    .from('rounds')
-    .select('season_id, name')
-    .eq('id', roundId)
-    .single()
-  if (!round?.season_id || !round?.name) return
-
-  // 1. Hent finished matches for runden (matches har season_id + round_name)
+  // 1. Hent finished matches for runden
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_score, away_score, home_score_ht, away_score_ht, status')
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
+    .select('id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status')
+    .eq('round_id', roundId)
     .eq('status', 'finished')
 
   if (!matches?.length) {
+    console.log(`[calculateRoundPoints] Ingen finished matches for runde ${roundId}`)
     return
   }
+
+  console.log(`[calculateRoundPoints] ${matches.length} finished matches: ${matches.map(m => m.id).join(', ')}`)
 
   const matchIds = matches.map((m) => m.id)
 
@@ -46,33 +40,46 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
   const allGameIds = [...new Set((betGameRows ?? []).map((b) => b.game_id as number))]
   if (allGameIds.length === 0) {
+    console.log(`[calculateRoundPoints] Ingen bets fundet for matchIds ${matchIds.join(', ')}`)
     return
   }
 
+  console.log(`[calculateRoundPoints] gameIds med bets: ${allGameIds.join(', ')}`)
+
   // 2. For hvert game: evaluer bets, beregn earnings, upsert round_scores
   for (const gameId of allGameIds) {
+    console.log(`[calculateRoundPoints] === Game ${gameId}, runde ${roundId} ===`)
+
     // 2a. Evaluer alle bets for alle finished matches i runden
     for (const match of matches) {
       if (match.home_score === null || match.away_score === null) continue
 
       const { data: bets } = await supabaseAdmin
         .from('bets')
-        .select('id, user_id, home_score, away_score, stake')
+        .select('id, user_id, prediction, stake, bet_type')
         .eq('match_id', match.id)
         .eq('game_id', gameId)
 
       if (!bets?.length) continue
 
+      console.log(`[calculateRoundPoints] Match ${match.id} (${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}): ${bets.length} bets`)
+
       for (const bet of bets) {
-        const betRow = bet as { home_score?: number; away_score?: number }
-        const prediction =
-          betRow.home_score != null && betRow.away_score != null
-            ? scoresToPrediction(betRow.home_score, betRow.away_score)
-            : 'X'
+        // Halvleg: skip hvis HT-scores mangler
+        if (
+          (bet.bet_type === 'halvleg' || bet.bet_type === 'halftime') &&
+          (match.home_score_ht == null || match.away_score_ht == null)
+        ) {
+          await supabaseAdmin
+            .from('bets')
+            .update({ result: 'pending', points_earned: 0 })
+            .eq('id', bet.id)
+          continue
+        }
 
         const correct = isBetCorrect(
-          'match_result',
-          prediction,
+          bet.bet_type,
+          bet.prediction,
           match.home_score,
           match.away_score,
           match.home_score_ht,
@@ -82,6 +89,8 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
         const stake = bet.stake ?? 0
         const pointsEarned = correct ? stake * 2 : 0
         const result = correct ? 'win' : 'loss'
+
+        console.log(`[calculateRoundPoints]   bet ${bet.id}: user=${(bet.user_id as string).slice(0,8)}, type=${bet.bet_type}, pred=${bet.prediction}, stake=${stake}, correct=${correct}, points_earned=${pointsEarned}`)
 
         const { error: betUpdateError } = await supabaseAdmin
           .from('bets')
@@ -103,8 +112,11 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       .in('match_id', matchIds)
 
     if (!roundBets?.length) {
+      console.log(`[calculateRoundPoints] Ingen roundBets fundet for game ${gameId} — skipper round_scores`)
       continue
     }
+
+    console.log(`[calculateRoundPoints] ${roundBets.length} bets i runde for game ${gameId}`)
 
     // Gruppér per bruger
     const userStats = new Map<string, { totalStake: number; totalEarned: number }>()
@@ -120,6 +132,8 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     for (const [userId, stats] of userStats) {
       const earningsDelta = stats.totalEarned
 
+      console.log(`[calculateRoundPoints] round_scores UPSERT: user=${userId.slice(0,8)}, round=${roundId}, game=${gameId}, totalEarned=${stats.totalEarned}, earnings_delta=${earningsDelta}`)
+
       const { error: upsertError } = await supabaseAdmin.from('round_scores').upsert(
         {
           user_id: userId,
@@ -133,6 +147,8 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
       if (upsertError) {
         console.error(`[calculateRoundPoints] FEJL ved round_scores upsert:`, upsertError)
+      } else {
+        console.log(`[calculateRoundPoints] round_scores upsert OK for user=${userId.slice(0,8)}`)
       }
     }
 
@@ -153,6 +169,8 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
         (sum, s) => sum + ((s as { earnings_delta?: number }).earnings_delta ?? 0),
         0
       )
+
+      console.log(`[calculateRoundPoints] game_members.earnings SET: user=${(member.user_id as string).slice(0,8)}, game=${gameId}, totalEarnings=${totalEarnings} (fra ${(scores ?? []).length} round_scores)`)
 
       await supabaseAdmin
         .from('game_members')

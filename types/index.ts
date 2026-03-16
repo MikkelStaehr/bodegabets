@@ -43,8 +43,7 @@ export type GameMember = {
 
 export type Round = {
   id: number
-  league_id?: number
-  season_id?: number
+  league_id: number
   name: string
   betting_closes_at: string | null
   status: 'upcoming' | 'open' | 'closed' | 'finished'
@@ -73,7 +72,6 @@ export type Bet = {
   user_id: string
   match_id: number
   game_id: number
-  /** 1/X/2 — vises i UI; match_result lagres som home_score/away_score i DB */
   prediction: string
   bet_type: BetType
   stake: number

@@ -19,36 +19,38 @@ export async function POST(req: NextRequest) {
   }
 
   const { data, error } = await supabaseAdmin
-    .from('tournaments')
+    .from('leagues')
     .insert({
       name: body.name.trim(),
       country: body.country?.trim() ?? 'World',
       is_active: true,
+      fixturedownload_slug: body.fixturedownload_slug?.trim() || null,
       bold_slug: body.bold_slug?.trim() || null,
     })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, league: data, tournament: data })
+  return NextResponse.json({ ok: true, league: data })
 }
 
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { tournament_id, league_id, bold_slug } = await req.json() as {
-    tournament_id?: number
-    league_id?: number
-    bold_slug?: string | null
+  const { league_id, fixturedownload_slug } = await req.json() as {
+    league_id: number
+    fixturedownload_slug: string | null
   }
 
-  const id = tournament_id ?? league_id
-  if (!id) return NextResponse.json({ error: 'tournament_id påkrævet' }, { status: 400 })
+  if (!league_id) return NextResponse.json({ error: 'league_id påkrævet' }, { status: 400 })
 
-  const { error } = bold_slug !== undefined
-    ? await supabaseAdmin.from('tournaments').update({ bold_slug: bold_slug?.trim() || null }).eq('id', id)
-    : { error: null }
+  const { error } = await supabaseAdmin
+    .from('leagues')
+    .update({
+      fixturedownload_slug: fixturedownload_slug?.trim() || null,
+    })
+    .eq('id', league_id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

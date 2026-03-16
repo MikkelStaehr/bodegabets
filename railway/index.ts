@@ -8,7 +8,7 @@
  *   GET /sync-scores       — hvert 5. min (sync live scores fra Bold API)
  *   GET /sync-fixtures     — dagligt 06:00 (sync fixtures fra Bold API)
  *   GET /update-rounds     — dagligt 08:00 (opdater runde-status)
- *   (calculate-points køres event-drevet fra syncMatchScores — ikke som cron)
+ *   GET /calculate-points  — dagligt 09:00 (beregn points)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /health            — health check
  *
@@ -22,27 +22,11 @@
  */
 
 import express from 'express'
-import cron from 'node-cron'
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
-
-async function pingAdmin(job: string, durationMs: number, status: 'success' | 'error', message: string) {
-  try {
-    await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/railway-ping`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-      },
-      body: JSON.stringify({ job, duration_ms: durationMs, status, message }),
-    })
-  } catch {
-    // Best effort
-  }
-}
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
@@ -79,21 +63,18 @@ app.use(authorize)
 app.get('/sync-scores', async (_req, res) => {
   try {
     const result = await syncMatchScores()
-    const updated = (result as { updated?: number }).updated ?? 0
-    const errors = (result as { errors?: string[] }).errors ?? []
-    const hasErrors = errors.length > 0
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'sync_scores',
-      status: hasErrors && updated === 0 ? 'warning' : 'success',
-      message: `sync-scores: ${updated} updated`,
-      metadata: { updated, errors },
+      type: 'cron_sync',
+      status: 'success',
+      message: `sync-scores: ${(result as Record<string, unknown>).updated ?? 0} updated`,
+      metadata: result,
     })
 
     res.json({ ok: true, ...result })
   } catch (e) {
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'sync_scores',
+      type: 'cron_sync',
       status: 'error',
       message: `sync-scores failed: ${String(e)}`,
     })
@@ -110,31 +91,31 @@ app.get('/sync-fixtures', async (_req, res) => {
     const totals = results.reduce(
       (acc, r) => ({
         synced: acc.synced + r.synced,
-        rounds_upserted: acc.rounds_upserted + r.rounds_upserted,
+        rounds_created: acc.rounds_created + r.rounds_created,
         matches_created: acc.matches_created + r.matches_created,
         matches_updated: acc.matches_updated + r.matches_updated,
       }),
-      { synced: 0, rounds_upserted: 0, matches_created: 0, matches_updated: 0 }
+      { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0 }
     )
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'sync_fixtures',
+      type: 'cron_sync',
       status: totals.synced > 0 ? 'success' : 'info',
-      message: `sync-fixtures: ${results.length} sæsoner, ${totals.matches_created} created, ${totals.matches_updated} updated`,
-      metadata: { seasons_synced: results.length, ...totals },
+      message: `sync-fixtures: ${results.length} leagues, ${totals.matches_created} created, ${totals.matches_updated} updated`,
+      metadata: { leagues_synced: results.length, ...totals },
     })
 
     res.json({
       ok: true,
       synced_at: new Date().toISOString(),
-      seasons_synced: results.length,
+      leagues_synced: results.length,
       ...totals,
       details: results,
     })
   } catch (err) {
     console.error('[sync-fixtures]', err)
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'sync_fixtures',
+      type: 'cron_sync',
       status: 'error',
       message: `sync-fixtures failed: ${String(err)}`,
     })
@@ -151,7 +132,7 @@ app.get('/update-rounds', async (_req, res) => {
 
     const { data: allRounds, error: roundsError } = await supabaseAdmin
       .from('rounds')
-      .select('id, name, status, betting_closes_at, season_id')
+      .select('id, name, status, betting_closes_at, league_id')
       .order('id', { ascending: true })
 
     if (roundsError) {
@@ -159,7 +140,7 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
-    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; season_id: number }
+    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; league_id: number }
     const typedAllRounds = (allRounds ?? []) as RoundRow[]
     const rounds = typedAllRounds.filter((r) => r.status !== 'finished')
     const roundIds = rounds.map((r) => r.id)
@@ -169,32 +150,27 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
-    const seasonIds = [...new Set(rounds.map((r) => r.season_id))]
     const { data: matchRows, error: statsError } = await supabaseAdmin
       .from('matches')
-      .select('season_id, round_name, status, kickoff')
-      .in('season_id', seasonIds)
+      .select('round_id, status, kickoff_at')
+      .in('round_id', roundIds)
 
     if (statsError) {
       res.status(500).json({ error: statsError.message })
       return
     }
 
-    type MatchRow = { season_id: number; round_name: string; status: string; kickoff: string | null }
-    const statsBySeasonRound = new Map<string, { total: number; finished: number; minKickoff: string | null }>()
-    for (const m of (matchRows ?? []) as MatchRow[]) {
-      const key = `${m.season_id}|${m.round_name}`
-      const entry = statsBySeasonRound.get(key) ?? { total: 0, finished: 0, minKickoff: null }
-      entry.total++
-      if (m.status === 'finished') entry.finished++
-      if (m.kickoff) {
-        if (!entry.minKickoff || m.kickoff < entry.minKickoff) entry.minKickoff = m.kickoff
-      }
-      statsBySeasonRound.set(key, entry)
-    }
+    type MatchRow = { round_id: number; status: string; kickoff_at: string | null }
     const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
-    for (const r of rounds) {
-      statMap[r.id] = statsBySeasonRound.get(`${r.season_id}|${r.name}`) ?? { total: 0, finished: 0, minKickoff: null }
+    for (const m of (matchRows ?? []) as MatchRow[]) {
+      if (!statMap[m.round_id]) statMap[m.round_id] = { total: 0, finished: 0, minKickoff: null }
+      statMap[m.round_id].total++
+      if (m.status === 'finished') statMap[m.round_id].finished++
+      if (m.kickoff_at) {
+        if (!statMap[m.round_id].minKickoff || m.kickoff_at < statMap[m.round_id].minKickoff!) {
+          statMap[m.round_id].minKickoff = m.kickoff_at
+        }
+      }
     }
 
     // 1) Markér runder som 'finished'
@@ -207,26 +183,26 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ status: 'finished' }).in('id', finishedIds)
     }
 
-    // Gruppér per sæson
-    const roundsBySeason = new Map<number, RoundRow[]>()
+    // Gruppér per liga
+    const roundsByLeague = new Map<number, RoundRow[]>()
     for (const r of typedAllRounds) {
-      if (!roundsBySeason.has(r.season_id)) roundsBySeason.set(r.season_id, [])
-      roundsBySeason.get(r.season_id)!.push(r)
+      if (!roundsByLeague.has(r.league_id)) roundsByLeague.set(r.league_id, [])
+      roundsByLeague.get(r.league_id)!.push(r)
     }
 
-    // 2) Åbn næste upcoming runde per sæson
+    // 2) Åbn næste upcoming runde per liga
     const toMarkOpen = rounds.filter((r) => {
       if (r.status !== 'upcoming') return false
       if (finishedIds.includes(r.id)) return false
-      const seasonRounds = roundsBySeason.get(r.season_id) ?? []
+      const leagueRounds = roundsByLeague.get(r.league_id) ?? []
       const effectiveStatus = (rd: RoundRow) => finishedIds.includes(rd.id) ? 'finished' : rd.status
-      const hasActiveRound = seasonRounds.some(
+      const hasActiveRound = leagueRounds.some(
         (rd) => rd.id !== r.id && (effectiveStatus(rd) === 'open' || effectiveStatus(rd) === 'closed')
       )
       if (hasActiveRound) return false
-      const idx = seasonRounds.findIndex((rd) => rd.id === r.id)
+      const idx = leagueRounds.findIndex((rd) => rd.id === r.id)
       if (idx > 0) {
-        const prev = seasonRounds[idx - 1]
+        const prev = leagueRounds[idx - 1]
         if (effectiveStatus(prev) !== 'finished') return false
       }
       return true
@@ -236,7 +212,7 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ status: 'open' }).in('id', openIds)
     }
 
-    // 3) Sæt betting_closes_at = første kamp kickoff (kun hvis ikke allerede sat)
+    // 3) Sæt betting_closes_at
     const toSetDeadline = rounds.filter((r) => {
       if (r.betting_closes_at) return false
       if (finishedIds.includes(r.id)) return false
@@ -245,17 +221,14 @@ app.get('/update-rounds', async (_req, res) => {
     })
     for (const r of toSetDeadline) {
       const stat = statMap[r.id]
-      await supabaseAdmin
-        .from('rounds')
-        .update({ betting_closes_at: stat!.minKickoff! })
-        .eq('id', r.id)
-        .is('betting_closes_at', null)
+      const deadline = new Date(new Date(stat.minKickoff!).getTime() - 60 * 60 * 1000).toISOString()
+      await supabaseAdmin.from('rounds').update({ betting_closes_at: deadline }).eq('id', r.id)
     }
 
-    console.log(`[update-rounds] finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines: ${toSetDeadline.length}`)
+    console.log(`[update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}`)
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'update_rounds',
+      type: 'cron_sync',
       status: finishedIds.length > 0 || openIds.length > 0 ? 'success' : 'info',
       message: `update-rounds: ${finishedIds.length} finished, ${openIds.length} opened, ${toSetDeadline.length} deadlines sat`,
       metadata: {
@@ -299,18 +272,10 @@ app.get('/calculate-points', async (_req, res) => {
       const roundIds = [...new Set((betRounds ?? []).map((b) => b.round_id as number))]
 
       for (const roundId of roundIds) {
-        const { data: round } = await supabaseAdmin
-          .from('rounds')
-          .select('season_id, name')
-          .eq('id', roundId)
-          .single()
-        if (!round?.season_id || !round?.name) continue
-
         const { data: matches } = await supabaseAdmin
           .from('matches')
           .select('id, status')
-          .eq('season_id', round.season_id)
-          .eq('round_name', round.name)
+          .eq('round_id', roundId)
 
         const allFinished = matches?.every((m) => m.status === 'finished')
         if (!allFinished) continue
@@ -323,7 +288,7 @@ app.get('/calculate-points', async (_req, res) => {
     const { updated } = await syncProfilesPoints()
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'calculate_points',
+      type: 'cron_sync',
       status: processed > 0 ? 'success' : 'info',
       message: `calculate-points: ${processed} rounds processed, ${updated} profiles updated`,
       metadata: { rounds_processed: processed, profiles_updated: updated },
@@ -354,7 +319,7 @@ app.get('/send-reminders', async (_req, res) => {
 
     const { data: rounds } = await supabaseAdmin
       .from('rounds')
-      .select('id, name, season_id, betting_closes_at')
+      .select('id, name, league_id, betting_closes_at')
       .neq('status', 'finished')
       .gt('betting_closes_at', now.toISOString())
       .lte('betting_closes_at', sixHoursLater.toISOString())
@@ -372,14 +337,14 @@ app.get('/send-reminders', async (_req, res) => {
         (new Date(round.betting_closes_at!).getTime() - now.getTime()) / (1000 * 60 * 60)
       )
 
-      const { data: gameSeasonRows } = await supabaseAdmin
-        .from('game_seasons')
+      const { data: gameLeagueRows } = await supabaseAdmin
+        .from('game_leagues')
         .select('game_id')
-        .eq('season_id', round.season_id)
+        .eq('league_id', round.league_id)
 
-      const gameIdsForSeason = (gameSeasonRows ?? []).map((g: { game_id: number }) => g.game_id)
-      const { data: games } = gameIdsForSeason.length
-        ? await supabaseAdmin.from('games').select('id, name').in('id', gameIdsForSeason)
+      const gameIdsForLeague = (gameLeagueRows ?? []).map((g: { game_id: number }) => g.game_id)
+      const { data: games } = gameIdsForLeague.length
+        ? await supabaseAdmin.from('games').select('id, name').in('id', gameIdsForLeague)
         : { data: [] as { id: number; name: string }[] }
 
       if (!games?.length) continue
@@ -437,7 +402,7 @@ app.get('/send-reminders', async (_req, res) => {
     }
 
     await supabaseAdmin.from('admin_logs').insert({
-      type: 'send_reminders',
+      type: 'cron_sync',
       status: totalSent > 0 ? 'success' : 'info',
       message: `send-reminders: ${totalSent} sent, ${totalFailed} failed`,
       metadata: { sent: totalSent, failed: totalFailed, rounds: rounds.length },
@@ -454,62 +419,4 @@ app.get('/send-reminders', async (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[bodegabets-cron] listening on port ${PORT}`)
-
-  const self = `http://localhost:${PORT}`
-  const headers = { Authorization: `Bearer ${process.env.CRON_SECRET ?? ''}` }
-
-  const call = (name: string, path: string) =>
-    fetch(`${self}${path}`, { headers })
-      .then(r => r.json())
-      .then(j => { console.log(`[cron] ${name}`, j); return j })
-      .catch(e => { console.error(`[cron] ${name} failed`, e); throw e })
-
-  // Hvert 5. minut — sync live scores
-  cron.schedule('*/5 * * * *', async () => {
-    const start = Date.now()
-    try {
-      const result = await call('sync-scores', '/sync-scores')
-      await pingAdmin('sync-scores', Date.now() - start, 'success', `${(result as { updated?: number })?.updated ?? 0} updated`)
-    } catch (err) {
-      await pingAdmin('sync-scores', Date.now() - start, 'error', String(err))
-    }
-  })
-
-  // Hvert 30. minut — sync fixtures
-  cron.schedule('*/30 * * * *', async () => {
-    const start = Date.now()
-    try {
-      const result = await call('sync-fixtures', '/sync-fixtures')
-      const r = result as { leagues_synced?: number; matches_created?: number; matches_updated?: number }
-      await pingAdmin('sync-fixtures', Date.now() - start, 'success', `${r?.leagues_synced ?? 0} leagues, ${r?.matches_created ?? 0} created, ${r?.matches_updated ?? 0} updated`)
-    } catch (err) {
-      await pingAdmin('sync-fixtures', Date.now() - start, 'error', String(err))
-    }
-  })
-
-  // Dagligt 08:00 UTC — opdater rundes status
-  cron.schedule('0 8 * * *', async () => {
-    const start = Date.now()
-    try {
-      const result = await call('update-rounds', '/update-rounds')
-      const r = result as { rounds_marked_finished?: number; rounds_marked_open?: number; deadlines_set?: number }
-      await pingAdmin('update-rounds', Date.now() - start, 'success', `finished: ${r?.rounds_marked_finished ?? 0}, opened: ${r?.rounds_marked_open ?? 0}, deadlines: ${r?.deadlines_set ?? 0}`)
-    } catch (err) {
-      await pingAdmin('update-rounds', Date.now() - start, 'error', String(err))
-    }
-  })
-
-  // Dagligt 10:00 UTC — send reminders
-  cron.schedule('0 10 * * *', async () => {
-    const start = Date.now()
-    try {
-      const result = await call('send-reminders', '/send-reminders')
-      const r = result as { sent?: number; failed?: number }
-      await pingAdmin('send-reminders', Date.now() - start, 'success', `${r?.sent ?? 0} sent, ${r?.failed ?? 0} failed`)
-    } catch (err) {
-      await pingAdmin('send-reminders', Date.now() - start, 'error', String(err))
-    }
-  })
-
-  console.log('[bodegabets-cron] cron jobs scheduled')
 })
