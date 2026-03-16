@@ -241,5 +241,46 @@ export async function syncMatchScores(options?: {
   if (dryRun) {
     return { updated, errors, preview, raw_bold_response: rawBoldResponse }
   }
+
+  // ─── Catch-up: find finished matches missing result ───────────────────────
+  const { data: missedMatches, error: missedError } = await supabaseAdmin
+    .from('matches')
+    .select('id, round_id, home_score, away_score')
+    .eq('status', 'finished')
+    .is('result', null)
+    .not('home_score', 'is', null)
+
+  if (missedError) {
+    errors.push(`Catch-up fetch fejl: ${missedError.message}`)
+  } else if (missedMatches?.length) {
+    console.log(`[syncMatchScores] Catch-up: ${missedMatches.length} finished kampe mangler result`)
+
+    const roundIds = new Set<number>()
+    for (const m of missedMatches) {
+      const result = m.home_score > m.away_score ? '1'
+        : m.home_score === m.away_score ? 'X' : '2'
+
+      const { error: updateErr } = await supabaseAdmin
+        .from('matches')
+        .update({ result })
+        .eq('id', m.id)
+
+      if (updateErr) {
+        errors.push(`Catch-up update fejl for match ${m.id}: ${updateErr.message}`)
+      } else if (m.round_id) {
+        roundIds.add(m.round_id)
+      }
+    }
+
+    for (const roundId of roundIds) {
+      try {
+        console.log(`[syncMatchScores] Catch-up: calculateRoundPoints for runde ${roundId}`)
+        await calculateRoundPoints(roundId)
+      } catch (e) {
+        errors.push(`Catch-up calculateRoundPoints fejl for runde ${roundId}: ${e}`)
+      }
+    }
+  }
+
   return { updated, errors }
 }
