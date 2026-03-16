@@ -856,36 +856,64 @@ export default function AfgivBets({
             </div>
           </div>
 
-          {matches.map((match) => {
-            const matchBet = existingBets.find(
-              (b) => b.match_id === match.id && b.bet_type === 'match_result'
-            )
-            const extraPicks: Record<string, string> = {}
-            for (const b of existingBets) {
-              if (b.match_id === match.id && EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType)) {
-                extraPicks[b.bet_type] = b.prediction
+          {(() => {
+            const sorted = [...matches].sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))
+            const elements: React.ReactNode[] = []
+            let lastDateKey = ''
+            for (const match of sorted) {
+              const dateKey = match.kickoff_at
+                ? new Date(match.kickoff_at).toLocaleDateString('da-DK', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    timeZone: 'Europe/Copenhagen',
+                  })
+                : ''
+              if (dateKey && dateKey !== lastDateKey) {
+                const label = new Date(match.kickoff_at).toLocaleDateString('da-DK', {
+                  weekday: 'long', day: 'numeric', month: 'long',
+                  timeZone: 'Europe/Copenhagen',
+                })
+                elements.push(
+                  <div key={`sep-${dateKey}`} className="flex items-center gap-2" style={{ margin: '12px 0 8px' }}>
+                    <div className="flex-1 h-px bg-[#e5e0d8]" />
+                    <span className="text-[11px] font-semibold text-[#9E9486] uppercase tracking-wide whitespace-nowrap">
+                      {label}
+                    </span>
+                    <div className="flex-1 h-px bg-[#e5e0d8]" />
+                  </div>
+                )
+                lastDateKey = dateKey
               }
+              const matchBet = existingBets.find(
+                (b) => b.match_id === match.id && b.bet_type === 'match_result'
+              )
+              const extraPicks: Record<string, string> = {}
+              for (const b of existingBets) {
+                if (b.match_id === match.id && EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType)) {
+                  extraPicks[b.bet_type] = b.prediction
+                }
+              }
+              elements.push(
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  selectedOutcome={getSelection(match.id)?.outcome ?? null}
+                  onSelect={(o) => selectOutcome(match.id, o)}
+                  disabled={isReadOnly || !matchBettingOpen(match)}
+                  extraBetsEnabled={extraBetsEnabled}
+                  isReadOnly={isReadOnly}
+                  extraBets={getSelection(match.id)?.extraBets ?? []}
+                  onExtraChange={updateExtraBets}
+                  fastPoints={effectiveFastPoints}
+                  userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
+                  userExtraPicks={extraPicks}
+                  rivalry={rivalryInfo[match.id]}
+                  userPoints={userPoints}
+                  totalMatches={totalMatchesInRound ?? totalMatches}
+                />
+              )
             }
-            return (
-              <MatchCard
-                key={match.id}
-                match={match}
-                selectedOutcome={getSelection(match.id)?.outcome ?? null}
-                onSelect={(o) => selectOutcome(match.id, o)}
-                disabled={isReadOnly || !matchBettingOpen(match)}
-                extraBetsEnabled={extraBetsEnabled}
-                isReadOnly={isReadOnly}
-                extraBets={getSelection(match.id)?.extraBets ?? []}
-                onExtraChange={updateExtraBets}
-                fastPoints={effectiveFastPoints}
-                userPrediction={(matchBet?.prediction as '1' | 'X' | '2') ?? null}
-                userExtraPicks={extraPicks}
-                rivalry={rivalryInfo[match.id]}
-                userPoints={userPoints}
-                totalMatches={totalMatchesInRound ?? totalMatches}
-              />
-            )
-          })}
+            return elements
+          })()}
         </div>
 
         {/* Højre — Dine valg */}
