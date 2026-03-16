@@ -88,12 +88,13 @@ export default async function GamePage({ params }: Props) {
   if (!game) notFound()
 
   // Hent season_ids fra game_seasons junction
-  const { data: gameSeasons } = await supabase
+  console.log('GAME ID TYPE:', typeof gameId, gameId)
+  const { data: gameSeasons, error: gameSeasonsError } = await supabase
     .from('game_seasons')
     .select('season_id')
-    .eq('game_id', gameId)
-  console.log('GAME ID:', gameId)
-  console.log('GAME SEASONS:', gameSeasons)
+    .eq('game_id', Number(gameId))
+  console.log('GAME SEASONS DATA:', gameSeasons)
+  console.log('GAME SEASONS ERROR:', gameSeasonsError)
   const seasonIds = (gameSeasons ?? []).map((gs) => gs.season_id as number)
 
   // Hent league_id fra game_leagues (til liga-navn)
