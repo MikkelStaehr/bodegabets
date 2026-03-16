@@ -77,8 +77,8 @@ export default async function RoundPage({ params }: Props) {
   const matchSelect = `
     id, kickoff, status, result,
     home_score, away_score,
-    home_team:teams!matches_home_team_id_fkey(id, name),
-    away_team:teams!matches_away_team_id_fkey(id, name)
+    home_team:teams!home_team_id(id, name),
+    away_team:teams!away_team_id(id, name)
   `
 
   type RawMatch = {

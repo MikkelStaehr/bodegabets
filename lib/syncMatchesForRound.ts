@@ -16,21 +16,21 @@ export async function syncMatchesForRound(
 
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('name, league_id')
+    .select('name, season_id')
     .eq('id', roundId)
     .single()
 
-  console.log('[syncMatchesForRound] round name:', round?.name, 'league_id:', round?.league_id)
+  console.log('[syncMatchesForRound] round name:', round?.name, 'season_id:', round?.season_id)
 
-  if (!round?.league_id || !round?.name) {
-    console.log('[syncMatchesForRound] early return: missing round.league_id or round.name')
+  if (!round?.season_id || !round?.name) {
+    console.log('[syncMatchesForRound] early return: missing round.season_id or round.name')
     return
   }
 
   const { data: leagueMatches } = await supabaseAdmin
     .from('league_matches')
     .select('id, home_team, away_team, kickoff_at, status, home_score, away_score')
-    .eq('league_id', round.league_id)
+    .eq('season_id', round.season_id)
     .eq('round_name', round.name)
     .order('kickoff_at', { ascending: true })
 
