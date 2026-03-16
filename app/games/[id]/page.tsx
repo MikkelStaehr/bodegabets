@@ -88,7 +88,7 @@ export default async function GamePage({ params }: Props) {
   if (!game) notFound()
 
   // Hent league_id fra game_leagues
-  const { data: gameLeagueRow } = await supabase
+  const { data: gameLeagueRow, error: gameLeagueError } = await supabase
     .from('game_leagues')
     .select('league_id')
     .eq('game_id', gameId)
@@ -96,6 +96,9 @@ export default async function GamePage({ params }: Props) {
     .maybeSingle()
   const gameLeagueId = gameLeagueRow?.league_id as number | null ?? null
 
+  console.log('GAME ID:', gameId)
+  console.log('GAME LEAGUE ROW:', gameLeagueRow)
+  console.log('GAME LEAGUE ERROR:', gameLeagueError)
   console.log('GAME LEAGUE ID:', gameLeagueId)
 
   const [
