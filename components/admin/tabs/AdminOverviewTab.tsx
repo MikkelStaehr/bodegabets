@@ -286,8 +286,6 @@ export function AdminOverviewTab({ adminSecret }: Props) {
   const [loading, setLoading] = useState(true)
   const [cronLoading, setCronLoading] = useState<Set<string>>(new Set())
   const [cronMessages, setCronMessages] = useState<Record<string, { type: 'ok' | 'err'; text: string }>>({})
-  const [logoSyncing, setLogoSyncing] = useState(false)
-  const [logoSyncResult, setLogoSyncResult] = useState<{ tournaments_updated: number; teams_updated: number } | null>(null)
 
   const authHeader = { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` }
 
@@ -300,19 +298,6 @@ export function AdminOverviewTab({ adminSecret }: Props) {
         return n
       })
     }, 5000)
-  }
-
-  async function syncLogos() {
-    setLogoSyncing(true)
-    try {
-      const res = await fetch('/api/admin/sync-logos', { method: 'POST', headers: authHeader })
-      const data = await res.json()
-      setLogoSyncResult(data)
-    } catch {
-      setLogoSyncResult(null)
-    } finally {
-      setLogoSyncing(false)
-    }
   }
 
   async function runCron(cron: string) {
@@ -395,31 +380,6 @@ export function AdminOverviewTab({ adminSecret }: Props) {
               )}
             </div>
           ))}
-        </div>
-
-        <div className="border-t border-warm-border mt-4 pt-4">
-          <p className="font-condensed text-[10px] font-bold text-warm-gray uppercase tracking-wider mb-2">Data</p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={syncLogos}
-              disabled={logoSyncing}
-              className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-forest px-4 py-2 border border-warm-border hover:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ borderRadius: '2px' }}
-            >
-              {logoSyncing && (
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-              )}
-              {logoSyncing ? 'Synkroniserer...' : 'Sync Logoer'}
-            </button>
-            {logoSyncResult && (
-              <span className="font-body text-[11px] text-forest">
-                Turneringer: {logoSyncResult.tournaments_updated} · Hold: {logoSyncResult.teams_updated}
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
