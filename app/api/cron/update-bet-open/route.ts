@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
   for (const r of rounds) {
     const count = countBySeason.get(r.season_id) ?? 0
-    if (count < 2) {
+    if (count < 1) {
       idsToOpen.push(r.id)
       countBySeason.set(r.season_id, count + 1)
     }
