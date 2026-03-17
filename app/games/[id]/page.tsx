@@ -234,16 +234,16 @@ export default async function GamePage({ params }: Props) {
   }))
 
   const sortedRounds = [...roundsWithStatus].sort((a, b) => {
-    const numA = parseInt(a.name.match(/\d+/)?.[0] ?? '0', 10)
-    const numB = parseInt(b.name.match(/\d+/)?.[0] ?? '0', 10)
-    return numA - numB
+    const aDate = a.betting_closes_at ?? ''
+    const bDate = b.betting_closes_at ?? ''
+    return aDate.localeCompare(bDate)
   })
 
   const finishedRounds = sortedRounds.filter((r) => r.computedStatus === 'finished')
 
   const activeRound =
-    sortedRounds.find((r) => r.computedStatus === 'open') ??
     sortedRounds.find((r) => r.computedStatus === 'active') ??
+    sortedRounds.find((r) => r.computedStatus === 'open') ??
     sortedRounds.find((r) => r.computedStatus === 'upcoming') ??
     null
 
