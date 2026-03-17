@@ -53,32 +53,32 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent live/halftime/finished kampe (kickoff inden for 24 timer)
   const { data: activeMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at,
+    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(logo_url),
       away_team_ref:teams!away_team_id(logo_url)`)
     .eq('round_id', roundId)
     .in('status', ['live', 'halftime', 'finished'])
-    .gte('kickoff_at', since.toISOString())
-    .order('kickoff_at', { ascending: true })
+    .gte('kickoff', since.toISOString())
+    .order('kickoff', { ascending: true })
     .limit(50)
 
   // Hent scheduled kampe (kickoff inden for 60 min)
   const { data: scheduledMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at,
+    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(logo_url),
       away_team_ref:teams!away_team_id(logo_url)`)
     .eq('round_id', roundId)
     .eq('status', 'scheduled')
-    .gt('kickoff_at', now.toISOString())
-    .lte('kickoff_at', soonCutoff.toISOString())
-    .order('kickoff_at', { ascending: true })
+    .gt('kickoff', now.toISOString())
+    .lte('kickoff', soonCutoff.toISOString())
+    .order('kickoff', { ascending: true })
     .limit(20)
 
   const nowIso = now.toISOString()
 
   const activeList = (activeMatches ?? [])
-    .filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
+    .filter((m) => m.kickoff && m.kickoff <= nowIso)
 
   const allMatches = [...activeList, ...(scheduledMatches ?? [])]
 
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest, { params }: Props) {
       home_score_ht: m.home_score_ht,
       away_score_ht: m.away_score_ht,
       status: m.status,
-      kickoff_at: m.kickoff_at,
+      kickoff_at: m.kickoff,
       home_team_logo: (m.home_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
       away_team_logo: (m.away_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
     }))
