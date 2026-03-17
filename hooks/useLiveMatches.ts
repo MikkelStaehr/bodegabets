@@ -10,7 +10,7 @@ export type LiveMatch = {
   away_score: number | null
   home_score_ht: number | null
   away_score_ht: number | null
-  status: 'live' | 'halftime' | 'finished'
+  status: 'live' | 'halftime' | 'finished' | 'scheduled'
   kickoff_at: string
   home_team_logo: string | null
   away_team_logo: string | null
@@ -20,6 +20,7 @@ export type LiveSummary = {
   live: number
   halftime: number
   finished: number
+  scheduled: number
   total: number
 }
 
@@ -28,7 +29,7 @@ export function useLiveMatches(
   enabled = true
 ) {
   const [matches, setMatches] = useState<LiveMatch[]>([])
-  const [summary, setSummary] = useState<LiveSummary>({ live: 0, halftime: 0, finished: 0, total: 0 })
+  const [summary, setSummary] = useState<LiveSummary>({ live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   const fetchLive = useCallback(async () => {
@@ -38,7 +39,7 @@ export function useLiveMatches(
       if (res.ok) {
         const json = await res.json()
         setMatches(json.matches ?? [])
-        setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, total: 0 })
+        setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
         setLastUpdate(new Date())
       }
     } catch {
@@ -48,7 +49,7 @@ export function useLiveMatches(
 
   useEffect(() => {
     fetchLive()
-    const interval = setInterval(fetchLive, 30_000)
+    const interval = setInterval(fetchLive, 120_000)
     return () => clearInterval(interval)
   }, [fetchLive])
 
@@ -93,7 +94,7 @@ export function useLiveMatchesForUser(enabled = true) {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 30_000)
+    const interval = setInterval(fetchData, 120_000)
     return () => clearInterval(interval)
   }, [fetchData])
 
