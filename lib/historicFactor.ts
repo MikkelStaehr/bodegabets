@@ -15,7 +15,7 @@ interface HistoricFactors {
 // Henter holdets stats fra league_matches
 async function getTeamStats(
   team: string,
-  leagueId: number,
+  seasonId: number,
   isHome: boolean
 ): Promise<TeamStats> {
 
@@ -23,7 +23,7 @@ async function getTeamStats(
   const { data: allMatches } = await supabaseAdmin
     .from('league_matches')
     .select('home_team, away_team, home_score, away_score')
-    .eq('league_id', leagueId)
+    .eq('season_id', seasonId)
     .eq(isHome ? 'home_team' : 'away_team', team)
     .eq('status', 'finished')
 
@@ -37,10 +37,10 @@ async function getTeamStats(
   const { data: recent } = await supabaseAdmin
     .from('league_matches')
     .select('home_team, away_team, home_score, away_score')
-    .eq('league_id', leagueId)
+    .eq('season_id', seasonId)
     .or(`home_team.eq.${team},away_team.eq.${team}`)
     .eq('status', 'finished')
-    .order('kickoff_at', { ascending: false })
+    .order('kickoff', { ascending: false })
     .limit(5)
 
   const formPoints = (recent ?? []).reduce((sum, m) => {
@@ -55,7 +55,7 @@ async function getTeamStats(
   const { data: allTeamResults } = await supabaseAdmin
     .from('league_matches')
     .select('home_team, away_team, home_score, away_score')
-    .eq('league_id', leagueId)
+    .eq('season_id', seasonId)
     .eq('status', 'finished')
 
   const pointsMap = new Map<string, number>()
@@ -79,11 +79,11 @@ async function getTeamStats(
 }
 
 // Beregn ligaens totale hold-antal til normalisering
-async function getLeagueSize(leagueId: number): Promise<number> {
+async function getLeagueSize(seasonId: number): Promise<number> {
   const { data } = await supabaseAdmin
     .from('league_matches')
     .select('home_team')
-    .eq('league_id', leagueId)
+    .eq('season_id', seasonId)
     .eq('status', 'finished')
   const teams = new Set(data?.map(m => m.home_team) ?? [])
   return Math.max(teams.size, 1)
@@ -93,20 +93,20 @@ async function getLeagueSize(leagueId: number): Promise<number> {
 export async function calculateHistoricFactors(
   homeTeam: string,
   awayTeam: string,
-  leagueId: number
+  seasonId: number
 ): Promise<HistoricFactors> {
 
   const [homeStats, awayStats, leagueSize] = await Promise.all([
-    getTeamStats(homeTeam, leagueId, true),
-    getTeamStats(awayTeam, leagueId, false),
-    getLeagueSize(leagueId)
+    getTeamStats(homeTeam, seasonId, true),
+    getTeamStats(awayTeam, seasonId, false),
+    getLeagueSize(seasonId)
   ])
 
   // Indbyrdes historik (10% vægt)
   const { data: h2h } = await supabaseAdmin
     .from('league_matches')
     .select('home_team, home_score, away_score')
-    .eq('league_id', leagueId)
+    .eq('season_id', seasonId)
     .eq('status', 'finished')
     .or(
       `and(home_team.eq.${homeTeam},away_team.eq.${awayTeam}),` +
