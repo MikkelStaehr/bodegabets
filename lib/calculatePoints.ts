@@ -16,11 +16,24 @@ import { isBetCorrect } from './betUtils'
 export async function calculateRoundPoints(roundId: number): Promise<void> {
   console.log(`[calculateRoundPoints] START roundId=${roundId}`)
 
-  // 1. Hent finished matches for runden
+  // 1. Hent round info
+  const { data: round } = await supabaseAdmin
+    .from('rounds')
+    .select('season_id, name')
+    .eq('id', roundId)
+    .single()
+
+  if (!round) {
+    console.log(`[calculateRoundPoints] Runde ${roundId} ikke fundet`)
+    return
+  }
+
+  // 2. Hent finished matches via season_id + round_name
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status')
-    .eq('round_id', roundId)
+    .select('id, home_score, away_score, home_score_ht, away_score_ht, status')
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
     .eq('status', 'finished')
 
   if (!matches?.length) {
@@ -62,7 +75,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
       if (!bets?.length) continue
 
-      console.log(`[calculateRoundPoints] Match ${match.id} (${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}): ${bets.length} bets`)
+      console.log(`[calculateRoundPoints] Match ${match.id} (${match.home_score}-${match.away_score}): ${bets.length} bets`)
 
       for (const bet of bets) {
         // Halvleg: skip hvis HT-scores mangler
