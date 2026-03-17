@@ -3,23 +3,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { League } from '@/types'
+import type { Tournament, Season } from '@/types'
 
-type Props = { leagues: League[] }
+type Props = {
+  tournaments: Tournament[]
+  seasonMap: Record<number, Season>
+}
 type SyncState = 'idle' | 'creating' | 'syncing' | 'done' | 'timeout'
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', Germany: '🇩🇪', Spain: '🇪🇸', France: '🇫🇷',
-  Italy: '🇮🇹', Netherlands: '🇳🇱', Turkey: '🇹🇷', Denmark: '🇩🇰',
-  Europe: '🇪🇺', World: '🌍',
-}
-
-// Ligaer der anses som "topligaer" (bold_slug eller navn-match)
+// Ligaer der anses som "topligaer" (navn-match)
 const TOP_LEAGUE_NAMES = [
   'Premier League', 'Bundesliga', 'La Liga', 'Serie A', 'Ligue 1',
 ]
 
-const CUP_KEYWORDS = ['League', 'Cup', 'Champions', 'Europa', 'Conference']
+const CUP_KEYWORDS = ['Champions', 'Europa', 'Conference', 'Cup', 'League']
 function isCupTournament(name: string) {
   return CUP_KEYWORDS.some((kw) => name.includes(kw))
 }
@@ -54,30 +51,36 @@ function Connector() {
   return <div className="w-px h-6 bg-border ml-[13px]" />
 }
 
-export default function NewGameForm({ leagues }: Props) {
+export default function NewGameForm({ tournaments, seasonMap }: Props) {
   const router = useRouter()
   const [name, setName]               = useState('')
   const [description, setDescription] = useState('')
-  const [leagueId, setLeagueId]       = useState<string>('')
-  const [cupIds, setCupIds]           = useState<string[]>([])
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>('')
+  const [cupTournamentIds, setCupTournamentIds]         = useState<string[]>([])
   const [error, setError]             = useState<string | null>(null)
   const [syncState, setSyncState]     = useState<SyncState>('idle')
   const [gameId, setGameId]           = useState<number | null>(null)
   const [pollAttempts, setPollAttempts] = useState(0)
 
   const loading    = syncState === 'creating' || syncState === 'syncing'
-  const canSubmit  = name.trim().length >= 2 && leagueId !== ''
+  const canSubmit  = name.trim().length >= 2 && selectedTournamentId !== ''
   const step2Active = name.trim().length >= 2
-  const step3Active = step2Active && leagueId !== ''
+  const step3Active = step2Active && selectedTournamentId !== ''
   const step4Active = step3Active
 
-  const cupLeagues   = leagues.filter((l) => isCupTournament(l.name))
-  const nonCupLeagues = leagues.filter((l) => !isCupTournament(l.name))
-  const topLeagues   = nonCupLeagues.filter((l) => TOP_LEAGUE_NAMES.includes(l.name))
-  const otherLeagues = nonCupLeagues.filter((l) => !TOP_LEAGUE_NAMES.includes(l.name))
+  const cupTournaments   = tournaments.filter((t) => isCupTournament(t.name))
+  const nonCupTournaments = tournaments.filter((t) => !isCupTournament(t.name))
+  const topTournaments   = nonCupTournaments.filter((t) => TOP_LEAGUE_NAMES.includes(t.name))
+  const otherTournaments = nonCupTournaments.filter((t) => !TOP_LEAGUE_NAMES.includes(t.name))
 
   function toggleCup(id: string) {
-    setCupIds((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id])
+    setCupTournamentIds((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id])
+  }
+
+  // Map tournament id → season id
+  function getSeasonId(tournamentId: string): number | null {
+    const season = seasonMap[parseInt(tournamentId)]
+    return season?.id ?? null
   }
 
   const poll = async (id: number, attempt: number) => {
@@ -95,14 +98,21 @@ export default function NewGameForm({ leagues }: Props) {
     e.preventDefault()
     setError(null)
     if (name.trim().length < 2) { setError('Spilnavn skal være mindst 2 tegn'); return }
-    if (!leagueId)               { setError('Vælg en liga'); return }
+    if (!selectedTournamentId)   { setError('Vælg en turnering'); return }
+
+    const primarySeasonId = getSeasonId(selectedTournamentId)
+    if (!primarySeasonId) { setError('Ingen sæson fundet for den valgte turnering'); return }
+
+    const cupSeasonIds = cupTournamentIds
+      .map((tid) => getSeasonId(tid))
+      .filter((id): id is number => id !== null)
 
     setSyncState('creating')
 
     const res  = await fetch('/api/games/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), league_id: parseInt(leagueId), cup_ids: cupIds.map(Number) }),
+      body: JSON.stringify({ name: name.trim(), season_id: primarySeasonId, cup_season_ids: cupSeasonIds }),
     })
     const data = await res.json()
 
@@ -118,40 +128,36 @@ export default function NewGameForm({ leagues }: Props) {
     setTimeout(() => poll(newGameId, 0), 1000)
   }
 
-  function LeagueGrid({ items, onSelect, isSelected }: { items: League[]; onSelect: (id: string) => void; isSelected: (id: string) => boolean }) {
+  function TournamentGrid({ items, onSelect, isSelected }: { items: Tournament[]; onSelect: (id: string) => void; isSelected: (id: string) => boolean }) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {items.map((l) => {
-          const flag     = COUNTRY_FLAGS[l.country ?? ''] ?? '🏳️'
-          const selected = isSelected(String(l.id))
-          const hasSrc   = (l as League & { fixturedownload_slug?: string; bold_slug?: string }).fixturedownload_slug
-                        || (l as League & { bold_slug?: string }).bold_slug
-          const meta     = l.country ?? ''
+        {items.map((t) => {
+          const selected = isSelected(String(t.id))
+          const hasSrc   = !!t.bold_slug || !!t.bold_id
 
           return (
             <button
-              key={l.id}
+              key={t.id}
               type="button"
-              onClick={() => onSelect(String(l.id))}
+              onClick={() => onSelect(String(t.id))}
               disabled={!hasSrc}
               className={`relative text-left p-3.5 border-[1.5px] rounded-sm transition-all flex flex-col gap-1.5 ${
                 selected
                   ? 'border-forest bg-cream-dark'
                   : 'border-border bg-white hover:border-forest/50 hover:bg-cream'
-              }`}
+              } ${!hasSrc ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               {selected && (
                 <span className="absolute top-2 right-2.5 text-forest font-bold text-xs">✓</span>
               )}
               <div className="flex items-center gap-2">
-                {l.logo_url ? (
-                  <img src={l.logo_url} alt={l.name} className="w-6 h-6 object-contain" />
+                {t.logo_url ? (
+                  <img src={t.logo_url} alt={t.name} className="w-6 h-6 object-contain" />
                 ) : (
-                  <span className="text-xl leading-none">{flag}</span>
+                  <span className="text-xl leading-none">🏳️</span>
                 )}
-                <span className="font-condensed font-semibold text-sm leading-snug text-primary">{l.name}</span>
+                <span className="font-condensed font-semibold text-sm leading-snug text-primary">{t.name}</span>
               </div>
-              <span className="font-body text-xs text-text-warm font-light">{meta}</span>
             </button>
           )
         })}
@@ -187,35 +193,43 @@ export default function NewGameForm({ leagues }: Props) {
 
         <Connector />
 
-        {/* ── Trin 2: Liga ─────────────────────────────────── */}
+        {/* ── Trin 2: Turnering ─────────────────────────────── */}
         <div className="flex gap-5">
           <StepNumber n={2} active={step2Active} />
           <div className="flex-1 pb-2">
             <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-1">Trin 2</p>
             <p className="font-condensed font-semibold text-lg text-primary mb-4">Vælg liga</p>
 
-            {leagues.length === 0 ? (
-              <p className="font-body text-sm text-text-warm">Ingen aktive ligaer — opret via admin-panelet.</p>
+            {tournaments.length === 0 ? (
+              <p className="font-body text-sm text-text-warm">Ingen turneringer fundet — opret via admin-panelet.</p>
             ) : (
               <>
-                <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-2 flex items-center gap-2">
-                  Topligaer
-                  <span className="flex-1 h-px bg-border" />
-                </p>
-                <LeagueGrid items={topLeagues} onSelect={setLeagueId} isSelected={(id) => leagueId === id} />
+                {topTournaments.length > 0 && (
+                  <>
+                    <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-2 flex items-center gap-2">
+                      Topligaer
+                      <span className="flex-1 h-px bg-border" />
+                    </p>
+                    <TournamentGrid items={topTournaments} onSelect={setSelectedTournamentId} isSelected={(id) => selectedTournamentId === id} />
+                  </>
+                )}
 
-                <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mt-4 mb-2 flex items-center gap-2">
-                  Øvrige
-                  <span className="flex-1 h-px bg-border" />
-                </p>
-                <LeagueGrid items={otherLeagues} onSelect={setLeagueId} isSelected={(id) => leagueId === id} />
+                {otherTournaments.length > 0 && (
+                  <>
+                    <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mt-4 mb-2 flex items-center gap-2">
+                      Øvrige
+                      <span className="flex-1 h-px bg-border" />
+                    </p>
+                    <TournamentGrid items={otherTournaments} onSelect={setSelectedTournamentId} isSelected={(id) => selectedTournamentId === id} />
+                  </>
+                )}
               </>
             )}
           </div>
         </div>
 
         {/* ── Cup turneringer (under liga-valg) ─────────── */}
-        {cupLeagues.length > 0 && step2Active && (
+        {cupTournaments.length > 0 && step2Active && (
           <>
             <Connector />
             <div className="flex gap-5">
@@ -226,7 +240,7 @@ export default function NewGameForm({ leagues }: Props) {
                 <p className="font-body text-xs text-text-warm font-light leading-relaxed mb-4">
                   Tilføj én eller flere cups til spilrummet — fx Champions League eller Europa League.
                 </p>
-                <LeagueGrid items={cupLeagues} onSelect={toggleCup} isSelected={(id) => cupIds.includes(id)} />
+                <TournamentGrid items={cupTournaments} onSelect={toggleCup} isSelected={(id) => cupTournamentIds.includes(id)} />
               </div>
             </div>
           </>
