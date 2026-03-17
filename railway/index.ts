@@ -22,6 +22,7 @@
  */
 
 import express from 'express'
+import cron from 'node-cron'
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { syncMatchScores } from '@/lib/syncMatchScores'
@@ -451,4 +452,37 @@ app.get('/send-reminders', async (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[bodegabets-cron] listening on port ${PORT}`)
+
+  // ─── Internal cron scheduler ───────────────────────────────────────────
+  const CRON_SECRET = process.env.CRON_SECRET!
+  const BASE_URL = `http://localhost:${PORT}`
+
+  async function callEndpoint(path: string) {
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        headers: { Authorization: `Bearer ${CRON_SECRET}` },
+      })
+      const data = await res.json()
+      console.log(`[cron] ${path}:`, data)
+    } catch (err) {
+      console.error(`[cron] ${path} failed:`, err)
+    }
+  }
+
+  // Hvert 5. minut — sync scores
+  cron.schedule('*/5 * * * *', () => callEndpoint('/sync-scores'))
+
+  // Dagligt kl. 06:00 UTC — sync fixtures
+  cron.schedule('0 6 * * *', () => callEndpoint('/sync-fixtures'))
+
+  // Dagligt kl. 07:00 UTC — update rounds
+  cron.schedule('0 7 * * *', () => callEndpoint('/update-rounds'))
+
+  // Dagligt kl. 08:00 UTC — calculate points
+  cron.schedule('0 8 * * *', () => callEndpoint('/calculate-points'))
+
+  // Dagligt kl. 10:00 UTC — send reminders
+  cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
+
+  console.log('[bodegabets-cron] cron jobs scheduled')
 })

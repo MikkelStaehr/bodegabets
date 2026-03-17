@@ -9,11 +9,13 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
     "express": "^4.21.2",
+    "node-cron": "^4.2.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.11",
     "@types/web-push": "^3.6.4",
     "tsc-alias": "^1.8.10",
     "typescript": "^5.7.0"
