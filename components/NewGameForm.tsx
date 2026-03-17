@@ -224,7 +224,7 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
         </div>
 
         {/* ── Cup turneringer (under liga-valg) ─────────── */}
-        {cupTournaments.length > 0 && step2Active && (
+        {cupTournaments.length > 0 && (
           <>
             <Connector />
             <div className="flex gap-5">
