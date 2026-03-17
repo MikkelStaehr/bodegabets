@@ -44,7 +44,7 @@ type LiveTestData = {
 function formatKickoff(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
+    timeZone: 'UTC',
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -63,7 +63,7 @@ function formatUpdatedAgo(iso: string | null): string {
   if (mins < 1) return 'lige nu'
   if (mins < 60) return `for ${mins} min siden`
   if (hours < 24) return `for ${hours} t siden`
-  return d.toLocaleString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 const DEFAULT_TEST_ROUND_ID = 217 // Premier League, 31. runde
@@ -141,7 +141,7 @@ export function LiveTestTab() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-[#7a7060]">
             Sidst opdateret: {new Date(d.timestamp).toLocaleString('da-DK', {
-              timeZone: 'Europe/Copenhagen',
+              timeZone: 'UTC',
               day: 'numeric',
               month: 'short',
               hour: '2-digit',

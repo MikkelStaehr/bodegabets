@@ -71,7 +71,7 @@ const STATUS_COLORS: Record<string, string> = {
 function formatDeadline(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('da-DK', {
-    timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
 }
 

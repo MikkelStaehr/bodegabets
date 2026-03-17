@@ -189,7 +189,7 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
                 }}
               >
                 {deadline.toLocaleString('da-DK', {
-                  timeZone: 'Europe/Copenhagen',
+                  timeZone: 'UTC',
                   day: 'numeric',
                   month: 'short',
                   hour: '2-digit',
