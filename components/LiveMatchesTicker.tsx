@@ -26,6 +26,16 @@ function StatusBadge({ status, kickoff }: { status: LiveMatch['status']; kickoff
   return null
 }
 
+function getBetResult(match: LiveMatch): 'correct' | 'incorrect' | 'none' {
+  if (!match.userPrediction) return 'none'
+  if (match.home_score === null || match.away_score === null) return 'none'
+  const actual =
+    match.home_score > match.away_score ? '1'
+    : match.home_score === match.away_score ? 'X'
+    : '2'
+  return match.userPrediction === actual ? 'correct' : 'incorrect'
+}
+
 function MatchRow({ match }: { match: LiveMatch }) {
   const isLive = match.status === 'live'
   const isHalftime = match.status === 'halftime'
@@ -37,46 +47,95 @@ function MatchRow({ match }: { match: LiveMatch }) {
     : isScheduled ? 'bg-white/[0.03]'
     : 'bg-white/5'
 
+  const betResult = getBetResult(match)
+  const borderColor = betResult === 'correct' ? '#27ae60'
+    : betResult === 'incorrect' ? '#c0392b'
+    : '#4a4a4a'
+
+  const badgeBg = betResult === 'correct' ? '#27ae60'
+    : betResult === 'incorrect' ? '#c0392b'
+    : '#6b7280'
+
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${rowBg}`}
+      className={`flex items-center gap-2 pr-3 py-1.5 rounded-lg ${rowBg}`}
+      style={{ borderLeft: `3px solid ${borderColor}`, paddingLeft: 8 }}
     >
-      {/* Hold + score */}
-      <div className="flex-1 flex items-center justify-between min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          {match.home_team_logo && (
-            <img src={match.home_team_logo} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} className="shrink-0" />
-          )}
-          <span
-            className={`text-[12px] truncate font-['Barlow_Condensed'] font-semibold
-            ${isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'}`}
-          >
-            {match.home_team}
-          </span>
-          {!isScheduled && (
+      {/* Turnerings-logo */}
+      <div className="shrink-0 w-5 h-5 flex items-center justify-center">
+        {match.tournamentLogo ? (
+          <img src={match.tournamentLogo} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} />
+        ) : (
+          <div className="w-4 h-4 rounded-full bg-white/10" />
+        )}
+      </div>
+
+      {/* Holdnavne stacked + score */}
+      <div className="flex-1 flex items-center gap-2 min-w-0">
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex items-center gap-1.5">
+            {match.home_team_logo && (
+              <img src={match.home_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
+            )}
             <span
-              className={`font-['Barlow_Condensed'] text-[15px] font-black tabular-nums
+              className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold leading-tight
+              ${isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'}`}
+            >
+              {match.home_team}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {match.away_team_logo && (
+              <img src={match.away_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
+            )}
+            <span
+              className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold leading-tight
+              ${isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'}`}
+            >
+              {match.away_team}
+            </span>
+          </div>
+        </div>
+
+        {/* Score */}
+        {!isScheduled && (
+          <div className="shrink-0 flex flex-col items-center">
+            <span
+              className={`font-['Barlow_Condensed'] text-[13px] font-black tabular-nums leading-tight
               ${isLive ? 'text-red-600' : isHalftime ? 'text-amber-600' : 'text-[#F2EDE4]'}`}
             >
-              {match.home_score ?? 0}–{match.away_score ?? 0}
+              {match.home_score ?? 0}
             </span>
-          )}
-          {match.away_team_logo && (
-            <img src={match.away_team_logo} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} className="shrink-0" />
-          )}
-          <span
-            className={`text-[12px] truncate font-['Barlow_Condensed'] font-semibold
-            ${isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'}`}
-          >
-            {match.away_team}
-          </span>
-        </div>
+            <span
+              className={`font-['Barlow_Condensed'] text-[13px] font-black tabular-nums leading-tight
+              ${isLive ? 'text-red-600' : isHalftime ? 'text-amber-600' : 'text-[#F2EDE4]'}`}
+            >
+              {match.away_score ?? 0}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Status + Clock */}
       <div className="shrink-0 flex items-center gap-1.5">
         <MatchClock kickoff={match.kickoff_at} status={match.status} />
         <StatusBadge status={match.status} kickoff={match.kickoff_at} />
+      </div>
+
+      {/* Bet badge */}
+      <div className="shrink-0 w-6 flex items-center justify-center">
+        {match.userPrediction ? (
+          <span
+            className="text-[10px] font-bold text-white rounded px-1 py-0.5 leading-none"
+            style={{ backgroundColor: badgeBg }}
+          >
+            {match.userPrediction}
+          </span>
+        ) : (
+          <span className="text-[10px] font-bold text-white/30 rounded px-1 py-0.5 leading-none bg-white/10">
+            —
+          </span>
+        )}
       </div>
     </div>
   )

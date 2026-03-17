@@ -39,10 +39,22 @@ export async function GET(req: NextRequest, { params }: Props) {
   since.setUTCHours(0, 0, 0, 0) // start af i dag UTC
   const endOfDay = new Date(since.getTime() + 24 * 60 * 60 * 1000)
 
+  // Hent tournament logos via season → tournament
+  const { data: seasonTournaments } = await supabaseAdmin
+    .from('seasons')
+    .select('id, tournament:tournaments!tournament_id(logo_url)')
+    .in('id', seasonIds)
+
+  const tournamentLogoMap = new Map<number, string | null>()
+  for (const st of seasonTournaments ?? []) {
+    const tournament = st.tournament as unknown as { logo_url: string | null } | null
+    tournamentLogoMap.set(st.id, tournament?.logo_url ?? null)
+  }
+
   // Hent alle kampe i dag fra alle sæsoner (live, halftime, finished, scheduled)
   const { data: todayMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
+    .select(`id, season_id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
     .in('season_id', seasonIds)
@@ -51,6 +63,23 @@ export async function GET(req: NextRequest, { params }: Props) {
     .lte('kickoff', endOfDay.toISOString())
     .order('kickoff', { ascending: true })
     .limit(100)
+
+  // Hent brugerens match_result bets for disse kampe
+  const matchIds = (todayMatches ?? []).map((m) => m.id)
+  const { data: userBets } = matchIds.length > 0
+    ? await supabaseAdmin
+        .from('bets')
+        .select('match_id, prediction')
+        .eq('user_id', user.id)
+        .eq('game_id', gameId)
+        .eq('bet_type', 'match_result')
+        .in('match_id', matchIds)
+    : { data: [] }
+
+  const betMap = new Map<number, string>()
+  for (const b of userBets ?? []) {
+    betMap.set(b.match_id, b.prediction)
+  }
 
   const matchList = (todayMatches ?? []).map((m) => {
     const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
@@ -67,6 +96,8 @@ export async function GET(req: NextRequest, { params }: Props) {
       kickoff_at: m.kickoff,
       home_team_logo: homeRef?.logo_url ?? null,
       away_team_logo: awayRef?.logo_url ?? null,
+      tournamentLogo: tournamentLogoMap.get(m.season_id) ?? null,
+      userPrediction: betMap.get(m.id) ?? null,
     }
   })
 
