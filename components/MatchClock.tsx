@@ -21,16 +21,16 @@ export default function MatchClock({ kickoff, status }: Props) {
       const elapsedMs = now - start
       const totalSeconds = Math.floor(elapsedMs / 1000)
 
-      // 2. halvleg starter ~60 min inde (45 min + ~15 min pause)
       let displayMinutes: number
       let displaySeconds: number
 
-      if (totalSeconds > 60 * 60) {
-        // 2. halvleg
-        const secondHalfSeconds = totalSeconds - (60 * 60) + (45 * 60)
-        displayMinutes = Math.min(90, Math.floor(secondHalfSeconds / 60))
+      if (totalSeconds > 52 * 60) {
+        // 2. halvleg — tæl fra 45:00
+        const secondHalfSeconds = totalSeconds - (52 * 60)
+        displayMinutes = Math.min(90, 45 + Math.floor(secondHalfSeconds / 60))
         displaySeconds = secondHalfSeconds % 60
       } else {
+        // 1. halvleg
         displayMinutes = Math.min(45, Math.floor(totalSeconds / 60))
         displaySeconds = totalSeconds % 60
       }

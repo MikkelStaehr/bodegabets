@@ -3,7 +3,7 @@
 import { LiveMatch, LiveSummary } from '@/hooks/useLiveMatches'
 import MatchClock from '@/components/MatchClock'
 
-function StatusBadge({ status }: { status: LiveMatch['status'] }) {
+function StatusBadge({ status, kickoff }: { status: LiveMatch['status']; kickoff?: string }) {
   if (status === 'live') return (
     <span className="flex items-center gap-1">
       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -17,7 +17,11 @@ function StatusBadge({ status }: { status: LiveMatch['status'] }) {
     <span className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wide">Slut</span>
   )
   if (status === 'scheduled') return (
-    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Snart</span>
+    <span style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, fontWeight: 700, color: '#9ca3af' }}>
+      {kickoff
+        ? new Date(kickoff).toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
+        : '—'}
+    </span>
   )
   return null
 }
@@ -72,7 +76,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
       {/* Status + Clock */}
       <div className="shrink-0 flex items-center gap-1.5">
         <MatchClock kickoff={match.kickoff_at} status={match.status} />
-        <StatusBadge status={match.status} />
+        <StatusBadge status={match.status} kickoff={match.kickoff_at} />
       </div>
     </div>
   )
