@@ -75,49 +75,58 @@ export async function GET() {
     const typedRounds = (rounds ?? []) as { id: number; name: string; status: string; betting_closes_at: string | null }[]
     const nowIso = now.toISOString()
 
-    // Hent alle kampe for alle åbne/aktive runder i én query
-    const openRoundIds = typedRounds
+    // Find åbne/aktive runder
+    const openRounds = typedRounds
       .filter((r) => ['open', 'active'].includes(computeRoundStatus(r, now)))
-      .map((r) => r.id)
 
-    if (openRoundIds.length === 0) continue
+    if (openRounds.length === 0) continue
+
+    const openRoundNames = openRounds.map((r) => r.name)
 
     const since = new Date()
     since.setHours(since.getHours() - 24)
 
+    // Hent kampe via season_id + round_name (matches har ingen round_id)
     const { data: allMatches } = await supabaseAdmin
       .from('matches')
-      .select(`id, round_id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at,
-        home_team_ref:teams!home_team_id(logo_url),
-        away_team_ref:teams!away_team_id(logo_url)`)
-      .in('round_id', openRoundIds)
+      .select(`id, round_name, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
+        home_team_ref:teams!home_team_id(name, logo_url),
+        away_team_ref:teams!away_team_id(name, logo_url)`)
+      .eq('season_id', seasonId)
+      .in('round_name', openRoundNames)
       .in('status', ['live', 'halftime', 'finished'])
-      .gte('kickoff_at', since.toISOString())
-      .order('kickoff_at', { ascending: true })
+      .gte('kickoff', since.toISOString())
+      .order('kickoff', { ascending: true })
       .limit(100)
 
     // Find nyeste runde der har kampe med kickoff i fortiden
     const pastMatches = (allMatches ?? [])
-      .filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
-      .map((m) => ({
-        id: m.id,
-        round_id: m.round_id,
-        home_team: m.home_team,
-        away_team: m.away_team,
-        home_score: m.home_score,
-        away_score: m.away_score,
-        home_score_ht: m.home_score_ht,
-        away_score_ht: m.away_score_ht,
-        status: m.status,
-        kickoff_at: m.kickoff_at,
-        home_team_logo: (m.home_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
-        away_team_logo: (m.away_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
-      }))
+      .filter((m) => m.kickoff && m.kickoff <= nowIso)
+      .map((m) => {
+        const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
+        const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
+        return {
+          id: m.id,
+          round_name: m.round_name,
+          home_team: homeRef?.name ?? '',
+          away_team: awayRef?.name ?? '',
+          home_score: m.home_score,
+          away_score: m.away_score,
+          home_score_ht: m.home_score_ht,
+          away_score_ht: m.away_score_ht,
+          status: m.status,
+          kickoff_at: m.kickoff,
+          home_team_logo: homeRef?.logo_url ?? null,
+          away_team_logo: awayRef?.logo_url ?? null,
+        }
+      })
 
-    const byRound = new Map<number, typeof pastMatches>()
+    // Grupper kampe efter round_name og map til round id
+    const byRoundName = new Map<string, typeof pastMatches>()
     for (const m of pastMatches) {
-      if (!byRound.has(m.round_id)) byRound.set(m.round_id, [])
-      byRound.get(m.round_id)!.push(m)
+      if (!m.round_name) continue
+      if (!byRoundName.has(m.round_name)) byRoundName.set(m.round_name, [])
+      byRoundName.get(m.round_name)!.push(m)
     }
 
     // Prioriter nyeste runde (sidst i listen)
@@ -125,7 +134,7 @@ export async function GET() {
     let matchList: typeof pastMatches = []
     for (let i = typedRounds.length - 1; i >= 0; i--) {
       const r = typedRounds[i]
-      const list = byRound.get(r.id) ?? []
+      const list = byRoundName.get(r.name) ?? []
       if (list.length > 0) {
         activeRound = r
         matchList = list.sort((a, b) => (a.kickoff_at ?? '').localeCompare(b.kickoff_at ?? ''))
