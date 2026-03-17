@@ -954,6 +954,14 @@ export default function AfgivBets({
           {/* Point per valg */}
           {!isReadOnly && (
             <div className="px-3 py-2.5 border-b border-black/10 bg-[#F2EDE4] shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
+                  Dine credits
+                </span>
+                <span className="font-condensed text-[18px] font-extrabold text-[#1a3329] leading-none">
+                  {userPoints - totalPoints} pt
+                </span>
+              </div>
               <p className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase mb-1.5">
                 Point per valg
               </p>
