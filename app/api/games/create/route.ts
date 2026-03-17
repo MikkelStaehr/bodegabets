@@ -17,9 +17,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, league_id } = body as {
+  const { name, league_id, cup_ids } = body as {
     name: string
     league_id: number
+    cup_ids?: number[]
   }
 
   if (!name?.trim()) {
@@ -73,13 +74,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: gameError.message }, { status: 500 })
   }
 
-  // Link game to season via junction table
-  const { error: linkError } = await supabaseAdmin
-    .from('game_seasons')
-    .insert({ game_id: game.id, season_id: league_id })
+  // Link game to all selected seasons via junction table
+  const allSeasonIds = [league_id, ...(cup_ids ?? [])]
+  for (const season_id of allSeasonIds) {
+    const { error: linkError } = await supabaseAdmin
+      .from('game_seasons')
+      .insert({ game_id: game.id, season_id })
 
-  if (linkError) {
-    return NextResponse.json({ error: linkError.message }, { status: 500 })
+    if (linkError) {
+      return NextResponse.json({ error: linkError.message }, { status: 500 })
+    }
   }
 
   // Tilmeld host som member
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: memberError.message }, { status: 500 })
   }
 
-  // Tjek at der eksisterer runder for denne liga
+  // Tjek at der eksisterer runder for den primære liga
   const { count: roundCount } = await supabaseAdmin
     .from('rounds')
     .select('*', { count: 'exact', head: true })
@@ -101,8 +105,9 @@ export async function POST(req: NextRequest) {
     ok: true,
     game_id: game.id,
     invite_code: game.invite_code,
+    seasons: allSeasonIds,
     warning: (roundCount ?? 0) === 0
-      ? 'Ingen runder fundet for denne liga. Synk liga via admin → Liga Hub først.'
+      ? 'Ingen runder fundet for den primære liga. Synk liga via admin → Liga Hub først.'
       : null,
   })
 }
