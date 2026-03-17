@@ -17,7 +17,7 @@ export default function MatchClock({ kickoff, status }: Props) {
 
     const tick = () => {
       const now = Date.now()
-      const start = new Date(kickoff).getTime()
+      const start = new Date(kickoff.includes('T') ? kickoff : kickoff.replace(' ', 'T')).getTime()
       const elapsedMs = now - start
       const totalSeconds = Math.floor(elapsedMs / 1000)
 
