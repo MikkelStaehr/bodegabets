@@ -101,6 +101,7 @@ export type Tournament = {
   bold_id?: string | null
   bold_slug?: string | null
   logo_url?: string | null
+  is_cup?: boolean
 }
 
 export type Season = {
