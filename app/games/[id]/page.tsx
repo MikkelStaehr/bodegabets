@@ -437,7 +437,7 @@ export default async function GamePage({ params }: Props) {
   })
 
   return (
-    <LiveMatchesProvider roundId={activeRound?.id ?? null} enabled={!!activeRound}>
+    <LiveMatchesProvider gameId={gameId} enabled={true}>
     <div className="min-h-screen" style={{ background: '#F2EDE4', fontFamily: "'Barlow', sans-serif" }}>
       <GameTicker items={tickerItems} />
 
@@ -496,12 +496,7 @@ export default async function GamePage({ params }: Props) {
             betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
             activeRoundId={activeRound?.id ?? null}
           />
-          {activeRound && (
-            <ActiveRoundLiveTicker
-              roundId={activeRound.id}
-              enabled={activeRound.computedStatus === 'open' || activeRound.computedStatus === 'active'}
-            />
-          )}
+          <ActiveRoundLiveTicker />
         </section>
 
         {/* Aktive betting runder */}

@@ -56,6 +56,40 @@ export function useLiveMatches(
   return { matches, summary, lastUpdate }
 }
 
+// ─── Live kampe for et helt spil (alle sæsoner) ─────────────────────────────
+
+export function useLiveMatchesForGame(
+  gameId: number | null,
+  enabled = true
+) {
+  const [matches, setMatches] = useState<LiveMatch[]>([])
+  const [summary, setSummary] = useState<LiveSummary>({ live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+
+  const fetchLive = useCallback(async () => {
+    if (!gameId || !enabled) return
+    try {
+      const res = await fetch(`/api/games/${gameId}/live-matches`)
+      if (res.ok) {
+        const json = await res.json()
+        setMatches(json.matches ?? [])
+        setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
+        setLastUpdate(new Date())
+      }
+    } catch {
+      // Ignorer fejl
+    }
+  }, [gameId, enabled])
+
+  useEffect(() => {
+    fetchLive()
+    const interval = setInterval(fetchLive, 120_000)
+    return () => clearInterval(interval)
+  }, [fetchLive])
+
+  return { matches, summary, lastUpdate }
+}
+
 // ─── Brugerens live kampe (alle aktive spil) ──────────────────────────────────
 
 export type LiveMatchesForUserItem = {
