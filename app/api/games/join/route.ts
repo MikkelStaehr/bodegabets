@@ -43,10 +43,32 @@ export async function POST(req: NextRequest) {
 
   const { error: joinError } = await supabaseAdmin
     .from('game_members')
-    .insert({ game_id: game.id, user_id: user.id, points: 1000 })
+    .insert({ game_id: game.id, user_id: user.id })
 
   if (joinError) {
     return NextResponse.json({ error: joinError.message }, { status: 500 })
+  }
+
+  // Hent sæsoner for dette spilrum
+  const { data: gameSeasons } = await supabaseAdmin
+    .from('game_seasons')
+    .select('season_id')
+    .eq('game_id', game.id)
+  const seasonIds = (gameSeasons ?? []).map(gs => gs.season_id)
+
+  // Tildel 1000 credits for alle åbne runder
+  const { data: openRounds } = await supabaseAdmin
+    .from('rounds')
+    .select('id')
+    .in('season_id', seasonIds.length > 0 ? seasonIds : [0])
+    .eq('bet_open', true)
+  for (const round of openRounds ?? []) {
+    await supabaseAdmin
+      .from('round_members')
+      .upsert(
+        { user_id: user.id, round_id: round.id, game_id: game.id, betting_balance: 1000 },
+        { onConflict: 'user_id,round_id,game_id' }
+      )
   }
 
   return NextResponse.json({ ok: true, game_id: game.id })

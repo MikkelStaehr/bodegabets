@@ -95,6 +95,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: memberError.message }, { status: 500 })
   }
 
+  // Tildel 1000 credits til host for alle åbne runder på tværs af alle sæsoner
+  const { data: openRounds } = await supabaseAdmin
+    .from('rounds')
+    .select('id')
+    .in('season_id', allSeasonIds)
+    .eq('bet_open', true)
+  for (const round of openRounds ?? []) {
+    await supabaseAdmin
+      .from('round_members')
+      .upsert(
+        { user_id: user.id, round_id: round.id, game_id: game.id, betting_balance: 1000 },
+        { onConflict: 'user_id,round_id,game_id' }
+      )
+  }
+
   // Tjek at der eksisterer runder for den primære sæson
   const { count: roundCount } = await supabaseAdmin
     .from('rounds')
