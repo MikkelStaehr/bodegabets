@@ -1,13 +1,11 @@
 /**
  * POST /api/admin/sync-schedule
  * Synkroniserer kampprogram for en runde via Bold.dk.
- * Triggerer sæson-sync og buildLeagueRounds — kampe hentes fra league_matches.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { syncSeasonViaBold } from '@/lib/syncLeagueMatches'
-import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req)
@@ -31,22 +29,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Runden blev ikke fundet eller mangler season_id' }, { status: 404 })
   }
 
-  const seasonId = round.season_id
-
-  // 2. Sync sæson (Bold.dk) — opdaterer league_matches
-  const syncRes = await syncSeasonViaBold(seasonId)
-  if (syncRes.errors.length) {
-    console.warn('[sync-schedule] Sync fejl:', syncRes.errors)
-  }
-
-  // 3. Byg runder for sæsonen — tilføjer/opdaterer matches fra league_matches
-  const buildRes = await buildLeagueRounds(seasonId)
+  // 2. Sync sæson (Bold.dk) — opdaterer matches + rounds direkte
+  const res = await syncSeasonViaBold(round.season_id)
 
   return NextResponse.json({
     ok: true,
-    synced: syncRes.synced,
-    rounds_created: buildRes.rounds_created,
-    matches_created: buildRes.matches_created,
-    matches_updated: buildRes.matches_updated,
+    synced: res.synced,
+    rounds_created: res.rounds_created,
+    matches_created: res.matches_created,
+    matches_updated: res.matches_updated,
   })
 }

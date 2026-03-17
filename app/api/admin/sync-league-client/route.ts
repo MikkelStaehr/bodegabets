@@ -4,9 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
-import { supabaseAdmin } from '@/lib/supabase'
 import { syncSeasonViaBold } from '@/lib/syncLeagueMatches'
-import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 export const maxDuration = 60
 
@@ -14,25 +12,19 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { season_id, rebuild_rounds } = await req.json() as {
-    season_id: number
-    rebuild_rounds?: boolean
-  }
+  const { season_id } = await req.json() as { season_id: number }
 
   if (!season_id) {
     return NextResponse.json({ error: 'season_id er påkrævet' }, { status: 400 })
   }
 
-  const syncRes = await syncSeasonViaBold(season_id)
+  const res = await syncSeasonViaBold(season_id)
 
-  let rounds_created = 0, matches_created = 0, matches_updated = 0
-
-  if (rebuild_rounds) {
-    const res = await buildLeagueRounds(season_id)
-    rounds_created  += res.rounds_created
-    matches_created += res.matches_created
-    matches_updated += res.matches_updated
-  }
-
-  return NextResponse.json({ ...syncRes, rounds_created, matches_created, matches_updated })
+  return NextResponse.json({
+    synced: res.synced,
+    rounds_created: res.rounds_created,
+    matches_created: res.matches_created,
+    matches_updated: res.matches_updated,
+    errors: res.errors,
+  })
 }

@@ -1,12 +1,11 @@
 /**
  * POST /api/admin/sync-result
  * Synkroniserer resultat for én kamp via Bold.dk.
- * Triggerer sæson-sync og buildLeagueRounds — resultatet propageres fra league_matches til matches.
+ * Triggerer sæson-sync — resultater skrives direkte til matches.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { syncSeasonViaBold } from '@/lib/syncLeagueMatches'
-import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get('authorization')
@@ -28,7 +27,7 @@ export async function POST(req: NextRequest) {
   // 1. Hent kampen og find sæson via season_id
   const { data: match, error: matchError } = await supabaseAdmin
     .from('matches')
-    .select('id, season_id, home_team, away_team, home_score, away_score, status')
+    .select('id, season_id, status')
     .eq('id', match_id)
     .single()
 
@@ -43,17 +42,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // 2. Sync sæson (Bold.dk) — opdaterer league_matches med resultater
+  // 2. Sync sæson (Bold.dk) — opdaterer matches direkte
   const syncRes = await syncSeasonViaBold(match.season_id)
-  if (syncRes.errors.length) {
-    console.warn('[sync-result] Sync fejl:', syncRes.errors)
-  }
 
-  // 3. Byg runder for sæsonen — propagerer scores til matches
-  const s = await buildLeagueRounds(match.season_id)
-  const matches_updated = s.matches_updated
-
-  // 4. Hent opdateret kamp
+  // 3. Hent opdateret kamp
   const { data: updated } = await supabaseAdmin
     .from('matches')
     .select('*')
@@ -64,6 +56,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     match: updated,
     season_synced: syncRes.synced,
-    matches_updated,
+    matches_updated: syncRes.matches_updated,
   })
 }
