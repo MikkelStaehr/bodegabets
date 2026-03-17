@@ -1,16 +1,16 @@
 /**
  * syncLeagueMatches.ts
  *
- * syncResults(leagueId, boldSlug)
+ * syncResults(seasonId, boldSlug)
  *   Henter seneste resultater fra Bold.dk og opdaterer scores i league_matches.
  *   Køres dagligt via cron.
  *
- * buildLeagueRounds(leagueId)
- *   Opretter/opdaterer runder og matches for en liga fra league_matches.
+ * buildLeagueRounds(seasonId)
+ *   Opretter/opdaterer runder og matches for en sæson fra league_matches.
  *   Forudsætter at league_matches er populeret (via admin-sync).
  *
  * runLeagueSync()
- *   Daglig cron: opdaterer resultater + bygger runder for alle aktive ligaer.
+ *   Daglig cron: opdaterer resultater + bygger runder for alle aktive sæsoner.
  */
 
 import { supabaseAdmin } from '@/lib/supabase'
@@ -22,7 +22,7 @@ const BOLD_MATCHES_API = 'https://api.bold.dk/aggregator/v1/apps/page/matches'
 // ─── Typer ────────────────────────────────────────────────────────────────────
 
 export type SyncResult = {
-  league_id:       number
+  season_id:       number
   synced:          number
   rounds_created:  number
   matches_created: number
@@ -33,7 +33,7 @@ export type SyncResult = {
 // ─── 1. Resultater fra Bold.dk API (live, pauseresultater, slutresultater) ─────
 
 export async function syncResults(
-  leagueId: number,
+  seasonId: number,
   boldSlug: string
 ): Promise<Pick<SyncResult, 'synced' | 'errors'>> {
   const errors: string[] = []
@@ -56,9 +56,9 @@ export async function syncResults(
     const { data: allMatches } = await supabaseAdmin
       .from('league_matches')
       .select('id, home_team, away_team, status, bold_match_id')
-      .eq('league_id', leagueId)
-      .gte('kickoff_at', `${dateStr}T00:00:00Z`)
-      .lte('kickoff_at', `${dateStr}T23:59:59Z`)
+      .eq('season_id', seasonId)
+      .gte('kickoff', `${dateStr}T00:00:00Z`)
+      .lte('kickoff', `${dateStr}T23:59:59Z`)
 
     const candidates = (allMatches ?? []) as Array<{
       id: number
@@ -135,7 +135,7 @@ export async function syncResults(
     }
   }
 
-  console.log(`[syncResults] ${synced} resultater opdateret for liga ${leagueId}`)
+  console.log(`[syncResults] ${synced} resultater opdateret for sæson ${seasonId}`)
   return { synced, errors }
 }
 
@@ -155,14 +155,14 @@ type BoldMatchItem = {
 
 /**
  * Henter fixtures fra Bold API via phase_ids og upsert til league_matches.
- * Bruges for alle ligaer med bold_phase_id (Bold.dk er eneste datakilde).
+ * Bruges for alle sæsoner med bold_phase_id (Bold.dk er eneste datakilde).
  */
 export type SyncBoldFixturesPreview = Array<{
-  league_id: number
+  season_id: number
   round_name: string
   home_team: string
   away_team: string
-  kickoff_at: string
+  kickoff: string
   home_score: number | null
   away_score: number | null
   status: string
@@ -170,7 +170,7 @@ export type SyncBoldFixturesPreview = Array<{
 }>
 
 export async function syncBoldFixtures(
-  leagueId: number,
+  seasonId: number,
   boldPhaseId: number,
   options?: { dryRun?: boolean }
 ): Promise<{ synced: number; errors: string[]; preview?: SyncBoldFixturesPreview; raw_bold_response?: BoldMatchItem[] }> {
@@ -210,9 +210,9 @@ export async function syncBoldFixtures(
     if (page === 1 && rawTotal != null) {
       totalPageCount = typeof rawTotal === 'number' ? rawTotal : parseInt(String(rawTotal), 10) || 1
     }
-    console.log(`[Liga ${leagueId}] side ${page}/${totalPageCount} — ${pageMatches.length} kampe`)
+    console.log(`[Sæson ${seasonId}] side ${page}/${totalPageCount} — ${pageMatches.length} kampe`)
     if (page >= totalPageCount) break
-    if (page > 20) break // Safety: ingen liga har mere end 1000 kampe
+    if (page > 20) break // Safety: ingen sæson har mere end 1000 kampe
     page++
   }
 
@@ -238,7 +238,7 @@ export async function syncBoldFixtures(
       const d = mt.date.slice(0, 10)
       return { date: d, time: '15:00' }
     })()
-    const kickoff_at = danishTimeToUtc(date, time)
+    const kickoff = danishTimeToUtc(date, time)
 
     const finished = mt.status_type === 'finished'
     const homeScore = mt.home_team?.score ?? null
@@ -257,16 +257,16 @@ export async function syncBoldFixtures(
     const round_name = mt.round?.includes('runde') ? mt.round : mt.round ? `${mt.round}. runde` : 'Ukendt runde'
 
     // Aldrig sæt fremtidige kampe til finished/live/halftime
-    if (new Date(kickoff_at) > new Date()) {
+    if (new Date(kickoff) > new Date()) {
       status = 'scheduled'
     }
 
     return {
-      league_id: leagueId,
+      season_id: seasonId,
       round_name,
       home_team: mt.home_team?.name ?? '',
       away_team: mt.away_team?.name ?? '',
-      kickoff_at,
+      kickoff,
       home_score: hasScores ? homeScore : null,
       away_score: hasScores ? awayScore : null,
       status,
@@ -286,38 +286,38 @@ export async function syncBoldFixtures(
   }
 
   const preview: SyncBoldFixturesPreview = rows.map((r) => ({
-    league_id: r.league_id,
+    season_id: r.season_id,
     round_name: r.round_name,
     home_team: r.home_team,
     away_team: r.away_team,
-    kickoff_at: r.kickoff_at,
+    kickoff: r.kickoff,
     home_score: r.home_score,
     away_score: r.away_score,
     status: r.status,
     bold_match_id: r.bold_match_id,
   }))
 
-  console.log(`[syncBoldFixtures] liga ${leagueId}: ${rows.length} kampe fra Bold API (phase_id=${boldPhaseId})${dryRun ? ' (dry-run)' : ''}`)
+  console.log(`[syncBoldFixtures] sæson ${seasonId}: ${rows.length} kampe fra Bold API (phase_id=${boldPhaseId})${dryRun ? ' (dry-run)' : ''}`)
   return dryRun
     ? { synced: rows.length, errors, preview, raw_bold_response: allMatches }
     : { synced: rows.length, errors }
 }
 
-/** Synkroniser en liga via Bold API. Kræver bold_phase_id. */
-export async function syncLeagueViaBold(leagueId: number): Promise<{ synced: number; errors: string[] }> {
-  const { data: league } = await supabaseAdmin
-    .from('leagues')
-    .select('bold_phase_id, name')
-    .eq('id', leagueId)
+/** Synkroniser en sæson via Bold API. Kræver bold_phase_id på seasons. */
+export async function syncSeasonViaBold(seasonId: number): Promise<{ synced: number; errors: string[] }> {
+  const { data: season } = await supabaseAdmin
+    .from('seasons')
+    .select('bold_phase_id')
+    .eq('id', seasonId)
     .single()
 
-  if (!league?.bold_phase_id) {
-    return { synced: 0, errors: [`Liga ${league?.name ?? leagueId} mangler bold_phase_id`] }
+  if (!season?.bold_phase_id) {
+    return { synced: 0, errors: [`Sæson ${seasonId} mangler bold_phase_id`] }
   }
-  return syncBoldFixtures(leagueId, league.bold_phase_id)
+  return syncBoldFixtures(seasonId, season.bold_phase_id)
 }
 
-// ─── 2. Opbyg runder + matches for en liga fra league_matches ────────────────
+// ─── 2. Opbyg runder + matches for en sæson fra league_matches ────────────────
 // Optimeret: maks 6 DB-kald uanset antal kampe/runder (batch insert/update)
 
 export type BuildGameRoundsResult = BuildLeagueRoundsResult
@@ -331,50 +331,49 @@ export type BuildLeagueRoundsResult = Pick<SyncResult, 'rounds_created' | 'match
   }
 }
 
-/** @deprecated Brug buildLeagueRounds(leagueId) i stedet */
-export const buildGameRounds = (_gameId: number, leagueId: number) => buildLeagueRounds(leagueId)
+/** @deprecated Brug buildLeagueRounds(seasonId) i stedet */
+export const buildGameRounds = (_gameId: number, seasonId: number) => buildLeagueRounds(seasonId)
 
 export async function buildLeagueRounds(
-  leagueId: number
+  seasonId: number
 ): Promise<BuildLeagueRoundsResult> {
   const stats = { rounds_created: 0, matches_created: 0, matches_updated: 0 }
 
   type LM = {
     id: number; round_name: string; home_team: string; away_team: string
-    kickoff_at: string; home_score: number | null; away_score: number | null; status: string
+    kickoff: string; home_score: number | null; away_score: number | null; status: string
   }
   type ExRound = { id: number; name: string }
-  type ExMatch = { id: number; home_team: string; away_team: string; status: string; round_id: number; league_match_id?: number | null }
+  type ExMatch = { id: number; home_team: string; away_team: string; status: string; season_id: number; round_name: string; league_match_id?: number | null }
 
   // 1. Hent alt data parallelt (2 queries)
   const [lmRes, roundRes] = await Promise.all([
     supabaseAdmin
       .from('league_matches')
-      .select('id, round_name, home_team, away_team, kickoff_at, home_score, away_score, status')
-      .eq('league_id', leagueId)
-      .order('kickoff_at', { ascending: true }),
+      .select('id, round_name, home_team, away_team, kickoff, home_score, away_score, status')
+      .eq('season_id', seasonId)
+      .order('kickoff', { ascending: true }),
     supabaseAdmin
       .from('rounds')
       .select('id, name')
-      .eq('league_id', leagueId),
+      .eq('season_id', seasonId),
   ])
 
   const leagueMatches  = (lmRes.data ?? []) as LM[]
   if (!leagueMatches.length) {
-    console.log(`[buildLeagueRounds] liga ${leagueId}: ingen league_matches`)
+    console.log(`[buildLeagueRounds] sæson ${seasonId}: ingen league_matches`)
     return stats
   }
 
   const existingRounds = (roundRes.data ?? []) as ExRound[]
 
-  // Hent matches via runde-IDs
-  const existingRoundIds = existingRounds.map((r) => r.id)
+  // Hent matches via season_id
   let existingMatches: ExMatch[] = []
-  if (existingRoundIds.length) {
+  {
     const { data } = await supabaseAdmin
       .from('matches')
-      .select('id, home_team, away_team, status, round_id, league_match_id')
-      .in('round_id', existingRoundIds)
+      .select('id, home_team, away_team, status, season_id, round_name, league_match_id')
+      .eq('season_id', seasonId)
     existingMatches = (data ?? []) as ExMatch[]
   }
 
@@ -398,7 +397,7 @@ export async function buildLeagueRounds(
   const matchByLmId     = new Map<number, ExMatch>(
     existingMatches.filter((m) => m.league_match_id != null).map((m) => [m.league_match_id!, m])
   )
-  const matchByPair     = new Map<string, ExMatch>(existingMatches.map((m) => [`${m.round_id}|${m.home_team}|${m.away_team}`, m]))
+  const matchByPair     = new Map<string, ExMatch>(existingMatches.map((m) => [`${m.round_name}|${m.home_team}|${m.away_team}`, m]))
 
   // 3. Gruppér kampe per runde
   const groups = new Map<string, LM[]>()
@@ -413,11 +412,11 @@ export async function buildLeagueRounds(
     const roundRows = newRoundNames.map((name) => {
       const matches = groups.get(name)!
       const firstKickoff = matches.reduce<string | null>((min, m) => {
-        if (!m.kickoff_at) return min
-        return !min || m.kickoff_at < min ? m.kickoff_at : min
+        if (!m.kickoff) return min
+        return !min || m.kickoff < min ? m.kickoff : min
       }, null)
       return {
-        league_id:         leagueId,
+        season_id:         seasonId,
         name,
         status:            matches.every((m) => m.status === 'finished') ? 'finished' : 'upcoming',
         betting_closes_at: firstKickoff,
@@ -458,11 +457,12 @@ export async function buildLeagueRounds(
       const matchStatus =
         lm.status === 'finished' ? 'finished' : lm.status === 'halftime' ? 'halftime' : lm.status === 'live' ? 'live' : 'scheduled'
       toUpsert.push({
-        round_id:        roundId,
+        season_id:       seasonId,
+        round_name:      roundName,
         league_match_id: lm.id,
         home_team:       lm.home_team,
         away_team:       lm.away_team,
-        kickoff_at:      lm.kickoff_at,
+        kickoff:         lm.kickoff,
         home_score:      lm.home_score,
         away_score:      lm.away_score,
         status:          matchStatus,
@@ -473,14 +473,14 @@ export async function buildLeagueRounds(
   // 6. Batch-upsert matches (scores + status opdateres altid fra league_matches)
   if (toUpsert.length) {
     const existingLmIds = new Set(existingMatches.filter((m) => m.league_match_id != null).map((m) => m.league_match_id!))
-    console.log(`[buildLeagueRounds] liga ${leagueId}: upsert ${toUpsert.length} matches`)
+    console.log(`[buildLeagueRounds] sæson ${seasonId}: upsert ${toUpsert.length} matches`)
     for (let i = 0; i < toUpsert.length; i += 500) {
       const chunk = toUpsert.slice(i, i + 500)
       const { error } = await supabaseAdmin
         .from('matches')
         .upsert(chunk, { onConflict: 'league_match_id' })
       if (error) {
-        console.error(`[buildLeagueRounds] match upsert fejlede (chunk ${i}–${i + 500}) for liga ${leagueId}:`, error.message)
+        console.error(`[buildLeagueRounds] match upsert fejlede (chunk ${i}–${i + 500}) for sæson ${seasonId}:`, error.message)
       } else {
         for (const row of chunk) {
           const lmId = (row as { league_match_id: number }).league_match_id
@@ -511,47 +511,39 @@ export async function buildLeagueRounds(
 // ─── 3. Daglig cron: opdater resultater + byg runder ─────────────────────────
 
 export async function runLeagueSync(): Promise<SyncResult[]> {
-  // Hent ALLE ligaer med bold_phase_id og is_active (ikke kun dem fra aktive spilrum)
-  const { data: leagues } = await supabaseAdmin
-    .from('leagues')
-    .select('id, name, bold_slug, bold_phase_id')
-    .eq('is_active', true)
+  // Hent ALLE sæsoner med bold_phase_id
+  const { data: seasons } = await supabaseAdmin
+    .from('seasons')
+    .select('id, bold_phase_id, tournaments:tournament_id(name)')
     .not('bold_phase_id', 'is', null)
 
-  if (!leagues?.length) {
-    console.log('[sync-fixtures] Ingen ligaer med bold_phase_id og is_active=true')
+  if (!seasons?.length) {
+    console.log('[sync-fixtures] Ingen sæsoner med bold_phase_id')
     return []
   }
 
   const results: SyncResult[] = []
 
-  type LeagueRow = {
-    id: number
-    name: string
-    bold_slug: string | null
-    bold_phase_id: number | null
-  }
-
-  for (const league of leagues as LeagueRow[]) {
+  for (const season of seasons) {
+    const tournaments = season.tournaments as unknown as { name: string } | null
+    const name = tournaments?.name ?? `Sæson ${season.id}`
     let synced = 0
     const errors: string[] = []
 
     try {
-      if (league.bold_slug && league.bold_phase_id) {
-        const res = await syncBoldFixtures(league.id, league.bold_phase_id)
+      if (season.bold_phase_id) {
+        const res = await syncBoldFixtures(season.id, season.bold_phase_id)
         synced = res.synced
         errors.push(...res.errors)
-      } else if (league.bold_slug && !league.bold_phase_id) {
-        errors.push(`${league.name}: bold_slug findes men bold_phase_id mangler — sæt phase_id i admin`)
       } else {
-        errors.push(`Ingen datakilde konfigureret for ${league.name} (bold_slug + bold_phase_id mangler)`)
+        errors.push(`Ingen datakilde konfigureret for ${name} (bold_phase_id mangler)`)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push(msg)
-      console.error(`[sync-fixtures] ${league.name} (id=${league.id}): ${msg}`)
+      console.error(`[sync-fixtures] ${name} (id=${season.id}): ${msg}`)
       results.push({
-        league_id: league.id,
+        season_id: season.id,
         synced: 0,
         rounds_created: 0,
         matches_created: 0,
@@ -561,17 +553,17 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
       continue
     }
 
-    // Kør buildLeagueRounds for ligaen
-    const s = await buildLeagueRounds(league.id)
+    // Kør buildLeagueRounds for sæsonen
+    const s = await buildLeagueRounds(season.id)
     const { rounds_created, matches_created, matches_updated } = s
 
     console.log(
-      `[sync-fixtures] ${league.name} (id=${league.id}, bold_phase_id=${league.bold_phase_id}): ` +
+      `[sync-fixtures] ${name} (id=${season.id}, bold_phase_id=${season.bold_phase_id}): ` +
         `${synced} kampe synket, ${matches_created} matches oprettet, ${matches_updated} opdateret` +
         (errors.length ? ` — ${errors.length} fejl` : '')
     )
 
-    results.push({ league_id: league.id, synced, rounds_created, matches_created, matches_updated, errors })
+    results.push({ season_id: season.id, synced, rounds_created, matches_created, matches_updated, errors })
   }
 
   return results
@@ -580,7 +572,7 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
 // ─── 4. Kort-interval cron: kun Bold resultater (live/halftime/finished) ────────
 
 export async function runSyncResultsOnly(): Promise<SyncResult[]> {
-  // Hent league_ids fra aktive spilrum via game_seasons → seasons → tournaments
+  // Hent season_ids fra aktive spilrum via game_seasons
   const { data: activeGames } = await supabaseAdmin
     .from('games')
     .select('id')
@@ -598,35 +590,22 @@ export async function runSyncResultsOnly(): Promise<SyncResult[]> {
 
   const seasonIds = [...new Set(gameSeasonRows.map((gs) => gs.season_id as number))]
 
-  const { data: seasonRows } = await supabaseAdmin
+  const { data: seasons } = await supabaseAdmin
     .from('seasons')
-    .select('tournament_id')
+    .select('id, bold_phase_id, tournaments:tournament_id(name)')
     .in('id', seasonIds)
-
-  if (!seasonRows?.length) return []
-
-  const leagueIds = [...new Set(seasonRows.map((s) => s.tournament_id as number))]
-
-  const { data: leagues } = await supabaseAdmin
-    .from('leagues')
-    .select('id, name, bold_slug')
-    .in('id', leagueIds)
-    .eq('is_active', true)
-    .not('bold_slug', 'is', null)
+    .not('bold_phase_id', 'is', null)
 
   const results: SyncResult[] = []
 
-  type LeagueRow = { id: number; name: string; bold_slug: string | null }
+  for (const season of (seasons ?? [])) {
+    if (!season.bold_phase_id) continue
 
-  for (const league of (leagues ?? []) as LeagueRow[]) {
-    if (!league.bold_slug) continue
-
-    const res = await syncResults(league.id, league.bold_slug)
-
-    const s = await buildLeagueRounds(league.id)
+    const res = await syncBoldFixtures(season.id, season.bold_phase_id)
+    const s = await buildLeagueRounds(season.id)
 
     results.push({
-      league_id: league.id,
+      season_id: season.id,
       synced: res.synced,
       rounds_created: s.rounds_created,
       matches_created: s.matches_created,

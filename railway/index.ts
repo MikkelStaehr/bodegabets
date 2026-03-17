@@ -132,7 +132,7 @@ app.get('/update-rounds', async (_req, res) => {
 
     const { data: allRounds, error: roundsError } = await supabaseAdmin
       .from('rounds')
-      .select('id, name, status, betting_closes_at, league_id')
+      .select('id, name, status, betting_closes_at, season_id')
       .order('id', { ascending: true })
 
     if (roundsError) {
@@ -140,35 +140,45 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
-    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; league_id: number }
+    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; season_id: number }
     const typedAllRounds = (allRounds ?? []) as RoundRow[]
     const rounds = typedAllRounds.filter((r) => r.status !== 'finished')
-    const roundIds = rounds.map((r) => r.id)
 
-    if (!roundIds.length) {
+    if (!rounds.length) {
       res.json({ ok: true, timestamp: nowIso, finished: 0, opened: 0, message: 'Ingen aktive runder' })
       return
     }
 
+    // Hent matches via season_id + round_name (ikke round_id)
+    const seasonIds = [...new Set(rounds.map((r) => r.season_id))]
+
     const { data: matchRows, error: statsError } = await supabaseAdmin
       .from('matches')
-      .select('round_id, status, kickoff_at')
-      .in('round_id', roundIds)
+      .select('season_id, round_name, status, kickoff')
+      .in('season_id', seasonIds)
 
     if (statsError) {
       res.status(500).json({ error: statsError.message })
       return
     }
 
-    type MatchRow = { round_id: number; status: string; kickoff_at: string | null }
+    // Map season_id::round_name → round.id
+    const roundIdByKey = new Map<string, number>()
+    for (const r of typedAllRounds) {
+      roundIdByKey.set(`${r.season_id}::${r.name}`, r.id)
+    }
+
+    type MatchRow = { season_id: number; round_name: string; status: string; kickoff: string | null }
     const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
     for (const m of (matchRows ?? []) as MatchRow[]) {
-      if (!statMap[m.round_id]) statMap[m.round_id] = { total: 0, finished: 0, minKickoff: null }
-      statMap[m.round_id].total++
-      if (m.status === 'finished') statMap[m.round_id].finished++
-      if (m.kickoff_at) {
-        if (!statMap[m.round_id].minKickoff || m.kickoff_at < statMap[m.round_id].minKickoff!) {
-          statMap[m.round_id].minKickoff = m.kickoff_at
+      const roundId = roundIdByKey.get(`${m.season_id}::${m.round_name}`)
+      if (!roundId) continue
+      if (!statMap[roundId]) statMap[roundId] = { total: 0, finished: 0, minKickoff: null }
+      statMap[roundId].total++
+      if (m.status === 'finished') statMap[roundId].finished++
+      if (m.kickoff) {
+        if (!statMap[roundId].minKickoff || m.kickoff < statMap[roundId].minKickoff!) {
+          statMap[roundId].minKickoff = m.kickoff
         }
       }
     }
@@ -183,26 +193,26 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ status: 'finished' }).in('id', finishedIds)
     }
 
-    // Gruppér per liga
-    const roundsByLeague = new Map<number, RoundRow[]>()
+    // Gruppér per season (ikke league)
+    const roundsBySeason = new Map<number, RoundRow[]>()
     for (const r of typedAllRounds) {
-      if (!roundsByLeague.has(r.league_id)) roundsByLeague.set(r.league_id, [])
-      roundsByLeague.get(r.league_id)!.push(r)
+      if (!roundsBySeason.has(r.season_id)) roundsBySeason.set(r.season_id, [])
+      roundsBySeason.get(r.season_id)!.push(r)
     }
 
-    // 2) Åbn næste upcoming runde per liga
+    // 2) Åbn næste upcoming runde per season
     const toMarkOpen = rounds.filter((r) => {
       if (r.status !== 'upcoming') return false
       if (finishedIds.includes(r.id)) return false
-      const leagueRounds = roundsByLeague.get(r.league_id) ?? []
+      const seasonRounds = roundsBySeason.get(r.season_id) ?? []
       const effectiveStatus = (rd: RoundRow) => finishedIds.includes(rd.id) ? 'finished' : rd.status
-      const hasActiveRound = leagueRounds.some(
+      const hasActiveRound = seasonRounds.some(
         (rd) => rd.id !== r.id && (effectiveStatus(rd) === 'open' || effectiveStatus(rd) === 'closed')
       )
       if (hasActiveRound) return false
-      const idx = leagueRounds.findIndex((rd) => rd.id === r.id)
+      const idx = seasonRounds.findIndex((rd) => rd.id === r.id)
       if (idx > 0) {
-        const prev = leagueRounds[idx - 1]
+        const prev = seasonRounds[idx - 1]
         if (effectiveStatus(prev) !== 'finished') return false
       }
       return true
@@ -264,24 +274,35 @@ app.get('/calculate-points', async (_req, res) => {
     let processed = 0
 
     if (activeGameIds.length > 0) {
-      const { data: betRounds } = await supabaseAdmin
-        .from('bets')
-        .select('round_id')
+      // Find seasons tilknyttet aktive spil
+      const { data: gameSeasonRows } = await supabaseAdmin
+        .from('game_seasons')
+        .select('season_id')
         .in('game_id', activeGameIds)
 
-      const roundIds = [...new Set((betRounds ?? []).map((b) => b.round_id as number))]
+      const seasonIds = [...new Set((gameSeasonRows ?? []).map((gs) => gs.season_id as number))]
 
-      for (const roundId of roundIds) {
-        const { data: matches } = await supabaseAdmin
-          .from('matches')
-          .select('id, status')
-          .eq('round_id', roundId)
+      if (seasonIds.length > 0) {
+        // Find runder for disse seasons
+        const { data: roundRows } = await supabaseAdmin
+          .from('rounds')
+          .select('id, season_id, name')
+          .in('season_id', seasonIds)
 
-        const allFinished = matches?.every((m) => m.status === 'finished')
-        if (!allFinished) continue
+        for (const round of roundRows ?? []) {
+          // Tjek om alle kampe i denne runde er finished
+          const { data: matches } = await supabaseAdmin
+            .from('matches')
+            .select('id, status')
+            .eq('season_id', round.season_id)
+            .eq('round_name', round.name)
 
-        await calculateRoundPoints(roundId)
-        processed++
+          const allFinished = matches?.length && matches.every((m) => m.status === 'finished')
+          if (!allFinished) continue
+
+          await calculateRoundPoints(round.id)
+          processed++
+        }
       }
     }
 
@@ -358,11 +379,22 @@ app.get('/send-reminders', async (_req, res) => {
         if (!members?.length) continue
         const memberUserIds = members.map((m) => m.user_id)
 
-        const { data: existingBets } = await supabaseAdmin
-          .from('bets')
-          .select('user_id')
-          .eq('round_id', round.id)
-          .in('user_id', memberUserIds)
+        // Find matches for denne runde via season_id + round_name
+        const { data: roundMatches } = await supabaseAdmin
+          .from('matches')
+          .select('id')
+          .eq('season_id', round.season_id)
+          .eq('round_name', round.name)
+
+        const matchIds = (roundMatches ?? []).map((m: { id: number }) => m.id)
+
+        const { data: existingBets } = matchIds.length
+          ? await supabaseAdmin
+              .from('bets')
+              .select('user_id')
+              .in('match_id', matchIds)
+              .in('user_id', memberUserIds)
+          : { data: [] as { user_id: string }[] }
 
         const betUserIds = new Set((existingBets ?? []).map((b) => b.user_id))
         const missingUserIds = memberUserIds.filter((uid) => !betUserIds.has(uid))

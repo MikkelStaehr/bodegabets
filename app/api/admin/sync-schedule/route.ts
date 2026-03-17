@@ -1,12 +1,12 @@
 /**
  * POST /api/admin/sync-schedule
- * Synkroniserer kampprogram for en runde via Bold.dk/fixturedownload.
- * Triggerer liga-sync og buildLeagueRounds — kampe hentes fra league_matches.
+ * Synkroniserer kampprogram for en runde via Bold.dk.
+ * Triggerer sæson-sync og buildLeagueRounds — kampe hentes fra league_matches.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { syncLeagueViaBold } from '@/lib/syncLeagueMatches'
+import { syncSeasonViaBold } from '@/lib/syncLeagueMatches'
 import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
 
 export async function POST(req: NextRequest) {
@@ -20,40 +20,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'round_id er påkrævet' }, { status: 400 })
   }
 
-  // 1. Hent runden for at finde league_id
+  // 1. Hent runden for at finde season_id
   const { data: round, error: roundError } = await supabaseAdmin
     .from('rounds')
-    .select('id, league_id')
+    .select('id, season_id')
     .eq('id', round_id)
     .single()
 
-  if (roundError || !round?.league_id) {
-    return NextResponse.json({ error: 'Runden blev ikke fundet eller mangler league_id' }, { status: 404 })
+  if (roundError || !round?.season_id) {
+    return NextResponse.json({ error: 'Runden blev ikke fundet eller mangler season_id' }, { status: 404 })
   }
 
-  const leagueId = round.league_id
+  const seasonId = round.season_id
 
-  const { data: league } = await supabaseAdmin
-    .from('leagues')
-    .select('name')
-    .eq('id', leagueId)
-    .single()
-
-  const leagueName = league?.name ?? 'Liga'
-
-  // 2. Sync liga (Bold.dk) — opdaterer league_matches
-  const syncRes = await syncLeagueViaBold(leagueId)
+  // 2. Sync sæson (Bold.dk) — opdaterer league_matches
+  const syncRes = await syncSeasonViaBold(seasonId)
   if (syncRes.errors.length) {
     console.warn('[sync-schedule] Sync fejl:', syncRes.errors)
   }
 
-  // 3. Byg runder for ligaen — tilføjer/opdaterer matches fra league_matches
-  const buildRes = await buildLeagueRounds(leagueId)
+  // 3. Byg runder for sæsonen — tilføjer/opdaterer matches fra league_matches
+  const buildRes = await buildLeagueRounds(seasonId)
 
   return NextResponse.json({
     ok: true,
     synced: syncRes.synced,
-    league: leagueName,
     rounds_created: buildRes.rounds_created,
     matches_created: buildRes.matches_created,
     matches_updated: buildRes.matches_updated,
