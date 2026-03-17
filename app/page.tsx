@@ -45,9 +45,9 @@ export default async function HomePage() {
   const tickerItems = shuffled.map((m) => {
     const round = m.round as unknown as { betting_closes_at: string | null } | null
     const dateStr = m.match_date
-      ? new Date(m.match_date).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
+      ? new Date(m.match_date).toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
       : (round?.betting_closes_at
-        ? new Date(round.betting_closes_at).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
+        ? new Date(round.betting_closes_at).toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
         : '')
     return `⚽ ${m.home_team} ${m.home_score ?? '?'}–${m.away_score ?? '?'} ${m.away_team}${dateStr ? ` · ${dateStr}` : ''}`
   })

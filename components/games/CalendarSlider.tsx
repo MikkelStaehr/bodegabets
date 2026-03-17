@@ -353,7 +353,7 @@ export default function CalendarSlider({
                   <span style={{ fontSize: 11, color: '#9E9486', marginLeft: 8 }}>
                     Deadline:{' '}
                     {new Date(selectedRound.betting_closes_at).toLocaleString('da-DK', {
-                      timeZone: 'Europe/Copenhagen',
+                      timeZone: 'UTC',
                       day: 'numeric',
                       month: 'short',
                       hour: '2-digit',
@@ -405,7 +405,7 @@ export default function CalendarSlider({
               .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())
               .map((match) => {
                 const kickoff = new Date(match.kickoff_at)
-                const timeStr = kickoff.toLocaleTimeString('da-DK', { timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit' })
+                const timeStr = kickoff.toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
                 const isLive = match.status === 'live' || match.status === 'halftime'
                 const isFinished = match.status === 'finished'
 

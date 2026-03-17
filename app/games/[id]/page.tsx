@@ -40,9 +40,9 @@ function formatDate(iso: string) {
   const d = new Date(iso)
   const isMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
   if (isMidnight) {
-    return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
+    return d.toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
   }
-  return d.toLocaleString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 // Beregn dynamisk rundestatus baseret på betting_closes_at og DB-status
@@ -353,7 +353,7 @@ export default async function GamePage({ params }: Props) {
     if (m.home_score !== null && m.away_score !== null) {
       const kickoff = (m as { kickoff_at?: string }).kickoff_at
       const dateStr = kickoff
-        ? new Date(kickoff).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
+        ? new Date(kickoff).toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
         : ''
       const suffix = dateStr ? ` · ${dateStr}` : ''
       tickerItems.push(`⚽ ${m.home_team} ${m.home_score}–${m.away_score} ${m.away_team}${suffix}`)

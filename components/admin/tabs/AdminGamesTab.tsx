@@ -22,7 +22,7 @@ type Props = {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
+    timeZone: 'UTC',
     day: 'numeric',
     month: 'short',
     year: 'numeric',

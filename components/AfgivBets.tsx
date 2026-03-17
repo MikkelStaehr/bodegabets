@@ -138,10 +138,10 @@ function formatKickoff(iso: string) {
   const d = new Date(iso)
   const isMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
   if (isMidnight) {
-    return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'short', day: 'numeric', month: 'short' })
+    return d.toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' })
   }
   return d.toLocaleString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
+    timeZone: 'UTC',
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -154,8 +154,8 @@ function formatDeadline(iso: string | null) {
   if (!iso) return { time: '—', date: '' }
   const d = new Date(iso)
   return {
-    time: d.toLocaleTimeString('da-DK', { timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit' }),
-    date: d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'short', day: 'numeric', month: 'short' }),
+    time: d.toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' }),
+    date: d.toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }),
   }
 }
 
@@ -864,13 +864,13 @@ export default function AfgivBets({
               const dateKey = match.kickoff_at
                 ? new Date(match.kickoff_at).toLocaleDateString('da-DK', {
                     year: 'numeric', month: '2-digit', day: '2-digit',
-                    timeZone: 'Europe/Copenhagen',
+                    timeZone: 'UTC',
                   })
                 : ''
               if (dateKey && dateKey !== lastDateKey) {
                 const label = new Date(match.kickoff_at).toLocaleDateString('da-DK', {
                   weekday: 'long', day: 'numeric', month: 'long',
-                  timeZone: 'Europe/Copenhagen',
+                  timeZone: 'UTC',
                 })
                 elements.push(
                   <div key={`sep-${dateKey}`} className="flex items-center gap-2" style={{ margin: '12px 0 8px' }}>

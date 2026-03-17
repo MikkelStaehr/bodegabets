@@ -33,7 +33,7 @@ export default function DashboardGameCard({ row }: { row: GameRow }) {
   const hasBets = bets_count > 0
   const deadline = activeRound?.betting_closes_at ? new Date(activeRound.betting_closes_at) : null
   const deadlineStr = deadline
-    ? deadline.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    ? deadline.toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
     : null
   const isDeadlineSoon = deadline ? deadline.getTime() - Date.now() < 6 * 60 * 60 * 1000 : false
   const isFinished = game.status === 'finished'

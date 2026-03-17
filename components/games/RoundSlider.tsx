@@ -25,16 +25,16 @@ interface RoundSliderProps {
 
 function formatCardDate(iso: string | null): string | null {
   if (!iso) return null
-  return new Date(iso).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
+  return new Date(iso).toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
 }
 
 function formatDeadline(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   return (
-    d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' }) +
+    d.toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' }) +
     ', ' +
-    d.toLocaleTimeString('da-DK', { timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit' })
+    d.toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
   )
 }
 
