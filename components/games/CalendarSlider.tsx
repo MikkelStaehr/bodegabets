@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import Link from 'next/link'
 
 export type CalendarMatch = {
   id: number
@@ -143,13 +142,6 @@ export default function CalendarSlider({
   useEffect(() => {
     selectedDayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [selectedDate, viewMonth])
-
-  const selectedMatches = matchesByDate.get(selectedDate) ?? []
-  const selectedFirstMatch = selectedMatches[0] ?? null
-  const selectedRound = selectedFirstMatch
-    ? roundByName.get(`${selectedFirstMatch.season_id}-${selectedFirstMatch.round_name}`) ?? null
-    : null
-  const isActiveRoundSelected = selectedRound?.id === activeRoundId
 
   const prevMonth = () =>
     setViewMonth((prev) =>
@@ -323,146 +315,6 @@ export default function CalendarSlider({
         </div>
       </div>
 
-      {/* Selected day content */}
-      {selectedMatches.length > 0 ? (
-        <div style={{ padding: '12px 0 0' }}>
-          {/* Round info + button */}
-          {selectedRound && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 4px',
-                marginBottom: 12,
-              }}
-            >
-              <div>
-                <span
-                  style={{
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: '#2C4A3E',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {selectedRound.name}
-                </span>
-                {selectedRound.computedStatus === 'open' && selectedRound.betting_closes_at && (
-                  <span style={{ fontSize: 11, color: '#9E9486', marginLeft: 8 }}>
-                    Deadline:{' '}
-                    {new Date(selectedRound.betting_closes_at).toLocaleString('da-DK', {
-                      timeZone: 'UTC',
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                )}
-              </div>
-              {(selectedRound.computedStatus === 'open' || selectedRound.computedStatus === 'active') && (
-                <Link
-                  href={`/games/${gameId}/rounds/${selectedRound.id}`}
-                  style={{
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    padding: '6px 14px',
-                    borderRadius: 4,
-                    background: '#2C4A3E',
-                    color: '#F2EDE4',
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {isActiveRoundSelected && betsCount > 0 ? 'Se / ændr bets ›' : 'Afgiv bets ›'}
-                </Link>
-              )}
-              {selectedRound.computedStatus === 'finished' && (
-                <Link
-                  href={`/games/${gameId}/rounds/${selectedRound.id}`}
-                  style={{
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontSize: 11,
-                    color: '#9E9486',
-                    textDecoration: 'none',
-                  }}
-                >
-                  Se resultater →
-                </Link>
-              )}
-            </div>
-          )}
-
-          {/* Match list */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {selectedMatches
-              .slice()
-              .sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime())
-              .map((match) => {
-                const kickoff = new Date(match.kickoff_at)
-                const timeStr = kickoff.toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
-                const isLive = match.status === 'live' || match.status === 'halftime'
-                const isFinished = match.status === 'finished'
-
-                return (
-                  <div
-                    key={match.id}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 48px 1fr',
-                      alignItems: 'center',
-                      padding: '10px 4px',
-                      borderBottom: '1px solid #EDE8E0',
-                      gap: 4,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        textAlign: 'right',
-                        color: '#1a1a1a',
-                        fontFamily: "'Barlow', sans-serif",
-                      }}
-                    >
-                      {match.home_team}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        textAlign: 'center',
-                        fontFamily: "'Barlow Condensed', sans-serif",
-                        color: isLive ? '#e53935' : '#2C4A3E',
-                      }}
-                    >
-                      {isFinished || isLive ? `${match.home_score ?? 0}–${match.away_score ?? 0}` : timeStr}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: '#1a1a1a',
-                        fontFamily: "'Barlow', sans-serif",
-                      }}
-                    >
-                      {match.away_team}
-                    </span>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
-      ) : (
-        <div style={{ padding: '24px 4px', textAlign: 'center', color: '#9E9486', fontSize: 13 }}>
-          Ingen kampe denne dag
-        </div>
-      )}
     </div>
   )
 }
