@@ -26,7 +26,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
   return (
     <div
       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg
-      ${isLive ? 'bg-red-500/8' : isHalftime ? 'bg-amber-500/8' : 'bg-black/4'}`}
+      ${isLive ? 'bg-red-500/15' : isHalftime ? 'bg-amber-500/15' : 'bg-white/5'}`}
     >
       {/* Hold + score */}
       <div className="flex-1 flex items-center justify-between min-w-0">
@@ -36,13 +36,13 @@ function MatchRow({ match }: { match: LiveMatch }) {
           )}
           <span
             className={`text-[12px] truncate font-['Barlow_Condensed'] font-semibold
-            ${isFinished ? 'text-[#7a7060]' : 'text-[#1a3329]'}`}
+            ${isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'}`}
           >
             {match.home_team}
           </span>
           <span
             className={`font-['Barlow_Condensed'] text-[15px] font-black tabular-nums
-            ${isLive ? 'text-red-600' : isHalftime ? 'text-amber-600' : 'text-[#1a3329]'}`}
+            ${isLive ? 'text-red-600' : isHalftime ? 'text-amber-600' : 'text-[#F2EDE4]'}`}
           >
             {match.home_score ?? 0}–{match.away_score ?? 0}
           </span>
@@ -51,7 +51,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
           )}
           <span
             className={`text-[12px] truncate font-['Barlow_Condensed'] font-semibold
-            ${isFinished ? 'text-[#7a7060]' : 'text-[#1a3329]'}`}
+            ${isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'}`}
           >
             {match.away_team}
           </span>
@@ -101,18 +101,16 @@ export function LiveMatchesTicker({
 
   return (
     <div
-      className={`rounded-xl border overflow-hidden
-      ${hasLive ? 'border-red-500/20 bg-red-500/5' : 'border-black/10 bg-white'}`}
+      className="overflow-hidden"
     >
       {/* Header */}
       <div
-        className={`flex items-center justify-between px-3 py-2 border-b
-        ${hasLive ? 'border-red-500/15' : 'border-black/8'}`}
+        className="flex items-center justify-between px-3 py-2 border-b border-white/10"
       >
         <div className="flex items-center gap-2">
           {hasLive && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
           {headerTitle ?? (
-            <span className="text-[11px] font-bold text-[#1a3329] uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-[#F2EDE4] uppercase tracking-wider">
               {defaultTitle}
             </span>
           )}

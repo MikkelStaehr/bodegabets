@@ -17,8 +17,18 @@ export default function ActiveRoundLiveTicker({ roundId, enabled = true }: Props
   if (matches.length === 0) return null
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <LiveMatchesTicker matches={matches} summary={summary} lastUpdate={lastUpdate} />
+    <div style={{
+      marginTop: 16,
+      background: '#1a3329',
+      borderRadius: 8,
+      overflow: 'hidden',
+      border: '1px solid rgba(255,255,255,0.08)'
+    }}>
+      <LiveMatchesTicker
+        matches={matches}
+        summary={summary}
+        lastUpdate={lastUpdate}
+      />
     </div>
   )
 }
