@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Match, Bet } from '@/types'
@@ -603,8 +603,14 @@ export default function AfgivBets({
   const [pointsError, setPointsError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const now = useMemo(() => new Date(), [])
-  const deadlinePassed = round.betting_closes_at ? now >= new Date(round.betting_closes_at) : false
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 10000)
+    return () => clearInterval(interval)
+  }, [])
+  const deadlinePassed = round.betting_closes_at
+    ? now >= new Date(round.betting_closes_at)
+    : false
   const isReadOnly =
     (round.status !== 'open' && round.status !== 'upcoming') || deadlinePassed
 
