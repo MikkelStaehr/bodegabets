@@ -16,8 +16,13 @@ const COUNTRY_FLAGS: Record<string, string> = {
 
 // Ligaer der anses som "topligaer" (bold_slug eller navn-match)
 const TOP_LEAGUE_NAMES = [
-  'Premier League', 'Bundesliga', 'La Liga', 'Serie A', 'Ligue 1', 'UEFA Champions League',
+  'Premier League', 'Bundesliga', 'La Liga', 'Serie A', 'Ligue 1',
 ]
+
+const CUP_KEYWORDS = ['League', 'Cup', 'Champions', 'Europa', 'Conference']
+function isCupTournament(name: string) {
+  return CUP_KEYWORDS.some((kw) => name.includes(kw))
+}
 
 const EXTRA_BETS = [
   { icon: '⚽', name: 'Første målscorer', desc: 'Gæt hvem der scorer det første mål i kampen' },
@@ -54,6 +59,7 @@ export default function NewGameForm({ leagues }: Props) {
   const [name, setName]               = useState('')
   const [description, setDescription] = useState('')
   const [leagueId, setLeagueId]       = useState<string>('')
+  const [cupIds, setCupIds]           = useState<string[]>([])
   const [error, setError]             = useState<string | null>(null)
   const [syncState, setSyncState]     = useState<SyncState>('idle')
   const [gameId, setGameId]           = useState<number | null>(null)
@@ -65,8 +71,14 @@ export default function NewGameForm({ leagues }: Props) {
   const step3Active = step2Active && leagueId !== ''
   const step4Active = step3Active
 
-  const topLeagues   = leagues.filter((l) => TOP_LEAGUE_NAMES.includes(l.name))
-  const otherLeagues = leagues.filter((l) => !TOP_LEAGUE_NAMES.includes(l.name))
+  const cupLeagues   = leagues.filter((l) => isCupTournament(l.name))
+  const nonCupLeagues = leagues.filter((l) => !isCupTournament(l.name))
+  const topLeagues   = nonCupLeagues.filter((l) => TOP_LEAGUE_NAMES.includes(l.name))
+  const otherLeagues = nonCupLeagues.filter((l) => !TOP_LEAGUE_NAMES.includes(l.name))
+
+  function toggleCup(id: string) {
+    setCupIds((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id])
+  }
 
   const poll = async (id: number, attempt: number) => {
     if (attempt >= 10) { setSyncState('timeout'); return }
@@ -90,7 +102,7 @@ export default function NewGameForm({ leagues }: Props) {
     const res  = await fetch('/api/games/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), league_id: parseInt(leagueId) }),
+      body: JSON.stringify({ name: name.trim(), league_id: parseInt(leagueId), cup_ids: cupIds.map(Number) }),
     })
     const data = await res.json()
 
@@ -106,12 +118,12 @@ export default function NewGameForm({ leagues }: Props) {
     setTimeout(() => poll(newGameId, 0), 1000)
   }
 
-  function LeagueGrid({ items }: { items: League[] }) {
+  function LeagueGrid({ items, onSelect, isSelected }: { items: League[]; onSelect: (id: string) => void; isSelected: (id: string) => boolean }) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {items.map((l) => {
           const flag     = COUNTRY_FLAGS[l.country ?? ''] ?? '🏳️'
-          const selected = leagueId === String(l.id)
+          const selected = isSelected(String(l.id))
           const hasSrc   = (l as League & { fixturedownload_slug?: string; bold_slug?: string }).fixturedownload_slug
                         || (l as League & { bold_slug?: string }).bold_slug
           const meta     = l.country ?? ''
@@ -120,7 +132,7 @@ export default function NewGameForm({ leagues }: Props) {
             <button
               key={l.id}
               type="button"
-              onClick={() => setLeagueId(String(l.id))}
+              onClick={() => onSelect(String(l.id))}
               disabled={!hasSrc}
               className={`relative text-left p-3.5 border-[1.5px] rounded-sm transition-all flex flex-col gap-1.5 ${
                 selected
@@ -131,8 +143,14 @@ export default function NewGameForm({ leagues }: Props) {
               {selected && (
                 <span className="absolute top-2 right-2.5 text-forest font-bold text-xs">✓</span>
               )}
-              <span className="text-xl leading-none">{flag}</span>
-              <span className="font-condensed font-semibold text-sm leading-snug text-primary">{l.name}</span>
+              <div className="flex items-center gap-2">
+                {l.logo_url ? (
+                  <img src={l.logo_url} alt={l.name} className="w-6 h-6 object-contain" />
+                ) : (
+                  <span className="text-xl leading-none">{flag}</span>
+                )}
+                <span className="font-condensed font-semibold text-sm leading-snug text-primary">{l.name}</span>
+              </div>
               <span className="font-body text-xs text-text-warm font-light">{meta}</span>
             </button>
           )
@@ -184,17 +202,35 @@ export default function NewGameForm({ leagues }: Props) {
                   Topligaer
                   <span className="flex-1 h-px bg-border" />
                 </p>
-                <LeagueGrid items={topLeagues} />
+                <LeagueGrid items={topLeagues} onSelect={setLeagueId} isSelected={(id) => leagueId === id} />
 
                 <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mt-4 mb-2 flex items-center gap-2">
                   Øvrige
                   <span className="flex-1 h-px bg-border" />
                 </p>
-                <LeagueGrid items={otherLeagues} />
+                <LeagueGrid items={otherLeagues} onSelect={setLeagueId} isSelected={(id) => leagueId === id} />
               </>
             )}
           </div>
         </div>
+
+        {/* ── Cup turneringer (under liga-valg) ─────────── */}
+        {cupLeagues.length > 0 && step2Active && (
+          <>
+            <Connector />
+            <div className="flex gap-5">
+              <StepNumber n={2} active={step2Active} />
+              <div className="flex-1 pb-2">
+                <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-1">Trin 2b · Valgfrit</p>
+                <p className="font-condensed font-semibold text-lg text-primary mb-1">Cup turneringer</p>
+                <p className="font-body text-xs text-text-warm font-light leading-relaxed mb-4">
+                  Tilføj én eller flere cups til spilrummet — fx Champions League eller Europa League.
+                </p>
+                <LeagueGrid items={cupLeagues} onSelect={toggleCup} isSelected={(id) => cupIds.includes(id)} />
+              </div>
+            </div>
+          </>
+        )}
 
         <Connector />
 

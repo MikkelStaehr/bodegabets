@@ -26,6 +26,7 @@ export type League = {
   /** @deprecated Bruges ikke længere — Bold.dk er eneste datakilde. Kolonnen beholdes i DB. */
   fixturedownload_slug?: string | null
   bold_slug?: string | null
+  logo_url?: string | null
   league_match_id?: number | null
   last_synced_at?: string | null
   sofascore_tournament_id?: string | null
