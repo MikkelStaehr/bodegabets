@@ -242,8 +242,8 @@ export default async function GamePage({ params }: Props) {
   const finishedRounds = sortedRounds.filter((r) => r.computedStatus === 'finished')
 
   const activeRound =
-    sortedRounds.find((r) => r.computedStatus === 'open') ??
     sortedRounds.find((r) => r.computedStatus === 'active') ??
+    sortedRounds.find((r) => r.computedStatus === 'open') ??
     sortedRounds.find((r) => r.computedStatus === 'upcoming') ??
     null
 
