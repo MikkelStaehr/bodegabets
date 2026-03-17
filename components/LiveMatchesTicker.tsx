@@ -1,6 +1,7 @@
 'use client'
 
 import { LiveMatch, LiveSummary } from '@/hooks/useLiveMatches'
+import MatchClock from '@/components/MatchClock'
 
 function StatusBadge({ status }: { status: LiveMatch['status'] }) {
   if (status === 'live') return (
@@ -15,6 +16,9 @@ function StatusBadge({ status }: { status: LiveMatch['status'] }) {
   if (status === 'finished') return (
     <span className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wide">Slut</span>
   )
+  if (status === 'scheduled') return (
+    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Snart</span>
+  )
   return null
 }
 
@@ -22,11 +26,16 @@ function MatchRow({ match }: { match: LiveMatch }) {
   const isLive = match.status === 'live'
   const isHalftime = match.status === 'halftime'
   const isFinished = match.status === 'finished'
+  const isScheduled = match.status === 'scheduled'
+
+  const rowBg = isLive ? 'bg-red-500/15'
+    : isHalftime ? 'bg-amber-500/15'
+    : isScheduled ? 'bg-white/[0.03]'
+    : 'bg-white/5'
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg
-      ${isLive ? 'bg-red-500/15' : isHalftime ? 'bg-amber-500/15' : 'bg-white/5'}`}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${rowBg}`}
     >
       {/* Hold + score */}
       <div className="flex-1 flex items-center justify-between min-w-0">
@@ -40,12 +49,14 @@ function MatchRow({ match }: { match: LiveMatch }) {
           >
             {match.home_team}
           </span>
-          <span
-            className={`font-['Barlow_Condensed'] text-[15px] font-black tabular-nums
-            ${isLive ? 'text-red-600' : isHalftime ? 'text-amber-600' : 'text-[#F2EDE4]'}`}
-          >
-            {match.home_score ?? 0}–{match.away_score ?? 0}
-          </span>
+          {!isScheduled && (
+            <span
+              className={`font-['Barlow_Condensed'] text-[15px] font-black tabular-nums
+              ${isLive ? 'text-red-600' : isHalftime ? 'text-amber-600' : 'text-[#F2EDE4]'}`}
+            >
+              {match.home_score ?? 0}–{match.away_score ?? 0}
+            </span>
+          )}
           {match.away_team_logo && (
             <img src={match.away_team_logo} alt="" style={{ width: 20, height: 20, objectFit: 'contain' }} className="shrink-0" />
           )}
@@ -58,8 +69,9 @@ function MatchRow({ match }: { match: LiveMatch }) {
         </div>
       </div>
 
-      {/* Status */}
-      <div className="shrink-0">
+      {/* Status + Clock */}
+      <div className="shrink-0 flex items-center gap-1.5">
+        <MatchClock kickoff={match.kickoff_at} status={match.status} />
         <StatusBadge status={match.status} />
       </div>
     </div>

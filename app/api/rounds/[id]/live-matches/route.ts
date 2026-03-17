@@ -44,10 +44,14 @@ export async function GET(req: NextRequest, { params }: Props) {
   }
   if (!membership) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
-  const since = new Date()
+  const now = new Date()
+  const since = new Date(now)
   since.setHours(since.getHours() - 24)
+  const soonCutoff = new Date(now)
+  soonCutoff.setMinutes(soonCutoff.getMinutes() + 60)
 
-  const { data: matches } = await supabaseAdmin
+  // Hent live/halftime/finished kampe (kickoff inden for 24 timer)
+  const { data: activeMatches } = await supabaseAdmin
     .from('matches')
     .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at,
       home_team_ref:teams!home_team_id(logo_url),
@@ -58,11 +62,27 @@ export async function GET(req: NextRequest, { params }: Props) {
     .order('kickoff_at', { ascending: true })
     .limit(50)
 
-  // Filtrér fremtidige kampe — status live/finished kræver kickoff i fortiden
-  const nowIso = new Date().toISOString()
-  const matchList = (matches ?? [])
+  // Hent scheduled kampe (kickoff inden for 60 min)
+  const { data: scheduledMatches } = await supabaseAdmin
+    .from('matches')
+    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at,
+      home_team_ref:teams!home_team_id(logo_url),
+      away_team_ref:teams!away_team_id(logo_url)`)
+    .eq('round_id', roundId)
+    .eq('status', 'scheduled')
+    .gt('kickoff_at', now.toISOString())
+    .lte('kickoff_at', soonCutoff.toISOString())
+    .order('kickoff_at', { ascending: true })
+    .limit(20)
+
+  const nowIso = now.toISOString()
+
+  const activeList = (activeMatches ?? [])
     .filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
-    .map((m) => ({
+
+  const allMatches = [...activeList, ...(scheduledMatches ?? [])]
+
+  const matchList = allMatches.map((m) => ({
       id: m.id,
       home_team: m.home_team,
       away_team: m.away_team,
@@ -79,10 +99,11 @@ export async function GET(req: NextRequest, { params }: Props) {
   const live = matchList.filter((m) => m.status === 'live').length
   const halftime = matchList.filter((m) => m.status === 'halftime').length
   const finished = matchList.filter((m) => m.status === 'finished').length
+  const scheduled = matchList.filter((m) => m.status === 'scheduled').length
   const total = matchList.length
 
   return NextResponse.json({
     matches: matchList,
-    summary: { live, halftime, finished, total },
+    summary: { live, halftime, finished, scheduled, total },
   })
 }
