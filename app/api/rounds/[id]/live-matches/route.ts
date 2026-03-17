@@ -53,10 +53,11 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent live/halftime/finished kampe (kickoff inden for 24 timer)
   const { data: activeMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
-      home_team_ref:teams!home_team_id(logo_url),
-      away_team_ref:teams!away_team_id(logo_url)`)
-    .eq('round_id', roundId)
+    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
+      home_team_ref:teams!home_team_id(name, logo_url),
+      away_team_ref:teams!away_team_id(name, logo_url)`)
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
     .in('status', ['live', 'halftime', 'finished'])
     .gte('kickoff', since.toISOString())
     .order('kickoff', { ascending: true })
@@ -65,10 +66,11 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent scheduled kampe (kickoff inden for 60 min)
   const { data: scheduledMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, home_team, away_team, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
-      home_team_ref:teams!home_team_id(logo_url),
-      away_team_ref:teams!away_team_id(logo_url)`)
-    .eq('round_id', roundId)
+    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
+      home_team_ref:teams!home_team_id(name, logo_url),
+      away_team_ref:teams!away_team_id(name, logo_url)`)
+    .eq('season_id', round.season_id)
+    .eq('round_name', round.name)
     .eq('status', 'scheduled')
     .gt('kickoff', now.toISOString())
     .lte('kickoff', soonCutoff.toISOString())
@@ -82,19 +84,23 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const allMatches = [...activeList, ...(scheduledMatches ?? [])]
 
-  const matchList = allMatches.map((m) => ({
-      id: m.id,
-      home_team: m.home_team,
-      away_team: m.away_team,
-      home_score: m.home_score,
-      away_score: m.away_score,
-      home_score_ht: m.home_score_ht,
-      away_score_ht: m.away_score_ht,
-      status: m.status,
-      kickoff_at: m.kickoff,
-      home_team_logo: (m.home_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
-      away_team_logo: (m.away_team_ref as unknown as { logo_url: string | null } | null)?.logo_url ?? null,
-    }))
+  const matchList = allMatches.map((m) => {
+      const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
+      const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
+      return {
+        id: m.id,
+        home_team: homeRef?.name ?? '',
+        away_team: awayRef?.name ?? '',
+        home_score: m.home_score,
+        away_score: m.away_score,
+        home_score_ht: m.home_score_ht,
+        away_score_ht: m.away_score_ht,
+        status: m.status,
+        kickoff_at: m.kickoff,
+        home_team_logo: homeRef?.logo_url ?? null,
+        away_team_logo: awayRef?.logo_url ?? null,
+      }
+    })
 
   const live = matchList.filter((m) => m.status === 'live').length
   const halftime = matchList.filter((m) => m.status === 'halftime').length
