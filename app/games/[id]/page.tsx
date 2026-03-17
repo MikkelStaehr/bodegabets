@@ -137,7 +137,7 @@ export default async function GamePage({ params }: Props) {
     seasonIds.length > 0
       ? supabase
           .from('rounds')
-          .select('id, name')
+          .select('id, name, season_id')
           .in('season_id', seasonIds)
           .eq('status', 'finished')
           .order('betting_closes_at', { ascending: false })
@@ -171,16 +171,21 @@ export default async function GamePage({ params }: Props) {
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'active') ??
     typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'upcoming') ??
     null
-  const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string } | null) ?? null
+  const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string; season_id: number } | null) ?? null
 
   const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
     latestFinishedRound
       ? supabase
           .from('matches')
-          .select('home_team, away_team, home_score, away_score, kickoff_at')
-          .eq('round_id', latestFinishedRound.id)
+          .select(`
+            home_score, away_score, kickoff,
+            home_team:teams!home_team_id(name),
+            away_team:teams!away_team_id(name)
+          `)
+          .eq('season_id', latestFinishedRound.season_id)
+          .eq('round_name', latestFinishedRound.name)
           .not('home_score', 'is', null)
-          .order('id', { ascending: true })
+          .order('kickoff', { ascending: true })
           .limit(6)
       : Promise.resolve({ data: [] }),
 
@@ -188,7 +193,8 @@ export default async function GamePage({ params }: Props) {
       ? supabase
           .from('matches')
           .select('id')
-          .eq('round_id', activeRoundEarly.id)
+          .eq('season_id', activeRoundEarly.season_id)
+          .eq('round_name', activeRoundEarly.name)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -351,12 +357,14 @@ export default async function GamePage({ params }: Props) {
   // Seneste resultater fra afsluttede runde
   for (const m of recentMatches ?? []) {
     if (m.home_score !== null && m.away_score !== null) {
-      const kickoff = (m as { kickoff_at?: string }).kickoff_at
+      const kickoff = (m as { kickoff?: string }).kickoff
       const dateStr = kickoff
         ? new Date(kickoff).toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
         : ''
       const suffix = dateStr ? ` · ${dateStr}` : ''
-      tickerItems.push(`⚽ ${m.home_team} ${m.home_score}–${m.away_score} ${m.away_team}${suffix}`)
+      const homeName = (m.home_team as unknown as { name: string })?.name ?? '?'
+      const awayName = (m.away_team as unknown as { name: string })?.name ?? '?'
+      tickerItems.push(`⚽ ${homeName} ${m.home_score}–${m.away_score} ${awayName}${suffix}`)
     }
   }
 
