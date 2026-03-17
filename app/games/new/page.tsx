@@ -9,11 +9,27 @@ export default async function NewGamePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: leagues } = await supabase
-    .from('leagues')
-    .select('id, name, country, is_active, fixturedownload_slug, bold_slug')
-    .eq('is_active', true)
-    .order('name', { ascending: true })
+  const [{ data: leagues }, { data: tournaments }] = await Promise.all([
+    supabase
+      .from('leagues')
+      .select('id, name, country, is_active, fixturedownload_slug, bold_slug')
+      .eq('is_active', true)
+      .order('name', { ascending: true }),
+    supabase
+      .from('tournaments')
+      .select('name, logo_url')
+      .not('logo_url', 'is', null),
+  ])
+
+  // Match tournament logos to leagues by name
+  const logoMap = new Map<string, string>()
+  for (const t of tournaments ?? []) {
+    if (t.logo_url) logoMap.set(t.name as string, t.logo_url as string)
+  }
+  const leaguesWithLogos = (leagues ?? []).map((l) => ({
+    ...l,
+    logo_url: logoMap.get(l.name as string) ?? null,
+  })) as League[]
 
   return (
     <div className="min-h-screen bg-cream">
@@ -24,7 +40,7 @@ export default async function NewGamePage() {
           Du får en invitationskode du kan dele med vennerne.
         </p>
 
-        <NewGameForm leagues={(leagues ?? []) as League[]} />
+        <NewGameForm leagues={leaguesWithLogos} />
       </div>
     </div>
   )

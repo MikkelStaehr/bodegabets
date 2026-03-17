@@ -118,12 +118,12 @@ export default function NewGameForm({ leagues }: Props) {
     setTimeout(() => poll(newGameId, 0), 1000)
   }
 
-  function LeagueGrid({ items }: { items: League[] }) {
+  function LeagueGrid({ items, onSelect, isSelected }: { items: League[]; onSelect: (id: string) => void; isSelected: (id: string) => boolean }) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {items.map((l) => {
           const flag     = COUNTRY_FLAGS[l.country ?? ''] ?? '🏳️'
-          const selected = leagueId === String(l.id)
+          const selected = isSelected(String(l.id))
           const hasSrc   = (l as League & { fixturedownload_slug?: string; bold_slug?: string }).fixturedownload_slug
                         || (l as League & { bold_slug?: string }).bold_slug
           const meta     = l.country ?? ''
@@ -132,7 +132,7 @@ export default function NewGameForm({ leagues }: Props) {
             <button
               key={l.id}
               type="button"
-              onClick={() => setLeagueId(String(l.id))}
+              onClick={() => onSelect(String(l.id))}
               disabled={!hasSrc}
               className={`relative text-left p-3.5 border-[1.5px] rounded-sm transition-all flex flex-col gap-1.5 ${
                 selected
@@ -143,8 +143,14 @@ export default function NewGameForm({ leagues }: Props) {
               {selected && (
                 <span className="absolute top-2 right-2.5 text-forest font-bold text-xs">✓</span>
               )}
-              <span className="text-xl leading-none">{flag}</span>
-              <span className="font-condensed font-semibold text-sm leading-snug text-primary">{l.name}</span>
+              <div className="flex items-center gap-2">
+                {l.logo_url ? (
+                  <img src={l.logo_url} alt={l.name} className="w-6 h-6 object-contain" />
+                ) : (
+                  <span className="text-xl leading-none">{flag}</span>
+                )}
+                <span className="font-condensed font-semibold text-sm leading-snug text-primary">{l.name}</span>
+              </div>
               <span className="font-body text-xs text-text-warm font-light">{meta}</span>
             </button>
           )
@@ -196,13 +202,13 @@ export default function NewGameForm({ leagues }: Props) {
                   Topligaer
                   <span className="flex-1 h-px bg-border" />
                 </p>
-                <LeagueGrid items={topLeagues} />
+                <LeagueGrid items={topLeagues} onSelect={setLeagueId} isSelected={(id) => leagueId === id} />
 
                 <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mt-4 mb-2 flex items-center gap-2">
                   Øvrige
                   <span className="flex-1 h-px bg-border" />
                 </p>
-                <LeagueGrid items={otherLeagues} />
+                <LeagueGrid items={otherLeagues} onSelect={setLeagueId} isSelected={(id) => leagueId === id} />
               </>
             )}
           </div>
@@ -220,35 +226,7 @@ export default function NewGameForm({ leagues }: Props) {
                 <p className="font-body text-xs text-text-warm font-light leading-relaxed mb-4">
                   Tilføj én eller flere cups til spilrummet — fx Champions League eller Europa League.
                 </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {cupLeagues.map((l) => {
-                    const flag     = COUNTRY_FLAGS[l.country ?? ''] ?? '🏳️'
-                    const selected = cupIds.includes(String(l.id))
-                    const hasSrc   = (l as League & { fixturedownload_slug?: string; bold_slug?: string }).fixturedownload_slug
-                                  || (l as League & { bold_slug?: string }).bold_slug
-
-                    return (
-                      <button
-                        key={l.id}
-                        type="button"
-                        onClick={() => toggleCup(String(l.id))}
-                        disabled={!hasSrc}
-                        className={`relative text-left p-3.5 border-[1.5px] rounded-sm transition-all flex flex-col gap-1.5 ${
-                          selected
-                            ? 'border-forest bg-cream-dark'
-                            : 'border-border bg-white hover:border-forest/50 hover:bg-cream'
-                        }`}
-                      >
-                        {selected && (
-                          <span className="absolute top-2 right-2.5 text-forest font-bold text-xs">✓</span>
-                        )}
-                        <span className="text-xl leading-none">{flag}</span>
-                        <span className="font-condensed font-semibold text-sm leading-snug text-primary">{l.name}</span>
-                        <span className="font-body text-xs text-text-warm font-light">{l.country ?? ''}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <LeagueGrid items={cupLeagues} onSelect={toggleCup} isSelected={(id) => cupIds.includes(id)} />
               </div>
             </div>
           </>
