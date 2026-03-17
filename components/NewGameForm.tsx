@@ -16,11 +16,6 @@ const TOP_LEAGUE_NAMES = [
   'Premier League', 'Bundesliga', 'La Liga', 'Serie A', 'Ligue 1',
 ]
 
-const CUP_KEYWORDS = ['Champions', 'Europa', 'Conference', 'Cup', 'League']
-function isCupTournament(name: string) {
-  return CUP_KEYWORDS.some((kw) => name.includes(kw))
-}
-
 const EXTRA_BETS = [
   { icon: '⚽', name: 'Første målscorer', desc: 'Gæt hvem der scorer det første mål i kampen' },
   { icon: '🟨', name: 'Antal kort',       desc: 'Over eller under antal gule kort i kampen' },
@@ -68,8 +63,8 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
   const step3Active = step2Active && selectedTournamentId !== ''
   const step4Active = step3Active
 
-  const cupTournaments   = tournaments.filter((t) => isCupTournament(t.name))
-  const nonCupTournaments = tournaments.filter((t) => !isCupTournament(t.name))
+  const cupTournaments   = tournaments.filter((t) => t.is_cup === true)
+  const nonCupTournaments = tournaments.filter((t) => t.is_cup !== true)
   const topTournaments   = nonCupTournaments.filter((t) => TOP_LEAGUE_NAMES.includes(t.name))
   const otherTournaments = nonCupTournaments.filter((t) => !TOP_LEAGUE_NAMES.includes(t.name))
 

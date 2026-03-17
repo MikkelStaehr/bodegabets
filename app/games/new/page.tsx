@@ -12,7 +12,7 @@ export default async function NewGamePage() {
   const [{ data: tournaments }, { data: seasons }] = await Promise.all([
     supabase
       .from('tournaments')
-      .select('id, name, logo_url, bold_id, bold_slug')
+      .select('id, name, logo_url, bold_id, bold_slug, is_cup')
       .order('name', { ascending: true }),
     supabase
       .from('seasons')
