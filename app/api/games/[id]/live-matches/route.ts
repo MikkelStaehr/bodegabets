@@ -35,45 +35,24 @@ export async function GET(req: NextRequest, { params }: Props) {
     return NextResponse.json({ matches: [], summary: { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 } })
   }
 
-  const now = new Date()
-  const since = new Date(now)
-  since.setHours(since.getHours() - 24)
-  const soonCutoff = new Date(now)
-  soonCutoff.setMinutes(soonCutoff.getMinutes() + 60)
+  const since = new Date()
+  since.setUTCHours(0, 0, 0, 0) // start af i dag UTC
+  const endOfDay = new Date(since.getTime() + 24 * 60 * 60 * 1000)
 
-  // Hent live/halftime/finished kampe fra alle sæsoner (kickoff inden for 24 timer)
-  const { data: activeMatches } = await supabaseAdmin
+  // Hent alle kampe i dag fra alle sæsoner (live, halftime, finished, scheduled)
+  const { data: todayMatches } = await supabaseAdmin
     .from('matches')
     .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
     .in('season_id', seasonIds)
-    .in('status', ['live', 'halftime', 'finished'])
+    .in('status', ['live', 'halftime', 'finished', 'scheduled'])
     .gte('kickoff', since.toISOString())
+    .lte('kickoff', endOfDay.toISOString())
     .order('kickoff', { ascending: true })
     .limit(100)
 
-  // Hent scheduled kampe (kickoff inden for 60 min)
-  const { data: scheduledMatches } = await supabaseAdmin
-    .from('matches')
-    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
-      home_team_ref:teams!home_team_id(name, logo_url),
-      away_team_ref:teams!away_team_id(name, logo_url)`)
-    .in('season_id', seasonIds)
-    .eq('status', 'scheduled')
-    .gt('kickoff', now.toISOString())
-    .lte('kickoff', soonCutoff.toISOString())
-    .order('kickoff', { ascending: true })
-    .limit(50)
-
-  const nowIso = now.toISOString()
-
-  const activeList = (activeMatches ?? [])
-    .filter((m) => m.kickoff && m.kickoff <= nowIso)
-
-  const allMatches = [...activeList, ...(scheduledMatches ?? [])]
-
-  const matchList = allMatches.map((m) => {
+  const matchList = (todayMatches ?? []).map((m) => {
     const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
     const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
     return {
