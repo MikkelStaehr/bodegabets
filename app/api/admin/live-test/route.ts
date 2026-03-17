@@ -11,26 +11,32 @@ export async function GET() {
       { data: recentData },
     ] = await Promise.all([
       supabaseAdmin
-        .from('league_matches')
+        .from('matches')
         .select(`
           id,
-          league_id,
-          home_team,
-          away_team,
+          season_id,
+          bold_match_id,
           home_score,
           away_score,
           status,
-          bold_match_id,
-          kickoff_at,
+          kickoff,
           updated_at,
-          league:leagues ( name )
+          home_team:teams!home_team_id(id, name),
+          away_team:teams!away_team_id(id, name)
         `)
         .in('status', ['live', 'halftime'])
-        .order('kickoff_at', { ascending: true }),
+        .order('kickoff', { ascending: true }),
 
       supabaseAdmin
-        .from('league_matches')
-        .select('bold_match_id, home_team, away_team, home_score, away_score, updated_at')
+        .from('matches')
+        .select(`
+          bold_match_id,
+          home_score,
+          away_score,
+          updated_at,
+          home_team:teams!home_team_id(name),
+          away_team:teams!away_team_id(name)
+        `)
         .gte('updated_at', since.toISOString())
         .not('home_score', 'is', null)
         .order('updated_at', { ascending: false })
@@ -38,18 +44,31 @@ export async function GET() {
     ])
 
     const liveMatches = (liveMatchesData ?? []).map((m: Record<string, unknown>) => {
-      const league = m.league as { name?: string } | null
+      const home = m.home_team as { id?: number; name?: string } | null
+      const away = m.away_team as { id?: number; name?: string } | null
       return {
         id: m.id,
-        league_id: m.league_id,
-        league_name: league?.name ?? '—',
-        home_team: m.home_team,
-        away_team: m.away_team,
+        season_id: m.season_id,
+        home_team: home?.name ?? '—',
+        away_team: away?.name ?? '—',
         home_score: m.home_score,
         away_score: m.away_score,
         status: m.status,
         bold_match_id: m.bold_match_id,
-        kickoff_at: m.kickoff_at,
+        kickoff: m.kickoff,
+        updated_at: m.updated_at,
+      }
+    })
+
+    const recentSyncs = (recentData ?? []).map((m: Record<string, unknown>) => {
+      const home = m.home_team as { name?: string } | null
+      const away = m.away_team as { name?: string } | null
+      return {
+        bold_match_id: m.bold_match_id,
+        home_team: home?.name ?? '—',
+        away_team: away?.name ?? '—',
+        home_score: m.home_score,
+        away_score: m.away_score,
         updated_at: m.updated_at,
       }
     })
@@ -57,7 +76,7 @@ export async function GET() {
     return NextResponse.json({
       liveMatches,
       coverage: [],
-      recentSyncs: recentData ?? [],
+      recentSyncs,
       timestamp: new Date().toISOString(),
     })
   } catch (err) {

@@ -1,30 +1,30 @@
 /**
  * build-game-rounds.ts
- * CLI-script: Kører buildLeagueRounds for en liga.
+ * CLI-script: Kører syncSeasonViaBold for en sæson.
  * Kør: npm run build-game-rounds -- 1
- * Eller: npx dotenv -e .env.local -- npx ts-node --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' scripts/build-game-rounds.ts 1
  */
 
-import { buildLeagueRounds } from '../lib/syncLeagueMatches'
+import { syncSeasonViaBold } from '../lib/syncLeagueMatches'
 
 async function main() {
-  const leagueId = parseInt(process.argv[2] ?? '1', 10)
+  const seasonId = parseInt(process.argv[2] ?? '1', 10)
 
-  if (!leagueId) {
-    console.error('Brug: npx ts-node scripts/build-game-rounds.ts <league_id>')
+  if (!seasonId) {
+    console.error('Brug: npx ts-node scripts/build-game-rounds.ts <season_id>')
     process.exit(1)
   }
 
-  console.log(`Kører buildLeagueRounds(league_id=${leagueId})…`)
+  console.log(`Kører syncSeasonViaBold(season_id=${seasonId})…`)
 
-  const result = await buildLeagueRounds(leagueId)
+  const result = await syncSeasonViaBold(seasonId)
 
   console.log('\nResultat:')
+  console.log(`  Kampe synket:    ${result.synced}`)
   console.log(`  Runder oprettet: ${result.rounds_created}`)
   console.log(`  Kampe oprettet:  ${result.matches_created}`)
   console.log(`  Kampe opdateret: ${result.matches_updated}`)
-  if (result.debug) {
-    console.log('  Debug:', JSON.stringify(result.debug, null, 2))
+  if (result.errors.length) {
+    console.log('  Fejl:', result.errors)
   }
 
   console.log('\nFærdig.')

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { buildLeagueRounds } from '@/lib/syncLeagueMatches'
+import { syncSeasonViaBold } from '@/lib/syncLeagueMatches'
 
 export const maxDuration = 60
 
@@ -34,28 +34,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Season ikke fundet for spilrum' }, { status: 404 })
   }
 
-  const leagueId = gameSeason.season_id
-  const result = await buildLeagueRounds(leagueId)
-
-  // Hvis ingen matches blev oprettet, hent diagnostic
-  let diagnostic: { league_matches_count?: number; rounds_count?: number } | null = null
-  if (result.matches_created === 0 && result.matches_updated === 0) {
-    const [lmRes, rRes] = await Promise.all([
-      supabaseAdmin.from('league_matches').select('*', { count: 'exact', head: true }).eq('season_id', leagueId),
-      supabaseAdmin.from('rounds').select('*', { count: 'exact', head: true }).eq('season_id', leagueId),
-    ])
-    diagnostic = {
-      league_matches_count: lmRes.count ?? 0,
-      rounds_count: rRes.count ?? 0,
-    }
-  }
+  const result = await syncSeasonViaBold(gameSeason.season_id)
 
   return NextResponse.json({
     ok: true,
     game_id,
     game_name: game.name,
-    ...result,
-    diagnostic: diagnostic ?? undefined,
-    debug: result.debug,
+    synced: result.synced,
+    rounds_created: result.rounds_created,
+    matches_created: result.matches_created,
+    matches_updated: result.matches_updated,
+    errors: result.errors,
   })
 }
