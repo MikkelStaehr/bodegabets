@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, type ReactNode } from 'react'
-import { useLiveMatches } from '@/hooks/useLiveMatches'
+import { useLiveMatchesForGame } from '@/hooks/useLiveMatches'
 import type { LiveMatch, LiveSummary } from '@/hooks/useLiveMatches'
 
 type LiveMatchesContextValue = {
@@ -17,15 +17,15 @@ export function useLiveMatchesContext() {
 }
 
 export function LiveMatchesProvider({
-  roundId,
+  gameId,
   enabled,
   children,
 }: {
-  roundId: number | null
+  gameId: number | null
   enabled: boolean
   children: ReactNode
 }) {
-  const { matches, summary, lastUpdate } = useLiveMatches(roundId, enabled)
+  const { matches, summary, lastUpdate } = useLiveMatchesForGame(gameId, enabled)
   const value: LiveMatchesContextValue = { matches, summary, lastUpdate }
   return (
     <LiveMatchesContext.Provider value={value}>

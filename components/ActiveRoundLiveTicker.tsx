@@ -1,18 +1,13 @@
 'use client'
 
-import { useLiveMatches } from '@/hooks/useLiveMatches'
 import { useLiveMatchesContext } from '@/contexts/LiveMatchesContext'
 import { LiveMatchesTicker } from '@/components/LiveMatchesTicker'
 
-type Props = {
-  roundId: number | null
-  enabled?: boolean
-}
-
-export default function ActiveRoundLiveTicker({ roundId, enabled = true }: Props) {
+export default function ActiveRoundLiveTicker() {
   const ctx = useLiveMatchesContext()
-  const hookData = useLiveMatches(roundId, enabled && !ctx)
-  const { matches, summary, lastUpdate } = ctx ?? hookData
+  const matches = ctx?.matches ?? []
+  const summary = ctx?.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 }
+  const lastUpdate = ctx?.lastUpdate ?? null
 
   if (matches.length === 0) return null
 
