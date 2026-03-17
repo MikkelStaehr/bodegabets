@@ -422,8 +422,8 @@ app.get('/calculate-points', async (_req, res) => {
             .eq('season_id', round.season_id)
             .eq('round_name', round.name)
 
-          const allFinished = matches?.length && matches.every((m) => m.status === 'finished')
-          if (!allFinished) continue
+          const anyFinished = matches?.some((m) => m.status === 'finished')
+          if (!anyFinished) continue
 
           await calculateRoundPoints(round.id)
           processed++
