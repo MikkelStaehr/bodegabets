@@ -14,6 +14,8 @@ export type LiveMatch = {
   kickoff_at: string
   home_team_logo: string | null
   away_team_logo: string | null
+  tournamentLogo?: string | null
+  userPrediction?: string | null
 }
 
 export type LiveSummary = {
