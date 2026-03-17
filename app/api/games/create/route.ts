@@ -17,17 +17,17 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, league_id, cup_ids } = body as {
+  const { name, season_id, cup_season_ids } = body as {
     name: string
-    league_id: number
-    cup_ids?: number[]
+    season_id: number
+    cup_season_ids?: number[]
   }
 
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Navn er påkrævet' }, { status: 400 })
   }
-  if (!league_id) {
-    return NextResponse.json({ error: 'Liga er påkrævet' }, { status: 400 })
+  if (!season_id) {
+    return NextResponse.json({ error: 'Turnering er påkrævet' }, { status: 400 })
   }
 
   // Sikr at brugerens profil eksisterer (FK games.host_id → profiles.id)
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Link game to all selected seasons via junction table
-  const allSeasonIds = [league_id, ...(cup_ids ?? [])]
+  const allSeasonIds = [season_id, ...(cup_season_ids ?? [])]
   for (const season_id of allSeasonIds) {
     const { error: linkError } = await supabaseAdmin
       .from('game_seasons')
@@ -95,11 +95,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: memberError.message }, { status: 500 })
   }
 
-  // Tjek at der eksisterer runder for den primære liga
+  // Tjek at der eksisterer runder for den primære sæson
   const { count: roundCount } = await supabaseAdmin
     .from('rounds')
     .select('*', { count: 'exact', head: true })
-    .eq('league_id', league_id)
+    .eq('season_id', season_id)
 
   return NextResponse.json({
     ok: true,

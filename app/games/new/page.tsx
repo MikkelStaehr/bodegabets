@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import NewGameForm from '@/components/NewGameForm'
-import type { League } from '@/types'
+import type { Tournament, Season } from '@/types'
 
 export default async function NewGamePage() {
   const supabase = await createServerSupabaseClient()
@@ -9,27 +9,30 @@ export default async function NewGamePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: leagues }, { data: tournaments }] = await Promise.all([
-    supabase
-      .from('leagues')
-      .select('id, name, country, is_active, fixturedownload_slug, bold_slug')
-      .eq('is_active', true)
-      .order('name', { ascending: true }),
+  const [{ data: tournaments }, { data: seasons }] = await Promise.all([
     supabase
       .from('tournaments')
-      .select('name, logo_url')
-      .not('logo_url', 'is', null),
+      .select('id, name, logo_url, bold_id, bold_slug')
+      .order('name', { ascending: true }),
+    supabase
+      .from('seasons')
+      .select('id, tournament_id, name, bold_phase_id')
+      .order('id', { ascending: false }),
   ])
 
-  // Match tournament logos to leagues by name
-  const logoMap = new Map<string, string>()
-  for (const t of tournaments ?? []) {
-    if (t.logo_url) logoMap.set(t.name as string, t.logo_url as string)
+  // Build map: tournament_id → latest season (first match since ordered desc)
+  const seasonMap: Record<number, Season> = {}
+  for (const s of seasons ?? []) {
+    const tid = s.tournament_id as number
+    if (!seasonMap[tid]) {
+      seasonMap[tid] = s as Season
+    }
   }
-  const leaguesWithLogos = (leagues ?? []).map((l) => ({
-    ...l,
-    logo_url: logoMap.get(l.name as string) ?? null,
-  })) as League[]
+
+  // Only include tournaments that have at least one season
+  const tournamentsWithSeason = (tournaments ?? []).filter(
+    (t) => seasonMap[t.id as number]
+  ) as Tournament[]
 
   return (
     <div className="min-h-screen bg-cream">
@@ -40,7 +43,7 @@ export default async function NewGamePage() {
           Du får en invitationskode du kan dele med vennerne.
         </p>
 
-        <NewGameForm leagues={leaguesWithLogos} />
+        <NewGameForm tournaments={tournamentsWithSeason} seasonMap={seasonMap} />
       </div>
     </div>
   )

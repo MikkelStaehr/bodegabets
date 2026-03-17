@@ -95,6 +95,21 @@ export type RoundScore = {
   created_at: string
 }
 
+export type Tournament = {
+  id: number
+  name: string
+  bold_id?: string | null
+  bold_slug?: string | null
+  logo_url?: string | null
+}
+
+export type Season = {
+  id: number
+  tournament_id: number
+  name: string
+  bold_phase_id?: string | null
+}
+
 // Extended types med joins
 export type GameWithMemberCount = Game & {
   member_count: number
