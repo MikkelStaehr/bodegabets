@@ -8,6 +8,7 @@
  *   GET /sync-scores       — hvert 5. min (sync live scores fra Bold API)
  *   GET /sync-fixtures     — dagligt 06:00 (sync fixtures fra Bold API)
  *   GET /update-rounds     — dagligt 08:00 (opdater runde-status)
+ *   GET /update-bet-open   — dagligt 07:05 (åbn betting for næste runder)
  *   GET /calculate-points  — dagligt 09:00 (beregn points)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /health            — health check
@@ -22,6 +23,7 @@
  */
 
 import express from 'express'
+import cron from 'node-cron'
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { syncMatchScores } from '@/lib/syncMatchScores'
@@ -261,6 +263,129 @@ app.get('/update-rounds', async (_req, res) => {
   }
 })
 
+// ─── GET /update-bet-open ───────────────────────────────────────────────────
+
+app.get('/update-bet-open', async (_req, res) => {
+  try {
+    const now = new Date()
+    const nowIso = now.toISOString()
+
+    // 1) Sæt alle runder til bet_open = false
+    const { error: resetError } = await supabaseAdmin
+      .from('rounds')
+      .update({ bet_open: false })
+      .gte('id', 0)
+
+    if (resetError) {
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'update_bet_open',
+        status: 'error',
+        message: `Reset bet_open failed: ${resetError.message}`,
+      })
+      res.status(500).json({ error: resetError.message })
+      return
+    }
+
+    // 2) Hent alle ikke-finished runder med betting_closes_at > now
+    const { data: candidateRounds, error: fetchError } = await supabaseAdmin
+      .from('rounds')
+      .select('id, season_id, betting_closes_at')
+      .neq('status', 'finished')
+      .gt('betting_closes_at', nowIso)
+      .order('betting_closes_at', { ascending: true })
+
+    if (fetchError) {
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'update_bet_open',
+        status: 'error',
+        message: `Fetch rounds failed: ${fetchError.message}`,
+      })
+      res.status(500).json({ error: fetchError.message })
+      return
+    }
+
+    // 3) Vælg de 2 nærmeste per season_id
+    type CandidateRound = { id: number; season_id: number; betting_closes_at: string }
+    const rounds = (candidateRounds ?? []) as CandidateRound[]
+    const countBySeason = new Map<number, number>()
+    const idsToOpen: number[] = []
+
+    for (const r of rounds) {
+      const count = countBySeason.get(r.season_id) ?? 0
+      if (count < 2) {
+        idsToOpen.push(r.id)
+        countBySeason.set(r.season_id, count + 1)
+      }
+    }
+
+    // 4) Sæt bet_open = true for de valgte runder
+    if (idsToOpen.length > 0) {
+      const { error: openError } = await supabaseAdmin
+        .from('rounds')
+        .update({ bet_open: true })
+        .in('id', idsToOpen)
+
+      if (openError) {
+        await supabaseAdmin.from('admin_logs').insert({
+          type: 'update_bet_open',
+          status: 'error',
+          message: `Set bet_open failed: ${openError.message}`,
+        })
+        res.status(500).json({ error: openError.message })
+        return
+      }
+    }
+
+    // 5) Opret round_members med 1000 pt for alle spillere i relevante spilrum
+    let roundMembersCreated = 0
+    const roundsToProvision = rounds.filter((r) => idsToOpen.includes(r.id))
+
+    for (const round of roundsToProvision) {
+      const { data: gameSeasonRows } = await supabaseAdmin
+        .from('game_seasons')
+        .select('game_id')
+        .eq('season_id', round.season_id)
+
+      const gameIds = (gameSeasonRows ?? []).map((gs: { game_id: number }) => gs.game_id)
+      if (gameIds.length === 0) continue
+
+      const { data: members } = await supabaseAdmin
+        .from('game_members')
+        .select('user_id, game_id')
+        .in('game_id', gameIds)
+
+      for (const member of members ?? []) {
+        await supabaseAdmin
+          .from('round_members')
+          .upsert(
+            {
+              user_id: member.user_id,
+              round_id: round.id,
+              game_id: member.game_id,
+              betting_balance: 1000,
+            },
+            { onConflict: 'user_id,round_id,game_id' }
+          )
+        roundMembersCreated++
+      }
+    }
+
+    console.log(`[update-bet-open] ${nowIso} — bet_open=true for ${idsToOpen.length} runder: [${idsToOpen.join(', ')}], round_members created: ${roundMembersCreated}`)
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'update_bet_open',
+      status: 'success',
+      message: `bet_open opdateret: ${idsToOpen.length} runder åbnet, ${roundMembersCreated} round_members oprettet`,
+      metadata: { round_ids: idsToOpen, round_members_created: roundMembersCreated, timestamp: nowIso },
+    })
+
+    res.json({ updated: true, timestamp: nowIso, rounds_opened: idsToOpen, round_members_created: roundMembersCreated })
+  } catch (err) {
+    console.error('[update-bet-open]', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /calculate-points ──────────────────────────────────────────────────
 
 app.get('/calculate-points', async (_req, res) => {
@@ -451,4 +576,40 @@ app.get('/send-reminders', async (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[bodegabets-cron] listening on port ${PORT}`)
+
+  // ─── Internal cron scheduler ───────────────────────────────────────────
+  const CRON_SECRET = process.env.CRON_SECRET!
+  const BASE_URL = `http://localhost:${PORT}`
+
+  async function callEndpoint(path: string) {
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        headers: { Authorization: `Bearer ${CRON_SECRET}` },
+      })
+      const data = await res.json()
+      console.log(`[cron] ${path}:`, data)
+    } catch (err) {
+      console.error(`[cron] ${path} failed:`, err)
+    }
+  }
+
+  // Hvert 5. minut — sync scores
+  cron.schedule('*/5 * * * *', () => callEndpoint('/sync-scores'))
+
+  // Dagligt kl. 06:00 UTC — sync fixtures
+  cron.schedule('0 6 * * *', () => callEndpoint('/sync-fixtures'))
+
+  // Dagligt kl. 07:00 UTC — update rounds
+  cron.schedule('0 7 * * *', () => callEndpoint('/update-rounds'))
+
+  // Dagligt kl. 07:05 UTC — update bet-open (efter update-rounds)
+  cron.schedule('5 7 * * *', () => callEndpoint('/update-bet-open'))
+
+  // Dagligt kl. 08:00 UTC — calculate points
+  cron.schedule('0 8 * * *', () => callEndpoint('/calculate-points'))
+
+  // Dagligt kl. 10:00 UTC — send reminders
+  cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
+
+  console.log('[bodegabets-cron] cron jobs scheduled')
 })
