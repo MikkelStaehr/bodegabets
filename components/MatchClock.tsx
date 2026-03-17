@@ -17,26 +17,30 @@ export default function MatchClock({ kickoff, status }: Props) {
     const tick = () => {
       const now = Date.now()
       const start = new Date(kickoff).getTime()
-      const elapsed = Math.floor((now - start) / 60000)
+      const elapsedSec = Math.floor((now - start) / 1000)
+      const elapsed = Math.floor(elapsedSec / 60)
+      const secs = elapsedSec % 60
 
       if (status === 'halftime') {
         setDisplay('HT')
         return
       }
 
+      const pad = (n: number) => String(n).padStart(2, '0')
+
       // 2. halvleg starter ~60 min inde (45 min spil + ~15 min pause)
       if (elapsed > 60) {
         const secondHalf = elapsed - 60 + 45
-        setDisplay(secondHalf > 90 ? `90+'` : `${secondHalf}'`)
+        setDisplay(secondHalf > 90 ? `90:${pad(secs)}` : `${secondHalf}:${pad(secs)}`)
       } else if (elapsed > 45) {
-        setDisplay(`45+'`)
+        setDisplay(`45:${pad(secs)}`)
       } else {
-        setDisplay(`${Math.max(1, elapsed)}'`)
+        setDisplay(`${Math.max(1, elapsed)}:${pad(secs)}`)
       }
     }
 
     tick()
-    const interval = setInterval(tick, 10000) // opdater hvert 10. sek
+    const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [kickoff, status])
 
