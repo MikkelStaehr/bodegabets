@@ -13,30 +13,31 @@ export default function MatchClock({ kickoff, status }: Props) {
   useEffect(() => {
     if (status === 'finished') { setDisplay('FT'); return }
     if (status === 'scheduled') { setDisplay(''); return }
+    if (status === 'halftime') { setDisplay('HT'); return }
 
     const tick = () => {
       const now = Date.now()
       const start = new Date(kickoff).getTime()
-      const elapsedSec = Math.floor((now - start) / 1000)
-      const elapsed = Math.floor(elapsedSec / 60)
-      const secs = elapsedSec % 60
+      const elapsedMs = now - start
+      const totalSeconds = Math.floor(elapsedMs / 1000)
 
-      if (status === 'halftime') {
-        setDisplay('HT')
-        return
-      }
+      // 2. halvleg starter ~60 min inde (45 min + ~15 min pause)
+      let displayMinutes: number
+      let displaySeconds: number
 
-      const pad = (n: number) => String(n).padStart(2, '0')
-
-      // 2. halvleg starter ~60 min inde (45 min spil + ~15 min pause)
-      if (elapsed > 60) {
-        const secondHalf = elapsed - 60 + 45
-        setDisplay(secondHalf > 90 ? `90:${pad(secs)}` : `${secondHalf}:${pad(secs)}`)
-      } else if (elapsed > 45) {
-        setDisplay(`45:${pad(secs)}`)
+      if (totalSeconds > 60 * 60) {
+        // 2. halvleg
+        const secondHalfSeconds = totalSeconds - (60 * 60) + (45 * 60)
+        displayMinutes = Math.min(90, Math.floor(secondHalfSeconds / 60))
+        displaySeconds = secondHalfSeconds % 60
       } else {
-        setDisplay(`${Math.max(1, elapsed)}:${pad(secs)}`)
+        displayMinutes = Math.min(45, Math.floor(totalSeconds / 60))
+        displaySeconds = totalSeconds % 60
       }
+
+      const mm = String(displayMinutes).padStart(2, '0')
+      const ss = String(displaySeconds).padStart(2, '0')
+      setDisplay(`${mm}:${ss}`)
     }
 
     tick()
