@@ -35,10 +35,6 @@ export async function GET(req: NextRequest, { params }: Props) {
     return NextResponse.json({ matches: [], summary: { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 } })
   }
 
-  const since = new Date()
-  since.setUTCHours(0, 0, 0, 0) // start af i dag UTC
-  const endOfDay = new Date(since.getTime() + 24 * 60 * 60 * 1000)
-
   // Hent tournament logos via season → tournament
   const { data: seasonTournaments } = await supabaseAdmin
     .from('seasons')
@@ -51,21 +47,31 @@ export async function GET(req: NextRequest, { params }: Props) {
     tournamentLogoMap.set(st.id, tournament?.logo_url ?? null)
   }
 
-  // Hent ALLE kampe i dag fra alle sæsoner (alle statusser)
-  const { data: todayMatches } = await supabaseAdmin
+  // Hent aktive runder (bet_open = true ELLER status = open/active) for disse sæsoner
+  const { data: activeRounds } = await supabaseAdmin
+    .from('rounds')
+    .select('id')
+    .in('season_id', seasonIds)
+    .or('bet_open.eq.true,status.eq.open,status.eq.active')
+
+  const roundIds = (activeRounds ?? []).map((r: { id: number }) => r.id)
+  if (roundIds.length === 0) {
+    return NextResponse.json({ matches: [], summary: { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 } })
+  }
+
+  // Hent alle kampe for aktive runder (alle statusser undtagen cancelled)
+  const { data: roundMatches } = await supabaseAdmin
     .from('matches')
     .select(`id, season_id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
-    .in('season_id', seasonIds)
+    .in('round_id', roundIds)
     .neq('status', 'cancelled')
-    .gte('kickoff', since.toISOString())
-    .lte('kickoff', endOfDay.toISOString())
     .order('kickoff', { ascending: true })
-    .limit(100)
+    .limit(200)
 
   // Hent brugerens match_result bets for disse kampe
-  const matchIds = (todayMatches ?? []).map((m) => m.id)
+  const matchIds = (roundMatches ?? []).map((m) => m.id)
   const { data: userBets } = matchIds.length > 0
     ? await supabaseAdmin
         .from('bets')
@@ -81,7 +87,7 @@ export async function GET(req: NextRequest, { params }: Props) {
     betMap.set(b.match_id, b.prediction)
   }
 
-  const matchList = (todayMatches ?? []).map((m) => {
+  const matchList = (roundMatches ?? []).map((m) => {
     const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
     const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
     return {
