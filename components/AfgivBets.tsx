@@ -7,8 +7,6 @@ import type { Match, Bet } from '@/types'
 import { BET_TYPE_LABELS, PREDICTION_LABELS } from '@/lib/betTypes'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
-import GameTicker from '@/components/GameTicker'
-import LiveMatches from '@/components/LiveMatches'
 
 type MatchWithOptions = Match
 
@@ -88,7 +86,6 @@ type Props = {
   matches: MatchWithOptions[]
   existingBets: Bet[]
   userPoints: number
-  tickerItems: string[]
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
 }
@@ -581,7 +578,6 @@ export default function AfgivBets({
   matches,
   existingBets,
   userPoints,
-  tickerItems,
   rivalryInfo = {},
   totalMatchesInRound,
 }: Props) {
@@ -884,9 +880,6 @@ export default function AfgivBets({
         </span>
       </nav>
 
-      {/* Ticker */}
-      {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
-
       {/* Read-only banner */}
       {isReadOnly && (
         <div className="w-full bg-[#c0392b]/15 border-b border-[#c0392b]/30 px-4 py-3 text-[#c0392b] text-sm text-center">
@@ -923,7 +916,6 @@ export default function AfgivBets({
       {/* ═══ MOBILE LAYOUT (< md) ═══ */}
       <div className="md:hidden pb-[80px]">
         <div className="max-w-[680px] mx-auto px-4 py-4">
-          <LiveMatches roundId={roundId} gameId={gameId} gameName={gameName} roundName={round.name} />
           {renderMatchList(true)}
         </div>
 
@@ -969,9 +961,6 @@ export default function AfgivBets({
         <div className="max-w-[960px] mx-auto grid grid-cols-[1fr_290px]">
           {/* Left — match cards */}
           <div className="py-3.5 px-5 pb-24 border-r border-black/10">
-            <div className="mb-4">
-              <LiveMatches roundId={roundId} gameId={gameId} gameName={gameName} roundName={round.name} />
-            </div>
             <div className="flex items-center justify-between mb-2.5">
               <span className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase">
                 Vælg udfald
