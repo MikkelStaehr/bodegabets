@@ -339,6 +339,7 @@ export default async function GamePage({ params }: Props) {
   const activeRoundRows: ActiveRoundRow[] = openRounds.map((r) => ({
     id: r.id,
     name: r.name,
+    status: r.status,
     betting_closes_at: r.betting_closes_at,
     totalMatches: matchCountByRound[r.id] ?? 0,
     userBets: userBetsByRound[r.id] ?? 0,
