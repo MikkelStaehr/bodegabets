@@ -603,24 +603,15 @@ export default function AfgivBets({
   const [pointsError, setPointsError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 10000)
-    return () => clearInterval(interval)
-  }, [])
-  const deadlinePassed = round.betting_closes_at
-    ? now >= new Date(round.betting_closes_at)
-    : false
-  const isReadOnly =
-    (round.status !== 'open' && round.status !== 'upcoming') || deadlinePassed
+  const isReadOnly = round.status === 'finished'
 
   const matchBettingOpen = useCallback(
     (match: MatchWithOptions): boolean => {
       if (round.status === 'finished') return false
       if (match.status === 'finished') return false
-      return true
+      return match.bet_open === true
     },
-    [round.status, now]
+    [round.status]
   )
 
   const totalMatches = matches.length
