@@ -169,6 +169,17 @@ export default async function RoundPage({ params }: Props) {
     }
   }
 
+  // Ticker items
+  const tickerItems: string[] = []
+  if (typedRound.betting_closes_at && typedRound.status === 'open') {
+    const dl = new Date(typedRound.betting_closes_at)
+    const dlStr = dl.toLocaleString('da-DK', {
+      timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    })
+    tickerItems.push(`Bets til ${typedRound.name} er åbne — deadline ${dlStr}`)
+  }
+  tickerItems.push(`${(game as { name: string }).name} · ${typedRound.name}`)
+
   if (matches.length === 0) {
     return (
       <div className="min-h-screen bg-[#F2EDE4] flex flex-col items-center justify-center p-8 gap-4">
@@ -198,6 +209,7 @@ export default async function RoundPage({ params }: Props) {
       matches={matches}
       existingBets={typedBets}
       userPoints={bettingBalance}
+      tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}
     />
