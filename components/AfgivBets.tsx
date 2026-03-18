@@ -92,33 +92,10 @@ type Props = {
   totalMatchesInRound?: number
 }
 
-function initSelections(matches: MatchWithOptions[], existing: Bet[]): BetEntry[] {
-  const entries: BetEntry[] = []
-  for (const m of matches) {
-    if (m.status === 'finished' || m.status === 'live' || m.status === 'halftime' || m.bet_open !== true) continue
-    const mr = existing.find((b) => b.match_id === m.id && b.bet_type === 'match_result')
-    if (mr) {
-      const extraBets: ExtraBet[] = existing
-        .filter(
-          (b) =>
-            b.match_id === m.id &&
-            (EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType) || b.bet_type === 'halftime')
-        )
-        .map((b) => ({
-          type: (b.bet_type === 'halftime' ? 'halvleg' : b.bet_type) as ExtraBetType,
-          prediction: b.prediction,
-          points: b.stake,
-        }))
-      entries.push({
-        matchId: m.id,
-        outcome: mr.prediction as '1' | 'X' | '2',
-        points: mr.stake,
-        match: m,
-        extraBets,
-      })
-    }
-  }
-  return entries
+function initSelections(_matches: MatchWithOptions[], _existing: Bet[]): BetEntry[] {
+  // Existing bets are already paid — don't load them into selections.
+  // Only new/changed bets appear in selections and count towards credits.
+  return []
 }
 
 function formatKickoff(iso: string) {
@@ -326,12 +303,13 @@ function MatchCard({
   showInlineStake: boolean
 }) {
   const isRivalry = !!rivalry
-  const displayOutcome = isFinished ? userPrediction : (sel?.outcome ?? null)
+  const displayOutcome = isFinished ? userPrediction : (sel?.outcome ?? userPrediction)
 
   const cardBg = isRivalry ? 'bg-[#1a3329]' : 'bg-white'
+  const hasSelection = !!sel || (!isFinished && !!userPrediction)
   const cardBorder = isRivalry
     ? 'border-[#B8963E]'
-    : sel
+    : hasSelection
       ? 'border-[#2C4A3E] shadow-[0_0_0_1px_#2C4A3E]'
       : 'border-black/10'
   const textPrimary = isRivalry ? 'text-[#F2EDE4]' : 'text-[#1a3329]'
@@ -455,6 +433,38 @@ function MatchCard({
         />
       )}
 
+      {/* Existing extra bets on open match with no new selection — read-only */}
+      {isOpen && !sel && Object.keys(userExtraPicks).length > 0 && (
+        <div className={`px-3 pb-2 ${isRivalry ? 'border-t border-[#B8963E]/20' : ''}`}>
+          {EXTRA_BET_ROWS
+            .filter((row) => userExtraPicks[row.key])
+            .map((row) => (
+              <div key={row.key} className="mb-1">
+                <span className={`text-[9px] font-bold tracking-wider uppercase mb-0.5 block ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
+                  {row.label}
+                </span>
+                <div className="flex gap-1">
+                  {row.opts.map((opt) => {
+                    const isUserPick = userExtraPicks[row.key] === opt.value
+                    const cls = isUserPick
+                      ? isRivalry
+                        ? 'bg-[#B8963E] border-[#B8963E] text-[#1a3329]'
+                        : 'bg-[#2C4A3E] border-[#2C4A3E] text-white'
+                      : isRivalry
+                        ? 'bg-[#2C4A3E] border-[#B8963E]/20 text-[#F2EDE4]/40'
+                        : 'bg-white border-black/10 text-[#7a7060]/40'
+                    return (
+                      <button key={opt.value} type="button" disabled className={`flex-1 py-1 border-[1.5px] rounded text-[10px] font-semibold cursor-not-allowed opacity-80 ${cls}`}>
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
       {/* Finished match: show user extra picks read-only */}
       {isFinished && <FinishedExtraBets match={match} userExtraPicks={userExtraPicks} />}
 
@@ -502,6 +512,18 @@ function MatchCard({
               +
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Open match with existing bet but no new selection: show existing stake read-only */}
+      {isOpen && !sel && matchResultBet && (
+        <div className={`flex items-center justify-between px-3 py-1.5 ${isRivalry ? 'border-t border-[#B8963E]/20' : 'border-t border-black/[0.06]'}`}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
+            Dit valg
+          </span>
+          <span className={`font-condensed text-[14px] font-bold ${isRivalry ? 'text-[#F2EDE4]/70' : 'text-[#7a7060]'}`}>
+            {matchResultBet.stake} pt
+          </span>
         </div>
       )}
 
@@ -569,9 +591,20 @@ export default function AfgivBets({
     const match = matches.find((m) => m.id === matchId)
     if (!match || !matchBettingOpen(match)) return
 
-    const existing = getSelection(matchId)
-    if (existing) {
-      if (existing.outcome === outcome) {
+    // Check if there's an existing (already-paid) bet for this match
+    const existingBet = existingBets.find(
+      (b) => b.match_id === matchId && b.bet_type === 'match_result'
+    )
+
+    const sel = getSelection(matchId)
+    if (sel) {
+      if (sel.outcome === outcome) {
+        // Toggle off — remove selection (reverts to existing bet if any)
+        setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
+        return
+      }
+      // If clicking the same outcome as the existing bet, just remove the selection
+      if (existingBet && existingBet.prediction === outcome) {
         setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
         return
       }
@@ -579,6 +612,8 @@ export default function AfgivBets({
         prev.map((s) => (s.matchId === matchId ? { ...s, outcome } : s))
       )
     } else {
+      // No active selection — if clicking same as existing bet, do nothing
+      if (existingBet && existingBet.prediction === outcome) return
       setSelections((prev) => [
         ...prev,
         { matchId, outcome, points: 100, match, extraBets: [] },
