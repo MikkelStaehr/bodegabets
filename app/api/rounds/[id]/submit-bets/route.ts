@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   const payloadMatchIds = [...new Set(bets.map((b) => b.match_id))]
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
-    .select('id')
+    .select('id, bet_open, kickoff')
     .eq('season_id', round.season_id)
     .eq('round_name', round.name)
 
@@ -84,6 +84,14 @@ export async function POST(req: NextRequest, { params }: Props) {
   const allValid = payloadMatchIds.every((id) => roundMatchIds.includes(id))
   if (!allValid) {
     return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
+  }
+
+  // Tjek at alle kampe stadig er åbne for bets (per-kamp bet_open)
+  const lockedMatches = (roundMatches ?? []).filter(
+    (m) => payloadMatchIds.includes(m.id) && !m.bet_open
+  )
+  if (lockedMatches.length > 0) {
+    return NextResponse.json({ error: 'En eller flere kampe er lukket for bets' }, { status: 400 })
   }
 
   // Slet ALLE eksisterende bets for denne bruger i denne runde (fuld erstatning)

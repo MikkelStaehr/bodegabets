@@ -270,27 +270,11 @@ app.get('/update-bet-open', async (_req, res) => {
     const now = new Date()
     const nowIso = now.toISOString()
 
-    // 1) Sæt alle runder til bet_open = false
-    const { error: resetError } = await supabaseAdmin
-      .from('rounds')
-      .update({ bet_open: false })
-      .gte('id', 0)
-
-    if (resetError) {
-      await supabaseAdmin.from('admin_logs').insert({
-        type: 'update_bet_open',
-        status: 'error',
-        message: `Reset bet_open failed: ${resetError.message}`,
-      })
-      res.status(500).json({ error: resetError.message })
-      return
-    }
-
-    // 2) Hent alle ikke-finished runder med betting_closes_at > now
+    // Hent åbne runder (status open/upcoming) med betting_closes_at > now
     const { data: candidateRounds, error: fetchError } = await supabaseAdmin
       .from('rounds')
       .select('id, season_id, betting_closes_at')
-      .neq('status', 'finished')
+      .in('status', ['open', 'upcoming'])
       .gt('betting_closes_at', nowIso)
       .order('betting_closes_at', { ascending: true })
 
@@ -304,41 +288,22 @@ app.get('/update-bet-open', async (_req, res) => {
       return
     }
 
-    // 3) Vælg de 2 nærmeste per season_id
+    // Vælg 1 nærmeste runde per season_id
     type CandidateRound = { id: number; season_id: number; betting_closes_at: string }
     const rounds = (candidateRounds ?? []) as CandidateRound[]
     const countBySeason = new Map<number, number>()
-    const idsToOpen: number[] = []
+    const roundsToProvision: CandidateRound[] = []
 
     for (const r of rounds) {
       const count = countBySeason.get(r.season_id) ?? 0
       if (count < 1) {
-        idsToOpen.push(r.id)
+        roundsToProvision.push(r)
         countBySeason.set(r.season_id, count + 1)
       }
     }
 
-    // 4) Sæt bet_open = true for de valgte runder
-    if (idsToOpen.length > 0) {
-      const { error: openError } = await supabaseAdmin
-        .from('rounds')
-        .update({ bet_open: true })
-        .in('id', idsToOpen)
-
-      if (openError) {
-        await supabaseAdmin.from('admin_logs').insert({
-          type: 'update_bet_open',
-          status: 'error',
-          message: `Set bet_open failed: ${openError.message}`,
-        })
-        res.status(500).json({ error: openError.message })
-        return
-      }
-    }
-
-    // 5) Opret round_members med 1000 pt for alle spillere i relevante spilrum
+    // Opret round_members med 1000 pt for alle spillere i relevante spilrum
     let roundMembersCreated = 0
-    const roundsToProvision = rounds.filter((r) => idsToOpen.includes(r.id))
 
     for (const round of roundsToProvision) {
       const { data: gameSeasonRows } = await supabaseAdmin
@@ -370,16 +335,17 @@ app.get('/update-bet-open', async (_req, res) => {
       }
     }
 
-    console.log(`[update-bet-open] ${nowIso} — bet_open=true for ${idsToOpen.length} runder: [${idsToOpen.join(', ')}], round_members created: ${roundMembersCreated}`)
+    const provisionedIds = roundsToProvision.map((r) => r.id)
+    console.log(`[update-bet-open] ${nowIso} — provisioned ${roundsToProvision.length} runder: [${provisionedIds.join(', ')}], round_members created: ${roundMembersCreated}`)
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'update_bet_open',
       status: 'success',
-      message: `bet_open opdateret: ${idsToOpen.length} runder åbnet, ${roundMembersCreated} round_members oprettet`,
-      metadata: { round_ids: idsToOpen, round_members_created: roundMembersCreated, timestamp: nowIso },
+      message: `round_members oprettet: ${roundsToProvision.length} runder, ${roundMembersCreated} round_members`,
+      metadata: { round_ids: provisionedIds, round_members_created: roundMembersCreated, timestamp: nowIso },
     })
 
-    res.json({ updated: true, timestamp: nowIso, rounds_opened: idsToOpen, round_members_created: roundMembersCreated })
+    res.json({ updated: true, timestamp: nowIso, rounds_provisioned: provisionedIds, round_members_created: roundMembersCreated })
   } catch (err) {
     console.error('[update-bet-open]', err)
     res.status(500).json({ error: String(err) })
