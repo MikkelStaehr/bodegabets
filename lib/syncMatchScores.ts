@@ -220,6 +220,38 @@ export async function syncMatchScores(options?: {
     }
   }
 
+  // ─── Lås kampe hvor bet_lock_at er passeret ─────────────────────────────
+  const { data: toLock } = await supabaseAdmin
+    .from('matches')
+    .select('id, round_id')
+    .eq('bet_open', true)
+    .lt('bet_lock_at', new Date().toISOString())
+
+  if (toLock?.length) {
+    await supabaseAdmin
+      .from('matches')
+      .update({ bet_open: false })
+      .in('id', toLock.map((m) => m.id))
+
+    // Opdater rounds.bet_open baseret på om der stadig er åbne kampe
+    const roundIds = [...new Set(toLock.map((m) => m.round_id).filter(Boolean))]
+    for (const roundId of roundIds) {
+      const { data: openMatches } = await supabaseAdmin
+        .from('matches')
+        .select('id')
+        .eq('round_id', roundId)
+        .eq('bet_open', true)
+
+      const roundBetOpen = (openMatches?.length ?? 0) > 0
+      await supabaseAdmin
+        .from('rounds')
+        .update({ bet_open: roundBetOpen })
+        .eq('id', roundId)
+    }
+
+    console.log(`[syncMatchScores] Låste ${toLock.length} kampe (bet_lock_at passeret)`)
+  }
+
   console.log(`[syncMatchScores] ${updated} kampe opdateret${dryRun ? ' (dry-run)' : ''}`)
 
   if (dryRun) {
