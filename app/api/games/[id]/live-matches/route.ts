@@ -68,7 +68,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent ALLE kampe for åbne runder via round_id (uanset kamp status/dato, undtagen cancelled)
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, round_id, round_name, kickoff, status, result,
+    .select(`id, round_id, round_name, kickoff, status, result, second_half_started_at,
       home_score, away_score, home_score_ht, away_score_ht,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
@@ -108,6 +108,7 @@ export async function GET(req: NextRequest, { params }: Props) {
       away_score_ht: m.away_score_ht,
       status: m.status,
       kickoff_at: m.kickoff,
+      second_half_started_at: (m as Record<string, unknown>).second_half_started_at ?? null,
       home_team_logo: homeRef?.logo_url ?? null,
       away_team_logo: awayRef?.logo_url ?? null,
       tournamentLogo: tournamentLogoMap.get(roundSeasonMap.get(m.round_id) ?? 0) ?? null,

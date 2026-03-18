@@ -123,7 +123,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
 
       {/* Status + Clock */}
       <div className="shrink-0 flex items-center gap-1.5 ml-auto">
-        <MatchClock kickoff={match.kickoff_at} status={match.status} />
+        <MatchClock kickoff={match.kickoff_at} status={match.status} secondHalfStartedAt={match.second_half_started_at} />
         <StatusBadge status={match.status} kickoff={match.kickoff_at} />
       </div>
 
