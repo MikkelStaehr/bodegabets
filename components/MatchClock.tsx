@@ -28,9 +28,9 @@ export default function MatchClock({ kickoff, status }: Props) {
       let displayMinutes: number
       let displaySeconds: number
 
-      if (totalSeconds > 52 * 60) {
+      if (totalSeconds > 60 * 60) {
         // 2. halvleg — tæl fra 45:00
-        const secondHalfSeconds = totalSeconds - (52 * 60)
+        const secondHalfSeconds = totalSeconds - (60 * 60)
         displayMinutes = Math.min(90, 45 + Math.floor(secondHalfSeconds / 60))
         displaySeconds = secondHalfSeconds % 60
       } else {
