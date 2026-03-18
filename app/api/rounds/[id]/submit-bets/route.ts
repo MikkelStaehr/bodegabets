@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Tjek at runden stadig er åben
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('name, season_id, status, betting_closes_at')
+    .select('name, season_id, status')
     .eq('id', roundId)
     .single()
 
@@ -44,10 +44,6 @@ export async function POST(req: NextRequest, { params }: Props) {
   const canBet = round && (round.status === 'open' || round.status === 'upcoming')
   if (!canBet) {
     return NextResponse.json({ error: 'Runden er ikke åben for bets' }, { status: 400 })
-  }
-
-  if (round.betting_closes_at && new Date(round.betting_closes_at) < new Date()) {
-    return NextResponse.json({ error: 'Betting-deadline er overskredet' }, { status: 400 })
   }
 
   // Tjek at brugeren er game_member
