@@ -438,37 +438,69 @@ export async function syncBoldFixtures(
     (existingMatches ?? []).map((m) => m.bold_match_id as number)
   )
 
-  const matchRows = parsedMatches.map((p) => ({
-    season_id: seasonId,
-    round_name: p.round_name,
-    home_team_id: p.home_team_id,
-    away_team_id: p.away_team_id,
-    kickoff: p.kickoff,
-    home_score: p.home_score,
-    away_score: p.away_score,
-    status: p.status,
-    bold_match_id: p.bold_match_id,
-    result: p.result,
-    updated_at: new Date().toISOString(),
-  }))
+  const nowIso = new Date().toISOString()
 
-  // Batch upsert in chunks of 500
-  for (let i = 0; i < matchRows.length; i += 500) {
-    const chunk = matchRows.slice(i, i + 500)
+  // Split into new matches (INSERT with bet_open=true) and existing (UPDATE without bet_open)
+  const newMatchRows = parsedMatches
+    .filter((p) => !existingBoldIds.has(p.bold_match_id))
+    .map((p) => ({
+      season_id: seasonId,
+      round_name: p.round_name,
+      home_team_id: p.home_team_id,
+      away_team_id: p.away_team_id,
+      kickoff: p.kickoff,
+      home_score: p.home_score,
+      away_score: p.away_score,
+      status: p.status,
+      bold_match_id: p.bold_match_id,
+      result: p.result,
+      bet_open: true,
+      bet_lock_at: new Date(new Date(p.kickoff).getTime() - 30 * 60 * 1000).toISOString(),
+      updated_at: nowIso,
+    }))
+
+  const existingMatchRows = parsedMatches
+    .filter((p) => existingBoldIds.has(p.bold_match_id))
+    .map((p) => ({
+      season_id: seasonId,
+      round_name: p.round_name,
+      home_team_id: p.home_team_id,
+      away_team_id: p.away_team_id,
+      kickoff: p.kickoff,
+      home_score: p.home_score,
+      away_score: p.away_score,
+      status: p.status,
+      bold_match_id: p.bold_match_id,
+      result: p.result,
+      bet_lock_at: new Date(new Date(p.kickoff).getTime() - 30 * 60 * 1000).toISOString(),
+      updated_at: nowIso,
+    }))
+
+  // INSERT new matches (with bet_open = true)
+  for (let i = 0; i < newMatchRows.length; i += 500) {
+    const chunk = newMatchRows.slice(i, i + 500)
+    const { error } = await supabaseAdmin
+      .from('matches')
+      .insert(chunk)
+
+    if (error) {
+      errors.push(`Matches insert fejl (chunk ${i}–${i + chunk.length}): ${error.message}`)
+    } else {
+      stats.matches_created += chunk.length
+    }
+  }
+
+  // UPDATE existing matches (preserve bet_open — don't overwrite locked matches)
+  for (let i = 0; i < existingMatchRows.length; i += 500) {
+    const chunk = existingMatchRows.slice(i, i + 500)
     const { error } = await supabaseAdmin
       .from('matches')
       .upsert(chunk, { onConflict: 'bold_match_id' })
 
     if (error) {
-      errors.push(`Matches upsert fejl (chunk ${i}–${i + chunk.length}): ${error.message}`)
+      errors.push(`Matches update fejl (chunk ${i}–${i + chunk.length}): ${error.message}`)
     } else {
-      for (const row of chunk) {
-        if (existingBoldIds.has(row.bold_match_id)) {
-          stats.matches_updated++
-        } else {
-          stats.matches_created++
-        }
-      }
+      stats.matches_updated += chunk.length
     }
   }
 
