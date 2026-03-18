@@ -26,6 +26,7 @@ type BetEntry = {
   points: number
   match: MatchWithOptions
   extraBets: ExtraBet[]
+  isReplacement?: boolean
 }
 
 const EXTRA_BET_ROWS = [
@@ -576,11 +577,13 @@ export default function AfgivBets({
   )
 
   const totalMatches = matches.length
-  const totalPoints = selections.reduce((sum, s) => {
-    const main = s.points
-    const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
-    return sum + main + extra
-  }, 0)
+  const totalPoints = selections
+    .filter((s) => !s.isReplacement)
+    .reduce((sum, s) => {
+      const main = s.points
+      const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
+      return sum + main + extra
+    }, 0)
   const displayCredits = userPoints - totalPoints
   const isOverBudget = displayCredits < 0
 
@@ -614,9 +617,10 @@ export default function AfgivBets({
     } else {
       // No active selection — if clicking same as existing bet, do nothing
       if (existingBet && existingBet.prediction === outcome) return
+      const isReplacement = !!existingBet
       setSelections((prev) => [
         ...prev,
-        { matchId, outcome, points: 100, match, extraBets: [] },
+        { matchId, outcome, points: isReplacement ? 0 : 100, match, extraBets: [], isReplacement },
       ])
     }
   }
