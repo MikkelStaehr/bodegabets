@@ -93,6 +93,7 @@ type Props = {
   matches: MatchWithOptions[]
   existingBets: Bet[]
   userPoints: number
+  usedPoints?: number
   tickerItems: string[]
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
@@ -109,6 +110,7 @@ const EXTRA_BET_TYPES: ExtraBetType[] = ['btts', 'over_under', 'halvleg', 'malfo
 function initSelections(matches: MatchWithOptions[], existing: Bet[]): BetEntry[] {
   const entries: BetEntry[] = []
   for (const m of matches) {
+    if (m.status === 'finished' || m.bet_open === false) continue
     const mr = existing.find((b) => b.match_id === m.id && b.bet_type === 'match_result')
     if (mr) {
       const extraBets: ExtraBet[] = existing
@@ -585,6 +587,7 @@ export default function AfgivBets({
   matches,
   existingBets,
   userPoints,
+  usedPoints = 0,
   tickerItems,
   rivalryInfo = {},
   totalMatchesInRound,
@@ -620,6 +623,7 @@ export default function AfgivBets({
     const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
     return sum + main + extra
   }, 0)
+  const availablePoints = userPoints - usedPoints
   const progressPct = totalMatches > 0 ? (selections.length / totalMatches) * 100 : 0
   const effectiveFastPoints = isManuel ? customPoints : fastPoints
   const extraBetsEnabled = true
@@ -731,8 +735,8 @@ export default function AfgivBets({
 
   async function handleSubmit() {
     if (selections.length === 0) return
-    if (totalPoints > userPoints) {
-      toast(`Ikke nok point. Du har ${userPoints} pt.`, 'error')
+    if (totalPoints > availablePoints) {
+      toast(`Ikke nok point. Du har ${availablePoints} pt.`, 'error')
       return
     }
 
@@ -956,7 +960,7 @@ export default function AfgivBets({
                   Dine credits
                 </span>
                 <span className="font-condensed text-[18px] font-extrabold text-[#1a3329] leading-none">
-                  {userPoints - totalPoints} pt
+                  {availablePoints - totalPoints} pt
                 </span>
               </div>
               <p className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase mb-1.5">
