@@ -12,6 +12,7 @@ export type LiveMatch = {
   away_score_ht: number | null
   status: 'live' | 'halftime' | 'finished' | 'scheduled'
   kickoff_at: string
+  second_half_started_at?: string | null
   home_team_logo: string | null
   away_team_logo: string | null
   tournamentLogo?: string | null

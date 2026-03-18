@@ -182,15 +182,22 @@ export async function syncMatchScores(options?: {
       .eq('id', match.id)
       .single()
 
+    const updates: Record<string, unknown> = {
+      home_score: boldData.home_score,
+      away_score: boldData.away_score,
+      status,
+      result,
+      updated_at: new Date().toISOString(),
+    }
+
+    // Gem 2. halvleg starttidspunkt
+    if (currentMatch?.status === 'halftime' && status === 'live') {
+      updates.second_half_started_at = new Date().toISOString()
+    }
+
     const { error } = await supabaseAdmin
       .from('matches')
-      .update({
-        home_score: boldData.home_score,
-        away_score: boldData.away_score,
-        status,
-        result,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', match.id)
 
     if (error) {

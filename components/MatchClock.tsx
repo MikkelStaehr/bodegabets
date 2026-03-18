@@ -5,9 +5,10 @@ import { useState, useEffect } from 'react'
 type Props = {
   kickoff: string
   status: 'live' | 'halftime' | 'finished' | 'scheduled'
+  secondHalfStartedAt?: string | null
 }
 
-export default function MatchClock({ kickoff, status }: Props) {
+export default function MatchClock({ kickoff, status, secondHalfStartedAt }: Props) {
   const [display, setDisplay] = useState('')
 
   useEffect(() => {
@@ -17,26 +18,28 @@ export default function MatchClock({ kickoff, status }: Props) {
 
     const tick = () => {
       const now = Date.now()
-      const normalizedKickoff = kickoff
-        .replace(' ', 'T')
-        .replace(/\+00$/, 'Z')
-        .replace(/\+00:00$/, 'Z')
-      const start = new Date(normalizedKickoff).getTime()
-      const elapsedMs = now - start
-      const totalSeconds = Math.floor(elapsedMs / 1000)
 
       let displayMinutes: number
       let displaySeconds: number
 
-      if (totalSeconds > 60 * 60) {
-        // 2. halvleg — tæl fra 45:00
-        const secondHalfSeconds = totalSeconds - (60 * 60)
-        displayMinutes = Math.min(90, 45 + Math.floor(secondHalfSeconds / 60))
-        displaySeconds = secondHalfSeconds % 60
+      if (secondHalfStartedAt) {
+        // 2. halvleg — tæl fra second_half_started_at
+        const shNormalized = secondHalfStartedAt
+          .replace(' ', 'T')
+          .replace(/\+00$/, 'Z')
+          .replace(/\+00:00$/, 'Z')
+        const elapsed = now - new Date(shNormalized).getTime()
+        displayMinutes = Math.min(90, 45 + Math.floor(elapsed / 60000))
+        displaySeconds = Math.floor((elapsed % 60000) / 1000)
       } else {
-        // 1. halvleg
-        displayMinutes = Math.min(45, Math.floor(totalSeconds / 60))
-        displaySeconds = totalSeconds % 60
+        // 1. halvleg — tæl fra kickoff
+        const normalizedKickoff = kickoff
+          .replace(' ', 'T')
+          .replace(/\+00$/, 'Z')
+          .replace(/\+00:00$/, 'Z')
+        const elapsed = now - new Date(normalizedKickoff).getTime()
+        displayMinutes = Math.min(45, Math.floor(elapsed / 60000))
+        displaySeconds = Math.floor((elapsed % 60000) / 1000)
       }
 
       const mm = String(displayMinutes).padStart(2, '0')
@@ -47,7 +50,7 @@ export default function MatchClock({ kickoff, status }: Props) {
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [kickoff, status])
+  }, [kickoff, status, secondHalfStartedAt])
 
   if (!display) return null
 
