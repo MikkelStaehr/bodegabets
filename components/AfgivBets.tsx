@@ -276,6 +276,7 @@ function MatchCard({
   isLocked,
   isOpen,
   isReadOnly,
+  isEditing,
   correctOutcome,
   userPrediction,
   userExtraPicks,
@@ -284,6 +285,8 @@ function MatchCard({
   toggleExtra,
   adjustStake,
   setStake,
+  onStartEdit,
+  onCancelEdit,
   showInlineStake,
 }: {
   match: MatchWithOptions
@@ -293,6 +296,7 @@ function MatchCard({
   isLocked: boolean
   isOpen: boolean
   isReadOnly: boolean
+  isEditing: boolean
   correctOutcome: '1' | 'X' | '2' | null
   userPrediction: '1' | 'X' | '2' | null
   userExtraPicks: Record<string, string>
@@ -301,9 +305,12 @@ function MatchCard({
   toggleExtra: (matchId: number, key: ExtraBetType, value: string) => void
   adjustStake: (matchId: number, delta: number) => void
   setStake: (matchId: number, val: number) => void
+  onStartEdit: (matchId: number) => void
+  onCancelEdit: (matchId: number) => void
   showInlineStake: boolean
 }) {
   const isRivalry = !!rivalry
+  const hasExistingBet = isOpen && !!matchResultBet
   const displayOutcome = isFinished ? userPrediction : (sel?.outcome ?? userPrediction)
 
   const cardBg = isRivalry ? 'bg-[#1a3329]' : 'bg-white'
@@ -395,7 +402,7 @@ function MatchCard({
           const textLight = active || isUserPick
           const sub =
             o === '1' ? firstWord(match.home_team) : o === '2' ? firstWord(match.away_team) : 'Uafgjort'
-          const disabled = isReadOnly || !isOpen
+          const disabled = isReadOnly || !isOpen || (hasExistingBet && !isEditing)
 
           return (
             <button
@@ -516,15 +523,34 @@ function MatchCard({
         </div>
       )}
 
-      {/* Open match with existing bet but no new selection: show existing stake read-only */}
-      {isOpen && !sel && matchResultBet && (
+      {/* Open match with existing bet: show stake + Ændre/Fortryd button */}
+      {hasExistingBet && (
         <div className={`flex items-center justify-between px-3 py-1.5 ${isRivalry ? 'border-t border-[#B8963E]/20' : 'border-t border-black/[0.06]'}`}>
           <span className={`text-[10px] font-bold uppercase tracking-wider ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
             Dit valg
           </span>
-          <span className={`font-condensed text-[14px] font-bold ${isRivalry ? 'text-[#F2EDE4]/70' : 'text-[#7a7060]'}`}>
-            {matchResultBet.stake} pt
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`font-condensed text-[14px] font-bold ${isRivalry ? 'text-[#F2EDE4]/70' : 'text-[#7a7060]'}`}>
+              {matchResultBet.stake} pt
+            </span>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={() => isEditing ? onCancelEdit(match.id) : onStartEdit(match.id)}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all ${
+                  isEditing
+                    ? isRivalry
+                      ? 'text-[#F2EDE4]/70 hover:text-[#F2EDE4] border border-[#B8963E]/30'
+                      : 'text-[#c0392b] hover:text-[#c0392b]/80 border border-[#c0392b]/30'
+                    : isRivalry
+                      ? 'text-[#B8963E] hover:text-[#B8963E]/80 border border-[#B8963E]/30'
+                      : 'text-[#2C4A3E] hover:text-[#2C4A3E]/80 border border-[#2C4A3E]/30'
+                }`}
+              >
+                {isEditing ? 'Fortryd' : 'Ændre \u2192'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -563,6 +589,7 @@ export default function AfgivBets({
   const { toast } = useToast()
 
   const [selections, setSelections] = useState<BetEntry[]>(() => initSelections(matches, existingBets))
+  const [editingMatchIds, setEditingMatchIds] = useState<Set<number>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isReadOnly = round.status === 'finished'
@@ -599,28 +626,34 @@ export default function AfgivBets({
       (b) => b.match_id === matchId && b.bet_type === 'match_result'
     )
 
+    // Block changes on existing bets unless explicitly editing
+    if (existingBet && !editingMatchIds.has(matchId)) return
+
     const sel = getSelection(matchId)
     if (sel) {
       if (sel.outcome === outcome) {
-        // Toggle off — remove selection (reverts to existing bet if any)
-        setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
-        return
-      }
-      // If clicking the same outcome as the existing bet, just remove the selection
-      if (existingBet && existingBet.prediction === outcome) {
-        setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
+        // For replacements, toggle off reverts to existing bet outcome
+        if (sel.isReplacement && existingBet) {
+          // Revert to existing bet outcome
+          setSelections((prev) =>
+            prev.map((s) =>
+              s.matchId === matchId
+                ? { ...s, outcome: existingBet.prediction as '1' | 'X' | '2' }
+                : s
+            )
+          )
+        } else {
+          setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
+        }
         return
       }
       setSelections((prev) =>
         prev.map((s) => (s.matchId === matchId ? { ...s, outcome } : s))
       )
     } else {
-      // No active selection — if clicking same as existing bet, do nothing
-      if (existingBet && existingBet.prediction === outcome) return
-      const isReplacement = !!existingBet
       setSelections((prev) => [
         ...prev,
-        { matchId, outcome, points: isReplacement ? 0 : 100, match, extraBets: [], isReplacement },
+        { matchId, outcome, points: 100, match, extraBets: [], isReplacement: false },
       ])
     }
   }
@@ -659,6 +692,51 @@ export default function AfgivBets({
         return { ...s, extraBets: next }
       })
     )
+  }
+
+  const startEditing = (matchId: number) => {
+    const match = matches.find((m) => m.id === matchId)
+    if (!match) return
+    const existingBet = existingBets.find(
+      (b) => b.match_id === matchId && b.bet_type === 'match_result'
+    )
+    if (!existingBet) return
+
+    setEditingMatchIds((prev) => new Set(prev).add(matchId))
+
+    // Load existing bet into selections as replacement
+    const existingExtraBets: ExtraBet[] = existingBets
+      .filter(
+        (b) =>
+          b.match_id === matchId &&
+          (EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType) || b.bet_type === 'halftime')
+      )
+      .map((b) => ({
+        type: (b.bet_type === 'halftime' ? 'halvleg' : b.bet_type) as ExtraBetType,
+        prediction: b.prediction,
+        points: b.stake,
+      }))
+
+    setSelections((prev) => [
+      ...prev.filter((s) => s.matchId !== matchId),
+      {
+        matchId,
+        outcome: existingBet.prediction as '1' | 'X' | '2',
+        points: 0,
+        match,
+        extraBets: existingExtraBets,
+        isReplacement: true,
+      },
+    ])
+  }
+
+  const cancelEditing = (matchId: number) => {
+    setEditingMatchIds((prev) => {
+      const next = new Set(prev)
+      next.delete(matchId)
+      return next
+    })
+    setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
   }
 
   async function handleSubmit() {
@@ -776,6 +854,7 @@ export default function AfgivBets({
           isLocked={md.isLocked}
           isOpen={md.isOpen}
           isReadOnly={isReadOnly}
+          isEditing={editingMatchIds.has(md.match.id)}
           correctOutcome={md.correctOutcome}
           userPrediction={md.userPrediction}
           userExtraPicks={md.userExtraPicks}
@@ -784,6 +863,8 @@ export default function AfgivBets({
           toggleExtra={toggleExtra}
           adjustStake={adjustStake}
           setStake={setStake}
+          onStartEdit={startEditing}
+          onCancelEdit={cancelEditing}
           showInlineStake={showInlineStake}
         />
       )
