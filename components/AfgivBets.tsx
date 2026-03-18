@@ -780,6 +780,16 @@ export default function AfgivBets({
 
   const deadline = formatDeadline(round.betting_closes_at)
 
+  console.log('[credits debug]', {
+    userPoints,
+    usedPoints,
+    availablePoints: userPoints - (usedPoints ?? 0),
+    totalPoints,
+    display: (userPoints - (usedPoints ?? 0)) - totalPoints,
+    selectionsCount: selections.length,
+    selections: selections.map(s => ({ matchId: s.matchId, points: s.points, extras: s.extraBets.length })),
+  })
+
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
       {/* Nav — fuld bredde */}
