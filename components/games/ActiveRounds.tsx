@@ -5,6 +5,7 @@ import Link from 'next/link'
 export type ActiveRoundRow = {
   id: number
   name: string
+  status: string
   betting_closes_at: string | null
   totalMatches: number
   userBets: number
@@ -83,7 +84,6 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
       {rounds.map((round, idx) => {
         const hasBets = round.userBets > 0
         const deadline = round.betting_closes_at ? new Date(round.betting_closes_at) : null
-        const bettingOpen = deadline !== null && deadline > now
         const hoursLeft = deadline ? (deadline.getTime() - now.getTime()) / (1000 * 60 * 60) : null
         const isUrgent = hoursLeft !== null && hoursLeft > 0 && hoursLeft <= 24
 
@@ -212,7 +212,7 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
                 textDecoration: 'none',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
-                ...(bettingOpen
+                ...(round.status !== 'finished' && round.userBets < round.totalMatches
                   ? {
                       background: '#2C4A3E',
                       color: '#F2EDE4',
@@ -225,11 +225,11 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
                     }),
               }}
             >
-              {bettingOpen
-                ? 'Afgiv bets →'
-                : hasBets
-                  ? 'Se resultater →'
-                  : 'Se live →'}
+              {round.status === 'finished'
+                ? 'Se resultater →'
+                : round.userBets < round.totalMatches
+                  ? 'Afgiv bets →'
+                  : 'Se runde →'}
             </Link>
           </div>
         )
