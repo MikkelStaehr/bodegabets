@@ -51,14 +51,14 @@ export async function GET(req: NextRequest, { params }: Props) {
     tournamentLogoMap.set(st.id, tournament?.logo_url ?? null)
   }
 
-  // Hent alle kampe i dag fra alle sæsoner (live, halftime, finished, scheduled)
+  // Hent ALLE kampe i dag fra alle sæsoner (alle statusser)
   const { data: todayMatches } = await supabaseAdmin
     .from('matches')
     .select(`id, season_id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
     .in('season_id', seasonIds)
-    .in('status', ['live', 'halftime', 'finished', 'scheduled'])
+    .neq('status', 'cancelled')
     .gte('kickoff', since.toISOString())
     .lte('kickoff', endOfDay.toISOString())
     .order('kickoff', { ascending: true })
