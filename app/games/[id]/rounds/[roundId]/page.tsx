@@ -72,7 +72,7 @@ export default async function RoundPage({ params }: Props) {
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
 
-  // Step 2: Hent matches via season_id + round_name med team joins
+  // Step 2: Hent matches via round_id med team joins
   const matchSelect = `
     id, kickoff, status, result,
     home_score, away_score,
@@ -111,8 +111,7 @@ export default async function RoundPage({ params }: Props) {
   const { data: rawMatches, error: matchesError } = await supabase
     .from('matches')
     .select(matchSelect)
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
+    .eq('round_id', roundIdNum)
     .order('kickoff', { ascending: true })
 
   let matches = (rawMatches ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
@@ -122,8 +121,7 @@ export default async function RoundPage({ params }: Props) {
     const { data: matchesRetry } = await supabase
       .from('matches')
       .select(matchSelect)
-      .eq('season_id', round.season_id)
-      .eq('round_name', round.name)
+      .eq('round_id', roundIdNum)
       .order('kickoff', { ascending: true })
     matches = (matchesRetry ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
   }

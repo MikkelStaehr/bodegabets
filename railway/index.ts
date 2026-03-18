@@ -151,29 +151,23 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
-    // Hent matches via season_id + round_name (ikke round_id)
-    const seasonIds = [...new Set(rounds.map((r) => r.season_id))]
+    // Hent matches via round_id
+    const roundIds = typedAllRounds.map((r) => r.id)
 
     const { data: matchRows, error: statsError } = await supabaseAdmin
       .from('matches')
-      .select('season_id, round_name, status, kickoff')
-      .in('season_id', seasonIds)
+      .select('round_id, status, kickoff')
+      .in('round_id', roundIds)
 
     if (statsError) {
       res.status(500).json({ error: statsError.message })
       return
     }
 
-    // Map season_id::round_name → round.id
-    const roundIdByKey = new Map<string, number>()
-    for (const r of typedAllRounds) {
-      roundIdByKey.set(`${r.season_id}::${r.name}`, r.id)
-    }
-
-    type MatchRow = { season_id: number; round_name: string; status: string; kickoff: string | null }
+    type MatchRow = { round_id: number; status: string; kickoff: string | null }
     const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
     for (const m of (matchRows ?? []) as MatchRow[]) {
-      const roundId = roundIdByKey.get(`${m.season_id}::${m.round_name}`)
+      const roundId = m.round_id
       if (!roundId) continue
       if (!statMap[roundId]) statMap[roundId] = { total: 0, finished: 0, minKickoff: null }
       statMap[roundId].total++
@@ -368,12 +362,11 @@ app.get('/calculate-points', async (_req, res) => {
           .in('season_id', seasonIds)
 
         for (const round of roundRows ?? []) {
-          // Tjek om alle kampe i denne runde er finished
+          // Tjek om mindst én kamp i denne runde er finished
           const { data: matches } = await supabaseAdmin
             .from('matches')
             .select('id, status')
-            .eq('season_id', round.season_id)
-            .eq('round_name', round.name)
+            .eq('round_id', round.id)
 
           const anyFinished = matches?.some((m) => m.status === 'finished')
           if (!anyFinished) continue
@@ -457,12 +450,11 @@ app.get('/send-reminders', async (_req, res) => {
         if (!members?.length) continue
         const memberUserIds = members.map((m) => m.user_id)
 
-        // Find matches for denne runde via season_id + round_name
+        // Find matches for denne runde via round_id
         const { data: roundMatches } = await supabaseAdmin
           .from('matches')
           .select('id')
-          .eq('season_id', round.season_id)
-          .eq('round_name', round.name)
+          .eq('round_id', round.id)
 
         const matchIds = (roundMatches ?? []).map((m: { id: number }) => m.id)
 

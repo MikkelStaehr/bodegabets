@@ -72,13 +72,12 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Validér at alle match_ids tilhører denne runde (via season_id + round_name)
+  // Validér at alle match_ids tilhører denne runde
   const payloadMatchIds = [...new Set(bets.map((b) => b.match_id))]
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
     .select('id, bet_open, kickoff')
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
+    .eq('round_id', roundId)
 
   const roundMatchIds = (roundMatches ?? []).map((m) => m.id)
   const allValid = payloadMatchIds.every((id) => roundMatchIds.includes(id))

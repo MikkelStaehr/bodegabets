@@ -56,8 +56,7 @@ export async function GET(req: NextRequest, { params }: Props) {
     .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
+    .eq('round_id', roundId)
     .in('status', ['live', 'halftime', 'finished'])
     .gte('kickoff', since.toISOString())
     .order('kickoff', { ascending: true })
@@ -69,8 +68,7 @@ export async function GET(req: NextRequest, { params }: Props) {
     .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
+    .eq('round_id', roundId)
     .eq('status', 'scheduled')
     .gt('kickoff', now.toISOString())
     .lte('kickoff', soonCutoff.toISOString())

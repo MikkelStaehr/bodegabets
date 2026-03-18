@@ -30,8 +30,7 @@ export async function syncMatchesForRound(
   const { data: leagueMatches } = await supabaseAdmin
     .from('league_matches')
     .select('id, home_team, away_team, kickoff_at, status, home_score, away_score')
-    .eq('season_id', round.season_id)
-    .eq('round_name', round.name)
+    .eq('round_id', roundId)
     .order('kickoff_at', { ascending: true })
 
   console.log('[syncMatchesForRound] leagueMatches count:', leagueMatches?.length)
