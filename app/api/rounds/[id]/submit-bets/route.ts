@@ -91,14 +91,13 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'En eller flere kampe er lukket for bets' }, { status: 400 })
   }
 
-  // Slet kun eksisterende bets for ÅBNE kampe (bevar bets på finished/locked kampe)
-  const openMatchIds = (roundMatches ?? []).filter((m) => m.bet_open).map((m) => m.id)
-  if (openMatchIds.length > 0) {
+  // Slet kun eksisterende bets for de kampe der er med i denne submission
+  if (payloadMatchIds.length > 0) {
     const { error: deleteError } = await supabaseAdmin
       .from('bets')
       .delete()
       .eq('user_id', user.id)
-      .in('match_id', openMatchIds)
+      .in('match_id', payloadMatchIds)
 
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 })
@@ -121,21 +120,16 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  // Opdater round_members.betting_balance = 1000 - (locked bets + nye bets)
-  const lockedMatchIds = (roundMatches ?? []).filter((m) => !m.bet_open).map((m) => m.id)
-  let lockedStake = 0
-  if (lockedMatchIds.length > 0) {
-    const { data: lockedBets } = await supabaseAdmin
-      .from('bets')
-      .select('stake')
-      .eq('user_id', user.id)
-      .in('match_id', lockedMatchIds)
-    lockedStake = (lockedBets ?? []).reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  }
-  const newStake = bets.reduce((sum, b) => sum + b.stake, 0)
+  // Opdater round_members.betting_balance = 1000 - alle aktive bets i runden
+  const { data: allRoundBets } = await supabaseAdmin
+    .from('bets')
+    .select('stake')
+    .eq('user_id', user.id)
+    .eq('round_id', roundId)
+  const totalStake = (allRoundBets ?? []).reduce((sum, b) => sum + (b.stake ?? 0), 0)
   await supabaseAdmin
     .from('round_members')
-    .update({ betting_balance: 1000 - lockedStake - newStake })
+    .update({ betting_balance: 1000 - totalStake })
     .eq('user_id', user.id)
     .eq('round_id', roundId)
     .eq('game_id', bodyGameId)
