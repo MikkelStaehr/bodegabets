@@ -253,6 +253,7 @@ export async function syncMatchScores(options?: {
         .from('rounds')
         .update({ bet_open: roundBetOpen })
         .eq('id', roundId)
+        .eq('status', 'open')
     }
 
     console.log(`[syncMatchScores] Låste ${tolock.length} kampe (bet_open=false), opdaterede ${roundIds.length} runder`)
