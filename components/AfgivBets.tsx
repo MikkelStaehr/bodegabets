@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Match, Bet } from '@/types'
 import { BET_TYPE_LABELS, PREDICTION_LABELS } from '@/lib/betTypes'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
+import GameTicker from '@/components/GameTicker'
 
 type MatchWithOptions = Match
 
@@ -86,6 +86,7 @@ type Props = {
   matches: MatchWithOptions[]
   existingBets: Bet[]
   userPoints: number
+  tickerItems: string[]
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
 }
@@ -578,6 +579,7 @@ export default function AfgivBets({
   matches,
   existingBets,
   userPoints,
+  tickerItems,
   rivalryInfo = {},
   totalMatchesInRound,
 }: Props) {
@@ -874,15 +876,8 @@ export default function AfgivBets({
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
-      {/* Nav */}
-      <nav className="bg-[#1a3329] h-[52px] flex items-center px-4 gap-3 sticky top-0 z-[100]">
-        <Link href={`/games/${gameId}`} className="text-[rgba(242,237,228,0.5)] text-xl">
-          ‹
-        </Link>
-        <span className="font-condensed text-lg font-bold text-[#F2EDE4] tracking-wide">
-          Bodega Bets
-        </span>
-      </nav>
+      {/* Ticker */}
+      {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
 
       {/* Read-only banner */}
       {isReadOnly && (
