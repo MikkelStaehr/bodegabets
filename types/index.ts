@@ -66,6 +66,7 @@ export type Match = {
   status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'cancelled'
   home_team_logo: string | null
   away_team_logo: string | null
+  bet_open?: boolean
   sofascore_event_id?: string | null
   league_match_id?: number | null
 }
