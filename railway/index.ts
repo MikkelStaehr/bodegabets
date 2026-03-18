@@ -270,42 +270,29 @@ app.get('/update-bet-open', async (_req, res) => {
     const now = new Date()
     const nowIso = now.toISOString()
 
-    // Hent åbne runder (status open/upcoming) med betting_closes_at > now
-    const { data: candidateRounds, error: fetchError } = await supabaseAdmin
+    // rounds.bet_open styres nu af syncMatchScores (per-kamp lås).
+    // Denne endpoint opretter kun round_members for åbne runder.
+
+    // Hent runder med bet_open = true (sat af syncMatchScores)
+    const { data: openRounds, error: fetchError } = await supabaseAdmin
       .from('rounds')
-      .select('id, season_id, betting_closes_at')
-      .in('status', ['open', 'upcoming'])
-      .gt('betting_closes_at', nowIso)
-      .order('betting_closes_at', { ascending: true })
+      .select('id, season_id')
+      .eq('bet_open', true)
 
     if (fetchError) {
       await supabaseAdmin.from('admin_logs').insert({
         type: 'update_bet_open',
         status: 'error',
-        message: `Fetch rounds failed: ${fetchError.message}`,
+        message: `Fetch open rounds failed: ${fetchError.message}`,
       })
       res.status(500).json({ error: fetchError.message })
       return
     }
 
-    // Vælg 1 nærmeste runde per season_id
-    type CandidateRound = { id: number; season_id: number; betting_closes_at: string }
-    const rounds = (candidateRounds ?? []) as CandidateRound[]
-    const countBySeason = new Map<number, number>()
-    const roundsToProvision: CandidateRound[] = []
-
-    for (const r of rounds) {
-      const count = countBySeason.get(r.season_id) ?? 0
-      if (count < 1) {
-        roundsToProvision.push(r)
-        countBySeason.set(r.season_id, count + 1)
-      }
-    }
-
     // Opret round_members med 1000 pt for alle spillere i relevante spilrum
     let roundMembersCreated = 0
 
-    for (const round of roundsToProvision) {
+    for (const round of openRounds ?? []) {
       const { data: gameSeasonRows } = await supabaseAdmin
         .from('game_seasons')
         .select('game_id')
@@ -335,17 +322,17 @@ app.get('/update-bet-open', async (_req, res) => {
       }
     }
 
-    const provisionedIds = roundsToProvision.map((r) => r.id)
-    console.log(`[update-bet-open] ${nowIso} — provisioned ${roundsToProvision.length} runder: [${provisionedIds.join(', ')}], round_members created: ${roundMembersCreated}`)
+    const openRoundIds = (openRounds ?? []).map((r) => r.id)
+    console.log(`[update-bet-open] ${nowIso} — ${openRoundIds.length} åbne runder, round_members created: ${roundMembersCreated}`)
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'update_bet_open',
       status: 'success',
-      message: `round_members oprettet: ${roundsToProvision.length} runder, ${roundMembersCreated} round_members`,
-      metadata: { round_ids: provisionedIds, round_members_created: roundMembersCreated, timestamp: nowIso },
+      message: `update-bet-open: ${openRoundIds.length} åbne runder, ${roundMembersCreated} round_members oprettet`,
+      metadata: { open_round_ids: openRoundIds, round_members_created: roundMembersCreated, timestamp: nowIso },
     })
 
-    res.json({ updated: true, timestamp: nowIso, rounds_provisioned: provisionedIds, round_members_created: roundMembersCreated })
+    res.json({ updated: true, timestamp: nowIso, open_rounds: openRoundIds.length, round_members_created: roundMembersCreated })
   } catch (err) {
     console.error('[update-bet-open]', err)
     res.status(500).json({ error: String(err) })

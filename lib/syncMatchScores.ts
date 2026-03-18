@@ -258,6 +258,39 @@ export async function syncMatchScores(options?: {
     return { updated, errors, preview, raw_bold_response: rawBoldResponse }
   }
 
+  // ─── Lås kampe der har passeret bet_lock_at ────────────────────────────────
+  const { data: tolock } = await supabaseAdmin
+    .from('matches')
+    .select('id, round_id')
+    .eq('bet_open', true)
+    .lt('bet_lock_at', new Date().toISOString())
+
+  if (tolock?.length) {
+    await supabaseAdmin
+      .from('matches')
+      .update({ bet_open: false })
+      .in('id', tolock.map((m: { id: number }) => m.id))
+
+    // Opdater rounds.bet_open baseret på om der stadig er åbne kampe
+    const roundIds = [...new Set(tolock.map((m: { round_id: number | null }) => m.round_id).filter(Boolean))] as number[]
+    for (const roundId of roundIds) {
+      const { data: openMatches } = await supabaseAdmin
+        .from('matches')
+        .select('id')
+        .eq('round_id', roundId)
+        .eq('bet_open', true)
+
+      const roundBetOpen = (openMatches?.length ?? 0) > 0
+      await supabaseAdmin
+        .from('rounds')
+        .update({ bet_open: roundBetOpen })
+        .eq('id', roundId)
+        .eq('status', 'open')
+    }
+
+    console.log(`[syncMatchScores] Låste ${tolock.length} kampe (bet_open=false), opdaterede ${roundIds.length} runder`)
+  }
+
   // ─── Catch-up: find finished matches missing result ───────────────────────
   const { data: missedMatches, error: missedError } = await supabaseAdmin
     .from('matches')

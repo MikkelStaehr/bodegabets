@@ -86,10 +86,12 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
   }
 
-  // Tjek at alle kampe stadig er åbne for bets (per-kamp bet_open)
-  const lockedMatches = (roundMatches ?? []).filter(
-    (m) => payloadMatchIds.includes(m.id) && !m.bet_open
-  )
+  // Per-kamp bet-luk validering
+  const matchMap = new Map((roundMatches ?? []).map((m) => [m.id, m as { id: number; bet_open: boolean; kickoff: string }]))
+  const lockedMatches = payloadMatchIds.filter((id) => {
+    const m = matchMap.get(id)
+    return m && !m.bet_open
+  })
   if (lockedMatches.length > 0) {
     return NextResponse.json({ error: 'En eller flere kampe er lukket for bets' }, { status: 400 })
   }

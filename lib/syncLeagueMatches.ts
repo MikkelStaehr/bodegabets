@@ -440,7 +440,7 @@ export async function syncBoldFixtures(
 
   const nowIso = new Date().toISOString()
 
-  // Split into new matches (INSERT with bet_open=true) and existing (UPDATE without touching bet_open)
+  // Split into new matches (INSERT with bet_open=true) and existing (UPDATE without bet_open)
   const newMatchRows = parsedMatches
     .filter((p) => !existingBoldIds.has(p.bold_match_id))
     .map((p) => ({
@@ -490,7 +490,7 @@ export async function syncBoldFixtures(
     }
   }
 
-  // UPDATE existing matches (preserve bet_open)
+  // UPDATE existing matches (preserve bet_open — don't overwrite locked matches)
   for (let i = 0; i < existingMatchRows.length; i += 500) {
     const chunk = existingMatchRows.slice(i, i + 500)
     const { error } = await supabaseAdmin
