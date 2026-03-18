@@ -563,6 +563,14 @@ export default function AfgivBets({
   }, 0)
   const availablePoints = userPoints - usedPoints
   const displayCredits = availablePoints - totalPoints
+
+  console.log('[credits]', {
+    userPoints,
+    usedPoints,
+    availablePoints: userPoints - (usedPoints ?? 0),
+    totalPoints,
+    selections: selections.map(s => ({ matchId: s.matchId, points: s.points, outcome: s.outcome }))
+  })
   const isOverBudget = displayCredits < 0
 
   const getSelection = (matchId: number) => selections.find((s) => s.matchId === matchId)
