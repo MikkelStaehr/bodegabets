@@ -11,21 +11,6 @@ type Props = {
 
 type MatchRow = Match
 
-function formatDate(iso: string | null) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const isMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
-  if (isMidnight) {
-    return d.toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
-  }
-  return d.toLocaleString('da-DK', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 export default async function RoundPage({ params }: Props) {
   const { id, roundId } = await params
@@ -184,15 +169,6 @@ export default async function RoundPage({ params }: Props) {
     }
   }
 
-  // Ticker items for round page
-  const tickerItems: string[] = []
-  if (typedRound.betting_closes_at && typedRound.status === 'open') {
-    tickerItems.push(
-      `🔓 Bets til ${typedRound.name} er åbne — deadline ${formatDate(typedRound.betting_closes_at)}`
-    )
-  }
-  tickerItems.push(`🏟 ${(game as { name: string }).name} · ${typedRound.name}`)
-
   if (matches.length === 0) {
     return (
       <div className="min-h-screen bg-[#F2EDE4] flex flex-col items-center justify-center p-8 gap-4">
@@ -222,7 +198,6 @@ export default async function RoundPage({ params }: Props) {
       matches={matches}
       existingBets={typedBets}
       userPoints={bettingBalance}
-      tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}
     />
