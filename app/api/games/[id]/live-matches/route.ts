@@ -47,12 +47,12 @@ export async function GET(req: NextRequest, { params }: Props) {
     tournamentLogoMap.set(st.id, tournament?.logo_url ?? null)
   }
 
-  // Hent aktive runder (bet_open = true ELLER status = open/active) for disse sæsoner
+  // Hent aktive runder (bet_open ELLER status = upcoming/open/closed)
   const { data: activeRounds } = await supabaseAdmin
     .from('rounds')
-    .select('id')
+    .select('id, name, season_id')
     .in('season_id', seasonIds)
-    .or('bet_open.eq.true,status.eq.open,status.eq.active')
+    .or('bet_open.eq.true,status.eq.open,status.eq.closed,status.eq.upcoming')
 
   const roundIds = (activeRounds ?? []).map((r: { id: number }) => r.id)
   if (roundIds.length === 0) {
