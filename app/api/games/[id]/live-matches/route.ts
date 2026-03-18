@@ -54,18 +54,19 @@ export async function GET(req: NextRequest, { params }: Props) {
     .in('season_id', seasonIds)
     .or('bet_open.eq.true,status.eq.open,status.eq.closed,status.eq.upcoming')
 
-  const roundIds = (activeRounds ?? []).map((r: { id: number }) => r.id)
-  if (roundIds.length === 0) {
+  const openRoundNames = (activeRounds ?? []).map((r: { name: string }) => r.name)
+  if (openRoundNames.length === 0) {
     return NextResponse.json({ matches: [], summary: { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 } })
   }
 
-  // Hent alle kampe for aktive runder (alle statusser undtagen cancelled)
+  // Hent ALLE kampe for åbne runder (uanset kamp status/dato, undtagen cancelled)
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, season_id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff,
+    .select(`id, season_id, round_name, home_score, away_score, home_score_ht, away_score_ht, status, kickoff, result,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
-    .in('round_id', roundIds)
+    .in('season_id', seasonIds)
+    .in('round_name', openRoundNames)
     .neq('status', 'cancelled')
     .order('kickoff', { ascending: true })
     .limit(200)
