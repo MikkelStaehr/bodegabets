@@ -47,29 +47,34 @@ export async function GET(req: NextRequest, { params }: Props) {
     tournamentLogoMap.set(st.id, tournament?.logo_url ?? null)
   }
 
-  // Hent aktive runder (bet_open ELLER status = upcoming/open/closed)
-  const { data: activeRounds } = await supabaseAdmin
+  // Hent åbne runder (status=open ELLER bet_open=true)
+  const { data: openRounds } = await supabaseAdmin
     .from('rounds')
     .select('id, name, season_id')
     .in('season_id', seasonIds)
-    .or('bet_open.eq.true,status.eq.open,status.eq.closed,status.eq.upcoming')
+    .or('status.eq.open,bet_open.eq.true')
 
-  const openRoundNames = (activeRounds ?? []).map((r: { name: string }) => r.name)
-  if (openRoundNames.length === 0) {
+  const openRoundIds = (openRounds ?? []).map((r: { id: number }) => r.id)
+  if (openRoundIds.length === 0) {
     return NextResponse.json({ matches: [], summary: { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 } })
   }
 
-  // Hent ALLE kampe for åbne runder (uanset kamp status/dato, undtagen cancelled)
+  // Map round_id → season_id for tournament logo lookup
+  const roundSeasonMap = new Map<number, number>()
+  for (const r of openRounds ?? []) {
+    roundSeasonMap.set(r.id, r.season_id)
+  }
+
+  // Hent ALLE kampe for åbne runder via round_id (uanset kamp status/dato, undtagen cancelled)
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, season_id, round_name, home_score, away_score, home_score_ht, away_score_ht, status, kickoff, result,
+    .select(`id, round_id, round_name, kickoff, status, result,
+      home_score, away_score, home_score_ht, away_score_ht,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
-    .in('season_id', seasonIds)
-    .in('round_name', openRoundNames)
+    .in('round_id', openRoundIds)
     .neq('status', 'cancelled')
     .order('kickoff', { ascending: true })
-    .limit(200)
 
   // Hent brugerens match_result bets for disse kampe
   const matchIds = (roundMatches ?? []).map((m) => m.id)
@@ -103,7 +108,7 @@ export async function GET(req: NextRequest, { params }: Props) {
       kickoff_at: m.kickoff,
       home_team_logo: homeRef?.logo_url ?? null,
       away_team_logo: awayRef?.logo_url ?? null,
-      tournamentLogo: tournamentLogoMap.get(m.season_id) ?? null,
+      tournamentLogo: tournamentLogoMap.get(roundSeasonMap.get(m.round_id) ?? 0) ?? null,
       userPrediction: betMap.get(m.id) ?? null,
     }
   })
