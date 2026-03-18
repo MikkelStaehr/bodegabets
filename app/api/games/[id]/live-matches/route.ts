@@ -98,6 +98,8 @@ export async function GET(req: NextRequest, { params }: Props) {
     const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
     return {
       id: m.id,
+      round_id: m.round_id,
+      round_name: m.round_name,
       home_team: homeRef?.name ?? '',
       away_team: awayRef?.name ?? '',
       home_score: m.home_score,
