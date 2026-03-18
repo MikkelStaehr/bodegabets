@@ -600,13 +600,17 @@ export default function AfgivBets({
   )
 
   const totalMatches = matches.length
-  const totalPoints = selections
-    .filter((s) => !s.isReplacement)
-    .reduce((sum, s) => {
-      const main = s.points
-      const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
-      return sum + main + extra
-    }, 0)
+  const totalPoints = selections.reduce((sum, s) => {
+    if (s.isReplacement) {
+      const oldStake = existingBets.find(
+        (b) => b.match_id === s.matchId && b.bet_type === 'match_result'
+      )?.stake ?? 0
+      return sum + Math.max(0, s.points - oldStake)
+    }
+    const main = s.points
+    const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
+    return sum + main + extra
+  }, 0)
   const displayCredits = userPoints - totalPoints
   const isOverBudget = displayCredits < 0
 
@@ -718,7 +722,7 @@ export default function AfgivBets({
       {
         matchId,
         outcome: existingBet.prediction as '1' | 'X' | '2',
-        points: 0,
+        points: existingBet.stake,
         match,
         extraBets: existingExtraBets,
         isReplacement: true,
