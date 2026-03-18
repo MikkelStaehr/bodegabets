@@ -182,8 +182,7 @@ export default async function GamePage({ params }: Props) {
             home_team:teams!home_team_id(name),
             away_team:teams!away_team_id(name)
           `)
-          .eq('season_id', latestFinishedRound.season_id)
-          .eq('round_name', latestFinishedRound.name)
+          .eq('round_id', latestFinishedRound.id)
           .not('home_score', 'is', null)
           .order('kickoff', { ascending: true })
           .limit(6)
@@ -193,8 +192,7 @@ export default async function GamePage({ params }: Props) {
       ? supabase
           .from('matches')
           .select('id')
-          .eq('season_id', activeRoundEarly.season_id)
-          .eq('round_name', activeRoundEarly.name)
+          .eq('round_id', activeRoundEarly.id)
       : Promise.resolve({ data: [] }),
   ])
 

@@ -25,37 +25,28 @@ export async function GET(req: NextRequest) {
       .select('match_id')
       .in('game_id', activeGameIds)
 
-    // Lookup match → round via matches table
+    // Lookup round_ids fra matches med bets
     const betMatchIds = [...new Set((betRounds ?? []).map((b) => b.match_id as number))]
 
     if (betMatchIds.length > 0) {
       const { data: betMatches } = await supabaseAdmin
         .from('matches')
-        .select('season_id, round_name')
+        .select('round_id')
         .in('id', betMatchIds)
 
-      const roundKeys = [...new Set((betMatches ?? []).map((m) => `${m.season_id}::${m.round_name}`))]
+      const roundIds = [...new Set((betMatches ?? []).filter((m) => m.round_id != null).map((m) => m.round_id as number))]
 
-      // Find matching rounds
-      const { data: allRounds } = await supabaseAdmin
-        .from('rounds')
-        .select('id, season_id, name')
-
-      for (const round of allRounds ?? []) {
-        const key = `${round.season_id}::${round.name}`
-        if (!roundKeys.includes(key)) continue
-
+      for (const roundId of roundIds) {
         // Tjek om mindst én kamp i runden er finished
         const { data: matches } = await supabaseAdmin
           .from('matches')
           .select('id, status')
-          .eq('season_id', round.season_id)
-          .eq('round_name', round.name)
+          .eq('round_id', roundId)
 
         const anyFinished = matches?.some((m) => m.status === 'finished')
         if (!anyFinished) continue
 
-        await calculateRoundPoints(round.id)
+        await calculateRoundPoints(roundId)
         processed++
       }
     }

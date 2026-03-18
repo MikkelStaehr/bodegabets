@@ -43,40 +43,40 @@ export async function syncMatchScores(options?: {
   const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000)
   const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
-  let activeMatches: Array<{ id: number; bold_match_id: number; season_id: number; round_name: string }> = []
+  let activeMatches: Array<{ id: number; bold_match_id: number; season_id: number; round_id: number | null }> = []
 
   if (boldMatchId != null) {
     const { data, error } = await supabaseAdmin
       .from('matches')
-      .select('id, bold_match_id, season_id, round_name')
+      .select('id, bold_match_id, season_id, round_id')
       .eq('bold_match_id', boldMatchId)
     if (error) {
       errors.push(`Fetch fejl: ${error.message}`)
       return { updated, errors }
     }
-    activeMatches = (data ?? []).filter((m) => m.round_name != null).map((m) => ({ ...m, round_name: m.round_name! }))
+    activeMatches = (data ?? []).map((m) => ({ ...m, round_id: m.round_id ?? null }))
   } else {
     const { data: liveData } = await supabaseAdmin
       .from('matches')
-      .select('id, bold_match_id, season_id, round_name')
+      .select('id, bold_match_id, season_id, round_id')
       .in('status', ['live', 'halftime'])
 
     const { data: scheduledData } = await supabaseAdmin
       .from('matches')
-      .select('id, bold_match_id, season_id, round_name')
+      .select('id, bold_match_id, season_id, round_id')
       .eq('status', 'scheduled')
       .gte('kickoff', threeHoursAgo.toISOString())
       .lte('kickoff', twentyFourHoursLater.toISOString())
 
     const seen = new Set<number>()
     for (const m of [...(liveData ?? []), ...(scheduledData ?? [])]) {
-      if (seen.has(m.id) || !m.round_name) continue
+      if (seen.has(m.id)) continue
       seen.add(m.id)
       activeMatches.push({
         id: m.id,
         bold_match_id: m.bold_match_id,
         season_id: m.season_id,
-        round_name: m.round_name,
+        round_id: m.round_id ?? null,
       })
     }
   }
@@ -197,15 +197,9 @@ export async function syncMatchScores(options?: {
       errors.push(`Opdatering fejlede for kamp ${match.id}: ${error.message}`)
     } else {
       updated++
-      // Kamp skiftet til finished → find round_id og trigger pointberegning
+      // Kamp skiftet til finished → trigger pointberegning via round_id
       if (status === 'finished' && currentMatch?.status !== 'finished') {
-        const { data: round } = await supabaseAdmin
-          .from('rounds')
-          .select('id')
-          .eq('season_id', match.season_id)
-          .eq('name', match.round_name)
-          .single()
-        if (round?.id) finishedRoundIds.add(round.id)
+        if (match.round_id) finishedRoundIds.add(match.round_id)
       }
     }
   }
@@ -291,42 +285,31 @@ export async function syncMatchScores(options?: {
   // Finder runder hvor alle kampe er finished med result, men round_scores mangler
   const { data: finishedWithResult, error: catchupError } = await supabaseAdmin
     .from('matches')
-    .select('season_id, round_name')
+    .select('round_id')
     .eq('status', 'finished')
     .not('result', 'is', null)
 
   if (catchupError) {
     errors.push(`Catch-up rounds fetch fejl: ${catchupError.message}`)
   } else if (finishedWithResult?.length) {
-    // Unikke season_id + round_name kombinationer
-    const roundKeys = new Set(finishedWithResult.map((m) => `${m.season_id}::${m.round_name}`))
+    const roundIds = [...new Set(finishedWithResult.map((m) => m.round_id as number).filter(Boolean))]
 
-    for (const key of roundKeys) {
-      const [seasonIdStr, roundName] = key.split('::')
-      const seasonId = parseInt(seasonIdStr, 10)
-
-      const { data: round } = await supabaseAdmin
-        .from('rounds')
-        .select('id')
-        .eq('season_id', seasonId)
-        .eq('name', roundName)
-        .single()
-
-      if (!round?.id || finishedRoundIds.has(round.id)) continue
+    for (const catchupRoundId of roundIds) {
+      if (finishedRoundIds.has(catchupRoundId)) continue
 
       // Tjek om round_scores allerede eksisterer for denne runde
       const { count } = await supabaseAdmin
         .from('round_scores')
         .select('id', { count: 'exact', head: true })
-        .eq('round_id', round.id)
+        .eq('round_id', catchupRoundId)
 
       if (count && count > 0) continue
 
       try {
-        console.log(`[syncMatchScores] Catch-up: calculateRoundPoints(${round.id}) for ${roundName}`)
-        await calculateRoundPoints(round.id)
+        console.log(`[syncMatchScores] Catch-up: calculateRoundPoints(${catchupRoundId})`)
+        await calculateRoundPoints(catchupRoundId)
       } catch (e) {
-        errors.push(`Catch-up calculateRoundPoints fejl for runde ${round.id}: ${e}`)
+        errors.push(`Catch-up calculateRoundPoints fejl for runde ${catchupRoundId}: ${e}`)
       }
     }
   }
