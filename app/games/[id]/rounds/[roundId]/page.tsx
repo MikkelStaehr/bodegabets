@@ -151,12 +151,6 @@ export default async function RoundPage({ params }: Props) {
 
   const typedBets = (betsData ?? []) as Bet[]
 
-  // Beregn usedPoints: sum af stakes på bets for finished/locked kampe
-  const lockedMatchIds = new Set(matches.filter((m) => m.status === 'finished' || m.bet_open === false).map((m) => m.id))
-  const usedPoints = typedBets
-    .filter((b) => lockedMatchIds.has(b.match_id))
-    .reduce((sum, b) => sum + b.stake, 0)
-
   // Hent rivalries via season → tournament → league
   const rivalryInfo: Record<number, { rivalry_name: string; multiplier: number }> = {}
   if (round.season_id) {
@@ -228,7 +222,6 @@ export default async function RoundPage({ params }: Props) {
       matches={matches}
       existingBets={typedBets}
       userPoints={bettingBalance}
-      usedPoints={usedPoints}
       tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}

@@ -87,7 +87,6 @@ type Props = {
   matches: MatchWithOptions[]
   existingBets: Bet[]
   userPoints: number
-  usedPoints?: number
   tickerItems: string[]
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
@@ -533,7 +532,6 @@ export default function AfgivBets({
   matches,
   existingBets,
   userPoints,
-  usedPoints = 0,
   tickerItems,
   rivalryInfo = {},
   totalMatchesInRound,
@@ -561,16 +559,7 @@ export default function AfgivBets({
     const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
     return sum + main + extra
   }, 0)
-  const availablePoints = userPoints - usedPoints
-  const displayCredits = availablePoints - totalPoints
-
-  console.log('[credits]', {
-    userPoints,
-    usedPoints,
-    availablePoints: userPoints - (usedPoints ?? 0),
-    totalPoints,
-    selections: selections.map(s => ({ matchId: s.matchId, points: s.points, outcome: s.outcome }))
-  })
+  const displayCredits = userPoints - totalPoints
   const isOverBudget = displayCredits < 0
 
   const getSelection = (matchId: number) => selections.find((s) => s.matchId === matchId)
@@ -635,8 +624,8 @@ export default function AfgivBets({
 
   async function handleSubmit() {
     if (selections.length === 0) return
-    if (totalPoints > availablePoints) {
-      toast(`Ikke nok credits. Du har ${availablePoints} pt.`, 'error')
+    if (totalPoints > userPoints) {
+      toast(`Ikke nok credits. Du har ${userPoints} pt.`, 'error')
       return
     }
 
