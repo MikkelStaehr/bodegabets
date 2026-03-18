@@ -110,7 +110,7 @@ const EXTRA_BET_TYPES: ExtraBetType[] = ['btts', 'over_under', 'halvleg', 'malfo
 function initSelections(matches: MatchWithOptions[], existing: Bet[]): BetEntry[] {
   const entries: BetEntry[] = []
   for (const m of matches) {
-    if (m.status === 'finished' || m.bet_open === false) continue
+    if (m.status === 'finished' || m.status === 'live' || m.status === 'halftime' || m.bet_open !== true) continue
     const mr = existing.find((b) => b.match_id === m.id && b.bet_type === 'match_result')
     if (mr) {
       const extraBets: ExtraBet[] = existing
