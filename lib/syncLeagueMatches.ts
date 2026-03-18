@@ -327,7 +327,7 @@ export async function syncBoldFixtures(
       status = 'scheduled'
     }
 
-    const round_name = mt.round?.includes('runde') ? mt.round : mt.round ? `${mt.round}. runde` : 'Ukendt runde'
+    const round_name = mt.round || 'Ukendt runde'
 
     // Result (1, X, 2)
     let result: string | null = null
