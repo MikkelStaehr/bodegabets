@@ -4,17 +4,6 @@ import { useEffect, useState, useMemo } from 'react'
 import JoinGameCard from './JoinGameCard'
 import type { SportType } from './DashboardContent'
 
-type RecentMatch = {
-  id: number
-  home_score: number | null
-  away_score: number | null
-  kickoff_at: string
-  status: string
-  result: string | null
-  home_team: { name: string; short_name: string | null; logo_url: string | null } | null
-  away_team: { name: string; short_name: string | null; logo_url: string | null } | null
-}
-
 type ScheduleMatch = {
   id: number
   kickoff_at: string
@@ -58,11 +47,9 @@ function extractLeagues(matches: ScheduleMatch[]): League[] {
 }
 
 export default function DashboardSidebar({
-  recentMatches,
   nextRoundDate,
   sportFilter,
 }: {
-  recentMatches: RecentMatch[]
   nextRoundDate: string | null
   sportFilter: 'all' | SportType
 }) {
@@ -94,18 +81,6 @@ export default function DashboardSidebar({
     if (!leagueFilter) return yesterdayMatches
     return yesterdayMatches.filter((m) => getLeague(m)?.name === leagueFilter)
   }, [yesterdayMatches, leagueFilter])
-
-  const groupedByDate = useMemo(() => {
-    const groups: Record<string, RecentMatch[]> = {}
-    for (const match of recentMatches) {
-      const date = new Date(match.kickoff_at).toLocaleDateString('da-DK', {
-        timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short',
-      })
-      if (!groups[date]) groups[date] = []
-      groups[date].push(match)
-    }
-    return Object.entries(groups)
-  }, [recentMatches])
 
   return (
     <div className="flex flex-col gap-4">
@@ -257,67 +232,7 @@ export default function DashboardSidebar({
         </div>
       )}
 
-      {/* SEKTION 3: Seneste kampe */}
-      {recentMatches.length > 0 && (
-        <div>
-          <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
-            Seneste kampe
-          </h2>
-          <div className="bg-white rounded-2xl border border-black/8 px-4 py-3">
-            <div className="flex flex-col max-h-[340px] overflow-y-auto scrollbar-hide">
-              {groupedByDate.map(([date, matches], gi) => (
-                <div key={date}>
-                  <p
-                    className="text-[9px] font-bold text-[#7a7060] uppercase tracking-wider py-1.5"
-                    style={{ borderTop: gi > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}
-                  >
-                    {date}
-                  </p>
-                  {matches.map((m, i) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center gap-2 py-1.5"
-                      style={{ borderBottom: i < matches.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}
-                    >
-                      {/* Home team */}
-                      <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
-                        <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
-                          {teamShort(m.home_team)}
-                        </span>
-                        {m.home_team?.logo_url && (
-                          <img src={m.home_team.logo_url} alt="" title={m.home_team.name} className="w-4 h-4 object-contain flex-shrink-0" />
-                        )}
-                      </div>
-
-                      {/* Score */}
-                      <span className="text-[11px] font-bold text-[#2c2418] min-w-[32px] text-center">
-                        {m.home_score ?? '-'}-{m.away_score ?? '-'}
-                      </span>
-
-                      {/* Away team */}
-                      <div className="flex items-center gap-1 flex-1 min-w-0">
-                        {m.away_team?.logo_url && (
-                          <img src={m.away_team.logo_url} alt="" title={m.away_team.name} className="w-4 h-4 object-contain flex-shrink-0" />
-                        )}
-                        <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
-                          {teamShort(m.away_team)}
-                        </span>
-                      </div>
-
-                      {/* Kickoff time */}
-                      <span className="text-[10px] text-[#7a7060] flex-shrink-0">
-                        {formatTime(m.kickoff_at)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI nyheder placeholder */}
+      {/* SEKTION 3: Bodega Bets Nyheder */}
       <div className="bg-white rounded-2xl border border-black/8 px-5 py-5">
         <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider mb-2">
           📰 Bodega Bets Nyheder
@@ -327,7 +242,7 @@ export default function DashboardSidebar({
         </p>
       </div>
 
-      {/* Join game */}
+      {/* SEKTION 4: Join game */}
       <div className="hidden lg:block">
         <JoinGameCard />
       </div>

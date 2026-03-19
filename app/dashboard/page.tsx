@@ -210,18 +210,6 @@ export default async function DashboardPage() {
           .in('round_id', roundIds)
       : { data: [] }
 
-  const { data: recentMatches } = roundIds.length > 0
-    ? await supabaseAdmin
-        .from('matches')
-        .select(`id, home_score, away_score, kickoff_at:kickoff, status, result,
-          home_team:teams!home_team_id(name, short_name, logo_url),
-          away_team:teams!away_team_id(name, short_name, logo_url)`)
-        .in('round_id', roundIds)
-        .eq('status', 'finished')
-        .order('kickoff', { ascending: false })
-        .limit(8)
-    : { data: [] }
-
   const typedRounds = (rounds ?? []) as { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null }[]
   const now = new Date()
 
@@ -369,7 +357,6 @@ export default async function DashboardPage() {
           games={games}
           activeRounds={activeRounds}
           nextRoundDate={nextRoundDate}
-          recentMatches={recentMatches ?? []}
           logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
           leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
           top3ByGame={Object.fromEntries(top3ByGame)}

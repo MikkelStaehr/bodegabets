@@ -57,24 +57,12 @@ const TABS: { key: TabKey; label: string; emoji: string }[] = [
   { key: 'cycling', label: 'Cykling', emoji: '🚴' },
 ]
 
-type RecentMatch = {
-  id: number
-  home_score: number | null
-  away_score: number | null
-  kickoff_at: string
-  status: string
-  result: string | null
-  home_team: { name: string; short_name: string | null; logo_url: string | null } | null
-  away_team: { name: string; short_name: string | null; logo_url: string | null } | null
-}
-
 type Top3Entry = { user_id: string; username: string; earnings: number }
 
 export default function DashboardContent({
   games,
   activeRounds,
   nextRoundDate,
-  recentMatches,
   logoUrlsByGame,
   leagueNamesByGame,
   top3ByGame,
@@ -82,7 +70,6 @@ export default function DashboardContent({
   games: GameRowWithSport[]
   activeRounds: Round[]
   nextRoundDate: string | null
-  recentMatches: RecentMatch[]
   logoUrlsByGame: Record<number, string[]>
   leagueNamesByGame: Record<number, string[]>
   top3ByGame: Record<number, Top3Entry[]>
@@ -211,7 +198,6 @@ export default function DashboardContent({
         {/* Right — sidebar (desktop) */}
         <div className="hidden lg:block">
           <DashboardSidebar
-            recentMatches={recentMatches}
             nextRoundDate={nextRoundDate}
             sportFilter={activeTab}
           />
