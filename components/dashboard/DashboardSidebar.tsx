@@ -11,8 +11,8 @@ type RecentMatch = {
   kickoff_at: string
   status: string
   result: string | null
-  home_team: { name: string; shortname: string | null; logo_url: string | null } | null
-  away_team: { name: string; shortname: string | null; logo_url: string | null } | null
+  home_team: { name: string; short_name: string | null; logo_url: string | null } | null
+  away_team: { name: string; short_name: string | null; logo_url: string | null } | null
 }
 
 type ScheduleMatch = {
@@ -21,13 +21,13 @@ type ScheduleMatch = {
   status: string
   home_score: number | null
   away_score: number | null
-  home_team: { name: string; shortname: string | null; logo_url: string | null } | null
-  away_team: { name: string; shortname: string | null; logo_url: string | null } | null
+  home_team: { name: string; short_name: string | null; logo_url: string | null } | null
+  away_team: { name: string; short_name: string | null; logo_url: string | null } | null
 }
 
-function teamShort(team: { name: string; shortname: string | null } | null): string {
+function teamShort(team: { name: string; short_name: string | null } | null): string {
   if (!team) return '?'
-  return team.shortname || team.name.slice(0, 3).toUpperCase()
+  return team.short_name || team.name.slice(0, 3).toUpperCase()
 }
 
 function formatTime(iso: string): string {

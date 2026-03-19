@@ -13,16 +13,16 @@ export async function GET() {
     supabaseAdmin
       .from('matches')
       .select(`id, kickoff_at:kickoff, status, home_score, away_score,
-        home_team:teams!home_team_id(name, shortname, logo_url),
-        away_team:teams!away_team_id(name, shortname, logo_url)`)
+        home_team:teams!home_team_id(name, short_name, logo_url),
+        away_team:teams!away_team_id(name, short_name, logo_url)`)
       .gte('kickoff', todayStart.toISOString())
       .lte('kickoff', todayEnd.toISOString())
       .order('kickoff', { ascending: true }),
     supabaseAdmin
       .from('matches')
       .select(`id, kickoff_at:kickoff, status, home_score, away_score,
-        home_team:teams!home_team_id(name, shortname, logo_url),
-        away_team:teams!away_team_id(name, shortname, logo_url)`)
+        home_team:teams!home_team_id(name, short_name, logo_url),
+        away_team:teams!away_team_id(name, short_name, logo_url)`)
       .gte('kickoff', yesterdayStart.toISOString())
       .lt('kickoff', todayStart.toISOString())
       .eq('status', 'finished')
