@@ -155,22 +155,24 @@ export default async function DashboardPage() {
 
   const seasonIds = [...new Set([...seasonIdByGame.values()])]
 
-  // Look up league/tournament names via seasons → tournaments
+  // Look up league/tournament names + logos via seasons → tournaments
   const leagueNameMap = new Map<number, string>()
+  const logoUrlMap = new Map<number, string>()
   if (seasonIds.length > 0) {
     const { data: seasons } = await supabaseAdmin
       .from('seasons')
-      .select('id, tournaments:tournament_id(name)')
+      .select('id, tournaments:tournament_id(name, logo_url)')
       .in('id', seasonIds)
-    for (const s of (seasons ?? []) as unknown as { id: number; tournaments: { name: string } | null }[]) {
+    for (const s of (seasons ?? []) as unknown as { id: number; tournaments: { name: string; logo_url: string | null } | null }[]) {
       if (s.tournaments?.name) leagueNameMap.set(s.id, s.tournaments.name)
+      if (s.tournaments?.logo_url) logoUrlMap.set(s.id, s.tournaments.logo_url)
     }
   }
 
   const results = await Promise.all([
     supabaseAdmin
       .from('game_members')
-      .select('game_id, user_id, earnings')
+      .select('game_id, user_id, earnings, profile:profiles!user_id(username)')
       .in('game_id', gameIds)
       .order('earnings', { ascending: false }),
 
@@ -191,7 +193,7 @@ export default async function DashboardPage() {
 
     ...rawGames.map((m) => getActiveRoundForGame(m.game.id, seasonIdByGame.get(m.game.id) ?? null)),
   ])
-  const allMembers = (results[0] as { data: { game_id: number; user_id: string; earnings: number }[] | null }).data
+  const allMembers = (results[0] as { data: { game_id: number; user_id: string; earnings: number; profile: { username: string } | null }[] | null }).data
   const rounds = (results[1] as { data: { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
   const bets = (results[2] as { data: { round_id: number }[] | null }).data
   const activeRoundsPerGame = results.slice(3) as Awaited<ReturnType<typeof getActiveRoundForGame>>[]
@@ -204,6 +206,18 @@ export default async function DashboardPage() {
           .select('round_id')
           .in('round_id', roundIds)
       : { data: [] }
+
+  const { data: recentMatches } = roundIds.length > 0
+    ? await supabaseAdmin
+        .from('matches')
+        .select(`id, home_score, away_score, kickoff_at:kickoff, status, result,
+          home_team:teams!home_team_id(name, logo_url),
+          away_team:teams!away_team_id(name, logo_url)`)
+        .in('round_id', roundIds)
+        .eq('status', 'finished')
+        .order('kickoff', { ascending: false })
+        .limit(8)
+    : { data: [] }
 
   const typedRounds = (rounds ?? []) as { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null }[]
   const now = new Date()
@@ -231,8 +245,8 @@ export default async function DashboardPage() {
   }
 
   const rankByGame = new Map<number, Map<string, number>>()
-  const membersByGame = new Map<number, { user_id: string; earnings: number }[]>()
-  for (const m of (allMembers ?? []) as { game_id: number; user_id: string; earnings: number }[]) {
+  const membersByGame = new Map<number, { user_id: string; earnings: number; profile: { username: string } | null }[]>()
+  for (const m of (allMembers ?? []) as { game_id: number; user_id: string; earnings: number; profile: { username: string } | null }[]) {
     if (!membersByGame.has(m.game_id)) membersByGame.set(m.game_id, [])
     membersByGame.get(m.game_id)!.push(m)
   }
@@ -253,6 +267,26 @@ export default async function DashboardPage() {
   for (const r of [...activeRoundByGame.values()]) {
     const count = userBetsInActiveRounds.filter((b: { round_id: number }) => b.round_id === r.id).length
     betsCountByGame.set(r.game_id, count)
+  }
+
+  // Build top3 per game (with usernames from profile join)
+  const top3ByGame = new Map<number, { user_id: string; username: string; earnings: number }[]>()
+  for (const [gid, arr] of membersByGame) {
+    top3ByGame.set(
+      gid,
+      arr.slice(0, 3).map((m) => ({
+        user_id: m.user_id,
+        username: (m as unknown as { profile: { username: string } | null }).profile?.username ?? 'Ukendt',
+        earnings: m.earnings,
+      }))
+    )
+  }
+
+  // Build logo URL per game
+  const logoUrlByGame = new Map<number, string>()
+  for (const [gameId, seasonId] of seasonIdByGame) {
+    const url = logoUrlMap.get(seasonId)
+    if (url) logoUrlByGame.set(gameId, url)
   }
 
   const games: GameRowWithSport[] = rawGames.map((m) => {
@@ -321,6 +355,9 @@ export default async function DashboardPage() {
           games={games}
           activeRounds={activeRounds}
           nextRoundDate={nextRoundDate}
+          recentMatches={recentMatches ?? []}
+          logoUrlByGame={Object.fromEntries(logoUrlByGame)}
+          top3ByGame={Object.fromEntries(top3ByGame)}
         />
       </div>
     </div>
