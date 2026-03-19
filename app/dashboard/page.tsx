@@ -214,9 +214,8 @@ export default async function DashboardPage() {
     ? await supabaseAdmin
         .from('matches')
         .select(`id, home_score, away_score, kickoff_at:kickoff, status, result,
-          home_team:teams!home_team_id(name, logo_url),
-          away_team:teams!away_team_id(name, logo_url),
-          round:rounds!round_id(season:seasons!season_id(tournament:tournaments!tournament_id(name, logo_url)))`)
+          home_team:teams!home_team_id(name, shortname, logo_url),
+          away_team:teams!away_team_id(name, shortname, logo_url)`)
         .in('round_id', roundIds)
         .eq('status', 'finished')
         .order('kickoff', { ascending: false })

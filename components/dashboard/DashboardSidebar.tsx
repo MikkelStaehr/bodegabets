@@ -11,17 +11,34 @@ type RecentMatch = {
   kickoff_at: string
   status: string
   result: string | null
-  home_team: { name: string; logo_url: string | null } | null
-  away_team: { name: string; logo_url: string | null } | null
-  round: { season: { tournament: { name: string; logo_url: string | null } | null } | null } | null
+  home_team: { name: string; shortname: string | null; logo_url: string | null } | null
+  away_team: { name: string; shortname: string | null; logo_url: string | null } | null
 }
 
-type LeaderboardEntry = {
-  username: string
-  total_bets: number
-  correct_bets: number
-  correct_pct: number
-  total_earnings: number
+type ScheduleMatch = {
+  id: number
+  kickoff: string
+  status: string
+  home_score: number | null
+  away_score: number | null
+  home_team: { name: string; shortname: string | null; logo_url: string | null } | null
+  away_team: { name: string; shortname: string | null; logo_url: string | null } | null
+}
+
+function teamShort(team: { name: string; shortname: string | null } | null): string {
+  if (!team) return '?'
+  return team.shortname || team.name.slice(0, 3).toUpperCase()
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === 'live') return <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full uppercase">Live</span>
+  if (status === 'halftime') return <span className="text-[9px] font-bold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full uppercase">HT</span>
+  return null
 }
 
 export default function DashboardSidebar({
@@ -33,29 +50,24 @@ export default function DashboardSidebar({
   nextRoundDate: string | null
   sportFilter: 'all' | SportType
 }) {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [loadingLb, setLoadingLb] = useState(true)
-  const [leagueFilter, setLeagueFilter] = useState<string | null>(null)
+  const [todayMatches, setTodayMatches] = useState<ScheduleMatch[]>([])
+  const [yesterdayMatches, setYesterdayMatches] = useState<ScheduleMatch[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const uniqueLeagues = useMemo(() => {
-    const seen = new Map<string, string | null>()
-    for (const m of recentMatches) {
-      const t = m.round?.season?.tournament
-      if (t?.name && !seen.has(t.name)) {
-        seen.set(t.name, t.logo_url)
-      }
-    }
-    return [...seen.entries()].map(([name, logo_url]) => ({ name, logo_url }))
-  }, [recentMatches])
-
-  const filteredMatches = useMemo(() => {
-    if (!leagueFilter) return recentMatches
-    return recentMatches.filter((m) => m.round?.season?.tournament?.name === leagueFilter)
-  }, [recentMatches, leagueFilter])
+  useEffect(() => {
+    fetch('/api/dashboard/todays-matches')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.today) setTodayMatches(data.today)
+        if (data.yesterday) setYesterdayMatches(data.yesterday)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
   const groupedByDate = useMemo(() => {
     const groups: Record<string, RecentMatch[]> = {}
-    for (const match of filteredMatches) {
+    for (const match of recentMatches) {
       const date = new Date(match.kickoff_at).toLocaleDateString('da-DK', {
         timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short',
       })
@@ -63,53 +75,67 @@ export default function DashboardSidebar({
       groups[date].push(match)
     }
     return Object.entries(groups)
-  }, [filteredMatches])
-
-  useEffect(() => {
-    fetch('/api/users/global-leaderboard')
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setLeaderboard(data.slice(0, 5))
-      })
-      .catch(() => {})
-      .finally(() => setLoadingLb(false))
-  }, [])
+  }, [recentMatches])
 
   return (
     <div className="flex flex-col gap-4">
-      {/* SEKTION 1: Globalt leaderboard */}
+      {/* SEKTION 1: Kampprogram i dag */}
       <div>
         <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
-          Globalt leaderboard
+          Kampprogram i dag
         </h2>
-        <div className="bg-white rounded-2xl border border-black/8 px-5 py-4">
-          {loadingLb ? (
+        <div className="bg-white rounded-2xl border border-black/8 px-4 py-3">
+          {loading ? (
             <p className="text-[13px] text-[#7a7060] text-center py-2">Indlæser...</p>
-          ) : leaderboard.length === 0 ? (
-            <p className="text-[13px] text-[#7a7060] text-center py-2">Ingen data endnu</p>
+          ) : todayMatches.length === 0 ? (
+            <p className="text-[13px] text-[#7a7060] text-center py-2">Ingen kampe i dag</p>
           ) : (
-            <div className="flex flex-col gap-2">
-              {leaderboard.map((entry, i) => (
+            <div className="flex flex-col">
+              {todayMatches.map((m, i) => (
                 <div
-                  key={entry.username}
-                  className="flex items-center gap-3 py-1.5"
-                  style={{ borderBottom: i < leaderboard.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none' }}
+                  key={m.id}
+                  className="flex items-center gap-2 py-2"
+                  style={{ borderBottom: i < todayMatches.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none' }}
                 >
-                  <span
-                    className="text-[13px] font-bold min-w-[20px] text-center"
-                    style={{ color: i === 0 ? '#B8963E' : i === 1 ? '#8a8a8a' : i === 2 ? '#a0724a' : '#7a7060' }}
-                  >
-                    {i + 1}
-                  </span>
-                  <span className="text-[13px] font-medium text-[#2c2418] flex-1 truncate">
-                    {entry.username}
-                  </span>
-                  <span className="text-[12px] font-semibold text-[#B8963E]">
-                    {entry.correct_pct}%
-                  </span>
-                  <span className="text-[11px] text-[#7a7060] min-w-[50px] text-right">
-                    {entry.total_earnings} pts
-                  </span>
+                  {/* Home team */}
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                    <span className="text-[12px] font-semibold text-[#2c2418] uppercase">
+                      {teamShort(m.home_team)}
+                    </span>
+                    {m.home_team?.logo_url && (
+                      <img src={m.home_team.logo_url} alt="" title={m.home_team.name} className="w-5 h-5 object-contain flex-shrink-0" />
+                    )}
+                  </div>
+
+                  {/* Time or score + status */}
+                  <div className="flex items-center gap-1 min-w-[50px] justify-center">
+                    {m.status === 'live' || m.status === 'halftime' ? (
+                      <>
+                        <span className="text-[12px] font-bold text-[#2c2418]">
+                          {m.home_score ?? 0}-{m.away_score ?? 0}
+                        </span>
+                        <StatusBadge status={m.status} />
+                      </>
+                    ) : m.status === 'finished' ? (
+                      <span className="text-[12px] font-bold text-[#2c2418]">
+                        {m.home_score ?? 0}-{m.away_score ?? 0}
+                      </span>
+                    ) : (
+                      <span className="text-[12px] font-medium text-[#7a7060]">
+                        {formatTime(m.kickoff)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Away team */}
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    {m.away_team?.logo_url && (
+                      <img src={m.away_team.logo_url} alt="" title={m.away_team.name} className="w-5 h-5 object-contain flex-shrink-0" />
+                    )}
+                    <span className="text-[12px] font-semibold text-[#2c2418] uppercase">
+                      {teamShort(m.away_team)}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -117,51 +143,64 @@ export default function DashboardSidebar({
         </div>
       </div>
 
-      {/* SEKTION 2: Seneste kampe */}
-      <div>
-        <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
-          Seneste kampe
-        </h2>
+      {/* SEKTION 2: Gårsdagens resultater */}
+      {!loading && yesterdayMatches.length > 0 && (
+        <div>
+          <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
+            Gårsdagens resultater
+          </h2>
+          <div className="bg-white rounded-2xl border border-black/8 px-4 py-3">
+            <div className="flex flex-col">
+              {yesterdayMatches.map((m, i) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-2 py-1.5"
+                  style={{ borderBottom: i < yesterdayMatches.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}
+                >
+                  {/* Home team */}
+                  <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
+                    <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
+                      {teamShort(m.home_team)}
+                    </span>
+                    {m.home_team?.logo_url && (
+                      <img src={m.home_team.logo_url} alt="" title={m.home_team.name} className="w-4 h-4 object-contain flex-shrink-0" />
+                    )}
+                  </div>
 
-        {/* League filter tabs */}
-        {uniqueLeagues.length > 1 && (
-          <div className="flex items-center gap-1.5 mb-2">
-            <button
-              onClick={() => setLeagueFilter(null)}
-              className="text-[10px] font-bold px-2 py-1 rounded-full transition-colors"
-              style={{
-                background: !leagueFilter ? 'rgba(184,150,62,0.15)' : 'transparent',
-                color: !leagueFilter ? '#B8963E' : '#7a7060',
-              }}
-            >
-              Alle
-            </button>
-            {uniqueLeagues.map((league) => (
-              <button
-                key={league.name}
-                onClick={() => setLeagueFilter(leagueFilter === league.name ? null : league.name)}
-                className="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
-                title={league.name}
-                style={{
-                  background: leagueFilter === league.name ? 'rgba(184,150,62,0.15)' : 'transparent',
-                  border: leagueFilter === league.name ? '1.5px solid rgba(184,150,62,0.4)' : '1.5px solid transparent',
-                }}
-              >
-                {league.logo_url ? (
-                  <img src={league.logo_url} alt="" title={league.name} className="w-4 h-4 object-contain" />
-                ) : (
-                  <span className="text-[10px] text-[#7a7060]">{league.name.slice(0, 2)}</span>
-                )}
-              </button>
-            ))}
+                  {/* Score */}
+                  <span className="text-[11px] font-bold text-[#2c2418] min-w-[32px] text-center">
+                    {m.home_score ?? '-'}-{m.away_score ?? '-'}
+                  </span>
+
+                  {/* Away team */}
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                    {m.away_team?.logo_url && (
+                      <img src={m.away_team.logo_url} alt="" title={m.away_team.name} className="w-4 h-4 object-contain flex-shrink-0" />
+                    )}
+                    <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
+                      {teamShort(m.away_team)}
+                    </span>
+                  </div>
+
+                  {/* Kickoff time */}
+                  <span className="text-[10px] text-[#7a7060] flex-shrink-0">
+                    {formatTime(m.kickoff)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="bg-white rounded-2xl border border-black/8 px-4 py-3">
-          {filteredMatches.length === 0 ? (
-            <p className="text-[13px] text-[#7a7060] text-center py-2">Ingen afsluttede kampe endnu</p>
-          ) : (
-            <div className="flex flex-col max-h-[380px] overflow-y-auto scrollbar-hide">
+      {/* SEKTION 3: Seneste kampe */}
+      {recentMatches.length > 0 && (
+        <div>
+          <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
+            Seneste kampe
+          </h2>
+          <div className="bg-white rounded-2xl border border-black/8 px-4 py-3">
+            <div className="flex flex-col max-h-[340px] overflow-y-auto scrollbar-hide">
               {groupedByDate.map(([date, matches], gi) => (
                 <div key={date}>
                   <p
@@ -177,44 +216,44 @@ export default function DashboardSidebar({
                       style={{ borderBottom: i < matches.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}
                     >
                       {/* Home team */}
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                        <span className="text-[12px] text-[#2c2418] truncate text-right">
-                          {m.home_team?.name ?? '?'}
+                      <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
+                        <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
+                          {teamShort(m.home_team)}
                         </span>
                         {m.home_team?.logo_url && (
-                          <img src={m.home_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
+                          <img src={m.home_team.logo_url} alt="" title={m.home_team.name} className="w-4 h-4 object-contain flex-shrink-0" />
                         )}
                       </div>
 
                       {/* Score */}
-                      <span className="text-[12px] font-bold text-[#2c2418] min-w-[36px] text-center">
-                        {m.home_score ?? '-'} – {m.away_score ?? '-'}
+                      <span className="text-[11px] font-bold text-[#2c2418] min-w-[32px] text-center">
+                        {m.home_score ?? '-'}-{m.away_score ?? '-'}
                       </span>
 
                       {/* Away team */}
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-1 flex-1 min-w-0">
                         {m.away_team?.logo_url && (
-                          <img src={m.away_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
+                          <img src={m.away_team.logo_url} alt="" title={m.away_team.name} className="w-4 h-4 object-contain flex-shrink-0" />
                         )}
-                        <span className="text-[12px] text-[#2c2418] truncate">
-                          {m.away_team?.name ?? '?'}
+                        <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
+                          {teamShort(m.away_team)}
                         </span>
                       </div>
 
                       {/* Kickoff time */}
                       <span className="text-[10px] text-[#7a7060] flex-shrink-0">
-                        {new Date(m.kickoff_at).toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })}
+                        {formatTime(m.kickoff_at)}
                       </span>
                     </div>
                   ))}
                 </div>
               ))}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* SEKTION 3: AI nyheder placeholder */}
+      {/* AI nyheder placeholder */}
       <div className="bg-white rounded-2xl border border-black/8 px-5 py-5">
         <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider mb-2">
           📰 Bodega Bets Nyheder
@@ -224,7 +263,7 @@ export default function DashboardSidebar({
         </p>
       </div>
 
-      {/* SEKTION 4: Join game */}
+      {/* Join game */}
       <div className="hidden lg:block">
         <JoinGameCard />
       </div>
