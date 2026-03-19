@@ -49,6 +49,10 @@ export async function syncMatchesForRound(
     status: lm.status ?? 'scheduled',
     home_score: lm.home_score ?? null,
     away_score: lm.away_score ?? null,
+    bet_open: true,
+    bet_lock_at: lm.kickoff_at
+      ? new Date(new Date(lm.kickoff_at).getTime() - 30 * 60 * 1000).toISOString()
+      : null,
   }))
 
   console.log('[syncMatchesForRound] rows[0]:', JSON.stringify(rows[0]))
