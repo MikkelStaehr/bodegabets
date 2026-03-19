@@ -236,7 +236,12 @@ export default function DashboardSidebar({
         </div>
       )}
 
-      {/* SEKTION 1: Kampprogram i dag */}
+      {/* SEKTION 1: Bodega Bets Nyheder */}
+      {!loading && (
+        <NewsBox matches={filteredYesterday} />
+      )}
+
+      {/* SEKTION 2: Kampprogram i dag */}
       <div>
         <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
           Kampprogram i dag
@@ -299,11 +304,6 @@ export default function DashboardSidebar({
           )}
         </div>
       </div>
-
-      {/* SEKTION 2: Bodega Bets Nyheder */}
-      {!loading && (
-        <NewsBox matches={filteredYesterday} />
-      )}
 
       {/* SEKTION 3: Gårsdagens resultater */}
       {!loading && filteredYesterday.length > 0 && (
