@@ -17,7 +17,7 @@ type RecentMatch = {
 
 type ScheduleMatch = {
   id: number
-  kickoff: string
+  kickoff_at: string
   status: string
   home_score: number | null
   away_score: number | null
@@ -122,7 +122,7 @@ export default function DashboardSidebar({
                       </span>
                     ) : (
                       <span className="text-[12px] font-medium text-[#7a7060]">
-                        {formatTime(m.kickoff)}
+                        {formatTime(m.kickoff_at)}
                       </span>
                     )}
                   </div>
@@ -184,7 +184,7 @@ export default function DashboardSidebar({
 
                   {/* Kickoff time */}
                   <span className="text-[10px] text-[#7a7060] flex-shrink-0">
-                    {formatTime(m.kickoff)}
+                    {formatTime(m.kickoff_at)}
                   </span>
                 </div>
               ))}
