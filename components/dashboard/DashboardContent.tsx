@@ -57,14 +57,33 @@ const TABS: { key: TabKey; label: string; emoji: string }[] = [
   { key: 'cycling', label: 'Cykling', emoji: '🚴' },
 ]
 
+type RecentMatch = {
+  id: number
+  home_score: number | null
+  away_score: number | null
+  kickoff_at: string
+  status: string
+  result: string | null
+  home_team: { name: string; logo_url: string | null } | null
+  away_team: { name: string; logo_url: string | null } | null
+}
+
+type Top3Entry = { user_id: string; username: string; earnings: number }
+
 export default function DashboardContent({
   games,
   activeRounds,
   nextRoundDate,
+  recentMatches,
+  logoUrlByGame,
+  top3ByGame,
 }: {
   games: GameRowWithSport[]
   activeRounds: Round[]
   nextRoundDate: string | null
+  recentMatches: RecentMatch[]
+  logoUrlByGame: Record<number, string>
+  top3ByGame: Record<number, Top3Entry[]>
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('all')
   const [transitioning, setTransitioning] = useState(false)
