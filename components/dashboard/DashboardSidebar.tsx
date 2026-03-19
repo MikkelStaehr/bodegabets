@@ -56,6 +56,7 @@ function NewsBox({ matches }: { matches: ScheduleMatch[] }) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [news, setNews] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -113,7 +114,7 @@ Skriv på dansk. Vær kortfattet og fængende.`,
           .filter((x): x is NewsItem => x !== null)
         setNews(items)
       })
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [matches])
 
@@ -153,7 +154,27 @@ Skriv på dansk. Vær kortfattet og fængende.`,
     )
   }
 
-  if (news.length === 0) return null
+  if (matches.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
+        <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider px-5 pt-4 pb-2">
+          Bodega Bets Nyheder
+        </p>
+        <p className="text-[12px] text-[#7a7060] px-5 pb-4">Ingen kampe i går</p>
+      </div>
+    )
+  }
+
+  if (error || news.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
+        <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider px-5 pt-4 pb-2">
+          Bodega Bets Nyheder
+        </p>
+        <p className="text-[12px] text-[#7a7060] px-5 pb-4">Nyheder ikke tilgængelige lige nu</p>
+      </div>
+    )
+  }
 
   const activeNews = news[activeIndex] ?? news[0]
 
