@@ -30,7 +30,7 @@ const SPORT_EMOJI: Record<SportType, string> = {
 
 type Top3Entry = { user_id: string; username: string; earnings: number }
 
-export default function DashboardGameCard({ row, logoUrls, top3 }: { row: GameRow; logoUrls?: string[]; top3?: Top3Entry[] }) {
+export default function DashboardGameCard({ row, logoUrls, leagueNames, top3 }: { row: GameRow; logoUrls?: string[]; leagueNames?: string[]; top3?: Top3Entry[] }) {
   const { game, points, rank, bets_count, activeRound } = row
   const hasBets = bets_count > 0
   const deadline = activeRound?.betting_closes_at ? new Date(activeRound.betting_closes_at) : null
@@ -61,22 +61,17 @@ export default function DashboardGameCard({ row, logoUrls, top3 }: { row: GameRo
       {/* Top — sport badge + name + status */}
       <div className="bg-[#2C4A3E] px-5 py-4">
         {/* Sport + league badge */}
-        {game.league_name && (
+        {logoUrls && logoUrls.length > 0 ? (
           <div className="flex items-center gap-1.5 mb-2">
-            {logoUrls && logoUrls.length > 0 ? (
-              <>
-                {logoUrls.slice(0, 3).map((url, i) => (
-                  <img key={i} src={url} alt="" className="w-5 h-5 object-contain" />
-                ))}
-              </>
-            ) : (
-              <span className="text-[11px]">{SPORT_EMOJI[game.sport_type]}</span>
-            )}
-            <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
-              {game.league_name}
-            </span>
+            {logoUrls.slice(0, 3).map((url, i) => (
+              <img key={i} src={url} alt="" title={leagueNames?.[i] ?? ''} className="w-5 h-5 object-contain" />
+            ))}
           </div>
-        )}
+        ) : game.league_name ? (
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="text-[11px]">{SPORT_EMOJI[game.sport_type]}</span>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-['Barlow_Condensed'] text-lg font-bold text-white uppercase tracking-wide">

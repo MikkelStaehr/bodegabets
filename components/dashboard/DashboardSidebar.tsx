@@ -13,6 +13,7 @@ type RecentMatch = {
   result: string | null
   home_team: { name: string; logo_url: string | null } | null
   away_team: { name: string; logo_url: string | null } | null
+  round: { season: { tournament: { name: string; logo_url: string | null } | null } | null } | null
 }
 
 type LeaderboardEntry = {
@@ -34,10 +35,27 @@ export default function DashboardSidebar({
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [loadingLb, setLoadingLb] = useState(true)
+  const [leagueFilter, setLeagueFilter] = useState<string | null>(null)
+
+  const uniqueLeagues = useMemo(() => {
+    const seen = new Map<string, string | null>()
+    for (const m of recentMatches) {
+      const t = m.round?.season?.tournament
+      if (t?.name && !seen.has(t.name)) {
+        seen.set(t.name, t.logo_url)
+      }
+    }
+    return [...seen.entries()].map(([name, logo_url]) => ({ name, logo_url }))
+  }, [recentMatches])
+
+  const filteredMatches = useMemo(() => {
+    if (!leagueFilter) return recentMatches
+    return recentMatches.filter((m) => m.round?.season?.tournament?.name === leagueFilter)
+  }, [recentMatches, leagueFilter])
 
   const groupedByDate = useMemo(() => {
     const groups: Record<string, RecentMatch[]> = {}
-    for (const match of recentMatches) {
+    for (const match of filteredMatches) {
       const date = new Date(match.kickoff_at).toLocaleDateString('da-DK', {
         timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short',
       })
@@ -45,7 +63,7 @@ export default function DashboardSidebar({
       groups[date].push(match)
     }
     return Object.entries(groups)
-  }, [recentMatches])
+  }, [filteredMatches])
 
   useEffect(() => {
     fetch('/api/users/global-leaderboard')
@@ -104,8 +122,43 @@ export default function DashboardSidebar({
         <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
           Seneste kampe
         </h2>
+
+        {/* League filter tabs */}
+        {uniqueLeagues.length > 1 && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <button
+              onClick={() => setLeagueFilter(null)}
+              className="text-[10px] font-bold px-2 py-1 rounded-full transition-colors"
+              style={{
+                background: !leagueFilter ? 'rgba(184,150,62,0.15)' : 'transparent',
+                color: !leagueFilter ? '#B8963E' : '#7a7060',
+              }}
+            >
+              Alle
+            </button>
+            {uniqueLeagues.map((league) => (
+              <button
+                key={league.name}
+                onClick={() => setLeagueFilter(leagueFilter === league.name ? null : league.name)}
+                className="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
+                title={league.name}
+                style={{
+                  background: leagueFilter === league.name ? 'rgba(184,150,62,0.15)' : 'transparent',
+                  border: leagueFilter === league.name ? '1.5px solid rgba(184,150,62,0.4)' : '1.5px solid transparent',
+                }}
+              >
+                {league.logo_url ? (
+                  <img src={league.logo_url} alt="" title={league.name} className="w-4 h-4 object-contain" />
+                ) : (
+                  <span className="text-[10px] text-[#7a7060]">{league.name.slice(0, 2)}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border border-black/8 px-4 py-3">
-          {recentMatches.length === 0 ? (
+          {filteredMatches.length === 0 ? (
             <p className="text-[13px] text-[#7a7060] text-center py-2">Ingen afsluttede kampe endnu</p>
           ) : (
             <div className="flex flex-col max-h-[380px] overflow-y-auto scrollbar-hide">
