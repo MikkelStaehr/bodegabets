@@ -35,10 +35,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, timestamp: nowIso, finished: 0, opened: 0, message: 'Ingen aktive runder' })
   }
 
-  // Hent alle matches for ikke-finished runder (status + kickoff_at)
+  // Hent alle matches for ikke-finished runder (status + kickoff)
   const { data: matchRows, error: statsError } = await supabaseAdmin
     .from('matches')
-    .select('round_id, status, kickoff_at')
+    .select('round_id, status, kickoff_at:kickoff')
     .in('round_id', roundIds)
 
   if (statsError) {

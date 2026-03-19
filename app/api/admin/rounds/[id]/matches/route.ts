@@ -17,9 +17,9 @@ export async function GET(
 
   const { data: matches, error } = await supabaseAdmin
     .from('matches')
-    .select('id, home_team, away_team, kickoff_at, status')
+    .select('id, home_team, away_team, kickoff_at:kickoff, status')
     .eq('round_id', roundId)
-    .order('kickoff_at', { ascending: true })
+    .order('kickoff', { ascending: true })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

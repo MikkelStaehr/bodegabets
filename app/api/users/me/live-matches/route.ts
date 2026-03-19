@@ -89,7 +89,7 @@ export async function GET() {
     // Hent kampe via season_id + round_name (matches har ingen round_id)
     const { data: allMatches } = await supabaseAdmin
       .from('matches')
-      .select(`id, round_name, home_score, away_score, home_score_ht, away_score_ht, status, kickoff, second_half_started_at,
+      .select(`id, round_name, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at:kickoff, second_half_started_at,
         home_team_ref:teams!home_team_id(name, logo_url),
         away_team_ref:teams!away_team_id(name, logo_url)`)
       .eq('season_id', seasonId)
@@ -97,11 +97,12 @@ export async function GET() {
       .in('status', ['live', 'halftime', 'finished'])
       .gte('kickoff', since.toISOString())
       .order('kickoff', { ascending: true })
+
       .limit(100)
 
     // Find nyeste runde der har kampe med kickoff i fortiden
     const pastMatches = (allMatches ?? [])
-      .filter((m) => m.kickoff && m.kickoff <= nowIso)
+      .filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
       .map((m) => {
         const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
         const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
@@ -115,7 +116,7 @@ export async function GET() {
           home_score_ht: m.home_score_ht,
           away_score_ht: m.away_score_ht,
           status: m.status,
-          kickoff_at: m.kickoff,
+          kickoff_at: m.kickoff_at,
           second_half_started_at: (m as Record<string, unknown>).second_half_started_at ?? null,
           home_team_logo: homeRef?.logo_url ?? null,
           away_team_logo: awayRef?.logo_url ?? null,

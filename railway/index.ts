@@ -156,7 +156,7 @@ app.get('/update-rounds', async (_req, res) => {
 
     const { data: matchRows, error: statsError } = await supabaseAdmin
       .from('matches')
-      .select('round_id, status, kickoff')
+      .select('round_id, status, kickoff_at:kickoff')
       .in('round_id', roundIds)
 
     if (statsError) {
@@ -164,7 +164,7 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
-    type MatchRow = { round_id: number; status: string; kickoff: string | null }
+    type MatchRow = { round_id: number; status: string; kickoff_at: string | null }
     const statMap: Record<number, { total: number; finished: number; minKickoff: string | null }> = {}
     for (const m of (matchRows ?? []) as MatchRow[]) {
       const roundId = m.round_id
@@ -172,9 +172,9 @@ app.get('/update-rounds', async (_req, res) => {
       if (!statMap[roundId]) statMap[roundId] = { total: 0, finished: 0, minKickoff: null }
       statMap[roundId].total++
       if (m.status === 'finished') statMap[roundId].finished++
-      if (m.kickoff) {
-        if (!statMap[roundId].minKickoff || m.kickoff < statMap[roundId].minKickoff!) {
-          statMap[roundId].minKickoff = m.kickoff
+      if (m.kickoff_at) {
+        if (!statMap[roundId].minKickoff || m.kickoff_at < statMap[roundId].minKickoff!) {
+          statMap[roundId].minKickoff = m.kickoff_at
         }
       }
     }

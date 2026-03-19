@@ -19,7 +19,7 @@ export async function GET() {
           home_score,
           away_score,
           status,
-          kickoff,
+          kickoff_at:kickoff,
           updated_at,
           home_team:teams!home_team_id(id, name),
           away_team:teams!away_team_id(id, name)
@@ -55,7 +55,7 @@ export async function GET() {
         away_score: m.away_score,
         status: m.status,
         bold_match_id: m.bold_match_id,
-        kickoff: m.kickoff,
+        kickoff_at: m.kickoff_at,
         updated_at: m.updated_at,
       }
     })

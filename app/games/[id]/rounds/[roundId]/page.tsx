@@ -59,7 +59,7 @@ export default async function RoundPage({ params }: Props) {
 
   // Step 2: Hent matches via round_id med team joins
   const matchSelect = `
-    id, kickoff, status, result, bet_open, second_half_started_at,
+    id, kickoff_at:kickoff, status, result, bet_open, second_half_started_at,
     home_score, away_score,
     home_team:teams!home_team_id(id, name, logo_url),
     away_team:teams!away_team_id(id, name, logo_url)
@@ -67,7 +67,7 @@ export default async function RoundPage({ params }: Props) {
 
   type RawMatch = {
     id: number
-    kickoff: string | null
+    kickoff_at: string | null
     status: string
     result: string | null
     bet_open: boolean
@@ -83,7 +83,7 @@ export default async function RoundPage({ params }: Props) {
       id: raw.id,
       home_team: raw.home_team?.name ?? 'Ukendt',
       away_team: raw.away_team?.name ?? 'Ukendt',
-      kickoff_at: raw.kickoff ?? '',
+      kickoff_at: raw.kickoff_at ?? '',
       home_score: raw.home_score,
       away_score: raw.away_score,
       home_score_ht: null,

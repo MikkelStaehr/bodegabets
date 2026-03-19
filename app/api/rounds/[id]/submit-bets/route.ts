@@ -72,7 +72,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   const payloadMatchIds = [...new Set(bets.map((b) => b.match_id))]
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
-    .select('id, bet_open, kickoff')
+    .select('id, bet_open, kickoff_at:kickoff')
     .eq('round_id', roundId)
 
   const roundMatchIds = (roundMatches ?? []).map((m) => m.id)
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   // Per-kamp bet-luk validering
-  const matchMap = new Map((roundMatches ?? []).map((m) => [m.id, m as { id: number; bet_open: boolean; kickoff: string }]))
+  const matchMap = new Map((roundMatches ?? []).map((m) => [m.id, m as { id: number; bet_open: boolean; kickoff_at: string }]))
   const lockedMatches = payloadMatchIds.filter((id) => {
     const m = matchMap.get(id)
     return m && !m.bet_open
