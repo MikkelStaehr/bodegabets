@@ -63,8 +63,7 @@ type UserStats = {
   roundsPlayed: number
   totalEarnings: number
   avgPerRound: number
-  topRoomsCount: number
-  totalRooms: number
+  correctPct: number
 }
 
 export default function DashboardContent({
@@ -131,7 +130,7 @@ export default function DashboardContent({
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Placering', value: `#1 i ${userStats.topRoomsCount}/${userStats.totalRooms}` },
+          { label: '% korrekte bets', value: `${userStats.correctPct}%` },
           { label: 'Total point', value: userStats.totalEarnings.toLocaleString('da-DK') + ' pt' },
           { label: 'Gns. per runde', value: userStats.avgPerRound.toLocaleString('da-DK') + ' pt' },
         ].map(({ label, value }) => (
