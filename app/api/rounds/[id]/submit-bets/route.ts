@@ -40,8 +40,8 @@ export async function POST(req: NextRequest, { params }: Props) {
     .eq('id', roundId)
     .single()
 
-  // Accepter både 'open' og 'upcoming' (sync opretter runder som 'upcoming')
-  const canBet = round && (round.status === 'open' || round.status === 'upcoming')
+  // Kun åbne runder tillader bets
+  const canBet = round && round.status === 'open'
   if (!canBet) {
     return NextResponse.json({ error: 'Runden er ikke åben for bets' }, { status: 400 })
   }
