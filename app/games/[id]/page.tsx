@@ -178,7 +178,7 @@ export default async function GamePage({ params }: Props) {
       ? supabase
           .from('matches')
           .select(`
-            home_score, away_score, kickoff,
+            home_score, away_score, kickoff_at:kickoff,
             home_team:teams!home_team_id(name),
             away_team:teams!away_team_id(name)
           `)
@@ -253,7 +253,7 @@ export default async function GamePage({ params }: Props) {
   // Hent alle kampe for kalender-slider
   type RawMatch = {
     id: number
-    kickoff: string
+    kickoff_at: string
     status: string
     result: string | null
     round_name: string
@@ -268,7 +268,7 @@ export default async function GamePage({ params }: Props) {
       ? await supabase
           .from('matches')
           .select(`
-            id, kickoff, status, result,
+            id, kickoff_at:kickoff, status, result,
             round_name, season_id,
             home_score, away_score,
             home_team:teams!home_team_id(id, name),
@@ -303,7 +303,7 @@ export default async function GamePage({ params }: Props) {
   // Map to CalendarMatch
   const allMatches: CalendarMatch[] = typedRawMatches.map((m) => ({
     id: m.id,
-    kickoff_at: m.kickoff,
+    kickoff_at: m.kickoff_at,
     status: m.status,
     round_name: m.round_name,
     season_id: m.season_id,
@@ -356,7 +356,7 @@ export default async function GamePage({ params }: Props) {
   // Seneste resultater fra afsluttede runde
   for (const m of recentMatches ?? []) {
     if (m.home_score !== null && m.away_score !== null) {
-      const kickoff = (m as { kickoff?: string }).kickoff
+      const kickoff = (m as { kickoff_at?: string }).kickoff_at
       const dateStr = kickoff
         ? new Date(kickoff).toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
         : ''

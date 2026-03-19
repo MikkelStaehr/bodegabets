@@ -47,11 +47,11 @@ export default async function AdminPage() {
     supabaseAdmin
       .from('matches')
       .select(`
-        id, home_team, away_team, kickoff_at,
+        id, home_team, away_team, kickoff_at:kickoff,
         home_score, away_score, status, round_id,
         round:rounds ( name, league:leagues ( name ) )
       `)
-      .order('kickoff_at', { ascending: true }),
+      .order('kickoff', { ascending: true }),
 
     supabaseAdmin
       .from('league_sync_logs')

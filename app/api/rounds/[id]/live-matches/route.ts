@@ -53,7 +53,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent live/halftime/finished kampe (kickoff inden for 24 timer)
   const { data: activeMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff, second_half_started_at,
+    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at:kickoff, second_half_started_at,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
     .eq('round_id', roundId)
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent scheduled kampe (kickoff inden for 60 min)
   const { data: scheduledMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff, second_half_started_at,
+    .select(`id, home_score, away_score, home_score_ht, away_score_ht, status, kickoff_at:kickoff, second_half_started_at,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
     .eq('round_id', roundId)
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   const nowIso = now.toISOString()
 
   const activeList = (activeMatches ?? [])
-    .filter((m) => m.kickoff && m.kickoff <= nowIso)
+    .filter((m) => m.kickoff_at && m.kickoff_at <= nowIso)
 
   const allMatches = [...activeList, ...(scheduledMatches ?? [])]
 
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest, { params }: Props) {
         home_score_ht: m.home_score_ht,
         away_score_ht: m.away_score_ht,
         status: m.status,
-        kickoff_at: m.kickoff,
+        kickoff_at: m.kickoff_at,
         second_half_started_at: (m as Record<string, unknown>).second_half_started_at ?? null,
         home_team_logo: homeRef?.logo_url ?? null,
         away_team_logo: awayRef?.logo_url ?? null,
