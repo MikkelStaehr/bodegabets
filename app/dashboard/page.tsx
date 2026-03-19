@@ -148,12 +148,15 @@ export default async function DashboardPage() {
     .filter((m) => gamesById.has(m.game_id))
     .map((m) => ({ game_id: m.game_id, earnings: m.earnings, game: gamesById.get(m.game_id)! }))
 
-  const seasonIdByGame = new Map<number, number>()
+  const seasonIdsByGame = new Map<number, number[]>()
   for (const gs of gameSeasonRows ?? []) {
-    seasonIdByGame.set(gs.game_id as number, gs.season_id as number)
+    const gid = gs.game_id as number
+    const sid = gs.season_id as number
+    if (!seasonIdsByGame.has(gid)) seasonIdsByGame.set(gid, [])
+    seasonIdsByGame.get(gid)!.push(sid)
   }
 
-  const seasonIds = [...new Set([...seasonIdByGame.values()])]
+  const seasonIds = [...new Set([...seasonIdsByGame.values()].flat())]
 
   // Look up league/tournament names + logos via seasons → tournaments
   const leagueNameMap = new Map<number, string>()
@@ -191,7 +194,7 @@ export default async function DashboardPage() {
       .select('round_id')
       .eq('user_id', user.id),
 
-    ...rawGames.map((m) => getActiveRoundForGame(m.game.id, seasonIdByGame.get(m.game.id) ?? null)),
+    ...rawGames.map((m) => getActiveRoundForGame(m.game.id, seasonIdsByGame.get(m.game.id)?.[0] ?? null)),
   ])
   const allMembers = (results[0] as { data: { game_id: number; user_id: string; earnings: number; profile: { username: string } | null }[] | null }).data
   const rounds = (results[1] as { data: { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
@@ -282,11 +285,15 @@ export default async function DashboardPage() {
     )
   }
 
-  // Build logo URL per game
-  const logoUrlByGame = new Map<number, string>()
-  for (const [gameId, seasonId] of seasonIdByGame) {
-    const url = logoUrlMap.get(seasonId)
-    if (url) logoUrlByGame.set(gameId, url)
+  // Build logo URLs per game (multiple leagues possible)
+  const logoUrlsByGame = new Map<number, string[]>()
+  for (const [gameId, sids] of seasonIdsByGame) {
+    const urls: string[] = []
+    for (const sid of sids) {
+      const url = logoUrlMap.get(sid)
+      if (url && !urls.includes(url)) urls.push(url)
+    }
+    if (urls.length > 0) logoUrlsByGame.set(gameId, urls)
   }
 
   const games: GameRowWithSport[] = rawGames.map((m) => {
@@ -295,8 +302,8 @@ export default async function DashboardPage() {
     const activeRound = activeRoundByGame.get(g.id) ?? null
     const rank = rankByGame.get(g.id)?.get(user.id) ?? 1
     const bets_count = betsCountByGame.get(g.id) ?? 0
-    const gameSeasonId = seasonIdByGame.get(g.id) ?? null
-    const leagueName = gameSeasonId ? leagueNameMap.get(gameSeasonId) ?? null : null
+    const gameSeasonIds = seasonIdsByGame.get(g.id) ?? []
+    const leagueName = gameSeasonIds.length > 0 ? leagueNameMap.get(gameSeasonIds[0]) ?? null : null
 
     return {
       points: m.earnings,
@@ -356,7 +363,7 @@ export default async function DashboardPage() {
           activeRounds={activeRounds}
           nextRoundDate={nextRoundDate}
           recentMatches={recentMatches ?? []}
-          logoUrlByGame={Object.fromEntries(logoUrlByGame)}
+          logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
           top3ByGame={Object.fromEntries(top3ByGame)}
         />
       </div>

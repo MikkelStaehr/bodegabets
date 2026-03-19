@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import JoinGameCard from './JoinGameCard'
 import type { SportType } from './DashboardContent'
 
@@ -34,6 +34,18 @@ export default function DashboardSidebar({
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [loadingLb, setLoadingLb] = useState(true)
+
+  const groupedByDate = useMemo(() => {
+    const groups: Record<string, RecentMatch[]> = {}
+    for (const match of recentMatches) {
+      const date = new Date(match.kickoff_at).toLocaleDateString('da-DK', {
+        timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short',
+      })
+      if (!groups[date]) groups[date] = []
+      groups[date].push(match)
+    }
+    return Object.entries(groups)
+  }, [recentMatches])
 
   useEffect(() => {
     fetch('/api/users/global-leaderboard')
@@ -96,37 +108,52 @@ export default function DashboardSidebar({
           {recentMatches.length === 0 ? (
             <p className="text-[13px] text-[#7a7060] text-center py-2">Ingen afsluttede kampe endnu</p>
           ) : (
-            <div className="flex flex-col max-h-[340px] overflow-y-auto scrollbar-hide">
-              {recentMatches.map((m, i) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-2 py-2"
-                  style={{ borderBottom: i < recentMatches.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none' }}
-                >
-                  {/* Home team */}
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                    <span className="text-[12px] text-[#2c2418] truncate text-right">
-                      {m.home_team?.name ?? '?'}
-                    </span>
-                    {m.home_team?.logo_url && (
-                      <img src={m.home_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
-                    )}
-                  </div>
+            <div className="flex flex-col max-h-[380px] overflow-y-auto scrollbar-hide">
+              {groupedByDate.map(([date, matches], gi) => (
+                <div key={date}>
+                  <p
+                    className="text-[9px] font-bold text-[#7a7060] uppercase tracking-wider py-1.5"
+                    style={{ borderTop: gi > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}
+                  >
+                    {date}
+                  </p>
+                  {matches.map((m, i) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-2 py-1.5"
+                      style={{ borderBottom: i < matches.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}
+                    >
+                      {/* Home team */}
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                        <span className="text-[12px] text-[#2c2418] truncate text-right">
+                          {m.home_team?.name ?? '?'}
+                        </span>
+                        {m.home_team?.logo_url && (
+                          <img src={m.home_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
+                        )}
+                      </div>
 
-                  {/* Score */}
-                  <span className="text-[12px] font-bold text-[#2c2418] min-w-[36px] text-center">
-                    {m.home_score ?? '-'} – {m.away_score ?? '-'}
-                  </span>
+                      {/* Score */}
+                      <span className="text-[12px] font-bold text-[#2c2418] min-w-[36px] text-center">
+                        {m.home_score ?? '-'} – {m.away_score ?? '-'}
+                      </span>
 
-                  {/* Away team */}
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    {m.away_team?.logo_url && (
-                      <img src={m.away_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
-                    )}
-                    <span className="text-[12px] text-[#2c2418] truncate">
-                      {m.away_team?.name ?? '?'}
-                    </span>
-                  </div>
+                      {/* Away team */}
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        {m.away_team?.logo_url && (
+                          <img src={m.away_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
+                        )}
+                        <span className="text-[12px] text-[#2c2418] truncate">
+                          {m.away_team?.name ?? '?'}
+                        </span>
+                      </div>
+
+                      {/* Kickoff time */}
+                      <span className="text-[10px] text-[#7a7060] flex-shrink-0">
+                        {new Date(m.kickoff_at).toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

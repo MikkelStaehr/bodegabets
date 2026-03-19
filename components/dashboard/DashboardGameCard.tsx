@@ -30,7 +30,7 @@ const SPORT_EMOJI: Record<SportType, string> = {
 
 type Top3Entry = { user_id: string; username: string; earnings: number }
 
-export default function DashboardGameCard({ row, logoUrl, top3 }: { row: GameRow; logoUrl?: string | null; top3?: Top3Entry[] }) {
+export default function DashboardGameCard({ row, logoUrls, top3 }: { row: GameRow; logoUrls?: string[]; top3?: Top3Entry[] }) {
   const { game, points, rank, bets_count, activeRound } = row
   const hasBets = bets_count > 0
   const deadline = activeRound?.betting_closes_at ? new Date(activeRound.betting_closes_at) : null
@@ -63,8 +63,12 @@ export default function DashboardGameCard({ row, logoUrl, top3 }: { row: GameRow
         {/* Sport + league badge */}
         {game.league_name && (
           <div className="flex items-center gap-1.5 mb-2">
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="w-5 h-5 object-contain" />
+            {logoUrls && logoUrls.length > 0 ? (
+              <>
+                {logoUrls.slice(0, 3).map((url, i) => (
+                  <img key={i} src={url} alt="" className="w-5 h-5 object-contain" />
+                ))}
+              </>
             ) : (
               <span className="text-[11px]">{SPORT_EMOJI[game.sport_type]}</span>
             )}
