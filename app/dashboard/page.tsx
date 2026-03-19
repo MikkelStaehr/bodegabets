@@ -215,7 +215,8 @@ export default async function DashboardPage() {
         .from('matches')
         .select(`id, home_score, away_score, kickoff_at:kickoff, status, result,
           home_team:teams!home_team_id(name, logo_url),
-          away_team:teams!away_team_id(name, logo_url)`)
+          away_team:teams!away_team_id(name, logo_url),
+          round:rounds!round_id(season:seasons!season_id(tournament:tournaments!tournament_id(name, logo_url)))`)
         .in('round_id', roundIds)
         .eq('status', 'finished')
         .order('kickoff', { ascending: false })
@@ -285,15 +286,22 @@ export default async function DashboardPage() {
     )
   }
 
-  // Build logo URLs per game (multiple leagues possible)
+  // Build logo URLs + league names per game (multiple leagues possible)
   const logoUrlsByGame = new Map<number, string[]>()
+  const leagueNamesByGame = new Map<number, string[]>()
   for (const [gameId, sids] of seasonIdsByGame) {
     const urls: string[] = []
+    const names: string[] = []
     for (const sid of sids) {
       const url = logoUrlMap.get(sid)
-      if (url && !urls.includes(url)) urls.push(url)
+      const name = leagueNameMap.get(sid)
+      if (url && !urls.includes(url)) {
+        urls.push(url)
+        names.push(name ?? '')
+      }
     }
     if (urls.length > 0) logoUrlsByGame.set(gameId, urls)
+    if (names.length > 0) leagueNamesByGame.set(gameId, names)
   }
 
   const games: GameRowWithSport[] = rawGames.map((m) => {
@@ -364,6 +372,7 @@ export default async function DashboardPage() {
           nextRoundDate={nextRoundDate}
           recentMatches={recentMatches ?? []}
           logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
+          leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
           top3ByGame={Object.fromEntries(top3ByGame)}
         />
       </div>
