@@ -339,20 +339,6 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
       <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <p className="text-[11px] font-semibold text-[#7a7060] uppercase tracking-widest mb-1">Velkommen tilbage</p>
-            <h1 className="font-['Playfair_Display'] text-4xl font-bold text-[#1a3329]">{profile?.username ?? 'Spiller'}</h1>
-            <p className="text-[13px] text-[#7a7060] mt-1">
-              {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-          </div>
-          <Link href="/games/new" className="shrink-0 flex items-center gap-1.5 text-[13px] font-semibold text-[#2C4A3E] border border-[#2C4A3E]/30 px-4 py-2 rounded-lg hover:bg-[#2C4A3E]/5 transition-colors">
-            + Opret spil
-          </Link>
-        </div>
-
         <DashboardContent
           games={games}
           activeRounds={activeRounds}
@@ -360,6 +346,7 @@ export default async function DashboardPage() {
           logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
           leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
           top3ByGame={Object.fromEntries(top3ByGame)}
+          username={profile?.username ?? 'Spiller'}
         />
       </div>
     </div>

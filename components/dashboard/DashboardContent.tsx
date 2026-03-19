@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import Link from 'next/link'
 import DashboardGameCard from './DashboardGameCard'
 import DashboardSidebar from './DashboardSidebar'
 import JoinGameCard from './JoinGameCard'
 import PushNotificationBanner from './PushNotificationBanner'
+import NewsBox from './NewsBox'
+import type { ScheduleMatch } from './NewsBox'
 
 export type SportType = 'football' | 'cycling'
 
@@ -66,6 +69,7 @@ export default function DashboardContent({
   logoUrlsByGame,
   leagueNamesByGame,
   top3ByGame,
+  username,
 }: {
   games: GameRowWithSport[]
   activeRounds: Round[]
@@ -73,9 +77,20 @@ export default function DashboardContent({
   logoUrlsByGame: Record<number, string[]>
   leagueNamesByGame: Record<number, string[]>
   top3ByGame: Record<number, Top3Entry[]>
+  username: string
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('all')
   const [transitioning, setTransitioning] = useState(false)
+  const [yesterdayMatches, setYesterdayMatches] = useState<ScheduleMatch[]>([])
+
+  useEffect(() => {
+    fetch('/api/dashboard/todays-matches')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.yesterday) setYesterdayMatches(data.yesterday)
+      })
+      .catch(() => {})
+  }, [])
 
   const counts = useMemo(() => {
     const active = games.filter((g) => g.game.status === 'active')
@@ -116,6 +131,35 @@ export default function DashboardContent({
         transition: 'color 0.3s ease, background 0.3s ease',
       } as React.CSSProperties}
     >
+      {/* Header — two column: user info + NewsBox */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 mb-6">
+        {/* Venstre — bruger info */}
+        <div className="flex flex-col justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-[#7a7060] uppercase tracking-widest mb-1">
+              Velkommen tilbage
+            </p>
+            <h1 className="font-['Playfair_Display'] text-4xl font-bold text-[#1a3329]">
+              {username}
+            </h1>
+            <p className="text-[13px] text-[#7a7060] mt-1">
+              {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </div>
+          <Link
+            href="/games/new"
+            className="shrink-0 self-start flex items-center gap-1.5 text-[13px] font-semibold text-[#2C4A3E] border border-[#2C4A3E]/30 px-4 py-2 rounded-lg hover:bg-[#2C4A3E]/5 transition-colors mt-4"
+          >
+            + Opret spil
+          </Link>
+        </div>
+
+        {/* Højre — nyhedsboks */}
+        <div className="hidden lg:block">
+          <NewsBox matches={yesterdayMatches} />
+        </div>
+      </div>
+
       <PushNotificationBanner />
 
       {/* Sport tabs */}
