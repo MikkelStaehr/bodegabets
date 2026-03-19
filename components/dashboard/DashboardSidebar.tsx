@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import JoinGameCard from './JoinGameCard'
 import type { SportType } from './DashboardContent'
 
@@ -13,6 +13,12 @@ type ScheduleMatch = {
   home_team: { short_name: string | null; logo_url: string | null } | null
   away_team: { short_name: string | null; logo_url: string | null } | null
   round: { season: { tournament: { name: string; logo_url: string | null } | null } | null } | null
+}
+
+type NewsItem = {
+  headline: string
+  body: string
+  match: ScheduleMatch
 }
 
 type League = { name: string; logo_url: string | null }
@@ -44,6 +50,173 @@ function extractLeagues(matches: ScheduleMatch[]): League[] {
     if (t?.name && !seen.has(t.name)) seen.set(t.name, t.logo_url)
   }
   return [...seen.entries()].map(([name, logo_url]) => ({ name, logo_url }))
+}
+
+function NewsBox({ matches }: { matches: ScheduleMatch[] }) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [news, setNews] = useState<NewsItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (matches.length === 0) {
+      setLoading(false)
+      return
+    }
+
+    fetch('/api/anthropic/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: `Du er sportsjournalist for Bodega Bets — en privat fantasy betting app.
+
+Skriv korte danske sportsnyhedsoverskrifter og tekster for disse kampe.
+Svar KUN med JSON array, ingen markdown:
+[
+  {
+    "match_id": number,
+    "headline": "3-5 ord overskrift",
+    "body": "2-3 sætninger om kampen i avisagtig tone"
+  }
+]
+Kampe:
+${JSON.stringify(
+  matches.map((m) => ({
+    id: m.id,
+    home: m.home_team?.short_name,
+    away: m.away_team?.short_name,
+    score: (m.home_score ?? 0) + '-' + (m.away_score ?? 0),
+    tournament: m.round?.season?.tournament?.name,
+  }))
+)}
+Skriv på dansk. Vær kortfattet og fængende.`,
+          },
+        ],
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const text = data.content?.[0]?.text
+        if (!text) return
+        const parsed: { match_id: number; headline: string; body: string }[] = JSON.parse(text)
+        const items: NewsItem[] = parsed
+          .map((p) => {
+            const match = matches.find((m) => m.id === p.match_id)
+            if (!match) return null
+            return { headline: p.headline, body: p.body, match }
+          })
+          .filter((x): x is NewsItem => x !== null)
+        setNews(items)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [matches])
+
+  const resetInterval = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (news.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setActiveIndex((i) => (i + 1) % news.length)
+      }, 20000)
+    }
+  }, [news.length])
+
+  useEffect(() => {
+    resetInterval()
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [resetInterval])
+
+  function handleClick(i: number) {
+    setActiveIndex(i)
+    resetInterval()
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
+        <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider px-5 pt-4 pb-2">
+          Bodega Bets Nyheder
+        </p>
+        <div className="px-5 pb-4 space-y-3">
+          <div className="h-3 bg-black/5 rounded-full w-3/4 animate-pulse" />
+          <div className="h-3 bg-black/5 rounded-full w-1/2 animate-pulse" />
+          <div className="h-10 bg-black/5 rounded-lg animate-pulse" />
+        </div>
+      </div>
+    )
+  }
+
+  if (news.length === 0) return null
+
+  const activeNews = news[activeIndex] ?? news[0]
+
+  return (
+    <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
+      <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider px-5 pt-4 pb-2">
+        Bodega Bets Nyheder
+      </p>
+
+      <div className="flex">
+        {/* Venstre — overskrifter */}
+        <div className="w-[140px] shrink-0 border-r border-black/8 py-2">
+          {news.map((n, i) => (
+            <button
+              key={i}
+              onClick={() => handleClick(i)}
+              className={`w-full text-left px-4 py-2 text-[11px] font-semibold leading-tight transition-colors ${
+                i === activeIndex ? 'text-[#1a3329] bg-black/4' : 'text-[#7a7060]'
+              }`}
+            >
+              {n.headline}
+            </button>
+          ))}
+        </div>
+
+        {/* Højre — aktiv nyhed */}
+        <div className="flex-1 px-4 py-3">
+          {/* Hold logoer overlappende */}
+          <div className="flex items-center mb-3 relative h-8">
+            {activeNews.match.home_team?.logo_url && (
+              <img
+                src={activeNews.match.home_team.logo_url}
+                alt=""
+                className="w-8 h-8 rounded-full border-2 border-white z-10 relative object-contain"
+              />
+            )}
+            {activeNews.match.away_team?.logo_url && (
+              <img
+                src={activeNews.match.away_team.logo_url}
+                alt=""
+                className="w-8 h-8 rounded-full border-2 border-white -ml-2 object-contain"
+              />
+            )}
+            <span className="ml-2 text-[11px] text-[#7a7060]">
+              {activeNews.match.home_score ?? 0}-{activeNews.match.away_score ?? 0}
+            </span>
+          </div>
+
+          <p className="text-[13px] text-[#1a3329] leading-relaxed">{activeNews.body}</p>
+
+          {/* Auto-progress indikator */}
+          <div className="flex gap-1 mt-3">
+            {news.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1 rounded-full flex-1 ${i === activeIndex ? 'bg-[#1a3329]' : 'bg-black/10'}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function DashboardSidebar({
@@ -233,14 +406,9 @@ export default function DashboardSidebar({
       )}
 
       {/* SEKTION 3: Bodega Bets Nyheder */}
-      <div className="bg-white rounded-2xl border border-black/8 px-5 py-5">
-        <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider mb-2">
-          📰 Bodega Bets Nyheder
-        </p>
-        <p className="text-[13px] text-[#7a7060] italic">
-          Nyheder kommer snart...
-        </p>
-      </div>
+      {!loading && filteredYesterday.length > 0 && (
+        <NewsBox matches={filteredYesterday} />
+      )}
 
       {/* SEKTION 4: Join game */}
       <div className="hidden lg:block">

@@ -336,34 +336,6 @@ export default async function DashboardPage() {
     return new Date(future).toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   })()
 
-  const { data: userStats } = await supabaseAdmin
-    .from('round_scores')
-    .select('round_id, earnings_delta')
-    .eq('user_id', user.id)
-  const uniqueRounds = new Set(userStats?.map((r) => r.round_id) ?? [])
-  const roundsPlayed = uniqueRounds.size
-  const earningsByRound = new Map<number, number>()
-  for (const rs of userStats ?? []) {
-    const current = earningsByRound.get(rs.round_id) ?? 0
-    earningsByRound.set(rs.round_id, current + rs.earnings_delta)
-  }
-  const totalEarnings = [...earningsByRound.values()].reduce((a, b) => a + b, 0)
-  const avgPerRound = roundsPlayed > 0 ? Math.round(totalEarnings / roundsPlayed) : 0
-
-  const { data: betStats } = await supabaseAdmin
-    .from('bets')
-    .select('prediction, matches!match_id(result, status)')
-    .eq('user_id', user.id)
-    .eq('bet_type', 'match_result')
-  type BetWithMatch = {
-    prediction: string
-    matches: { result: string | null; status: string } | null
-  }
-  const typedBets = (betStats ?? []) as unknown as BetWithMatch[]
-  const finishedBets = typedBets.filter((b) => b.matches?.status === 'finished')
-  const correctBets = finishedBets.filter((b) => b.prediction === b.matches?.result)
-  const correctPct = finishedBets.length > 0 ? Math.round((correctBets.length * 100) / finishedBets.length) : 0
-
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
       <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
@@ -388,7 +360,6 @@ export default async function DashboardPage() {
           logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
           leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
           top3ByGame={Object.fromEntries(top3ByGame)}
-          userStats={{ roundsPlayed, totalEarnings, avgPerRound, correctPct }}
         />
       </div>
     </div>
