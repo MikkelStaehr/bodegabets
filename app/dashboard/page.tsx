@@ -350,17 +350,18 @@ export default async function DashboardPage() {
   const totalEarnings = [...earningsByRound.values()].reduce((a, b) => a + b, 0)
   const avgPerRound = roundsPlayed > 0 ? Math.round(totalEarnings / roundsPlayed) : 0
 
-  const { data: userBets } = await supabaseAdmin
+  const { data: betStats } = await supabaseAdmin
     .from('bets')
-    .select('prediction, match:matches!match_id(result, status)')
+    .select('prediction, matches!match_id(result, status)')
     .eq('user_id', user.id)
     .eq('bet_type', 'match_result')
-  const finishedBets = (userBets ?? []).filter(
-    (b) => (b.match as unknown as { status: string })?.status === 'finished'
-  )
-  const correctBets = finishedBets.filter(
-    (b) => b.prediction === (b.match as unknown as { result: string })?.result
-  )
+  type BetWithMatch = {
+    prediction: string
+    matches: { result: string | null; status: string } | null
+  }
+  const typedBets = (betStats ?? []) as unknown as BetWithMatch[]
+  const finishedBets = typedBets.filter((b) => b.matches?.status === 'finished')
+  const correctBets = finishedBets.filter((b) => b.prediction === b.matches?.result)
   const correctPct = finishedBets.length > 0 ? Math.round((correctBets.length * 100) / finishedBets.length) : 0
 
   return (
