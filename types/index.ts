@@ -67,6 +67,7 @@ export type Match = {
   home_team_logo: string | null
   away_team_logo: string | null
   bet_open?: boolean
+  bet_lock_at?: string | null
   second_half_started_at?: string | null
   sofascore_event_id?: string | null
   league_match_id?: number | null
