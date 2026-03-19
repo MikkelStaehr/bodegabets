@@ -110,7 +110,7 @@ function NewsBox({ matches }: { matches: ScheduleMatch[] }) {
 
       <div className="flex">
         {/* Venstre — overskrifter */}
-        <div className="w-[140px] shrink-0 border-r border-black/8 py-2">
+        <div className="w-[160px] shrink-0 border-r border-black/8 py-2">
           {news.map((n, i) => (
             <button
               key={i}
@@ -125,7 +125,7 @@ function NewsBox({ matches }: { matches: ScheduleMatch[] }) {
         </div>
 
         {/* Højre — aktiv nyhed */}
-        <div className="flex-1 px-4 py-3">
+        <div className="flex-1 px-4 py-3 min-h-[140px]">
           {/* Hold logoer overlappende */}
           <div className="flex items-center mb-3 relative h-8">
             {activeNews.match.home_team?.logo_url && (
@@ -300,7 +300,12 @@ export default function DashboardSidebar({
         </div>
       </div>
 
-      {/* SEKTION 2: Gårsdagens resultater */}
+      {/* SEKTION 2: Bodega Bets Nyheder */}
+      {!loading && (
+        <NewsBox matches={filteredYesterday} />
+      )}
+
+      {/* SEKTION 3: Gårsdagens resultater */}
       {!loading && filteredYesterday.length > 0 && (
         <div>
           <h2 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">
@@ -348,11 +353,6 @@ export default function DashboardSidebar({
             </div>
           </div>
         </div>
-      )}
-
-      {/* SEKTION 3: Bodega Bets Nyheder */}
-      {!loading && filteredYesterday.length > 0 && (
-        <NewsBox matches={filteredYesterday} />
       )}
 
       {/* SEKTION 4: Join game */}

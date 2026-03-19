@@ -348,7 +348,7 @@ export default async function DashboardPage() {
               {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
           </div>
-          <Link href="/games/new" className="shrink-0 flex items-center gap-2 bg-[#2C4A3E] text-white font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-widest px-5 py-3 rounded-xl hover:bg-[#1a3329] transition-colors">
+          <Link href="/games/new" className="shrink-0 flex items-center gap-1.5 text-[13px] font-semibold text-[#2C4A3E] border border-[#2C4A3E]/30 px-4 py-2 rounded-lg hover:bg-[#2C4A3E]/5 transition-colors">
             + Opret spil
           </Link>
         </div>
