@@ -64,9 +64,8 @@ type RecentMatch = {
   kickoff_at: string
   status: string
   result: string | null
-  home_team: { name: string; logo_url: string | null } | null
-  away_team: { name: string; logo_url: string | null } | null
-  round: { season: { tournament: { name: string; logo_url: string | null } | null } | null } | null
+  home_team: { name: string; shortname: string | null; logo_url: string | null } | null
+  away_team: { name: string; shortname: string | null; logo_url: string | null } | null
 }
 
 type Top3Entry = { user_id: string; username: string; earnings: number }
