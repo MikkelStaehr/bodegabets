@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import JoinGameCard from './JoinGameCard'
 import type { SportType } from './DashboardContent'
+import { generateMatchNews } from '@/lib/newsTemplates'
 
 type ScheduleMatch = {
   id: number
@@ -54,68 +55,17 @@ function extractLeagues(matches: ScheduleMatch[]): League[] {
 
 function NewsBox({ matches }: { matches: ScheduleMatch[] }) {
   const [activeIndex, setActiveIndex] = useState(0)
-  const [news, setNews] = useState<NewsItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => {
-    if (matches.length === 0) {
-      setLoading(false)
-      return
-    }
-
-    fetch('/api/anthropic/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [
-          {
-            role: 'user',
-            content: `Du er sportsjournalist for Bodega Bets — en privat fantasy betting app.
-
-Skriv korte danske sportsnyhedsoverskrifter og tekster for disse kampe.
-Svar KUN med JSON array, ingen markdown:
-[
-  {
-    "match_id": number,
-    "headline": "3-5 ord overskrift",
-    "body": "2-3 sætninger om kampen i avisagtig tone"
-  }
-]
-Kampe:
-${JSON.stringify(
-  matches.map((m) => ({
-    id: m.id,
-    home: m.home_team?.short_name,
-    away: m.away_team?.short_name,
-    score: (m.home_score ?? 0) + '-' + (m.away_score ?? 0),
-    tournament: m.round?.season?.tournament?.name,
-  }))
-)}
-Skriv på dansk. Vær kortfattet og fængende.`,
-          },
-        ],
-      }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        const text = data.content?.[0]?.text
-        if (!text) return
-        const parsed: { match_id: number; headline: string; body: string }[] = JSON.parse(text)
-        const items: NewsItem[] = parsed
-          .map((p) => {
-            const match = matches.find((m) => m.id === p.match_id)
-            if (!match) return null
-            return { headline: p.headline, body: p.body, match }
-          })
-          .filter((x): x is NewsItem => x !== null)
-        setNews(items)
+  const news = useMemo<NewsItem[]>(() => {
+    return matches
+      .map((m) => {
+        const home = m.home_team?.short_name ?? '?'
+        const away = m.away_team?.short_name ?? '?'
+        const tournament = m.round?.season?.tournament?.name ?? ''
+        const template = generateMatchNews(home, away, m.home_score ?? 0, m.away_score ?? 0, tournament)
+        return { headline: template.headline, body: template.body, match: m }
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
   }, [matches])
 
   const resetInterval = useCallback(() => {
@@ -139,39 +89,13 @@ Skriv på dansk. Vær kortfattet og fængende.`,
     resetInterval()
   }
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
-        <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider px-5 pt-4 pb-2">
-          Bodega Bets Nyheder
-        </p>
-        <div className="px-5 pb-4 space-y-3">
-          <div className="h-3 bg-black/5 rounded-full w-3/4 animate-pulse" />
-          <div className="h-3 bg-black/5 rounded-full w-1/2 animate-pulse" />
-          <div className="h-10 bg-black/5 rounded-lg animate-pulse" />
-        </div>
-      </div>
-    )
-  }
-
-  if (matches.length === 0) {
+  if (news.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
         <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider px-5 pt-4 pb-2">
           Bodega Bets Nyheder
         </p>
         <p className="text-[12px] text-[#7a7060] px-5 pb-4">Ingen kampe i går</p>
-      </div>
-    )
-  }
-
-  if (error || news.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
-        <p className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider px-5 pt-4 pb-2">
-          Bodega Bets Nyheder
-        </p>
-        <p className="text-[12px] text-[#7a7060] px-5 pb-4">Nyheder ikke tilgængelige lige nu</p>
       </div>
     )
   }
