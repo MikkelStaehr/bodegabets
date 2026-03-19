@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import DashboardGameCard from './DashboardGameCard'
-import LiveSidebar from './LiveSidebar'
+import DashboardSidebar from './DashboardSidebar'
 import JoinGameCard from './JoinGameCard'
 import PushNotificationBanner from './PushNotificationBanner'
 
@@ -206,12 +206,13 @@ export default function DashboardContent({
           </div>
         </div>
 
-        {/* Right — live + join (desktop) */}
-        <div className="flex flex-col gap-4">
-          <LiveSidebar rounds={activeRounds} nextRoundDate={nextRoundDate} sportFilter={activeTab} />
-          <div className="hidden lg:block">
-            <JoinGameCard />
-          </div>
+        {/* Right — sidebar (desktop) */}
+        <div className="hidden lg:block">
+          <DashboardSidebar
+            recentMatches={recentMatches}
+            nextRoundDate={nextRoundDate}
+            sportFilter={activeTab}
+          />
         </div>
       </div>
     </div>
