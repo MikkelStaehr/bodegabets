@@ -59,13 +59,6 @@ const TABS: { key: TabKey; label: string; emoji: string }[] = [
 
 type Top3Entry = { user_id: string; username: string; earnings: number }
 
-type UserStats = {
-  roundsPlayed: number
-  totalEarnings: number
-  avgPerRound: number
-  correctPct: number
-}
-
 export default function DashboardContent({
   games,
   activeRounds,
@@ -73,7 +66,6 @@ export default function DashboardContent({
   logoUrlsByGame,
   leagueNamesByGame,
   top3ByGame,
-  userStats,
 }: {
   games: GameRowWithSport[]
   activeRounds: Round[]
@@ -81,7 +73,6 @@ export default function DashboardContent({
   logoUrlsByGame: Record<number, string[]>
   leagueNamesByGame: Record<number, string[]>
   top3ByGame: Record<number, Top3Entry[]>
-  userStats: UserStats
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('all')
   const [transitioning, setTransitioning] = useState(false)
@@ -126,20 +117,6 @@ export default function DashboardContent({
       } as React.CSSProperties}
     >
       <PushNotificationBanner />
-
-      {/* Stats bar */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        {[
-          { label: '% korrekte bets', value: `${userStats.correctPct}%` },
-          { label: 'Total point', value: userStats.totalEarnings.toLocaleString('da-DK') + ' pt' },
-          { label: 'Gns. per runde', value: userStats.avgPerRound.toLocaleString('da-DK') + ' pt' },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-white rounded-xl border border-black/8 px-4 py-3 text-center">
-            <p className="text-[9px] font-bold text-[#7a7060] uppercase tracking-wider mb-1">{label}</p>
-            <p className="font-['Barlow_Condensed'] text-[18px] font-bold text-[#1a3329]">{value}</p>
-          </div>
-        ))}
-      </div>
 
       {/* Sport tabs */}
       <div className="mb-4 -mx-4 px-4 overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
