@@ -184,14 +184,14 @@ export default function DashboardContent({
             ) : (
               <>
                 {activeGames.map((row) => (
-                  <DashboardGameCard key={row.game.id} row={row} />
+                  <DashboardGameCard key={row.game.id} row={row} logoUrl={logoUrlByGame[row.game.id]} top3={top3ByGame[row.game.id]} />
                 ))}
                 {finishedGames.length > 0 && (
                   <div className="mt-4">
                     <h3 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">Afsluttede spil</h3>
                     <div className="flex flex-col gap-4 opacity-75">
                       {finishedGames.map((row) => (
-                        <DashboardGameCard key={row.game.id} row={row} />
+                        <DashboardGameCard key={row.game.id} row={row} logoUrl={logoUrlByGame[row.game.id]} top3={top3ByGame[row.game.id]} />
                       ))}
                     </div>
                   </div>
