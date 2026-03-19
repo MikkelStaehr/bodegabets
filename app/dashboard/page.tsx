@@ -336,6 +336,15 @@ export default async function DashboardPage() {
     return new Date(future).toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   })()
 
+  const { data: userStats } = await supabaseAdmin
+    .from('round_scores')
+    .select('round_id, earnings_delta')
+    .eq('user_id', user.id)
+  const roundsPlayed = new Set(userStats?.map((r) => r.round_id) ?? []).size
+  const totalEarnings = userStats?.reduce((sum, r) => sum + r.earnings_delta, 0) ?? 0
+  const avgPerRound = roundsPlayed > 0 ? Math.round(totalEarnings / roundsPlayed) : 0
+  const topRoomsCount = games.filter((g) => g.rank === 1).length
+
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
       <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
@@ -360,6 +369,7 @@ export default async function DashboardPage() {
           logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
           leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
           top3ByGame={Object.fromEntries(top3ByGame)}
+          userStats={{ roundsPlayed, totalEarnings, avgPerRound, topRoomsCount, totalRooms: games.length }}
         />
       </div>
     </div>
