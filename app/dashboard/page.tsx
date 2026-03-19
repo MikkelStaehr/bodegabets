@@ -343,7 +343,18 @@ export default async function DashboardPage() {
   const roundsPlayed = new Set(userStats?.map((r) => r.round_id) ?? []).size
   const totalEarnings = userStats?.reduce((sum, r) => sum + r.earnings_delta, 0) ?? 0
   const avgPerRound = roundsPlayed > 0 ? Math.round(totalEarnings / roundsPlayed) : 0
-  const topRoomsCount = games.filter((g) => g.rank === 1).length
+
+  const { data: userBets } = await supabaseAdmin
+    .from('bets')
+    .select('id, prediction, matches!inner(status, result)')
+    .eq('user_id', user.id)
+    .eq('bet_type', 'match_result')
+  const totalBets = userBets?.length ?? 0
+  const correctBets = (userBets ?? []).filter((b) => {
+    const m = b.matches as unknown as { status: string; result: string | null }
+    return m.status === 'finished' && b.prediction === m.result
+  }).length
+  const correctPct = totalBets > 0 ? Math.round((correctBets / totalBets) * 100) : 0
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
@@ -369,7 +380,7 @@ export default async function DashboardPage() {
           logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
           leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
           top3ByGame={Object.fromEntries(top3ByGame)}
-          userStats={{ roundsPlayed, totalEarnings, avgPerRound, topRoomsCount, totalRooms: games.length }}
+          userStats={{ roundsPlayed, totalEarnings, avgPerRound, correctPct }}
         />
       </div>
     </div>
