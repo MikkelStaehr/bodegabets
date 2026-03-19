@@ -340,21 +340,28 @@ export default async function DashboardPage() {
     .from('round_scores')
     .select('round_id, earnings_delta')
     .eq('user_id', user.id)
-  const roundsPlayed = new Set(userStats?.map((r) => r.round_id) ?? []).size
-  const totalEarnings = userStats?.reduce((sum, r) => sum + r.earnings_delta, 0) ?? 0
+  const uniqueRounds = new Set(userStats?.map((r) => r.round_id) ?? [])
+  const roundsPlayed = uniqueRounds.size
+  const earningsByRound = new Map<number, number>()
+  for (const rs of userStats ?? []) {
+    const current = earningsByRound.get(rs.round_id) ?? 0
+    earningsByRound.set(rs.round_id, current + rs.earnings_delta)
+  }
+  const totalEarnings = [...earningsByRound.values()].reduce((a, b) => a + b, 0)
   const avgPerRound = roundsPlayed > 0 ? Math.round(totalEarnings / roundsPlayed) : 0
 
   const { data: userBets } = await supabaseAdmin
     .from('bets')
-    .select('id, prediction, matches!inner(status, result)')
+    .select('prediction, match:matches!match_id(result, status)')
     .eq('user_id', user.id)
     .eq('bet_type', 'match_result')
-  const totalBets = userBets?.length ?? 0
-  const correctBets = (userBets ?? []).filter((b) => {
-    const m = b.matches as unknown as { status: string; result: string | null }
-    return m.status === 'finished' && b.prediction === m.result
-  }).length
-  const correctPct = totalBets > 0 ? Math.round((correctBets / totalBets) * 100) : 0
+  const finishedBets = (userBets ?? []).filter(
+    (b) => (b.match as unknown as { status: string })?.status === 'finished'
+  )
+  const correctBets = finishedBets.filter(
+    (b) => b.prediction === (b.match as unknown as { result: string })?.result
+  )
+  const correctPct = finishedBets.length > 0 ? Math.round((correctBets.length * 100) / finishedBets.length) : 0
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
