@@ -538,8 +538,46 @@ app.listen(PORT, () => {
     }
   }
 
-  // Hvert 5. minut — sync scores
-  cron.schedule('*/5 * * * *', () => callEndpoint('/sync-scores'))
+  // Dynamisk polling — hvert minut
+  cron.schedule('* * * * *', async () => {
+    try {
+      const now = new Date()
+      const soon = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
+
+      // Tjek om der er live kampe
+      const { data: liveMatches } = await supabaseAdmin
+        .from('matches')
+        .select('id')
+        .in('status', ['live', 'halftime'])
+        .limit(1)
+
+      // Tjek om der er kampe der starter inden for 30 min
+      const { data: soonMatches } = await supabaseAdmin
+        .from('matches')
+        .select('id')
+        .eq('status', 'scheduled')
+        .lte('kickoff', soon)
+        .gte('kickoff', now.toISOString())
+        .limit(1)
+
+      const hasLive = (liveMatches?.length ?? 0) > 0
+      const hasSoon = (soonMatches?.length ?? 0) > 0
+
+      if (hasLive || hasSoon) {
+        // Live kampe eller kamp starter snart → sync hvert minut
+        console.log(`[cron] Dynamic sync — live: ${hasLive}, soon: ${hasSoon}`)
+        await callEndpoint('/sync-scores')
+      } else {
+        // Ingen live kampe → sync kun hvert 5. minut
+        const minute = now.getMinutes()
+        if (minute % 5 === 0) {
+          await callEndpoint('/sync-scores')
+        }
+      }
+    } catch (err) {
+      console.error('[cron] Dynamic polling fejl:', err)
+    }
+  })
 
   // Dagligt kl. 06:00 UTC — sync fixtures
   cron.schedule('0 6 * * *', () => callEndpoint('/sync-fixtures'))
