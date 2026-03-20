@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import DashboardContent from '@/components/dashboard/DashboardContent'
+import DashboardClient from '@/components/dashboard/DashboardClient'
 import JoinGameCard from '@/components/dashboard/JoinGameCard'
 import type { SportType, GameRowWithSport } from '@/components/dashboard/DashboardContent'
 
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
   const [profileResult, membershipsResult] = await Promise.all([
     supabaseAdmin
       .from('profiles')
-      .select('username, points, is_admin')
+      .select('username, points, is_admin, onboarding_completed')
       .eq('id', user.id)
       .single(),
 
@@ -337,18 +338,20 @@ export default async function DashboardPage() {
   })()
 
   return (
-    <div className="min-h-screen bg-[#F2EDE4]">
-      <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
-        <DashboardContent
-          games={games}
-          activeRounds={activeRounds}
-          nextRoundDate={nextRoundDate}
-          logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
-          leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
-          top3ByGame={Object.fromEntries(top3ByGame)}
-          username={profile?.username ?? 'Spiller'}
-        />
+    <DashboardClient onboardingCompleted={profile?.onboarding_completed ?? false}>
+      <div className="min-h-screen bg-[#F2EDE4]">
+        <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
+          <DashboardContent
+            games={games}
+            activeRounds={activeRounds}
+            nextRoundDate={nextRoundDate}
+            logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
+            leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
+            top3ByGame={Object.fromEntries(top3ByGame)}
+            username={profile?.username ?? 'Spiller'}
+          />
+        </div>
       </div>
-    </div>
+    </DashboardClient>
   )
 }
