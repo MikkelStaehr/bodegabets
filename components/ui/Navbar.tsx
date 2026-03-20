@@ -1,9 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import UserMenu from '@/components/ui/UserMenu'
 import { useLiveMatches } from '@/hooks/useLiveMatches'
 import { useLiveMatchesContext } from '@/contexts/LiveMatchesContext'
+import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
 
 type Props = {
   username?: string
@@ -15,6 +17,30 @@ type Props = {
 }
 
 export default function Navbar({ username, isAdmin, backHref, backLabel, gameId, activeRoundId }: Props) {
+  const [clientUsername, setClientUsername] = useState<string | undefined>(username)
+  const [clientIsAdmin, setClientIsAdmin] = useState<boolean>(isAdmin ?? false)
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, is_admin')
+            .eq('id', session.user.id)
+            .single()
+          setClientUsername(profile?.username)
+          setClientIsAdmin(profile?.is_admin === true)
+        } else {
+          setClientUsername(undefined)
+          setClientIsAdmin(false)
+        }
+      }
+    )
+    return () => subscription.unsubscribe()
+  }, [])
+
   const ctx = useLiveMatchesContext()
   const hookData = useLiveMatches(activeRoundId ?? null, !!activeRoundId && !ctx)
   const summary = ctx?.summary ?? hookData.summary
@@ -59,8 +85,8 @@ export default function Navbar({ username, isAdmin, backHref, backLabel, gameId,
         </div>
 
         {/* Højre: bruger-dropdown eller gæste-links */}
-        {username ? (
-          <UserMenu username={username} isAdmin={isAdmin} />
+        {clientUsername ? (
+          <UserMenu username={clientUsername} isAdmin={clientIsAdmin} />
         ) : (
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
