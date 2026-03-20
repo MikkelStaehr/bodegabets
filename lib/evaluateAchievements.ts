@@ -12,14 +12,20 @@ export async function evaluateAchievements(userId: string, gameId: number): Prom
 
   // ─── Hjælpefunktion til at tildele achievement ────────────────────────────
   async function award(key: string, gameIdOrNull: number | null = gameId) {
-    // Tjek om allerede tildelt
-    const { count } = await supabaseAdmin
+    // Tjek om allerede tildelt — håndter NULL game_id korrekt
+    let query = supabaseAdmin
       .from('user_achievements')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('achievement_key', key)
-      .eq('game_id', gameIdOrNull ?? -1)
 
+    if (gameIdOrNull === null) {
+      query = query.is('game_id', null)
+    } else {
+      query = query.eq('game_id', gameIdOrNull)
+    }
+
+    const { count } = await query
     if (count && count > 0) return
 
     const { error } = await supabaseAdmin
