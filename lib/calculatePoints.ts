@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { isBetCorrect } from './betUtils'
+import { evaluateAchievements } from '@/lib/evaluateAchievements'
 
 /**
  * V1 — Simpel, idempotent pointberegning.
@@ -165,6 +166,15 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
         .update({ earnings: totalEarnings })
         .eq('game_id', gameId)
         .eq('user_id', member.user_id)
+    }
+
+    // Evaluer achievements for alle medlemmer i dette game
+    for (const member of members ?? []) {
+      try {
+        await evaluateAchievements(member.user_id as string, gameId)
+      } catch (e) {
+        console.error(`[calculateRoundPoints] evaluateAchievements fejl for user ${(member.user_id as string).slice(0, 8)}:`, e)
+      }
     }
   }
 
