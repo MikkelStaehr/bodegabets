@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type LiveMatch = {
   id: number
@@ -69,6 +69,8 @@ export function useLiveMatchesForGame(
   const [matches, setMatches] = useState<LiveMatch[]>([])
   const [summary, setSummary] = useState<LiveSummary>({ live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const hasLoadedOnce = useRef(false)
 
   const fetchLive = useCallback(async () => {
     if (!gameId || !enabled) return
@@ -79,6 +81,10 @@ export function useLiveMatchesForGame(
         setMatches(json.matches ?? [])
         setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
         setLastUpdate(new Date())
+        if (!hasLoadedOnce.current) {
+          hasLoadedOnce.current = true
+          setIsLoading(false)
+        }
       }
     } catch {
       // Ignorer fejl
@@ -91,7 +97,7 @@ export function useLiveMatchesForGame(
     return () => clearInterval(interval)
   }, [fetchLive])
 
-  return { matches, summary, lastUpdate }
+  return { matches, summary, lastUpdate, isLoading }
 }
 
 // ─── Brugerens live kampe (alle aktive spil) ──────────────────────────────────

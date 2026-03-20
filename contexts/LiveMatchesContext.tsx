@@ -8,6 +8,7 @@ type LiveMatchesContextValue = {
   matches: LiveMatch[]
   summary: LiveSummary
   lastUpdate: Date | null
+  isLoading: boolean
 }
 
 const LiveMatchesContext = createContext<LiveMatchesContextValue | null>(null)
@@ -25,8 +26,8 @@ export function LiveMatchesProvider({
   enabled: boolean
   children: ReactNode
 }) {
-  const { matches, summary, lastUpdate } = useLiveMatchesForGame(gameId, enabled)
-  const value: LiveMatchesContextValue = { matches, summary, lastUpdate }
+  const { matches, summary, lastUpdate, isLoading } = useLiveMatchesForGame(gameId, enabled)
+  const value: LiveMatchesContextValue = { matches, summary, lastUpdate, isLoading }
   return (
     <LiveMatchesContext.Provider value={value}>
       {children}
