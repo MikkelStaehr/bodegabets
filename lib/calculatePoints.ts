@@ -65,18 +65,6 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       console.log(`[calculateRoundPoints] Match ${match.id} (${match.home_score}-${match.away_score}): ${bets.length} bets`)
 
       for (const bet of bets) {
-        // Halvleg: skip hvis HT-scores mangler
-        if (
-          (bet.bet_type === 'halvleg' || bet.bet_type === 'halftime') &&
-          (match.home_score_ht == null || match.away_score_ht == null)
-        ) {
-          await supabaseAdmin
-            .from('bets')
-            .update({ result: 'pending', points_earned: 0 })
-            .eq('id', bet.id)
-          continue
-        }
-
         const correct = isBetCorrect(
           bet.bet_type,
           bet.prediction,

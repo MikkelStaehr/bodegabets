@@ -1,5 +1,3 @@
-import type { BetType } from '@/lib/betTypes'
-
 export type Profile = {
   id: string
   username: string
@@ -73,7 +71,7 @@ export type Match = {
   league_match_id?: number | null
 }
 
-export type { BetType }
+export type BetType = 'match_result' | 'goals_3plus' | 'clean_sheet' | 'win_margin'
 
 export type Bet = {
   id: number
@@ -81,7 +79,7 @@ export type Bet = {
   match_id: number
   game_id: number
   prediction: string
-  bet_type: BetType
+  bet_type: string
   stake: number
   result: 'win' | 'loss' | 'pending' | null
   points_earned: number | null

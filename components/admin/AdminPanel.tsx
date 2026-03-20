@@ -76,12 +76,9 @@ function formatDeadline(iso: string | null) {
 }
 
 const BET_TYPE_LABELS: Record<string, string> = {
-  first_scorer:  'Første målscorer',
-  total_goals:   'Antal mål',
-  yellow_cards:  'Gule kort',
-  red_cards:     'Røde kort',
-  btts:          'Begge hold scorer',
-  halftime:      'Halvtidsresultat',
+  goals_3plus: 'Scorer 3+ mål',
+  clean_sheet: 'Clean sheet',
+  win_margin: 'Vinder med 2+',
 }
 
 const SIDEBET_TYPES = Object.keys(BET_TYPE_LABELS)
