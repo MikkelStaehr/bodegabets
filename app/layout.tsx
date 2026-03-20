@@ -4,6 +4,7 @@ import { ToastProvider } from '@/components/ui/Toast'
 import Navbar from '@/components/ui/Navbar'
 import Footer from '@/components/layout/Footer'
 import NavbarScrollHandler from '@/components/layout/NavbarScrollHandler'
+import OnboardingProvider from '@/components/layout/OnboardingProvider'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import './globals.css'
 
@@ -55,7 +56,7 @@ export default async function RootLayout({
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = user
-    ? await supabase.from('profiles').select('username, points, is_admin').eq('id', user.id).single()
+    ? await supabase.from('profiles').select('username, points, is_admin, onboarding_completed').eq('id', user.id).single()
     : { data: null }
 
   return (
@@ -72,7 +73,13 @@ export default async function RootLayout({
               isAdmin={(profile as { is_admin?: boolean } | null)?.is_admin === true}
             />
             <main className="flex-1">
-              {children}
+              {user ? (
+                <OnboardingProvider onboardingCompleted={profile?.onboarding_completed ?? true}>
+                  {children}
+                </OnboardingProvider>
+              ) : (
+                children
+              )}
             </main>
             <Footer />
           </div>
