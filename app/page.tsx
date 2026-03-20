@@ -288,11 +288,11 @@ export default async function HomePage() {
             {/* Højre — feature liste */}
             <div className="space-y-6">
               {[
-                { title: 'Konsensus-odds', desc: 'Sjældne tips giver op til 5× bonus' },
-                { title: 'Streak bonus', desc: 'Win 3+ runder i træk for op til 1.5× bonus' },
-                { title: 'Ekstra bets', desc: 'BTTS, over/under 2.5, halvleg, målforskel' },
-                { title: 'Rivalry multiplier', desc: 'Store derby-opgør giver 1.5× bonus' },
-                { title: 'Wildcard runde', desc: 'Admin vælger én kamp med dobbelt point' },
+                { title: 'Konsensus-odds', desc: 'Jo sjældnere dit valg, jo højere din potentielle gevinst — op til ×1.8' },
+                { title: 'Ekstra bets', desc: 'Bet på clean sheet, scorer 3+ mål eller vindermarginal på hver kamp' },
+                { title: 'Rivalry multiplier', desc: 'Store derby-opgør giver automatisk ×1.5 bonus' },
+                { title: 'Achievements & øgenavne', desc: 'Optjen hemmelige titler og profilrammer baseret på dine resultater og spillestil' },
+                { title: 'Profilrammer', desc: 'Jo mere du vinder, jo mere eksklusiv bliver din profil' },
               ].map(({ title, desc }) => (
                 <div key={title} className="flex items-start gap-4">
                   {/* Gold checkmark circle */}
@@ -411,6 +411,57 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ── 5b. FAQ ──────────────────────────────────────────── */}
+      <section className="bg-cream">
+        <div className="max-w-[640px] mx-auto px-6 lg:px-8 py-12 lg:py-24">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="block w-6 h-[2px] bg-gold" />
+            <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
+              FAQ
+            </span>
+          </div>
+          <h2 className="font-display italic text-ink mb-12" style={{ fontWeight: 700, fontSize: 'clamp(28px, 4vw, 40px)' }}>
+            Ofte stillede spørgsmål.
+          </h2>
+
+          <div className="flex flex-col divide-y divide-black/[0.07]">
+            {[
+              {
+                q: 'Er Bodega Bets gratis?',
+                a: 'Ja, helt gratis. Der spilles ikke om rigtige penge — kun om prestige og æren af at slå vennerne.',
+              },
+              {
+                q: 'Hvordan joiner jeg et spilrum?',
+                a: 'Du skal have en 6-tegns invitationskode fra den der oprettede spilrummet. Opret en profil, gå til dashboard og indtast koden.',
+              },
+              {
+                q: 'Hvad er konsensus-odds?',
+                a: 'Jo færre der vælger det samme som dig, jo højere er din potentielle gevinst. Odds beregnes løbende men vises først når bets lukker — så du aldrig ved hvad andre har valgt inden deadline.',
+              },
+              {
+                q: 'Hvornår lukker bets?',
+                a: 'Bets lukker automatisk 30 minutter før kampstart. Du kan afgive og ændre dine bets helt frem til da.',
+              },
+              {
+                q: 'Hvad er ekstra bets?',
+                a: 'Udover 1/X/2 kan du på hver kamp bette på om et hold scorer 3+ mål, holder clean sheet, eller vinder med 2+ mål. Korrekt ekstra bet giver stake × 2 — men forkert ekstra bet trækkes fra din rundegevinst.',
+              },
+              {
+                q: 'Hvad sker der hvis jeg ikke afgiver bets i en runde?',
+                a: 'Du scorer 0 point i den runde. Du kan stadig deltage i næste runde — du mister ikke din plads i spilrummet.',
+              },
+            ].map(({ q, a }) => (
+              <div key={q} className="py-5">
+                <p className="font-condensed text-ink text-sm uppercase tracking-[0.06em] mb-2" style={{ fontWeight: 700 }}>
+                  {q}
+                </p>
+                <p className="font-body text-warm-gray text-sm leading-relaxed">{a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── 6. Final CTA ───────────────────────────────────────── */}
       {!user && (
         <section className="relative overflow-hidden" style={{ background: '#0d1f18' }}>
@@ -443,6 +494,35 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* ── Footer ───────────────────────────────────────────── */}
+      <footer style={{ background: '#0d1f18' }}>
+        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-10">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex flex-col items-center md:items-start gap-1">
+              <span className="font-display italic text-cream text-xl" style={{ fontWeight: 700 }}>
+                Bodega Bets
+              </span>
+              <span className="font-body text-cream/30 text-xs">
+                Spil med vennerne. Ingen rigtige penge.
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              <Link href="/privatlivspolitik" className="font-body text-cream/40 text-xs hover:text-cream/70 transition-colors">
+                Privatlivspolitik
+              </Link>
+              <Link href="/cookie-politik" className="font-body text-cream/40 text-xs hover:text-cream/70 transition-colors">
+                Cookie politik
+              </Link>
+              <Link href="/vilkaar" className="font-body text-cream/40 text-xs hover:text-cream/70 transition-colors">
+                Vilkår og betingelser
+              </Link>
+            </div>
+            <span className="font-body text-cream/20 text-xs">
+              © {new Date().getFullYear()} Bodega Bets
+            </span>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
