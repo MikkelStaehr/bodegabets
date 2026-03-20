@@ -814,8 +814,8 @@ export default function AfgivBets({
 
   async function handleSubmit() {
     if (selections.length === 0) return
-    if (totalPoints > userPoints) {
-      toast(`Ikke nok credits. Du har ${userPoints} pt.`, 'error')
+    if (isOverBudget) {
+      toast(`Ikke nok credits. Du har ${displayCredits} pt tilbage.`, 'error')
       return
     }
 
