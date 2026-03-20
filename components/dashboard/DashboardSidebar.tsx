@@ -103,24 +103,33 @@ export default function DashboardSidebar({
           >
             Alle
           </button>
-          {uniqueLeagues.map((league) => (
-            <button
-              key={league.name}
-              onClick={() => setLeagueFilter(leagueFilter === league.name ? null : league.name)}
-              className="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
-              title={league.name}
-              style={{
-                background: leagueFilter === league.name ? 'rgba(184,150,62,0.15)' : 'transparent',
-                border: leagueFilter === league.name ? '1.5px solid rgba(184,150,62,0.4)' : '1.5px solid transparent',
-              }}
-            >
-              {league.logo_url ? (
-                <img src={league.logo_url} alt="" title={league.name} className="w-4 h-4 object-contain" />
-              ) : (
-                <span className="text-[10px] text-[#7a7060]">{league.name.slice(0, 2)}</span>
-              )}
-            </button>
-          ))}
+          {uniqueLeagues.map((league) => {
+            const count = allScheduleMatches.filter(
+              (m) => getLeague(m)?.name === league.name
+            ).length
+
+            return (
+              <button
+                key={league.name}
+                onClick={() => setLeagueFilter(leagueFilter === league.name ? null : league.name)}
+                className="flex items-center gap-1 px-2 py-1 rounded-full transition-colors"
+                title={league.name}
+                style={{
+                  background: leagueFilter === league.name ? 'rgba(184,150,62,0.15)' : 'transparent',
+                  border: leagueFilter === league.name ? '1.5px solid rgba(184,150,62,0.4)' : '1.5px solid transparent',
+                }}
+              >
+                {league.logo_url ? (
+                  <img src={league.logo_url} alt="" className="w-4 h-4 object-contain shrink-0" />
+                ) : (
+                  <span className="text-[10px] text-[#7a7060]">{league.name.slice(0, 2)}</span>
+                )}
+                <span className={`text-[10px] font-bold ${leagueFilter === league.name ? 'text-[#B8963E]' : 'text-[#9E9486]'}`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -166,7 +175,7 @@ export default function DashboardSidebar({
                           {m.home_team?.short_name ?? m.home_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
                         </span>
                         {m.home_team?.logo_url && (
-                          <img src={m.home_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                          <img src={m.home_team.logo_url} alt="" className="w-7 h-7 object-contain flex-shrink-0" />
                         )}
                       </div>
 
@@ -200,7 +209,7 @@ export default function DashboardSidebar({
                       {/* Away team */}
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         {m.away_team?.logo_url && (
-                          <img src={m.away_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                          <img src={m.away_team.logo_url} alt="" className="w-7 h-7 object-contain flex-shrink-0" />
                         )}
                         <span className="text-[12px] font-bold text-[#1a3329] truncate" style={{ maxWidth: 80 }}>
                           {m.away_team?.short_name ?? m.away_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
@@ -253,7 +262,7 @@ export default function DashboardSidebar({
                           {m.home_team?.short_name ?? m.home_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
                         </span>
                         {m.home_team?.logo_url && (
-                          <img src={m.home_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                          <img src={m.home_team.logo_url} alt="" className="w-7 h-7 object-contain flex-shrink-0" />
                         )}
                       </div>
 
@@ -267,7 +276,7 @@ export default function DashboardSidebar({
                       {/* Away team */}
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         {m.away_team?.logo_url && (
-                          <img src={m.away_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                          <img src={m.away_team.logo_url} alt="" className="w-7 h-7 object-contain flex-shrink-0" />
                         )}
                         <span className="text-[12px] font-bold text-[#1a3329] truncate" style={{ maxWidth: 80 }}>
                           {m.away_team?.short_name ?? m.away_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
