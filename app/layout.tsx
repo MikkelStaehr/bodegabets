@@ -3,6 +3,7 @@ import { Playfair_Display, Barlow_Condensed, Barlow, Lobster, Pacifico } from 'n
 import { ToastProvider } from '@/components/ui/Toast'
 import Navbar from '@/components/ui/Navbar'
 import Footer from '@/components/layout/Footer'
+import NavbarScrollHandler from '@/components/layout/NavbarScrollHandler'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import './globals.css'
 
@@ -63,6 +64,7 @@ export default async function RootLayout({
       className={`${playfair.variable} ${barlowCondensed.variable} ${barlow.variable} ${lobster.variable} ${pacifico.variable}`}
     >
       <body className="antialiased">
+        <NavbarScrollHandler />
         <ToastProvider>
           <div className="min-h-screen bg-cream flex flex-col">
             <Navbar
