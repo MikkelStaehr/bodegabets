@@ -129,11 +129,15 @@ function InlineExtraBets({
   sel,
   isRivalry,
   toggleExtra,
+  adjustExtraStake,
+  setExtraStake,
 }: {
   matchId: number
   sel: BetEntry
   isRivalry: boolean
   toggleExtra: (matchId: number, key: ExtraBetType, value: string) => void
+  adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
+  setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
 }) {
   const [open, setOpen] = useState(sel.extraBets.length > 0)
 
@@ -185,6 +189,46 @@ function InlineExtraBets({
                     )
                   })}
                 </div>
+                {pick && (
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => adjustExtraStake(matchId, row.key, -50)}
+                      className={`w-6 h-6 border rounded font-bold text-sm flex items-center justify-center ${
+                        isRivalry
+                          ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
+                          : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                      }`}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={10}
+                      value={sel.extraBets.find((eb) => eb.type === row.key)?.points ?? 50}
+                      onChange={(e) => setExtraStake(matchId, row.key, parseInt(e.target.value) || 10)}
+                      className={`w-14 text-center font-condensed text-[13px] font-bold border rounded h-6 ${
+                        isRivalry
+                          ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
+                          : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                      }`}
+                    />
+                    <span className={`text-[10px] font-semibold ${isRivalry ? 'text-[#F2EDE4]/50' : 'text-[#7a7060]'}`}>
+                      pt
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => adjustExtraStake(matchId, row.key, 50)}
+                      className={`w-6 h-6 border rounded font-bold text-sm flex items-center justify-center ${
+                        isRivalry
+                          ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
+                          : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                      }`}
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -271,6 +315,8 @@ function MatchCard({
   matchResultBet,
   selectOutcome,
   toggleExtra,
+  adjustExtraStake,
+  setExtraStake,
   adjustStake,
   setStake,
   onStartEdit,
@@ -291,6 +337,8 @@ function MatchCard({
   matchResultBet: Bet | undefined
   selectOutcome: (matchId: number, outcome: '1' | 'X' | '2') => void
   toggleExtra: (matchId: number, key: ExtraBetType, value: string) => void
+  adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
+  setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
   adjustStake: (matchId: number, delta: number) => void
   setStake: (matchId: number, val: number) => void
   onStartEdit: (matchId: number) => void
@@ -426,6 +474,8 @@ function MatchCard({
           sel={sel}
           isRivalry={isRivalry}
           toggleExtra={toggleExtra}
+          adjustExtraStake={adjustExtraStake}
+          setExtraStake={setExtraStake}
         />
       )}
 
@@ -686,6 +736,34 @@ export default function AfgivBets({
     )
   }
 
+  const adjustExtraStake = (matchId: number, type: ExtraBetType, delta: number) => {
+    setSelections((prev) =>
+      prev.map((s) => {
+        if (s.matchId !== matchId) return s
+        return {
+          ...s,
+          extraBets: s.extraBets.map((eb) =>
+            eb.type === type ? { ...eb, points: Math.max(10, eb.points + delta) } : eb
+          ),
+        }
+      })
+    )
+  }
+
+  const setExtraStake = (matchId: number, type: ExtraBetType, val: number) => {
+    setSelections((prev) =>
+      prev.map((s) => {
+        if (s.matchId !== matchId) return s
+        return {
+          ...s,
+          extraBets: s.extraBets.map((eb) =>
+            eb.type === type ? { ...eb, points: Math.max(10, val) } : eb
+          ),
+        }
+      })
+    )
+  }
+
   const startEditing = (matchId: number) => {
     const match = matches.find((m) => m.id === matchId)
     if (!match) return
@@ -853,6 +931,8 @@ export default function AfgivBets({
           matchResultBet={md.matchResultBet}
           selectOutcome={selectOutcome}
           toggleExtra={toggleExtra}
+          adjustExtraStake={adjustExtraStake}
+          setExtraStake={setExtraStake}
           adjustStake={adjustStake}
           setStake={setStake}
           onStartEdit={startEditing}
@@ -1084,9 +1164,30 @@ export default function AfgivBets({
                             <span className="font-condensed text-[12px] font-bold text-[#2C4A3E] bg-[#2C4A3E]/10 rounded px-1.5 shrink-0">
                               {getExtraBetLabel(eb.type, eb.prediction)}
                             </span>
-                            <span className="font-condensed text-[11px] font-bold text-[#7a7060] ml-auto">
-                              {eb.points} pt
-                            </span>
+                            <div className="flex items-center gap-1 ml-auto">
+                              <button
+                                type="button"
+                                onClick={() => adjustExtraStake(entry.matchId, eb.type as ExtraBetType, -50)}
+                                className="w-5 h-5 border border-black/10 rounded bg-[#F2EDE4] text-[#1a3329] font-bold text-xs flex items-center justify-center"
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                min={10}
+                                value={eb.points}
+                                onChange={(e) => setExtraStake(entry.matchId, eb.type as ExtraBetType, parseInt(e.target.value) || 10)}
+                                className="w-12 text-center font-condensed text-[12px] font-bold text-[#1a3329] border border-black/10 rounded bg-[#F2EDE4] h-5"
+                              />
+                              <span className="text-[9px] text-[#7a7060] font-semibold">pt</span>
+                              <button
+                                type="button"
+                                onClick={() => adjustExtraStake(entry.matchId, eb.type as ExtraBetType, 50)}
+                                className="w-5 h-5 border border-black/10 rounded bg-[#F2EDE4] text-[#1a3329] font-bold text-xs flex items-center justify-center"
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
