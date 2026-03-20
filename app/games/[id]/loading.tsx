@@ -3,9 +3,13 @@ export default function GameRoomLoading() {
     <div className="min-h-screen bg-[#1a3329] flex flex-col items-center justify-center gap-6">
       <div className="flex flex-col items-center gap-4">
         <span
-          className="font-['Playfair_Display'] text-[32px] font-bold text-[#F2EDE4] tracking-wide"
+          style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}
         >
-          Bodega Bets
+          <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '32px', color: '#F2EDE4', marginRight: '-4px' }}>B</span>
+          <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '16px', color: '#F2EDE4' }}>odega</span>
+          <span style={{ display: 'inline-block', width: '4px' }} />
+          <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '32px', color: '#F2EDE4', marginRight: '-4px' }}>B</span>
+          <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '16px', color: '#F2EDE4' }}>ets</span>
         </span>
         <span
           className="font-['Barlow_Condensed'] text-[13px] font-bold tracking-widest uppercase text-[#B8963E]"
