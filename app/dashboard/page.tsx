@@ -159,48 +159,55 @@ export default async function DashboardPage() {
 
   const seasonIds = [...new Set([...seasonIdsByGame.values()].flat())]
 
-  // Look up league/tournament names + logos via seasons → tournaments
-  const leagueNameMap = new Map<number, string>()
-  const logoUrlMap = new Map<number, string>()
-  if (seasonIds.length > 0) {
-    const { data: seasons } = await supabaseAdmin
-      .from('seasons')
-      .select('id, tournaments:tournament_id(name, logo_url)')
-      .in('id', seasonIds)
-    for (const s of (seasons ?? []) as unknown as { id: number; tournaments: { name: string; logo_url: string | null } | null }[]) {
-      if (s.tournaments?.name) leagueNameMap.set(s.id, s.tournaments.name)
-      if (s.tournaments?.logo_url) logoUrlMap.set(s.id, s.tournaments.logo_url)
-    }
-  }
-
+  // Kombinér seasons/tournaments + allMembers + rounds + bets + activeRounds i ét Promise.all
   const results = await Promise.all([
+    // [0] seasons/tournaments
+    seasonIds.length > 0
+      ? supabaseAdmin
+          .from('seasons')
+          .select('id, tournaments:tournament_id(name, logo_url)')
+          .in('id', seasonIds)
+      : Promise.resolve({ data: [] }),
+
+    // [1] allMembers
     supabaseAdmin
       .from('game_members')
       .select('game_id, user_id, earnings, profile:profiles!user_id(username)')
       .in('game_id', gameIds)
       .order('earnings', { ascending: false }),
 
-    (() => {
-      return seasonIds.length > 0
-        ? supabaseAdmin
-            .from('rounds')
-            .select('id, season_id, name, status, betting_closes_at')
-            .in('season_id', seasonIds)
-            .order('created_at', { ascending: true })
-        : Promise.resolve({ data: [] })
-    })(),
+    // [2] rounds
+    seasonIds.length > 0
+      ? supabaseAdmin
+          .from('rounds')
+          .select('id, season_id, name, status, betting_closes_at')
+          .in('season_id', seasonIds)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
 
+    // [3] bets
     supabaseAdmin
       .from('bets')
       .select('round_id')
       .eq('user_id', user.id),
 
+    // [4+] activeRounds per game
     ...rawGames.map((m) => getActiveRoundForGame(m.game.id, seasonIdsByGame.get(m.game.id)?.[0] ?? null)),
   ])
-  const allMembers = (results[0] as { data: { game_id: number; user_id: string; earnings: number; profile: { username: string } | null }[] | null }).data
-  const rounds = (results[1] as { data: { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
-  const bets = (results[2] as { data: { round_id: number }[] | null }).data
-  const activeRoundsPerGame = results.slice(3) as Awaited<ReturnType<typeof getActiveRoundForGame>>[]
+
+  // Unpack seasons/tournaments → leagueNameMap + logoUrlMap
+  const leagueNameMap = new Map<number, string>()
+  const logoUrlMap = new Map<number, string>()
+  const seasonsData = (results[0] as { data: { id: number; tournaments: { name: string; logo_url: string | null } | null }[] | null }).data
+  for (const s of (seasonsData ?? []) as unknown as { id: number; tournaments: { name: string; logo_url: string | null } | null }[]) {
+    if (s.tournaments?.name) leagueNameMap.set(s.id, s.tournaments.name)
+    if (s.tournaments?.logo_url) logoUrlMap.set(s.id, s.tournaments.logo_url)
+  }
+
+  const allMembers = (results[1] as { data: { game_id: number; user_id: string; earnings: number; profile: { username: string } | null }[] | null }).data
+  const rounds = (results[2] as { data: { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
+  const bets = (results[3] as { data: { round_id: number }[] | null }).data
+  const activeRoundsPerGame = results.slice(4) as Awaited<ReturnType<typeof getActiveRoundForGame>>[]
 
   const roundIds = (rounds ?? []).map((r: { id: number }) => r.id)
   const { data: matchesByRound } =
