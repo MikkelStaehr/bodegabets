@@ -26,14 +26,21 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
 }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'live') return <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full uppercase">Live</span>
-  if (status === 'halftime') return <span className="text-[9px] font-bold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full uppercase">HT</span>
-  return null
-}
-
 function getLeague(m: ScheduleMatch): League | null {
   return m.round?.season?.tournament ?? null
+}
+
+function groupByLeague(matches: ScheduleMatch[]): Array<{ league: League; matches: ScheduleMatch[] }> {
+  const map = new Map<string, { league: League; matches: ScheduleMatch[] }>()
+  for (const m of matches) {
+    const league = getLeague(m)
+    const key = league?.name ?? 'Ukendt'
+    if (!map.has(key)) {
+      map.set(key, { league: league ?? { name: 'Ukendt', logo_url: null }, matches: [] })
+    }
+    map.get(key)!.matches.push(m)
+  }
+  return [...map.values()]
 }
 
 function extractLeagues(matches: ScheduleMatch[]): League[] {
@@ -129,51 +136,78 @@ export default function DashboardSidebar({
             <p className="text-[13px] text-[#7a7060] text-center py-2">Ingen kampe i dag</p>
           ) : (
             <div className="flex flex-col">
-              {filteredToday.map((m, i) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-2 py-2"
-                  style={{ borderBottom: i < filteredToday.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none' }}
-                >
-                  {/* Home team */}
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                    <span className="text-[12px] font-semibold text-[#2c2418] uppercase">
-                      {teamShort(m.home_team)}
-                    </span>
-                    {m.home_team?.logo_url && (
-                      <img src={m.home_team.logo_url} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
-                    )}
-                  </div>
-
-                  {/* Time or score + status */}
-                  <div className="flex items-center gap-1 min-w-[50px] justify-center">
-                    {m.status === 'live' || m.status === 'halftime' ? (
-                      <>
-                        <span className="text-[12px] font-bold text-[#2c2418]">
-                          {m.home_score ?? 0}-{m.away_score ?? 0}
+              {(leagueFilter
+                ? [{ league: { name: leagueFilter, logo_url: null }, matches: filteredToday }]
+                : groupByLeague(filteredToday)
+              ).map((group, gi) => (
+                <div key={group.league.name}>
+                  {/* Turneringsheader — kun på Alle tab */}
+                  {!leagueFilter && (
+                    <div className={`flex items-center gap-2 ${gi > 0 ? 'mt-3' : ''} mb-1.5`}>
+                      {group.league.logo_url && (
+                        <img src={group.league.logo_url} alt="" className="w-3.5 h-3.5 object-contain opacity-70" />
+                      )}
+                      <span className="text-[9px] font-bold text-[#9E9486] uppercase tracking-widest">
+                        {group.league.name}
+                      </span>
+                      <div className="flex-1 h-px bg-black/[0.06]" />
+                    </div>
+                  )}
+                  {/* Kampe */}
+                  {group.matches.map((m, i) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-2 py-2.5"
+                      style={{ borderBottom: i < group.matches.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none' }}
+                    >
+                      {/* Home team */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                        <span className="text-[12px] font-bold text-[#1a3329] truncate" style={{ maxWidth: 80 }}>
+                          {m.home_team?.short_name ?? m.home_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
                         </span>
-                        <StatusBadge status={m.status} />
-                      </>
-                    ) : m.status === 'finished' ? (
-                      <span className="text-[12px] font-bold text-[#2c2418]">
-                        {m.home_score ?? 0}-{m.away_score ?? 0}
-                      </span>
-                    ) : (
-                      <span className="text-[12px] font-medium text-[#7a7060]">
-                        {formatTime(m.kickoff_at)}
-                      </span>
-                    )}
-                  </div>
+                        {m.home_team?.logo_url && (
+                          <img src={m.home_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                        )}
+                      </div>
 
-                  {/* Away team */}
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    {m.away_team?.logo_url && (
-                      <img src={m.away_team.logo_url} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
-                    )}
-                    <span className="text-[12px] font-semibold text-[#2c2418] uppercase">
-                      {teamShort(m.away_team)}
-                    </span>
-                  </div>
+                      {/* Tid eller score */}
+                      <div className="flex flex-col items-center min-w-[52px]">
+                        {m.status === 'live' ? (
+                          <>
+                            <span className="text-[13px] font-extrabold text-[#1a3329] leading-none">
+                              {m.home_score ?? 0}–{m.away_score ?? 0}
+                            </span>
+                            <span className="text-[8px] font-bold text-red-500 uppercase tracking-wider mt-0.5">● Live</span>
+                          </>
+                        ) : m.status === 'halftime' ? (
+                          <>
+                            <span className="text-[13px] font-extrabold text-[#1a3329] leading-none">
+                              {m.home_score ?? 0}–{m.away_score ?? 0}
+                            </span>
+                            <span className="text-[8px] font-bold text-orange-500 uppercase tracking-wider mt-0.5">HT</span>
+                          </>
+                        ) : m.status === 'finished' ? (
+                          <span className="text-[13px] font-extrabold text-[#9E9486] leading-none">
+                            {m.home_score ?? 0}–{m.away_score ?? 0}
+                          </span>
+                        ) : (
+                          <span className="text-[12px] font-semibold text-[#7a7060]">
+                            {formatTime(m.kickoff_at)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Away team */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {m.away_team?.logo_url && (
+                          <img src={m.away_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                        )}
+                        <span className="text-[12px] font-bold text-[#1a3329] truncate" style={{ maxWidth: 80 }}>
+                          {m.away_team?.short_name ?? m.away_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -189,41 +223,58 @@ export default function DashboardSidebar({
           </h2>
           <div className="bg-white rounded-2xl border border-black/8 px-4 py-3">
             <div className="flex flex-col">
-              {filteredYesterday.map((m, i) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-2 py-1.5"
-                  style={{ borderBottom: i < filteredYesterday.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}
-                >
-                  {/* Home team */}
-                  <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
-                    <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
-                      {teamShort(m.home_team)}
-                    </span>
-                    {m.home_team?.logo_url && (
-                      <img src={m.home_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
-                    )}
-                  </div>
+              {(leagueFilter
+                ? [{ league: { name: leagueFilter, logo_url: null }, matches: filteredYesterday }]
+                : groupByLeague(filteredYesterday)
+              ).map((group, gi) => (
+                <div key={group.league.name}>
+                  {/* Turneringsheader — kun på Alle tab */}
+                  {!leagueFilter && (
+                    <div className={`flex items-center gap-2 ${gi > 0 ? 'mt-3' : ''} mb-1.5`}>
+                      {group.league.logo_url && (
+                        <img src={group.league.logo_url} alt="" className="w-3.5 h-3.5 object-contain opacity-70" />
+                      )}
+                      <span className="text-[9px] font-bold text-[#9E9486] uppercase tracking-widest">
+                        {group.league.name}
+                      </span>
+                      <div className="flex-1 h-px bg-black/[0.06]" />
+                    </div>
+                  )}
+                  {/* Kampe */}
+                  {group.matches.map((m, i) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-2 py-2.5"
+                      style={{ borderBottom: i < group.matches.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none' }}
+                    >
+                      {/* Home team */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                        <span className="text-[12px] font-bold text-[#1a3329] truncate" style={{ maxWidth: 80 }}>
+                          {m.home_team?.short_name ?? m.home_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
+                        </span>
+                        {m.home_team?.logo_url && (
+                          <img src={m.home_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                        )}
+                      </div>
 
-                  {/* Score */}
-                  <span className="text-[11px] font-bold text-[#2c2418] min-w-[32px] text-center">
-                    {m.home_score ?? '-'}-{m.away_score ?? '-'}
-                  </span>
+                      {/* Score — altid grå for gårsdagens kampe */}
+                      <div className="flex flex-col items-center min-w-[52px]">
+                        <span className="text-[13px] font-extrabold text-[#9E9486] leading-none">
+                          {m.home_score ?? '-'}–{m.away_score ?? '-'}
+                        </span>
+                      </div>
 
-                  {/* Away team */}
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                    {m.away_team?.logo_url && (
-                      <img src={m.away_team.logo_url} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
-                    )}
-                    <span className="text-[11px] font-semibold text-[#2c2418] uppercase">
-                      {teamShort(m.away_team)}
-                    </span>
-                  </div>
-
-                  {/* Kickoff time */}
-                  <span className="text-[10px] text-[#7a7060] flex-shrink-0">
-                    {formatTime(m.kickoff_at)}
-                  </span>
+                      {/* Away team */}
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {m.away_team?.logo_url && (
+                          <img src={m.away_team.logo_url} alt="" className="w-6 h-6 object-contain flex-shrink-0" />
+                        )}
+                        <span className="text-[12px] font-bold text-[#1a3329] truncate" style={{ maxWidth: 80 }}>
+                          {m.away_team?.short_name ?? m.away_team?.short_name?.slice(0, 3).toUpperCase() ?? '?'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
