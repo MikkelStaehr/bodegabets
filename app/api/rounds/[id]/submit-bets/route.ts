@@ -121,18 +121,37 @@ export async function POST(req: NextRequest, { params }: Props) {
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
   // Opdater round_members.betting_balance = 1000 - alle aktive bets i runden
-  const { data: allRoundBets } = await supabaseAdmin
+  const { data: allRoundBets, error: betsQueryError } = await supabaseAdmin
     .from('bets')
     .select('stake')
     .eq('user_id', user.id)
     .eq('round_id', roundId)
-  const totalStake = (allRoundBets ?? []).reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  await supabaseAdmin
-    .from('round_members')
-    .update({ betting_balance: 1000 - totalStake })
-    .eq('user_id', user.id)
-    .eq('round_id', roundId)
     .eq('game_id', bodyGameId)
+
+  if (betsQueryError) {
+    console.error('[submit-bets] Fejl ved hentning af bets for balance:', betsQueryError.message)
+  }
+
+  const totalStake = (allRoundBets ?? []).reduce((sum, b) => sum + (b.stake ?? 0), 0)
+  const newBalance = 1000 - totalStake
+
+  const { error: balanceError, count } = await supabaseAdmin
+    .from('round_members')
+    .upsert(
+      {
+        user_id: user.id,
+        round_id: roundId,
+        game_id: bodyGameId,
+        betting_balance: newBalance,
+      },
+      { onConflict: 'user_id,round_id,game_id' }
+    )
+
+  if (balanceError) {
+    console.error('[submit-bets] Fejl ved betting_balance upsert:', balanceError.message)
+  } else {
+    console.log(`[submit-bets] betting_balance sat til ${newBalance} for user=${user.id.slice(0, 8)}, round=${roundId}, game=${bodyGameId}`)
+  }
 
   return NextResponse.json({ ok: true, bets_submitted: rows.length })
 }
