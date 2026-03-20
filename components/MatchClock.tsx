@@ -6,15 +6,21 @@ type Props = {
   kickoff: string
   status: 'live' | 'halftime' | 'finished' | 'scheduled'
   secondHalfStartedAt?: string | null
+  currentMinute?: number | null
 }
 
-export default function MatchClock({ kickoff, status, secondHalfStartedAt }: Props) {
+export default function MatchClock({ kickoff, status, secondHalfStartedAt, currentMinute }: Props) {
   const [display, setDisplay] = useState('')
 
   useEffect(() => {
     if (status === 'finished') { setDisplay('FT'); return }
     if (status === 'scheduled') { setDisplay(''); return }
     if (status === 'halftime') { setDisplay('HT'); return }
+
+    if (typeof currentMinute === 'number') {
+      setDisplay(`${currentMinute}'`)
+      return
+    }
 
     const tick = () => {
       const now = Date.now()
@@ -50,7 +56,7 @@ export default function MatchClock({ kickoff, status, secondHalfStartedAt }: Pro
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [kickoff, status, secondHalfStartedAt])
+  }, [kickoff, status, secondHalfStartedAt, currentMinute])
 
   if (!display) return null
 
