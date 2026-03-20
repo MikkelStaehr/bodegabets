@@ -57,11 +57,15 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-cream">
 
-      {/* ── 1. Ticker bar ──────────────────────────────────────── */}
-      {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
+      {/* ── 1. Ticker + Hero wrapper (pulls up behind sticky navbar) ── */}
+      <div className="-mt-14 bg-forest">
+        {/* ── 1. Ticker bar ──────────────────────────────────────── */}
+        <div className="pt-14">
+          {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
+        </div>
 
-      {/* ── 2. Hero ────────────────────────────────────────────── */}
-      <header className="bg-forest relative overflow-hidden" style={{ minHeight: '100vh' }}>
+        {/* ── 2. Hero ────────────────────────────────────────────── */}
+        <header className="relative overflow-hidden" style={{ minHeight: '100vh' }}>
         <div className="max-w-6xl mx-auto px-6 lg:px-8 flex items-center" style={{ minHeight: '100vh' }}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center w-full py-20">
 
@@ -217,7 +221,8 @@ export default async function HomePage() {
             </div>
           </div>
         </div>
-      </header>
+        </header>
+      </div>
 
       {/* ── 3. Sådan virker det ─────────────────────────────────── */}
       <section className="bg-cream">

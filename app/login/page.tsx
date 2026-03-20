@@ -60,11 +60,11 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
             <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}>
-              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '28px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
-              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '14px', color: '#2C4A3E' }}>odega</span>
-              <span style={{ display: 'inline-block', width: '4px' }} />
-              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '28px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
-              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '14px', color: '#2C4A3E' }}>ets</span>
+              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '40px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
+              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '20px', color: '#2C4A3E' }}>odega</span>
+              <span style={{ display: 'inline-block', width: '5px' }} />
+              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '40px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
+              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '20px', color: '#2C4A3E' }}>ets</span>
             </span>
           </Link>
         </div>
@@ -118,6 +118,16 @@ export default function LoginPage() {
               className={inputClass}
             />
           </div>
+
+          {/* Husk mig */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4 accent-[#2C4A3E] rounded-sm cursor-pointer"
+              defaultChecked
+            />
+            <span className="font-body text-sm" style={{ color: '#5C5C4A' }}>Husk mig</span>
+          </label>
 
           {/* Error */}
           {error && (

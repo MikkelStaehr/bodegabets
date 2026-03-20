@@ -21,7 +21,7 @@ export default function Navbar({ username, isAdmin, backHref, backLabel, gameId,
   const liveCount = summary.live + summary.halftime
 
   return (
-    <nav data-navbar="" className="transition-colors duration-300 px-4 py-0">
+    <nav data-navbar="" className="sticky top-0 z-50 transition-colors duration-300 px-4 py-0">
       <div className="max-w-5xl mx-auto h-14 flex items-center justify-between gap-4">
 
         {/* Venstre: evt. tilbage-pil + logo */}
