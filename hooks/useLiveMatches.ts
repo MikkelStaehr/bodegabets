@@ -15,6 +15,7 @@ export type LiveMatch = {
   second_half_started_at?: string | null
   home_team_logo: string | null
   away_team_logo: string | null
+  current_minute?: number | null
   tournamentLogo?: string | null
   userPrediction?: string | null
 }

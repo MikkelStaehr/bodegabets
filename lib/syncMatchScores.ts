@@ -101,7 +101,7 @@ export async function syncMatchScores(options?: {
     return { updated, errors }
   }
 
-  const boldMatchMap = new Map<number, { home_score: number; away_score: number; status: string }>()
+  const boldMatchMap = new Map<number, { home_score: number; away_score: number; status: string; time?: number }>()
   let rawBoldResponse: unknown = null
 
   try {
@@ -126,7 +126,7 @@ export async function syncMatchScores(options?: {
     rawBoldResponse = data
     const matchesRaw = Array.isArray(data) ? data : ((data as { matches?: unknown[] }).matches ?? (data as { data?: unknown[] }).data ?? [])
 
-    for (const m of (matchesRaw ?? []) as Array<{ match?: { id: number; status_type: string; paused?: boolean; home_team?: { score: number }; away_team?: { score: number } } }>) {
+    for (const m of (matchesRaw ?? []) as Array<{ match?: { id: number; status_type: string; paused?: boolean; home_team?: { score: number }; away_team?: { score: number }; time?: number; estimatedTime?: boolean } }>) {
       const match = m.match
       if (!match || !boldMatchIds.has(match.id)) continue
 
@@ -142,6 +142,7 @@ export async function syncMatchScores(options?: {
         home_score: match.home_team?.score ?? 0,
         away_score: match.away_team?.score ?? 0,
         status,
+        time: match.time,
       })
     }
   } catch (e) {
@@ -187,6 +188,7 @@ export async function syncMatchScores(options?: {
       away_score: boldData.away_score,
       status,
       result,
+      current_minute: typeof boldData.time === 'number' ? boldData.time : null,
       updated_at: new Date().toISOString(),
     }
 
