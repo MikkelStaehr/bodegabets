@@ -183,12 +183,19 @@ export async function syncMatchScores(options?: {
       .eq('id', match.id)
       .single()
 
+    // Ekstra bet resultater — opdateres live
+    const h = boldData.home_score
+    const a = boldData.away_score
+
     const updates: Record<string, unknown> = {
-      home_score: boldData.home_score,
-      away_score: boldData.away_score,
+      home_score: h,
+      away_score: a,
       status,
       result,
       current_minute: typeof boldData.time === 'number' ? boldData.time : null,
+      goals_3plus_result: h >= 3 ? '1' : a >= 3 ? '2' : null,
+      clean_sheet_result: a === 0 && h > 0 ? '1' : h === 0 && a > 0 ? '2' : null,
+      win_margin_result: h - a >= 2 ? '1' : a - h >= 2 ? '2' : null,
       updated_at: new Date().toISOString(),
     }
 
