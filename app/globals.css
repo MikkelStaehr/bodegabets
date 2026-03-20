@@ -47,10 +47,11 @@
 [data-navbar] {
   background: #1a3329;
   border-bottom: 1px solid rgba(255,255,255,0.08);
+  transition: background 300ms, border-color 300ms;
 }
 
 [data-navbar][data-transparent] {
-  background: transparent;
+  background: transparent !important;
   border-bottom: 1px solid transparent;
 }
 
