@@ -10,7 +10,7 @@ import GameTicker from '@/components/GameTicker'
 
 type MatchWithOptions = Match
 
-type ExtraBetType = 'btts' | 'over_under' | 'halvleg' | 'malforskel'
+type ExtraBetType = 'goals_3plus' | 'clean_sheet' | 'win_margin'
 
 type ExtraBet = {
   type: ExtraBetType
@@ -29,37 +29,27 @@ type BetEntry = {
 
 const EXTRA_BET_ROWS = [
   {
-    key: 'over_under' as const,
-    label: 'Over/under',
+    key: 'goals_3plus' as const,
+    label: 'Scorer 3+ mål',
     opts: [
-      { label: 'Over 2.5', value: 'over' },
-      { label: 'Under 2.5', value: 'under' },
+      { label: 'Hjemme', value: '1' },
+      { label: 'Ude', value: '2' },
     ],
   },
   {
-    key: 'halvleg' as const,
-    label: 'Halvleg',
+    key: 'clean_sheet' as const,
+    label: 'Clean sheet',
     opts: [
-      { label: '1. HV', value: 'h1' },
-      { label: '2. HV', value: 'h2' },
-      { label: 'Lige', value: 'draw' },
+      { label: 'Hjemme', value: '1' },
+      { label: 'Ude', value: '2' },
     ],
   },
   {
-    key: 'malforskel' as const,
-    label: 'Målforskel',
+    key: 'win_margin' as const,
+    label: 'Vinder med 2+',
     opts: [
-      { label: '2+', value: '2plus' },
-      { label: '1 mål', value: '1goal' },
-      { label: 'Uafgjort', value: 'udraw' },
-    ],
-  },
-  {
-    key: 'btts' as const,
-    label: 'Begge scorer',
-    opts: [
-      { label: 'Ja', value: 'yes' },
-      { label: 'Nej', value: 'no' },
+      { label: 'Hjemme', value: '1' },
+      { label: 'Ude', value: '2' },
     ],
   },
 ] as const
@@ -70,7 +60,7 @@ function getExtraBetLabel(type: ExtraBetType, value: string): string {
   return opt?.label ?? value
 }
 
-const EXTRA_BET_TYPES: ExtraBetType[] = ['btts', 'over_under', 'halvleg', 'malforskel']
+const EXTRA_BET_TYPES: ExtraBetType[] = ['goals_3plus', 'clean_sheet', 'win_margin']
 
 type RivalryInfo = { rivalry_name: string; multiplier: number }
 
@@ -689,7 +679,7 @@ export default function AfgivBets({
         } else if (existing) {
           next = s.extraBets.map((eb) => (eb.type === key ? { ...eb, prediction: value } : eb))
         } else {
-          next = [...s.extraBets, { type: key, prediction: value, points: s.points }]
+          next = [...s.extraBets, { type: key, prediction: value, points: 50 }]
         }
         return { ...s, extraBets: next }
       })
@@ -711,10 +701,10 @@ export default function AfgivBets({
       .filter(
         (b) =>
           b.match_id === matchId &&
-          (EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType) || b.bet_type === 'halftime')
+          EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType)
       )
       .map((b) => ({
-        type: (b.bet_type === 'halftime' ? 'halvleg' : b.bet_type) as ExtraBetType,
+        type: b.bet_type as ExtraBetType,
         prediction: b.prediction,
         points: b.stake,
       }))
