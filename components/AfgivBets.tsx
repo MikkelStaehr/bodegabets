@@ -642,18 +642,21 @@ export default function AfgivBets({
   )
 
   const totalMatches = matches.length
-  const totalPoints = selections.reduce((sum, s) => {
-    if (s.isReplacement) {
-      const oldStake = existingBets.find(
-        (b) => b.match_id === s.matchId && b.bet_type === 'match_result'
-      )?.stake ?? 0
-      return sum + Math.max(0, s.points - oldStake)
-    }
-    const main = s.points
-    const extra = s.extraBets.reduce((es, eb) => es + eb.points, 0)
-    return sum + main + extra
-  }, 0)
-  const displayCredits = userPoints - totalPoints
+  const totalPoints = useMemo(() => {
+    // Eksisterende bets for kampe der IKKE er i aktive selections
+    const existingStake = existingBets
+      .filter((b) => !selections.some((s) => s.matchId === b.match_id))
+      .reduce((sum, b) => sum + (b.stake ?? 0), 0)
+
+    // Stake fra aktive selections (nye + ændrede) inkl. ekstra bets
+    const newStake = selections.reduce((sum, s) => {
+      const extraStake = s.extraBets.reduce((es, eb) => es + eb.points, 0)
+      return sum + s.points + extraStake
+    }, 0)
+
+    return existingStake + newStake
+  }, [selections, existingBets])
+  const displayCredits = 1000 - totalPoints
   const isOverBudget = displayCredits < 0
 
   const getSelection = (matchId: number) => selections.find((s) => s.matchId === matchId)
