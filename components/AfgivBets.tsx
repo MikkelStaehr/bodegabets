@@ -32,24 +32,24 @@ const EXTRA_BET_ROWS = [
     key: 'goals_3plus' as const,
     label: 'Scorer 3+ mål',
     opts: [
-      { label: 'Hjemme', value: '1' },
-      { label: 'Ude', value: '2' },
+      { label: '1', value: '1' },
+      { label: '2', value: '2' },
     ],
   },
   {
     key: 'clean_sheet' as const,
     label: 'Clean sheet',
     opts: [
-      { label: 'Hjemme', value: '1' },
-      { label: 'Ude', value: '2' },
+      { label: '1', value: '1' },
+      { label: '2', value: '2' },
     ],
   },
   {
     key: 'win_margin' as const,
     label: 'Vinder med 2+',
     opts: [
-      { label: 'Hjemme', value: '1' },
-      { label: 'Ude', value: '2' },
+      { label: '1', value: '1' },
+      { label: '2', value: '2' },
     ],
   },
 ] as const
