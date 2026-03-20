@@ -494,35 +494,6 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── Footer ───────────────────────────────────────────── */}
-      <footer style={{ background: '#0d1f18' }}>
-        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex flex-col items-center md:items-start gap-1">
-              <span className="font-display italic text-cream text-xl" style={{ fontWeight: 700 }}>
-                Bodega Bets
-              </span>
-              <span className="font-body text-cream/30 text-xs">
-                Spil med vennerne. Ingen rigtige penge.
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-6">
-              <Link href="/privatlivspolitik" className="font-body text-cream/40 text-xs hover:text-cream/70 transition-colors">
-                Privatlivspolitik
-              </Link>
-              <Link href="/cookie-politik" className="font-body text-cream/40 text-xs hover:text-cream/70 transition-colors">
-                Cookie politik
-              </Link>
-              <Link href="/vilkaar" className="font-body text-cream/40 text-xs hover:text-cream/70 transition-colors">
-                Vilkår og betingelser
-              </Link>
-            </div>
-            <span className="font-body text-cream/20 text-xs">
-              © {new Date().getFullYear()} Bodega Bets
-            </span>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

@@ -30,6 +30,19 @@ export default function Footer() {
           </p>
 
         </div>
+
+        {/* Juridiske links */}
+        <div className="flex flex-wrap items-center justify-center gap-4 mt-2">
+          <Link href="/privatlivspolitik" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
+            Privatlivspolitik
+          </Link>
+          <Link href="/cookie-politik" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
+            Cookie politik
+          </Link>
+          <Link href="/vilkaar" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
+            Vilkår og betingelser
+          </Link>
+        </div>
       </div>
     </footer>
   )
