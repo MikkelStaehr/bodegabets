@@ -353,6 +353,14 @@ export async function syncMatchScores(options?: {
 
       if (count && count > 0) continue
 
+      // Skip runder uden bets — ingen grund til at beregne points
+      const { count: betCount } = await supabaseAdmin
+        .from('bets')
+        .select('id', { count: 'exact', head: true })
+        .eq('round_id', catchupRoundId)
+
+      if (!betCount || betCount === 0) continue
+
       try {
         console.log(`[syncMatchScores] Catch-up: calculateRoundPoints(${catchupRoundId})`)
         await calculateRoundPoints(catchupRoundId)
