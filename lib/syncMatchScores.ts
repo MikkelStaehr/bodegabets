@@ -81,6 +81,8 @@ export async function syncMatchScores(options?: {
     }
   }
 
+  console.log(`[syncMatchScores] activeMatches: ${activeMatches.length} kampe`, activeMatches.map(m => m.bold_match_id))
+
   if (!activeMatches.length) {
     console.log('[syncMatchScores] Ingen aktive kampe lige nu')
     return { updated, errors }
@@ -149,6 +151,8 @@ export async function syncMatchScores(options?: {
     errors.push(`Bold API fejl: ${e}`)
     return { updated, errors }
   }
+
+  console.log(`[syncMatchScores] boldMatchMap size: ${boldMatchMap.size}`, [...boldMatchMap.keys()])
 
   const matchesStatus = (s: string) =>
     s === 'finished' ? 'finished' : s === 'halftime' ? 'halftime' : 'live'
