@@ -330,7 +330,11 @@ export default async function GamePage({ params }: Props) {
   const openRounds = sortedRounds.filter((r) => r.bet_open === true)
 
   const userBetsByRound: Record<number, number> = {}
+  const seenMatchIds = new Set<number>()
+
   for (const b of allUserBets ?? []) {
+    if (seenMatchIds.has(b.match_id)) continue
+    seenMatchIds.add(b.match_id)
     const roundId = matchRoundMap.get(b.match_id)
     if (roundId != null) {
       userBetsByRound[roundId] = (userBetsByRound[roundId] ?? 0) + 1
