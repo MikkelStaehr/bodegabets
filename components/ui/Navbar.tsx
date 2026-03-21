@@ -63,7 +63,7 @@ export default function Navbar({ username, isAdmin, backHref, backLabel, gameId,
               </svg>
             </Link>
           )}
-          <Link href="/" className="flex items-center" aria-label="Bodega Bets">
+          <Link href={clientUsername ? '/dashboard' : '/'} className="flex items-center" aria-label="Bodega Bets">
             <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}>
               <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '32px', color: '#F2EDE4', marginRight: '-4px' }}>B</span>
               <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '16px', color: '#F2EDE4' }}>odega</span>
