@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
@@ -43,15 +43,9 @@ export default function ProfileEditPage() {
   /* ── Form state ────────────────────────────────────────── */
   const [username, setUsername] = useState('')
   const [originalUsername, setOriginalUsername] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-
-  /* ── Avatar state ──────────────────────────────────────── */
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   /* ── Password state ────────────────────────────────────── */
   const [currentPassword, setCurrentPassword] = useState('')
@@ -75,15 +69,13 @@ export default function ProfileEditPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('username, avatar_url')
+        .select('username')
         .eq('id', user.id)
         .single()
 
       if (profile) {
         setUsername(profile.username ?? '')
         setOriginalUsername(profile.username ?? '')
-        setAvatarUrl(profile.avatar_url ?? null)
-        setAvatarPreview(profile.avatar_url ?? null)
       }
       setPageLoading(false)
 
@@ -125,20 +117,6 @@ export default function ProfileEditPage() {
       })
     return () => { cancelled = true }
   }, [debouncedUsername, usernameChanged])
-
-  /* ── Avatar handling ───────────────────────────────────── */
-  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Billedet må maks. være 2MB')
-      return
-    }
-    setAvatarFile(file)
-    const reader = new FileReader()
-    reader.onload = (ev) => setAvatarPreview(ev.target?.result as string)
-    reader.readAsDataURL(file)
-  }
 
   /* ── Push notification toggle ─────────────────────────── */
   async function handlePushToggle() {
@@ -215,32 +193,11 @@ export default function ProfileEditPage() {
 
     setSaving(true)
 
-    // Upload avatar if changed
-    let newAvatarUrl = avatarUrl
-    if (avatarFile) {
-      const ext = avatarFile.name.split('.').pop()
-      const filePath = `${userId}.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile, { upsert: true })
-
-      if (uploadError) {
-        setSaving(false)
-        return setError('Kunne ikke uploade billede: ' + uploadError.message)
-      }
-
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
-      if (urlData?.publicUrl) {
-        newAvatarUrl = urlData.publicUrl
-      }
-    }
-
     // Update profile
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
         username: trimmedUsername,
-        avatar_url: newAvatarUrl,
       })
       .eq('id', userId)
 
@@ -271,7 +228,6 @@ export default function ProfileEditPage() {
 
     setSaving(false)
     setOriginalUsername(trimmedUsername)
-    setAvatarFile(null)
     setCurrentPassword('')
     setNewPassword('')
     toast('Profil opdateret ✓', 'success')
@@ -327,40 +283,6 @@ export default function ProfileEditPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* ── Avatar upload ──────────────────────────────── */}
-          <div
-            className="flex items-center gap-4 p-4 rounded-sm border-[1.5px] border-dashed border-[#D4CFC4] bg-[#EDE8DF] cursor-pointer hover:border-[#B8963E] transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div
-              className="shrink-0 w-16 h-16 rounded-full flex items-center justify-center overflow-hidden"
-              style={{ background: '#2C4A3E' }}
-            >
-              {avatarPreview ? (
-                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <span className="font-condensed text-cream text-lg" style={{ fontWeight: 700 }}>
-                  {initials}
-                </span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="font-condensed text-ink text-xs uppercase tracking-[0.08em] mb-0.5" style={{ fontWeight: 700 }}>
-                Profilbillede
-              </p>
-              <p className="font-body text-warm-gray text-xs">
-                Klik for at ændre · JPG/PNG · Maks 2MB
-              </p>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarChange}
-            />
-          </div>
 
           {/* ── Brugernavn ─────────────────────────────────── */}
           <div>
