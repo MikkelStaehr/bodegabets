@@ -59,7 +59,10 @@ export default function ProfileEditPage() {
   /* ── Load profile data ─────────────────────────────────── */
   useEffect(() => {
     async function loadProfile() {
-      const { data: { user } } = await supabase.auth.getUser()
+      console.log('[profile] loadProfile start')
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      console.log('[profile] user:', user?.id, 'authError:', authError)
+
       if (!user) {
         router.push('/login')
         return
@@ -67,16 +70,20 @@ export default function ProfileEditPage() {
       setUserId(user.id)
       setUserEmail(user.email ?? '')
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('username')
         .eq('id', user.id)
         .single()
 
+      console.log('[profile] profile:', profile, 'profileError:', profileError)
+
       if (profile) {
         setUsername(profile.username ?? '')
         setOriginalUsername(profile.username ?? '')
       }
+
+      console.log('[profile] setting pageLoading false')
       setPageLoading(false)
 
       // Check push subscription status
