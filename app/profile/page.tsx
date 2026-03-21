@@ -41,8 +41,6 @@ export default function ProfileEditPage() {
   const [userEmail, setUserEmail] = useState('')
 
   /* ── Form state ────────────────────────────────────────── */
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
   const [username, setUsername] = useState('')
   const [originalUsername, setOriginalUsername] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -77,7 +75,7 @@ export default function ProfileEditPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('username, full_name, avatar_url')
+        .select('username, avatar_url')
         .eq('id', user.id)
         .single()
 
@@ -86,15 +84,6 @@ export default function ProfileEditPage() {
         setOriginalUsername(profile.username ?? '')
         setAvatarUrl(profile.avatar_url ?? null)
         setAvatarPreview(profile.avatar_url ?? null)
-
-        const fullName = (profile.full_name as string) ?? ''
-        const parts = fullName.split(' ')
-        if (parts.length >= 2) {
-          setFirstName(parts[0])
-          setLastName(parts.slice(1).join(' '))
-        } else if (parts.length === 1) {
-          setFirstName(parts[0])
-        }
       }
       setPageLoading(false)
 
@@ -204,9 +193,7 @@ export default function ProfileEditPage() {
   }
 
   /* ── Initials ──────────────────────────────────────────── */
-  const initials =
-    [firstName[0], lastName[0]].filter(Boolean).map((c) => c.toUpperCase()).join('') ||
-    (username[0]?.toUpperCase() ?? '?')
+  const initials = username[0]?.toUpperCase() ?? '?'
 
   /* ── Password strength ─────────────────────────────────── */
   const strength = getPasswordStrength(newPassword)
@@ -249,12 +236,10 @@ export default function ProfileEditPage() {
     }
 
     // Update profile
-    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ')
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
         username: trimmedUsername,
-        full_name: fullName || null,
         avatar_url: newAvatarUrl,
       })
       .eq('id', userId)
@@ -375,36 +360,6 @@ export default function ProfileEditPage() {
               className="hidden"
               onChange={handleAvatarChange}
             />
-          </div>
-
-          {/* ── Fornavn + Efternavn ────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
-                Fornavn
-              </label>
-              <input
-                type="text"
-                placeholder="Anders"
-                autoComplete="given-name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-ink mb-1.5" style={{ fontWeight: 600 }}>
-                Efternavn
-              </label>
-              <input
-                type="text"
-                placeholder="Jensen"
-                autoComplete="family-name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className={inputClass}
-              />
-            </div>
           </div>
 
           {/* ── Brugernavn ─────────────────────────────────── */}
