@@ -107,10 +107,8 @@ export async function syncMatchScores(options?: {
   let rawBoldResponse: unknown = null
 
   try {
-    const url = `${BOLD_MATCHES_API}?phase_ids=${phaseIds.join(',')}&page=1&limit=1000&offset=0`
-    console.log(`[syncMatchScores] Bold API URL: ${url}`)
+    const url = `${BOLD_MATCHES_API}?phase_ids=${phaseIds.join(',')}&page=1&limit=1000&offset=0&include_live=true`
     const res = await fetch(url, { headers: BOLD_HEADERS, cache: 'no-store' })
-    console.log(`[syncMatchScores] Bold API status: ${res.status} ${res.statusText}`)
 
     if (!res.ok) {
       errors.push(`Bold API fejl: ${res.status} ${res.statusText}`)
@@ -121,7 +119,6 @@ export async function syncMatchScores(options?: {
     let data: { matches?: unknown[] }
     try {
       text = await res.text()
-      console.log(`[syncMatchScores] Bold API response preview: ${text.slice(0, 500)}`)
       data = JSON.parse(text) as { matches?: unknown[] }
     } catch (err) {
       errors.push(`Bold API JSON fejl: ${String(err)} — response: ${text?.slice(0, 500)}`)
