@@ -11,6 +11,7 @@
  *   GET /update-bet-open   — dagligt 07:05 (åbn betting for næste runder)
  *   GET /calculate-points  — dagligt 09:00 (beregn points)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
+ *   GET /batch-sync        — hver 3. time (opdater alle kampe på tværs af ligaer)
  *   GET /health            — health check
  *
  * Environment:
@@ -81,6 +82,38 @@ app.get('/sync-scores', async (_req, res) => {
       message: `sync-scores failed: ${String(e)}`,
     })
     res.status(500).json({ ok: false, error: String(e) })
+  }
+})
+
+// ─── GET /batch-sync ────────────────────────────────────────────────────────
+// Opdaterer alle kampe med passeret kickoff på tværs af alle ligaer
+// Kører hver 3. time via cron
+
+app.get('/batch-sync', async (_req, res) => {
+  try {
+    const results = await runLeagueSync()
+
+    const totals = results.reduce(
+      (acc, r) => ({
+        synced: acc.synced + r.synced,
+        rounds_created: acc.rounds_created + r.rounds_created,
+        matches_created: acc.matches_created + r.matches_created,
+        matches_updated: acc.matches_updated + r.matches_updated,
+      }),
+      { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0 }
+    )
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cron_sync',
+      status: 'success',
+      message: `batch-sync: ${results.length} leagues, ${totals.matches_updated} updated`,
+      metadata: { leagues_synced: results.length, ...totals },
+    })
+
+    res.json({ ok: true, ...totals })
+  } catch (err) {
+    console.error('[batch-sync]', err)
+    res.status(500).json({ error: String(err) })
   }
 })
 
@@ -544,31 +577,47 @@ app.listen(PORT, () => {
       const now = new Date()
       const soon = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
 
-      // Tjek om der er live kampe
+      // Hent kun round_ids fra aktive spil
+      const { data: activeGameSeasons } = await supabaseAdmin
+        .from('game_seasons')
+        .select('season_id, games!inner(status)')
+        .eq('games.status', 'active')
+
+      const activeSeasonIds = [...new Set((activeGameSeasons ?? []).map(gs => gs.season_id as number))]
+
+      const { data: activeRounds } = await supabaseAdmin
+        .from('rounds')
+        .select('id')
+        .in('season_id', activeSeasonIds.length > 0 ? activeSeasonIds : [0])
+
+      const activeRoundIds = (activeRounds ?? []).map(r => r.id as number)
+      if (activeRoundIds.length === 0) return
+
+      // Tjek om der er live kampe i aktive spil
       const { data: liveMatches } = await supabaseAdmin
         .from('matches')
         .select('id')
         .in('status', ['live', 'halftime'])
+        .in('round_id', activeRoundIds)
         .limit(1)
 
-      // Tjek om der er kampe der starter inden for 30 min
+      // Tjek om der er kampe der starter inden for 30 min i aktive spil
       const { data: soonMatches } = await supabaseAdmin
         .from('matches')
         .select('id')
         .eq('status', 'scheduled')
         .lte('kickoff', soon)
         .gte('kickoff', now.toISOString())
+        .in('round_id', activeRoundIds)
         .limit(1)
 
       const hasLive = (liveMatches?.length ?? 0) > 0
       const hasSoon = (soonMatches?.length ?? 0) > 0
 
       if (hasLive || hasSoon) {
-        // Live kampe eller kamp starter snart → sync hvert minut
         console.log(`[cron] Dynamic sync — live: ${hasLive}, soon: ${hasSoon}`)
         await callEndpoint('/sync-scores')
       } else {
-        // Ingen live kampe → sync kun hvert 5. minut
         const minute = now.getMinutes()
         if (minute % 5 === 0) {
           await callEndpoint('/sync-scores')
@@ -581,6 +630,9 @@ app.listen(PORT, () => {
 
   // Dagligt kl. 06:00 UTC — sync fixtures
   cron.schedule('0 6 * * *', () => callEndpoint('/sync-fixtures'))
+
+  // Hver 3. time — batch sync af alle kampe
+  cron.schedule('0 */3 * * *', () => callEndpoint('/batch-sync'))
 
   // Dagligt kl. 07:00 UTC — update rounds
   cron.schedule('0 7 * * *', () => callEndpoint('/update-rounds'))
