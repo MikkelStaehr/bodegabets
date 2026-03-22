@@ -18,12 +18,13 @@ export async function POST(req: NextRequest) {
   const { endpoint } = await req.json()
   const railwayUrl = process.env.RAILWAY_URL ?? 'https://bodegabets-production.up.railway.app'
 
-  const res = await fetch(`${railwayUrl}/${endpoint}`, {
+  // Send kaldet til Railway men vent ikke på svar
+  fetch(`${railwayUrl}/${endpoint}`, {
     headers: {
       Authorization: `Bearer ${process.env.CRON_SECRET}`,
     },
-  })
+  }).catch(() => {}) // ignorer fejl — Railway logger dem selv
 
-  const data = await res.json()
-  return NextResponse.json(data)
+  // Returner med det samme
+  return NextResponse.json({ ok: true, message: 'Job startet på Railway — tjek Railway logs for status' })
 }
