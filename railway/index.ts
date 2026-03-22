@@ -611,11 +611,21 @@ app.listen(PORT, () => {
         .in('round_id', activeRoundIds)
         .limit(1)
 
+      // Tjek om der er kampe der er scheduled men kickoff er passeret (bør være live)
+      const { data: startedMatches } = await supabaseAdmin
+        .from('matches')
+        .select('id')
+        .eq('status', 'scheduled')
+        .lt('kickoff', now.toISOString())
+        .in('round_id', activeRoundIds)
+        .limit(1)
+
       const hasLive = (liveMatches?.length ?? 0) > 0
       const hasSoon = (soonMatches?.length ?? 0) > 0
+      const hasStarted = (startedMatches?.length ?? 0) > 0
 
-      if (hasLive || hasSoon) {
-        console.log(`[cron] Dynamic sync — live: ${hasLive}, soon: ${hasSoon}`)
+      if (hasLive || hasSoon || hasStarted) {
+        console.log(`[cron] Dynamic sync — live: ${hasLive}, soon: ${hasSoon}, started: ${hasStarted}`)
         await callEndpoint('/sync-scores')
       } else {
         const minute = now.getMinutes()
