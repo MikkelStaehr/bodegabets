@@ -436,7 +436,19 @@ export default async function GamePage({ params }: Props) {
     const played = finishedRounds.filter((r) => (scoreMap[entry.user_id]?.[r.id] ?? null) !== null).length
     const losses = played - wins
     const hasActiveBet = placedBetIds.has(entry.user_id)
-    return { ...entry, wins, losses, played, hasActiveBet }
+
+    // Form — sidste 5 runder: 'W' | 'L' | null
+    const form = finishedRounds.slice(-5).map((r) => {
+      const pts = scoreMap[entry.user_id]?.[r.id] ?? null
+      if (pts === null) return null
+      return pts > 0 ? 'W' : 'L'
+    })
+
+    // Pointændring siden sidste runde
+    const lastRound = finishedRounds[finishedRounds.length - 1]
+    const lastRoundPoints = lastRound ? (scoreMap[entry.user_id]?.[lastRound.id] ?? null) : null
+
+    return { ...entry, wins, losses, played, hasActiveBet, form, lastRoundPoints }
   })
 
   return (
@@ -519,25 +531,41 @@ export default async function GamePage({ params }: Props) {
 
           <div style={{ background: '#FDFAF5', border: '1px solid #C8BEA8', borderRadius: 2, overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 36px 36px 36px 52px', padding: '8px 12px', background: '#E8E0D3', borderBottom: '1px solid #C8BEA8', gap: 4, alignItems: 'center' }}>
-              {['#', 'Spiller', 'R', 'V', 'T', 'PT'].map((h, i) => (
-                <span key={h} style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b6b6b', textAlign: i === 1 ? 'left' : 'center' }} title={i === 2 ? 'Runder spillet' : i === 3 ? 'Vundne runder' : i === 4 ? 'Tabte runder' : undefined}>
-                  {h}
-                </span>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr auto 52px', padding: '8px 12px', background: '#E8E0D3', borderBottom: '1px solid #C8BEA8', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b6b6b', textAlign: 'center' }}>#</span>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b6b6b' }}>Spiller</span>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b6b6b', textAlign: 'center' }}>Form</span>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b6b6b', textAlign: 'right' }}>PT</span>
             </div>
 
             {leaderboardRows.map((entry, idx) => {
               const isMe = entry.user_id === user.id
               const rankColor = entry.rank === 1 ? '#B8963E' : entry.rank === 2 ? '#8A9BA8' : entry.rank === 3 ? '#A0785A' : '#6b6b6b'
+              const isTop3 = entry.rank <= 3
+              const isLast = idx === leaderboardRows.length - 1 && leaderboardRows.length > 3
+
               return (
-                <div key={entry.user_id} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 36px 36px 36px 52px', padding: '10px 12px', borderBottom: idx < leaderboardRows.length - 1 ? '1px solid #E8E0D3' : 'none', gap: 4, alignItems: 'center', background: isMe ? 'rgba(44,74,62,0.05)' : undefined }}>
+                <div
+                  key={entry.user_id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '28px 1fr auto 52px',
+                    padding: '10px 12px',
+                    borderBottom: idx < leaderboardRows.length - 1 ? '1px solid #E8E0D3' : 'none',
+                    gap: 8,
+                    alignItems: 'center',
+                    background: isMe ? 'rgba(44,74,62,0.05)' : undefined,
+                    borderLeft: isTop3 ? '3px solid #2C4A3E' : isLast ? '3px solid #8B2E2E' : '3px solid transparent',
+                  }}
+                >
                   {/* Rank */}
-                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, textAlign: 'center', color: rankColor }}>{entry.rank}</span>
+                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, textAlign: 'center', color: rankColor }}>
+                    {entry.rank}
+                  </span>
 
                   {/* Spiller */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: '50%', background: isMe ? '#3D6B5A' : '#2C4A3E', border: isMe ? '1.5px solid #2C4A3E' : 'none', color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: isMe ? '#3D6B5A' : '#2C4A3E', color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {entry.username.slice(0, 2).toUpperCase()}
                     </div>
                     <div style={{ minWidth: 0 }}>
@@ -555,14 +583,42 @@ export default async function GamePage({ params }: Props) {
                     </div>
                   </div>
 
-                  {/* R */}
-                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 400, textAlign: 'center', color: '#6b6b6b' }}>{entry.played}</span>
-                  {/* V */}
-                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, textAlign: 'center', color: '#2C4A3E' }}>{entry.wins}</span>
-                  {/* T */}
-                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, textAlign: 'center', color: '#8B2E2E' }}>{entry.losses}</span>
-                  {/* PT */}
-                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, textAlign: 'right', color: entry.rank === 1 ? '#B8963E' : '#1a1a1a' }}>{entry.earnings.toLocaleString('da-DK')}</span>
+                  {/* Form — sidste 5 runder */}
+                  <div style={{ display: 'flex', gap: 3, alignItems: 'center', justifyContent: 'center' }}>
+                    {entry.form.map((f, i) => (
+                      <div
+                        key={i}
+                        title={f === 'W' ? 'Vundet' : f === 'L' ? 'Tabt' : 'Ingen bets'}
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: 2,
+                          background: f === 'W' ? '#2C4A3E' : f === 'L' ? '#8B2E2E' : '#E8E0D3',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {f && (
+                          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 8, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
+                            {f}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* PT + pointændring */}
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, color: entry.rank === 1 ? '#B8963E' : '#1a1a1a', lineHeight: 1 }}>
+                      {entry.earnings.toLocaleString('da-DK')}
+                    </div>
+                    {entry.lastRoundPoints !== null && (
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600, color: entry.lastRoundPoints > 0 ? '#2C4A3E' : '#8B2E2E', lineHeight: 1, marginTop: 2 }}>
+                        {entry.lastRoundPoints > 0 ? `+${entry.lastRoundPoints}` : `${entry.lastRoundPoints}`}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -579,7 +635,14 @@ export default async function GamePage({ params }: Props) {
                 {label}
               </div>
             ))}
-            <span style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 300 }}>R = runder · V = vundet · T = tabt · PT = point</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#6b6b6b', fontWeight: 300 }}>
+              <div style={{ display: 'flex', gap: 3 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: '#2C4A3E' }} />
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: '#8B2E2E' }} />
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: '#E8E0D3' }} />
+              </div>
+              W · L · —
+            </div>
           </div>
         </div>
       </div>
