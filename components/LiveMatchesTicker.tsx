@@ -1,7 +1,6 @@
 'use client'
 
 import { LiveMatch, LiveSummary } from '@/hooks/useLiveMatches'
-import MatchClock from '@/components/MatchClock'
 
 function StatusBadge({ status, kickoff }: { status: LiveMatch['status']; kickoff?: string }) {
   if (status === 'live') return (
@@ -121,9 +120,8 @@ function MatchRow({ match }: { match: LiveMatch }) {
           </span>
         </div>
 
-        {/* Status + Clock */}
+        {/* Status */}
         <div className="shrink-0 flex items-center gap-1.5 ml-auto">
-          <MatchClock status={match.status} />
           <StatusBadge status={match.status} kickoff={match.kickoff_at} />
         </div>
 
