@@ -619,10 +619,10 @@ function MatchCard({
               const isHighest = count === Math.max(distribution['1'], distribution['X'], distribution['2'])
               return (
                 <div key={opt} className="flex-1 text-center">
-                  <div className={`font-condensed text-[11px] font-bold ${isHighest ? 'text-[#1a3329]' : 'text-[#9E9486]'}`}>
+                  <div className="font-condensed text-[11px] font-bold text-[#9E9486] uppercase">
                     {opt}
                   </div>
-                  <div className={`font-condensed text-[13px] font-bold ${isHighest ? 'text-[#1a3329]' : 'text-[#9E9486]'}`}>
+                  <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#9E9486]'}`}>
                     {pct}%
                   </div>
                 </div>

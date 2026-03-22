@@ -142,9 +142,12 @@ function MatchRow({ match }: { match: LiveMatch }) {
             const isHighest = count === Math.max(match.distribution!['1'], match.distribution!['X'], match.distribution!['2'])
             return (
               <div key={opt} className="flex-1 text-center">
-                <span className={`font-['Barlow_Condensed'] text-[10px] font-bold ${isHighest ? 'text-[#F2EDE4]' : 'text-[#7a7060]'}`}>
-                  {opt} {pct}%
-                </span>
+                <div className="font-condensed text-[10px] text-[#F2EDE4]/40 font-bold uppercase">
+                  {opt}
+                </div>
+                <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#F2EDE4]/50'}`}>
+                  {pct}%
+                </div>
               </div>
             )
           })}
