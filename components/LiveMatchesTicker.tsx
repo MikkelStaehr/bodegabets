@@ -75,62 +75,81 @@ function MatchRow({ match }: { match: LiveMatch }) {
   const scoreColor = isLive ? 'text-red-500' : isHalftime ? 'text-amber-500' : 'text-[#F2EDE4]'
   const teamColor = isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'
 
+  const showDistribution = match.bet_open === false && match.distribution && match.distribution.total > 0
+
   return (
-    <div
-      className={`flex items-center gap-2 pr-3 py-1.5 rounded-lg ${rowBg}`}
-      style={{ borderLeft: `3px solid ${borderColor}`, paddingLeft: 8 }}
-    >
-      {/* Tournament logo */}
-      {match.tournamentLogo && (
-        <img
-          src={match.tournamentLogo}
-          alt=""
-          className="shrink-0"
-          style={{ width: 16, height: 16, objectFit: 'contain' }}
-        />
-      )}
-
-      {/* Hjemmehold */}
-      <div className="flex items-center gap-1 min-w-0" style={{ width: '35%' }}>
-        {match.home_team_logo && (
-          <img src={match.home_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
+    <div className={`rounded-lg ${rowBg}`} style={{ borderLeft: `3px solid ${borderColor}` }}>
+      <div className="flex items-center gap-2 pr-3 py-1.5" style={{ paddingLeft: 8 }}>
+        {/* Tournament logo */}
+        {match.tournamentLogo && (
+          <img
+            src={match.tournamentLogo}
+            alt=""
+            className="shrink-0"
+            style={{ width: 16, height: 16, objectFit: 'contain' }}
+          />
         )}
-        <span className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold ${teamColor}`}>
-          {match.home_team}
-        </span>
-      </div>
 
-      {/* Score */}
-      <div className="shrink-0 w-10 text-center">
-        {!isScheduled ? (
-          <span className={`font-['Barlow_Condensed'] text-[13px] font-black tabular-nums ${scoreColor}`}>
-            {match.home_score ?? 0}–{match.away_score ?? 0}
+        {/* Hjemmehold */}
+        <div className="flex items-center gap-1 min-w-0" style={{ width: '35%' }}>
+          {match.home_team_logo && (
+            <img src={match.home_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
+          )}
+          <span className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold ${teamColor}`}>
+            {match.home_team}
           </span>
-        ) : (
-          <span className="text-[11px] text-[#7a7060]">vs</span>
-        )}
+        </div>
+
+        {/* Score */}
+        <div className="shrink-0 w-10 text-center">
+          {!isScheduled ? (
+            <span className={`font-['Barlow_Condensed'] text-[13px] font-black tabular-nums ${scoreColor}`}>
+              {match.home_score ?? 0}–{match.away_score ?? 0}
+            </span>
+          ) : (
+            <span className="text-[11px] text-[#7a7060]">vs</span>
+          )}
+        </div>
+
+        {/* Udehold */}
+        <div className="flex items-center gap-1 min-w-0" style={{ width: '35%' }}>
+          {match.away_team_logo && (
+            <img src={match.away_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
+          )}
+          <span className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold ${teamColor}`}>
+            {match.away_team}
+          </span>
+        </div>
+
+        {/* Status + Clock */}
+        <div className="shrink-0 flex items-center gap-1.5 ml-auto">
+          <MatchClock status={match.status} />
+          <StatusBadge status={match.status} kickoff={match.kickoff_at} />
+        </div>
+
+        {/* Bet badge */}
+        <div className="shrink-0 w-6 flex items-center justify-center">
+          <BetBadge match={match} />
+        </div>
       </div>
 
-      {/* Udehold */}
-      <div className="flex items-center gap-1 min-w-0" style={{ width: '35%' }}>
-        {match.away_team_logo && (
-          <img src={match.away_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
-        )}
-        <span className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold ${teamColor}`}>
-          {match.away_team}
-        </span>
-      </div>
-
-      {/* Status + Clock */}
-      <div className="shrink-0 flex items-center gap-1.5 ml-auto">
-        <MatchClock status={match.status} />
-        <StatusBadge status={match.status} kickoff={match.kickoff_at} />
-      </div>
-
-      {/* Bet badge */}
-      <div className="shrink-0 w-6 flex items-center justify-center">
-        <BetBadge match={match} />
-      </div>
+      {/* Bet fordeling — kun på låste kampe */}
+      {showDistribution && (
+        <div className="flex gap-1 items-center px-3 pb-1.5 border-t border-white/[0.06]">
+          {(['1', 'X', '2'] as const).map((opt) => {
+            const count = match.distribution![opt] ?? 0
+            const pct = match.distribution!.total > 0 ? Math.round((count / match.distribution!.total) * 100) : 0
+            const isHighest = count === Math.max(match.distribution!['1'], match.distribution!['X'], match.distribution!['2'])
+            return (
+              <div key={opt} className="flex-1 text-center">
+                <span className={`font-['Barlow_Condensed'] text-[10px] font-bold ${isHighest ? 'text-[#F2EDE4]' : 'text-[#7a7060]'}`}>
+                  {opt} {pct}%
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

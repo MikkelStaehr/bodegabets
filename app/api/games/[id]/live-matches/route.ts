@@ -68,7 +68,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent ALLE kampe for åbne runder via round_id (uanset kamp status/dato, undtagen cancelled)
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
-    .select(`id, round_id, round_name, kickoff_at:kickoff, status, result, second_half_started_at,
+    .select(`id, round_id, round_name, kickoff_at:kickoff, status, result, second_half_started_at, bet_open,
       home_score, away_score, home_score_ht, away_score_ht,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
@@ -93,6 +93,30 @@ export async function GET(req: NextRequest, { params }: Props) {
     betMap.set(b.match_id, b.prediction)
   }
 
+  // Hent bet-fordeling for låste kampe
+  const lockedMatchIds = (roundMatches ?? []).filter(m => (m as Record<string, unknown>).bet_open === false).map(m => m.id)
+
+  let betDistribution: Record<number, { '1': number; 'X': number; '2': number; total: number }> = {}
+
+  if (lockedMatchIds.length > 0) {
+    const { data: allBets } = await supabaseAdmin
+      .from('bets')
+      .select('match_id, prediction')
+      .eq('game_id', gameId)
+      .eq('bet_type', 'match_result')
+      .in('match_id', lockedMatchIds)
+
+    for (const bet of allBets ?? []) {
+      if (!betDistribution[bet.match_id]) {
+        betDistribution[bet.match_id] = { '1': 0, 'X': 0, '2': 0, total: 0 }
+      }
+      if (bet.prediction === '1' || bet.prediction === 'X' || bet.prediction === '2') {
+        betDistribution[bet.match_id][bet.prediction as '1' | 'X' | '2']++
+        betDistribution[bet.match_id].total++
+      }
+    }
+  }
+
   const matchList = (roundMatches ?? []).map((m) => {
     const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
     const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
@@ -113,6 +137,8 @@ export async function GET(req: NextRequest, { params }: Props) {
       away_team_logo: awayRef?.logo_url ?? null,
       tournamentLogo: tournamentLogoMap.get(roundSeasonMap.get(m.round_id) ?? 0) ?? null,
       userPrediction: betMap.get(m.id) ?? null,
+      bet_open: (m as Record<string, unknown>).bet_open ?? true,
+      distribution: betDistribution[m.id] ?? null,
     }
   })
 
