@@ -30,6 +30,10 @@ export type LiveSummary = {
   total: number
 }
 
+function hasActiveMatches(matches: LiveMatch[]): boolean {
+  return matches.some(m => m.status === 'live' || m.status === 'halftime' || m.status === 'scheduled')
+}
+
 export function useLiveMatches(
   roundId: number | null,
   enabled = true
@@ -37,6 +41,8 @@ export function useLiveMatches(
   const [matches, setMatches] = useState<LiveMatch[]>([])
   const [summary, setSummary] = useState<LiveSummary>({ live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const latestMatchesRef = useRef<LiveMatch[]>([])
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchLive = useCallback(async () => {
     if (!roundId || !enabled) return
@@ -44,7 +50,9 @@ export function useLiveMatches(
       const res = await fetch(`/api/rounds/${roundId}/live-matches`)
       if (res.ok) {
         const json = await res.json()
-        setMatches(json.matches ?? [])
+        const data = json.matches ?? []
+        setMatches(data)
+        latestMatchesRef.current = data
         setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
         setLastUpdate(new Date())
       }
@@ -54,9 +62,15 @@ export function useLiveMatches(
   }, [roundId, enabled])
 
   useEffect(() => {
-    fetchLive()
-    const interval = setInterval(fetchLive, 120_000)
-    return () => clearInterval(interval)
+    let cancelled = false
+    async function poll() {
+      await fetchLive()
+      if (cancelled) return
+      const delay = hasActiveMatches(latestMatchesRef.current) ? 30_000 : 120_000
+      timeoutRef.current = setTimeout(poll, delay)
+    }
+    poll()
+    return () => { cancelled = true; clearTimeout(timeoutRef.current) }
   }, [fetchLive])
 
   return { matches, summary, lastUpdate }
@@ -75,6 +89,8 @@ export function useLiveMatchesForGame(
   const hasLoadedOnce = useRef(false)
   const router = useRouter()
   const prevStatusRef = useRef<Record<number, string>>({})
+  const latestMatchesRef = useRef<LiveMatch[]>([])
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchLive = useCallback(async () => {
     if (!gameId || !enabled) return
@@ -84,6 +100,7 @@ export function useLiveMatchesForGame(
         const json = await res.json()
         const data = json.matches ?? []
         setMatches(data)
+        latestMatchesRef.current = data
         setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
         setLastUpdate(new Date())
         if (!hasLoadedOnce.current) {
@@ -112,9 +129,15 @@ export function useLiveMatchesForGame(
   }, [gameId, enabled, router])
 
   useEffect(() => {
-    fetchLive()
-    const interval = setInterval(fetchLive, 120_000)
-    return () => clearInterval(interval)
+    let cancelled = false
+    async function poll() {
+      await fetchLive()
+      if (cancelled) return
+      const delay = hasActiveMatches(latestMatchesRef.current) ? 30_000 : 120_000
+      timeoutRef.current = setTimeout(poll, delay)
+    }
+    poll()
+    return () => { cancelled = true; clearTimeout(timeoutRef.current) }
   }, [fetchLive])
 
   return { matches, summary, lastUpdate, isLoading }
@@ -135,6 +158,8 @@ export type LiveMatchesForUserItem = {
 export function useLiveMatchesForUser(enabled = true) {
   const [items, setItems] = useState<LiveMatchesForUserItem[]>([])
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const latestItemsRef = useRef<LiveMatchesForUserItem[]>([])
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!enabled) return
@@ -143,12 +168,12 @@ export function useLiveMatchesForUser(enabled = true) {
       if (res.ok) {
         const json = await res.json()
         const raw = json.items ?? []
-        setItems(
-          raw.map((item: { gameId: number; gameName: string; leagueName: string | null; roundId: number; roundName: string; matches: unknown[]; summary: LiveSummary }) => ({
-            ...item,
-            matches: (item.matches ?? []) as LiveMatch[],
-          }))
-        )
+        const parsed = raw.map((item: { gameId: number; gameName: string; leagueName: string | null; roundId: number; roundName: string; matches: unknown[]; summary: LiveSummary }) => ({
+          ...item,
+          matches: (item.matches ?? []) as LiveMatch[],
+        }))
+        setItems(parsed)
+        latestItemsRef.current = parsed
         setLastUpdate(new Date())
       }
     } catch {
@@ -157,9 +182,16 @@ export function useLiveMatchesForUser(enabled = true) {
   }, [enabled])
 
   useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 120_000)
-    return () => clearInterval(interval)
+    let cancelled = false
+    async function poll() {
+      await fetchData()
+      if (cancelled) return
+      const allMatches = latestItemsRef.current.flatMap(i => i.matches)
+      const delay = hasActiveMatches(allMatches) ? 30_000 : 120_000
+      timeoutRef.current = setTimeout(poll, delay)
+    }
+    poll()
+    return () => { cancelled = true; clearTimeout(timeoutRef.current) }
   }, [fetchData])
 
   return { items, lastUpdate }
