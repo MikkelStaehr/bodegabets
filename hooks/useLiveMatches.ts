@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 export type LiveMatch = {
   id: number
@@ -72,6 +73,8 @@ export function useLiveMatchesForGame(
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const hasLoadedOnce = useRef(false)
+  const router = useRouter()
+  const prevStatusRef = useRef<Record<number, string>>({})
 
   const fetchLive = useCallback(async () => {
     if (!gameId || !enabled) return
@@ -79,18 +82,34 @@ export function useLiveMatchesForGame(
       const res = await fetch(`/api/games/${gameId}/live-matches`)
       if (res.ok) {
         const json = await res.json()
-        setMatches(json.matches ?? [])
+        const data = json.matches ?? []
+        setMatches(data)
         setSummary(json.summary ?? { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 })
         setLastUpdate(new Date())
         if (!hasLoadedOnce.current) {
           hasLoadedOnce.current = true
           setIsLoading(false)
         }
+
+        // Detekter kampe der netop er skiftet til finished
+        let anyFinished = false
+        for (const match of data) {
+          const prevStatus = prevStatusRef.current[match.id]
+          if (prevStatus && prevStatus !== 'finished' && match.status === 'finished') {
+            anyFinished = true
+          }
+          prevStatusRef.current[match.id] = match.status
+        }
+
+        if (anyFinished) {
+          // Vent 3 sekunder så calculateRoundPoints når at køre
+          setTimeout(() => router.refresh(), 3000)
+        }
       }
     } catch {
       // Ignorer fejl
     }
-  }, [gameId, enabled])
+  }, [gameId, enabled, router])
 
   useEffect(() => {
     fetchLive()
