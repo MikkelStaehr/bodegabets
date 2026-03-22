@@ -43,6 +43,21 @@ export async function syncMatchScores(options?: {
   const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000)
   const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
+  // Hent kun round_ids fra aktive spil
+  const { data: activeGameSeasons } = await supabaseAdmin
+    .from('game_seasons')
+    .select('season_id, games!inner(status)')
+    .eq('games.status', 'active')
+
+  const activeSeasonIds = [...new Set((activeGameSeasons ?? []).map(gs => gs.season_id as number))]
+
+  const { data: activeRounds } = await supabaseAdmin
+    .from('rounds')
+    .select('id')
+    .in('season_id', activeSeasonIds.length > 0 ? activeSeasonIds : [0])
+
+  const activeRoundIds = (activeRounds ?? []).map(r => r.id as number)
+
   let activeMatches: Array<{ id: number; bold_match_id: number; season_id: number; round_id: number | null }> = []
 
   if (boldMatchId != null) {
@@ -60,6 +75,7 @@ export async function syncMatchScores(options?: {
       .from('matches')
       .select('id, bold_match_id, season_id, round_id')
       .in('status', ['live', 'halftime'])
+      .in('round_id', activeRoundIds.length > 0 ? activeRoundIds : [0])
 
     const { data: scheduledData } = await supabaseAdmin
       .from('matches')
@@ -67,6 +83,7 @@ export async function syncMatchScores(options?: {
       .eq('status', 'scheduled')
       .gte('kickoff', threeHoursAgo.toISOString())
       .lte('kickoff', twentyFourHoursLater.toISOString())
+      .in('round_id', activeRoundIds.length > 0 ? activeRoundIds : [0])
 
     const seen = new Set<number>()
     for (const m of [...(liveData ?? []), ...(scheduledData ?? [])]) {
