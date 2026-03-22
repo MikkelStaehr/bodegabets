@@ -115,10 +115,10 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
   async function runCron(cron: 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points') {
     setCronLoading(cron)
     try {
-      const res = await fetch('/api/admin/run-cron', {
+      const res = await fetch('/api/admin/railway', {
         method: 'POST',
-        headers: authHeader,
-        body: JSON.stringify({ cron }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: cron }),
       })
       const data = await res.json()
       if (data.ok) {
