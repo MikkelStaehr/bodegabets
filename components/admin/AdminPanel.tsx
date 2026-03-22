@@ -112,7 +112,7 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
 
   // ── Cron jobs ─────────────────────────────────────────────────────────────────
 
-  async function runCron(cron: 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points') {
+  async function runCron(cron: 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points' | 'batch-sync') {
     setCronLoading(cron)
     try {
       const res = await fetch('/api/admin/railway', {
@@ -322,10 +322,11 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
             { key: 'sync-scores', label: 'Sync scores' },
             { key: 'update-rounds', label: 'Opdater runder' },
             { key: 'calculate-points', label: 'Beregn point' },
+            { key: 'batch-sync', label: 'Batch sync' },
           ].map(({ key, label }) => (
             <AdminBtn
               key={key}
-              onClick={() => runCron(key as 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points')}
+              onClick={() => runCron(key as 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points' | 'batch-sync')}
               loading={cronLoading === key}
               variant="secondary"
               size="sm"

@@ -40,7 +40,7 @@ export async function syncMatchScores(options?: {
   const preview: SyncMatchScoresPreview = []
 
   const now = new Date()
-  const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000)
+  const eightHoursAgo = new Date(now.getTime() - 8 * 60 * 60 * 1000)
   const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
   // Hent kun round_ids fra aktive spil
@@ -81,7 +81,7 @@ export async function syncMatchScores(options?: {
       .from('matches')
       .select('id, bold_match_id, season_id, round_id')
       .eq('status', 'scheduled')
-      .gte('kickoff', threeHoursAgo.toISOString())
+      .gte('kickoff', eightHoursAgo.toISOString())
       .lte('kickoff', twentyFourHoursLater.toISOString())
       .in('round_id', activeRoundIds.length > 0 ? activeRoundIds : [0])
 
@@ -97,8 +97,6 @@ export async function syncMatchScores(options?: {
       })
     }
   }
-
-  console.log(`[syncMatchScores] activeMatches: ${activeMatches.length} kampe`, activeMatches.map(m => m.bold_match_id))
 
   if (!activeMatches.length) {
     console.log('[syncMatchScores] Ingen aktive kampe lige nu')
@@ -168,8 +166,6 @@ export async function syncMatchScores(options?: {
     errors.push(`Bold API fejl: ${e}`)
     return { updated, errors }
   }
-
-  console.log(`[syncMatchScores] boldMatchMap size: ${boldMatchMap.size}`, [...boldMatchMap.keys()])
 
   const matchesStatus = (s: string) =>
     s === 'finished' ? 'finished' : s === 'halftime' ? 'halftime' : 'live'

@@ -16,6 +16,19 @@ export async function POST(req: NextRequest) {
   if (!profile?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { endpoint } = await req.json()
+
+  const ALLOWED_ENDPOINTS = [
+    'sync-fixtures',
+    'sync-scores',
+    'update-rounds',
+    'calculate-points',
+    'batch-sync'
+  ]
+
+  if (!ALLOWED_ENDPOINTS.includes(endpoint)) {
+    return NextResponse.json({ error: 'Ukendt endpoint' }, { status: 400 })
+  }
+
   const railwayUrl = process.env.RAILWAY_URL ?? 'https://bodegabets-production.up.railway.app'
 
   // Send kaldet til Railway men vent ikke på svar
