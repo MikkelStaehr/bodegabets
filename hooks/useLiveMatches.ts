@@ -17,6 +17,8 @@ export type LiveMatch = {
   away_team_logo: string | null
   tournamentLogo?: string | null
   userPrediction?: string | null
+  bet_open?: boolean
+  distribution?: { '1': number; 'X': number; '2': number; total: number } | null
 }
 
 export type LiveSummary = {

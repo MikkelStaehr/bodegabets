@@ -64,6 +64,8 @@ const EXTRA_BET_TYPES: ExtraBetType[] = ['goals_3plus', 'clean_sheet', 'win_marg
 
 type RivalryInfo = { rivalry_name: string; multiplier: number }
 
+type BetDistribution = Record<number, { '1': number; 'X': number; '2': number; total: number }>
+
 type Props = {
   gameId: number
   roundId: number
@@ -79,6 +81,7 @@ type Props = {
   tickerItems: string[]
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
+  betDistribution?: BetDistribution
 }
 
 function initSelections(_matches: MatchWithOptions[], _existing: Bet[]): BetEntry[] {
@@ -322,6 +325,7 @@ function MatchCard({
   onStartEdit,
   onCancelEdit,
   showInlineStake,
+  distribution,
 }: {
   match: MatchWithOptions
   sel: BetEntry | undefined
@@ -344,6 +348,7 @@ function MatchCard({
   onStartEdit: (matchId: number) => void
   onCancelEdit: (matchId: number) => void
   showInlineStake: boolean
+  distribution?: { '1': number; 'X': number; '2': number; total: number }
 }) {
   const isRivalry = !!rivalry
   const hasExistingBet = isOpen && !!matchResultBet
@@ -603,6 +608,29 @@ function MatchCard({
           </span>
         </div>
       )}
+
+      {/* Bet fordeling — kun på låste kampe */}
+      {!isOpen && distribution && distribution.total > 0 && (
+        <div className={`px-3 pb-2.5 pt-1 border-t border-black/[0.06]`}>
+          <div className="flex gap-1 items-center">
+            {(['1', 'X', '2'] as const).map((opt) => {
+              const count = distribution[opt] ?? 0
+              const pct = distribution.total > 0 ? Math.round((count / distribution.total) * 100) : 0
+              const isHighest = count === Math.max(distribution['1'], distribution['X'], distribution['2'])
+              return (
+                <div key={opt} className="flex-1 text-center">
+                  <div className={`font-condensed text-[11px] font-bold ${isHighest ? 'text-[#1a3329]' : 'text-[#9E9486]'}`}>
+                    {opt}
+                  </div>
+                  <div className={`font-condensed text-[13px] font-bold ${isHighest ? 'text-[#1a3329]' : 'text-[#9E9486]'}`}>
+                    {pct}%
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -622,6 +650,7 @@ export default function AfgivBets({
   tickerItems,
   rivalryInfo = {},
   totalMatchesInRound,
+  betDistribution,
 }: Props) {
   const router = useRouter()
   const { toast } = useToast()
@@ -941,6 +970,7 @@ export default function AfgivBets({
           onStartEdit={startEditing}
           onCancelEdit={cancelEditing}
           showInlineStake={showInlineStake}
+          distribution={betDistribution?.[md.match.id]}
         />
       )
     }

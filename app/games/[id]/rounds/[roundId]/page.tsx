@@ -138,6 +138,25 @@ export default async function RoundPage({ params }: Props) {
 
   const typedBets = (betsData ?? []) as Bet[]
 
+  // Hent bet-fordeling for låste kampe
+  const { data: distributionData } = await supabase
+    .from('bets')
+    .select('match_id, prediction')
+    .eq('game_id', gameId)
+    .eq('bet_type', 'match_result')
+    .in('match_id', matches.filter(m => !m.bet_open).map(m => m.id).length > 0 ? matches.filter(m => !m.bet_open).map(m => m.id) : [0])
+
+  const betDistribution: Record<number, { '1': number; 'X': number; '2': number; total: number }> = {}
+  for (const bet of distributionData ?? []) {
+    if (!betDistribution[bet.match_id]) {
+      betDistribution[bet.match_id] = { '1': 0, 'X': 0, '2': 0, total: 0 }
+    }
+    if (bet.prediction === '1' || bet.prediction === 'X' || bet.prediction === '2') {
+      betDistribution[bet.match_id][bet.prediction as '1' | 'X' | '2']++
+      betDistribution[bet.match_id].total++
+    }
+  }
+
   // Hent rivalries via season → tournament → league
   const rivalryInfo: Record<number, { rivalry_name: string; multiplier: number }> = {}
   if (round.season_id) {
@@ -214,6 +233,7 @@ export default async function RoundPage({ params }: Props) {
       tickerItems={tickerItems}
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}
+      betDistribution={betDistribution}
     />
   )
 }
