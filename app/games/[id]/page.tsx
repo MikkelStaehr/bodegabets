@@ -555,7 +555,7 @@ export default async function GamePage({ params }: Props) {
                     gap: 8,
                     alignItems: 'center',
                     background: isMe ? 'rgba(44,74,62,0.05)' : undefined,
-                    borderLeft: isTop3 ? '3px solid #2C4A3E' : isLast ? '3px solid #8B2E2E' : '3px solid transparent',
+                    borderLeft: (isTop3 && leaderboardRows.length > 3) ? '3px solid #2C4A3E' : (isLast && leaderboardRows.length > 1) ? '3px solid #8B2E2E' : '3px solid transparent',
                   }}
                 >
                   {/* Rank */}
