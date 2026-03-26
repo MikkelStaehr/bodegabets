@@ -64,7 +64,7 @@ const EXTRA_BET_TYPES: ExtraBetType[] = ['goals_3plus', 'clean_sheet', 'win_marg
 
 type RivalryInfo = { rivalry_name: string; multiplier: number }
 
-type BetDistribution = Record<number, { '1': number; 'X': number; '2': number; total: number }>
+type BetDistribution = Record<number, { '1': number; 'X': number; '2': number; total: number; odds?: { '1': number | null; 'X': number | null; '2': number | null } }>
 
 type Props = {
   gameId: number
@@ -82,6 +82,7 @@ type Props = {
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
   betDistribution?: BetDistribution
+  blockInfo?: { block_number: number; block_name: string; is_last_in_block: boolean } | null
 }
 
 function initSelections(_matches: MatchWithOptions[], _existing: Bet[]): BetEntry[] {
@@ -348,7 +349,7 @@ function MatchCard({
   onStartEdit: (matchId: number) => void
   onCancelEdit: (matchId: number) => void
   showInlineStake: boolean
-  distribution?: { '1': number; 'X': number; '2': number; total: number }
+  distribution?: { '1': number; 'X': number; '2': number; total: number; odds?: { '1': number | null; 'X': number | null; '2': number | null } }
 }) {
   const isRivalry = !!rivalry
   const hasExistingBet = isOpen && !!matchResultBet
@@ -617,11 +618,17 @@ function MatchCard({
               const count = distribution[opt] ?? 0
               const pct = distribution.total > 0 ? Math.round((count / distribution.total) * 100) : 0
               const isHighest = count === Math.max(distribution['1'], distribution['X'], distribution['2'])
+              const odds = distribution.odds?.[opt] ?? null
               return (
                 <div key={opt} className="flex-1 text-center">
                   <div className="font-condensed text-[11px] font-bold text-[#9E9486] uppercase">
                     {opt}
                   </div>
+                  {odds !== null && (
+                    <div className="font-condensed text-[12px] text-[#9E9486]">
+                      {odds.toFixed(2)}
+                    </div>
+                  )}
                   <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#9E9486]'}`}>
                     {pct}%
                   </div>
@@ -651,6 +658,7 @@ export default function AfgivBets({
   rivalryInfo = {},
   totalMatchesInRound,
   betDistribution,
+  blockInfo,
 }: Props) {
   const router = useRouter()
   const { toast } = useToast()
@@ -993,12 +1001,24 @@ export default function AfgivBets({
       <div className="w-full bg-white border-b border-black/10">
         <div className="max-w-[960px] mx-auto px-4 py-3 flex items-start justify-between gap-3">
           <div>
-            <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase mb-1">
-              {gameName} · {round.name}
-            </p>
+            <div className="flex items-center gap-1.5 mb-1">
+              <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase">
+                {gameName} · {round.name}
+              </p>
+              {blockInfo?.is_last_in_block && (
+                <span className="font-condensed text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide" style={{ background: 'rgba(184,150,62,0.15)', color: '#B8963E' }}>
+                  Blokafslutning 🏆
+                </span>
+              )}
+            </div>
             <h1 className="font-condensed text-[28px] md:text-[32px] font-extrabold text-[#1a3329] leading-none">
               Afgiv dine valg
             </h1>
+            {blockInfo && (
+              <p className="font-condensed text-[11px] mt-0.5" style={{ color: '#9E9486' }}>
+                Block {blockInfo.block_number} · {round.name}
+              </p>
+            )}
             <p className="text-[11px] text-[#7a7060] mt-1">
               {totalMatches} kampe
             </p>

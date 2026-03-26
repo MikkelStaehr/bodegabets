@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { generateBlocksForSeason } from '@/lib/generateBlocks'
 
 export const maxDuration = 30
 
@@ -84,6 +85,11 @@ export async function POST(req: NextRequest) {
     if (linkError) {
       return NextResponse.json({ error: linkError.message }, { status: 500 })
     }
+  }
+
+  // Auto-generer blocks for alle tilknyttede sæsoner (idempotent)
+  for (const sid of allSeasonIds) {
+    await generateBlocksForSeason(sid)
   }
 
   // Tilmeld host som member

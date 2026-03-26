@@ -180,7 +180,7 @@ export default async function DashboardPage() {
     seasonIds.length > 0
       ? supabaseAdmin
           .from('rounds')
-          .select('id, season_id, name, status, betting_closes_at')
+          .select('id, season_id, name, status, betting_closes_at, block_id')
           .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -191,7 +191,16 @@ export default async function DashboardPage() {
       .select('round_id')
       .eq('user_id', user.id),
 
-    // [4+] activeRounds per game
+    // [4] active blocks
+    seasonIds.length > 0
+      ? supabaseAdmin
+          .from('blocks')
+          .select('id, season_id, block_number, name, status')
+          .in('season_id', seasonIds)
+          .eq('status', 'active')
+      : Promise.resolve({ data: [] as { id: number; season_id: number; block_number: number; name: string; status: string }[] }),
+
+    // [5+] activeRounds per game
     ...rawGames.map((m) => getActiveRoundForGame(m.game.id, seasonIdsByGame.get(m.game.id)?.[0] ?? null)),
   ])
 
@@ -205,9 +214,10 @@ export default async function DashboardPage() {
   }
 
   const allMembers = (results[1] as { data: { game_id: number; user_id: string; earnings: number; profile: { username: string } | null }[] | null }).data
-  const rounds = (results[2] as { data: { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null }[] | null }).data
+  const rounds = (results[2] as { data: { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null; block_id?: number | null }[] | null }).data
   const bets = (results[3] as { data: { round_id: number }[] | null }).data
-  const activeRoundsPerGame = results.slice(4) as Awaited<ReturnType<typeof getActiveRoundForGame>>[]
+  const activeBlocksData = (results[4] as { data: { id: number; season_id: number; block_number: number; name: string }[] | null }).data ?? []
+  const activeRoundsPerGame = results.slice(5) as Awaited<ReturnType<typeof getActiveRoundForGame>>[]
 
   const roundIds = (rounds ?? []).map((r: { id: number }) => r.id)
   const { data: matchesByRound } =
@@ -279,6 +289,25 @@ export default async function DashboardPage() {
         earnings: m.earnings,
       }))
     )
+  }
+
+  // Build active block per game
+  const activeBlockBySeason = new Map<number, { id: number; season_id: number; block_number: number; name: string }>()
+  for (const b of activeBlocksData) activeBlockBySeason.set(b.season_id, b)
+
+  const typedRoundsWithBlock = (rounds ?? []) as { id: number; season_id: number; name: string; status: string; betting_closes_at: string | null; block_id?: number | null }[]
+  const activeBlockByGame = new Map<number, { block_number: number; name: string; rounds_remaining: number }>()
+  for (const m of rawGames) {
+    const gameSeasonIds = seasonIdsByGame.get(m.game.id) ?? []
+    for (const sid of gameSeasonIds) {
+      const block = activeBlockBySeason.get(sid)
+      if (block) {
+        const blockRounds = typedRoundsWithBlock.filter((r) => r.block_id === block.id)
+        const rounds_remaining = blockRounds.filter((r) => r.status !== 'finished').length
+        activeBlockByGame.set(m.game.id, { block_number: block.block_number, name: block.name, rounds_remaining })
+        break
+      }
+    }
   }
 
   // Build logo URLs + league names per game (multiple leagues possible)
@@ -356,6 +385,7 @@ export default async function DashboardPage() {
             leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
             top3ByGame={Object.fromEntries(top3ByGame)}
             username={profile?.username ?? 'Spiller'}
+            activeBlockByGame={Object.fromEntries(activeBlockByGame)}
           />
         </div>
       </div>

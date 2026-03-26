@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { rateLimit, getIp } from '@/lib/rateLimit'
 
 export async function POST(req: NextRequest) {
+  const { success } = rateLimit(getIp(req), 'games:join', 10, 15 * 60 * 1000)
+  if (!success) {
+    return NextResponse.json({ error: 'For mange forsøg. Prøv igen om lidt.' }, { status: 429 })
+  }
+
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
 

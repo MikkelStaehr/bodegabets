@@ -30,7 +30,7 @@ const SPORT_EMOJI: Record<SportType, string> = {
 
 type Top3Entry = { user_id: string; username: string; earnings: number }
 
-export default function DashboardGameCard({ row, logoUrls, leagueNames, top3 }: { row: GameRow; logoUrls?: string[]; leagueNames?: string[]; top3?: Top3Entry[] }) {
+export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, activeBlock }: { row: GameRow; logoUrls?: string[]; leagueNames?: string[]; top3?: Top3Entry[]; activeBlock?: { block_number: number; name: string; rounds_remaining: number } | null }) {
   const { game, points, rank, bets_count, activeRound } = row
   const hasBets = bets_count > 0
   const deadline = activeRound?.betting_closes_at ? new Date(activeRound.betting_closes_at) : null
@@ -80,6 +80,11 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3 }: 
             {activeRound && (
               <p className="text-[11px] text-white/60 mt-0.5">
                 {activeRound.name} · {activeRound.matches_count} kampe
+              </p>
+            )}
+            {activeBlock && (
+              <p className="font-['Barlow_Condensed'] text-[11px] mt-0.5" style={{ color: '#9E9486' }}>
+                {activeBlock.name} · {activeBlock.rounds_remaining} runde{activeBlock.rounds_remaining !== 1 ? 'r' : ''} tilbage
               </p>
             )}
           </div>

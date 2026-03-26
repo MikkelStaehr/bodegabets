@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import type { BetType } from '@/types'
+import { rateLimit, getIp } from '@/lib/rateLimit'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -12,6 +13,11 @@ type BetInput = {
 }
 
 export async function POST(req: NextRequest, { params }: Props) {
+  const { success } = rateLimit(getIp(req), 'rounds:submit-bets', 20, 5 * 60 * 1000)
+  if (!success) {
+    return NextResponse.json({ error: 'For mange forsøg. Prøv igen om lidt.' }, { status: 429 })
+  }
+
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })

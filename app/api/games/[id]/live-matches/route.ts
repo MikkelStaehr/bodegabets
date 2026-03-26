@@ -96,23 +96,27 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent bet-fordeling for låste kampe
   const lockedMatchIds = (roundMatches ?? []).filter(m => (m as Record<string, unknown>).bet_open === false).map(m => m.id)
 
-  let betDistribution: Record<number, { '1': number; 'X': number; '2': number; total: number }> = {}
+  type DistEntry = { '1': number; 'X': number; '2': number; total: number; odds: { '1': number | null; 'X': number | null; '2': number | null } }
+  let betDistribution: Record<number, DistEntry> = {}
 
   if (lockedMatchIds.length > 0) {
     const { data: allBets } = await supabaseAdmin
       .from('bets')
-      .select('match_id, prediction')
+      .select('match_id, prediction, odds')
       .eq('game_id', gameId)
       .eq('bet_type', 'match_result')
       .in('match_id', lockedMatchIds)
 
     for (const bet of allBets ?? []) {
       if (!betDistribution[bet.match_id]) {
-        betDistribution[bet.match_id] = { '1': 0, 'X': 0, '2': 0, total: 0 }
+        betDistribution[bet.match_id] = { '1': 0, 'X': 0, '2': 0, total: 0, odds: { '1': null, 'X': null, '2': null } }
       }
       if (bet.prediction === '1' || bet.prediction === 'X' || bet.prediction === '2') {
         betDistribution[bet.match_id][bet.prediction as '1' | 'X' | '2']++
         betDistribution[bet.match_id].total++
+        if (betDistribution[bet.match_id].odds[bet.prediction as '1' | 'X' | '2'] === null && bet.odds != null) {
+          betDistribution[bet.match_id].odds[bet.prediction as '1' | 'X' | '2'] = bet.odds
+        }
       }
     }
   }

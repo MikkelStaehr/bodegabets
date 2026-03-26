@@ -138,11 +138,17 @@ function MatchRow({ match }: { match: LiveMatch }) {
             const count = match.distribution![opt] ?? 0
             const pct = match.distribution!.total > 0 ? Math.round((count / match.distribution!.total) * 100) : 0
             const isHighest = count === Math.max(match.distribution!['1'], match.distribution!['X'], match.distribution!['2'])
+            const odds = match.distribution!.odds?.[opt] ?? null
             return (
               <div key={opt} className="flex-1 text-center">
                 <div className="font-condensed text-[10px] text-[#F2EDE4]/40 font-bold uppercase">
                   {opt}
                 </div>
+                {odds !== null && (
+                  <div className="font-condensed text-[11px] text-[#F2EDE4]/40">
+                    {odds.toFixed(2)}
+                  </div>
+                )}
                 <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#F2EDE4]/50'}`}>
                   {pct}%
                 </div>

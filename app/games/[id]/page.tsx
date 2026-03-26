@@ -101,6 +101,7 @@ export default async function GamePage({ params }: Props) {
     { data: myMembership },
     { data: profile },
     { data: latestFinishedRoundByStatus },
+    { data: blocks },
   ] = await Promise.all([
     supabase
       .from('game_members')
@@ -111,14 +112,14 @@ export default async function GamePage({ params }: Props) {
     seasonIds.length > 0
       ? supabase
           .from('rounds')
-          .select('id, name, status, betting_closes_at, season_id, bet_open')
+          .select('id, name, status, betting_closes_at, season_id, bet_open, block_id')
           .in('season_id', seasonIds)
           .order('created_at', { ascending: true })
       : Promise.resolve({ data: [] }),
 
     supabase
       .from('round_scores')
-      .select('user_id, round_id, points_earned')
+      .select('user_id, round_id, points_earned, earnings_delta')
       .eq('game_id', gameId),
 
     supabase
@@ -144,6 +145,13 @@ export default async function GamePage({ params }: Props) {
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+
+    seasonIds.length > 0
+      ? supabase
+          .from('blocks')
+          .select('id, season_id, block_number, name, status')
+          .in('season_id', seasonIds)
+      : Promise.resolve({ data: [] as { id: number; season_id: number; block_number: number; name: string; status: string }[] }),
   ])
 
   if (!myMembership) redirect('/dashboard')
@@ -207,6 +215,47 @@ export default async function GamePage({ params }: Props) {
           .in('match_id', activeMatchIds)
       : { data: [] as { id: number; user_id: string }[] }
 
+  // ── Achievements til leaderboard ────────────────────────────────────────────
+  const ACHIEVEMENT_PRIORITY = [
+    'maskinen', 'oraklet', 'analytikeren', 'hattrick', 'blokkongen',
+    'comebacket', 'bundskraberen', 'trofast', 'veteranen', 'all_in',
+    'detaljeorienteret', 'clean_sheet_fan', 'måljægeren', 'gætteren',
+    'spareblussen', 'blindskud',
+  ]
+
+  const { data: userAchievementsRaw } = await supabase
+    .from('user_achievements')
+    .select('user_id, achievement_key')
+    .eq('game_id', gameId)
+
+  const achievementKeys = [...new Set((userAchievementsRaw ?? []).map(a => a.achievement_key as string))]
+  const { data: achievementDefs } = achievementKeys.length > 0
+    ? await supabase
+        .from('achievements')
+        .select('key, name, icon')
+        .in('key', achievementKeys)
+    : { data: [] as { key: string; name: string; icon: string }[] }
+
+  const achievementDefMap = new Map((achievementDefs ?? []).map(a => [a.key, a]))
+
+  // Per bruger: find det achievement med højest prioritet (lavest index)
+  const bestKeyPerUser = new Map<string, { key: string; priority: number }>()
+  for (const ua of userAchievementsRaw ?? []) {
+    const key = ua.achievement_key as string
+    const userId = ua.user_id as string
+    const priority = ACHIEVEMENT_PRIORITY.indexOf(key)
+    if (priority === -1) continue
+    const current = bestKeyPerUser.get(userId)
+    if (!current || priority < current.priority) {
+      bestKeyPerUser.set(userId, { key, priority })
+    }
+  }
+  const achievementMap = new Map<string, { icon: string; name: string }>()
+  for (const [userId, { key }] of bestKeyPerUser) {
+    const def = achievementDefMap.get(key)
+    if (def) achievementMap.set(userId, { icon: def.icon, name: def.name })
+  }
+
   const typedGame = game as Game
   const members = (rawMembers ?? []) as unknown as MemberRow[]
   const typedRounds = (rounds ?? []) as Round[]
@@ -238,6 +287,49 @@ export default async function GamePage({ params }: Props) {
   })
 
   const finishedRounds = sortedRounds.filter((r) => r.computedStatus === 'finished')
+
+  // ── Block data ────────────────────────────────────────────────────────────
+  type BlockRow = { id: number; season_id: number; block_number: number; name: string; status: string }
+  const typedBlocks = (blocks ?? []) as BlockRow[]
+  const blockById = new Map<number, BlockRow>()
+  for (const b of typedBlocks) blockById.set(b.id, b)
+  const activeBlock = typedBlocks.find((b) => b.status === 'active') ?? null
+
+  // Block leaderboard: sum earnings_delta per user for finished rounds in active block
+  const roundsWithBlock = sortedRounds as (typeof sortedRounds[number] & { block_id?: number | null })[]
+
+  let blockLeaderboardRows: Array<{ user_id: string; username: string; total: number; rank: number }> = []
+  let roundsRemainingInBlock = 0
+
+  if (activeBlock) {
+    const allBlockRoundIds = roundsWithBlock
+      .filter((r) => r.block_id === activeBlock.id)
+      .map((r) => r.id)
+    const finishedBlockRoundIds = roundsWithBlock
+      .filter((r) => r.block_id === activeBlock.id && r.computedStatus === 'finished')
+      .map((r) => r.id)
+    roundsRemainingInBlock = allBlockRoundIds.length - finishedBlockRoundIds.length
+
+    const blockEarnings = new Map<string, number>()
+    for (const s of (roundScores ?? []) as RoundScore[]) {
+      if (!finishedBlockRoundIds.includes(s.round_id)) continue
+      blockEarnings.set(s.user_id, (blockEarnings.get(s.user_id) ?? 0) + (s.earnings_delta ?? 0))
+    }
+
+    const rawBlockRows = [...blockEarnings.entries()]
+      .map(([user_id, total]) => ({
+        user_id,
+        username: members.find((m) => m.user_id === user_id)?.profile?.username ?? 'Ukendt',
+        total,
+      }))
+      .sort((a, b) => b.total - a.total)
+
+    let blockRank = 1
+    blockLeaderboardRows = rawBlockRows.map((row, i, arr) => {
+      if (i > 0 && row.total < arr[i - 1].total) blockRank = i + 1
+      return { ...row, rank: blockRank }
+    })
+  }
 
   const activeRound =
     sortedRounds.find((r) => r.computedStatus === 'active') ??
@@ -448,7 +540,8 @@ export default async function GamePage({ params }: Props) {
     const lastRound = finishedRounds[finishedRounds.length - 1]
     const lastRoundPoints = lastRound ? (scoreMap[entry.user_id]?.[lastRound.id] ?? null) : null
 
-    return { ...entry, wins, losses, played, hasActiveBet, form, lastRoundPoints }
+    const achievement = achievementMap.get(entry.user_id) ?? null
+    return { ...entry, wins, losses, played, hasActiveBet, form, lastRoundPoints, achievement }
   })
 
   return (
@@ -497,7 +590,7 @@ export default async function GamePage({ params }: Props) {
         <section className="border-t border-b border-[#d4cec4] py-0">
           <CalendarSlider
             matches={allMatches}
-            rounds={sortedRounds.map((r) => ({
+            rounds={roundsWithBlock.map((r) => ({
               id: r.id,
               name: r.name,
               season_id: r.season_id ?? 0,
@@ -506,13 +599,71 @@ export default async function GamePage({ params }: Props) {
               leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
               leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
               logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
+              block_id: r.block_id ?? null,
+              block_number: r.block_id != null ? (blockById.get(r.block_id)?.block_number ?? null) : null,
             })) as CalendarRound[]}
             gameId={gameId}
             betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
             activeRoundId={activeRound?.id ?? null}
+            activeBlockId={activeBlock?.id ?? null}
           />
           <ActiveRoundLiveTicker />
         </section>
+
+        {/* Block leaderboard — kun hvis aktiv block */}
+        {activeBlock && blockLeaderboardRows.length > 0 && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6b6b6b' }}>
+                {activeBlock.name}
+              </span>
+              {roundsRemainingInBlock > 0 && (
+                <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: '#9E9486' }}>
+                  {roundsRemainingInBlock} runde{roundsRemainingInBlock !== 1 ? 'r' : ''} tilbage
+                </span>
+              )}
+            </div>
+            <div style={{ background: '#FDFAF5', border: '1px solid #C8BEA8', borderRadius: 2, overflow: 'hidden' }}>
+              {blockLeaderboardRows.slice(0, 5).map((entry, idx) => {
+                const isMe = entry.user_id === user.id
+                return (
+                  <div
+                    key={entry.user_id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '28px 1fr 60px',
+                      padding: '8px 12px',
+                      borderBottom: idx < Math.min(blockLeaderboardRows.length, 5) - 1 ? '1px solid #E8E0D3' : 'none',
+                      gap: 8,
+                      alignItems: 'center',
+                      background: isMe ? 'rgba(44,74,62,0.05)' : undefined,
+                    }}
+                  >
+                    <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, textAlign: 'center', color: entry.rank <= 3 ? '#B8963E' : '#6b6b6b' }}>
+                      {entry.rank}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: isMe ? '#3D6B5A' : '#2C4A3E', color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {entry.username.slice(0, 2).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 13, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {entry.username}{isMe && <span style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 300 }}> · dig</span>}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>
+                      {entry.total >= 0 ? `+${entry.total}` : entry.total.toLocaleString('da-DK')}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {blockLeaderboardRows.length > 5 && (
+              <p style={{ fontSize: 11, color: '#9E9486', textAlign: 'center', padding: '8px 0 0', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                +{blockLeaderboardRows.length - 5} flere spillere
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Aktive betting runder */}
         <ActiveRounds rounds={activeRoundRows} gameId={gameId} />
@@ -572,6 +723,11 @@ export default async function GamePage({ params }: Props) {
                       <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2, color: '#1a1a1a' }}>
                         {entry.username}{isMe && <span style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 300 }}> · dig</span>}
                       </div>
+                      {entry.achievement && (
+                        <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: '#6b6b6b', lineHeight: 1, marginTop: 2 }}>
+                          {entry.achievement.icon} {entry.achievement.name}
+                        </div>
+                      )}
                       {activeRound && (
                         <div style={{ fontSize: 10, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: entry.hasActiveBet ? '#4CAF50' : '#D4A017', flexShrink: 0 }} />

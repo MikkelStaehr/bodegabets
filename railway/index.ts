@@ -30,6 +30,7 @@ import webpush from 'web-push'
 import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
+import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
@@ -406,6 +407,12 @@ app.get('/calculate-points', async (_req, res) => {
 
           await calculateRoundPoints(round.id)
           processed++
+        }
+
+        // Opdater block-statuser og evaluer færdige blocks
+        for (const sid of seasonIds) {
+          await updateBlockStatuses(sid)
+          await evaluateFinishedBlocks(sid)
         }
       }
     }

@@ -57,7 +57,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 
       const { data: bets } = await supabaseAdmin
         .from('bets')
-        .select('id, user_id, prediction, stake, bet_type')
+        .select('id, user_id, prediction, stake, bet_type, odds')
         .eq('match_id', match.id)
         .eq('game_id', gameId)
 
@@ -76,10 +76,19 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
         )
 
         const stake = bet.stake ?? 0
-        const pointsEarned = correct ? stake * 2 : 0
+        let pointsEarned: number
+        if (!correct) {
+          pointsEarned = 0
+        } else if (bet.bet_type === 'match_result') {
+          const odds = (bet as { odds?: number | null }).odds ?? 1.0
+          pointsEarned = Math.round(stake * odds)
+        } else {
+          pointsEarned = stake * 2
+        }
         const result = correct ? 'win' : 'loss'
 
-        console.log(`[calculateRoundPoints]   bet ${bet.id}: user=${(bet.user_id as string).slice(0,8)}, type=${bet.bet_type}, pred=${bet.prediction}, stake=${stake}, correct=${correct}, points_earned=${pointsEarned}`)
+        const oddsVal = (bet as { odds?: number | null }).odds ?? null
+        console.log(`[calculateRoundPoints]   bet ${bet.id}: user=${(bet.user_id as string).slice(0,8)}, type=${bet.bet_type}, pred=${bet.prediction}, stake=${stake}, odds=${oddsVal}, correct=${correct}, points_earned=${pointsEarned}`)
 
         const { error: betUpdateError } = await supabaseAdmin
           .from('bets')

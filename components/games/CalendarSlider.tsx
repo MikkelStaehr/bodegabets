@@ -23,6 +23,8 @@ export type CalendarRound = {
   leagueAbbr: string
   leagueType: 'league' | 'cup'
   logo_url?: string | null
+  block_id?: number | null
+  block_number?: number | null
 }
 
 interface CalendarSliderProps {
@@ -31,6 +33,7 @@ interface CalendarSliderProps {
   gameId: number
   betsCount: number
   activeRoundId: number | null
+  activeBlockId?: number | null
 }
 
 const DAY_NAMES_DA = ['søn', 'man', 'tir', 'ons', 'tor', 'fre', 'lør']
@@ -54,6 +57,7 @@ export default function CalendarSlider({
   gameId,
   betsCount,
   activeRoundId,
+  activeBlockId,
 }: CalendarSliderProps) {
   const matchesByDate = useMemo(() => {
     const map = new Map<string, CalendarMatch[]>()
@@ -104,7 +108,12 @@ export default function CalendarSlider({
       hasMatches: boolean
       logoUrl: string | null
       roundNum: string | null
+      blockId: number | null
+      blockNum: number | null
+      isBlockStart: boolean
     }> = []
+
+    let prevMatchBlockId: number | null | undefined = undefined
 
     for (let i = 1; i <= count; i++) {
       const d = new Date(year, month, i)
@@ -114,6 +123,10 @@ export default function CalendarSlider({
 
       let logoUrl: string | null = null
       let roundNum: string | null = null
+      let blockId: number | null = null
+      let blockNum: number | null = null
+      let isBlockStart = false
+
       if (dayMatches.length > 0) {
         const match = dayMatches[0]
         const lookupKey = `${match.season_id}-${match.round_name}`
@@ -121,6 +134,12 @@ export default function CalendarSlider({
         if (round) {
           logoUrl = round.logo_url ?? null
           roundNum = getRoundNum(round.name)
+          blockId = round.block_id ?? null
+          blockNum = round.block_number ?? null
+          if (blockId !== null && blockId !== prevMatchBlockId) {
+            isBlockStart = true
+          }
+          prevMatchBlockId = blockId
         }
       }
 
@@ -134,6 +153,9 @@ export default function CalendarSlider({
         hasMatches: dayMatches.length > 0,
         logoUrl,
         roundNum,
+        blockId,
+        blockNum,
+        isBlockStart,
       })
     }
     return days
@@ -219,8 +241,9 @@ export default function CalendarSlider({
           className="scrollbar-hide"
           style={{ display: 'flex', overflowX: 'auto', padding: '4px 12px 12px', gap: 0 }}
         >
-          {daysInMonth.map((day) => {
+          {daysInMonth.flatMap((day) => {
             const isSelected = day.key === selectedDate
+            const isActiveBlock = activeBlockId != null && day.blockId === activeBlockId && day.hasMatches
             const dayColor = isSelected
               ? '#fff'
               : day.hasLive
@@ -229,7 +252,43 @@ export default function CalendarSlider({
                   ? '#C0B8B0'
                   : '#2C4A3E'
 
-            return (
+            const elements = []
+
+            // Block separator before first day of new block
+            if (day.isBlockStart && day.blockNum !== null) {
+              elements.push(
+                <div
+                  key={`block-sep-${day.key}`}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    paddingBottom: 10,
+                    paddingLeft: 2,
+                    paddingRight: 4,
+                    flexShrink: 0,
+                    gap: 3,
+                  }}
+                >
+                  <div style={{ width: 1, height: 32, background: '#EDE8E0' }} />
+                  <span
+                    style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 8,
+                      fontWeight: 700,
+                      color: '#C8B89A',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    B{day.blockNum}
+                  </span>
+                </div>
+              )
+            }
+
+            elements.push(
               <button
                 key={day.key}
                 ref={isSelected ? selectedDayRef : undefined}
@@ -244,6 +303,7 @@ export default function CalendarSlider({
                   minWidth: 44,
                   borderRadius: 8,
                   border: 'none',
+                  borderTop: isActiveBlock && !isSelected ? '2px solid #C8B89A' : '2px solid transparent',
                   cursor: 'pointer',
                   background: isSelected ? '#2C4A3E' : 'transparent',
                   transition: 'background 0.15s',
@@ -311,6 +371,8 @@ export default function CalendarSlider({
                 )}
               </button>
             )
+
+            return elements
           })}
         </div>
       </div>

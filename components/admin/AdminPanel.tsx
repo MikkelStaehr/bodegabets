@@ -32,7 +32,6 @@ type MatchRow = {
   home_score: number | null
   away_score: number | null
   status: 'scheduled' | 'finished'
-  existing_sidebet_types: string[]
 }
 
 type GameRow = {
@@ -75,13 +74,6 @@ function formatDeadline(iso: string | null) {
   })
 }
 
-const BET_TYPE_LABELS: Record<string, string> = {
-  goals_3plus: 'Scorer 3+ mål',
-  clean_sheet: 'Clean sheet',
-  win_margin: 'Vinder med 2+',
-}
-
-const SIDEBET_TYPES = Object.keys(BET_TYPE_LABELS)
 
 export default function AdminPanel({ leagues, games, rounds, matches, adminSecret }: Props) {
   const router = useRouter()
@@ -94,10 +86,6 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
   const [deleteLoading, setDeleteLoading] = useState<Set<number>>(new Set())
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
-  // Sektion 3 — side-bets
-  const [sbMatchId, setSbMatchId] = useState<string>('')
-  const [sbType, setSbType] = useState<string>('')
-  const [sbLoading, setSbLoading] = useState(false)
 
   // Sektion 4 — resultater
   const [scoreInputs, setScoreInputs] = useState<Record<number, { home: string; away: string; ht_home: string; ht_away: string }>>({})
@@ -195,42 +183,6 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
     } finally {
       setRoundLoading((s) => { const n = new Set(s); n.delete(roundId); return n })
     }
-  }
-
-  // ── Side-bet options ─────────────────────────────────────────────────────────
-
-  async function addSidebetOption() {
-    if (!sbMatchId || !sbType) return
-    setSbLoading(true)
-    try {
-      const res = await fetch('/api/admin/sidebet-options', {
-        method: 'POST', headers: authHeader,
-        body: JSON.stringify({ match_id: parseInt(sbMatchId), bet_type: sbType }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        setMsg('sidebet', 'ok', 'Side-bet option tilføjet')
-        setSbMatchId('')
-        setSbType('')
-        router.refresh()
-      } else {
-        setMsg('sidebet', 'err', data.error || 'Fejl')
-      }
-    } catch {
-      setMsg('sidebet', 'err', 'Netværksfejl')
-    } finally {
-      setSbLoading(false)
-    }
-  }
-
-  async function removeSidebetOption(optionId: number) {
-    try {
-      await fetch('/api/admin/sidebet-options', {
-        method: 'DELETE', headers: authHeader,
-        body: JSON.stringify({ id: optionId }),
-      })
-      router.refresh()
-    } catch { /* ignore */ }
   }
 
   // ── Resultater ────────────────────────────────────────────────────────────────
@@ -577,87 +529,7 @@ export default function AdminPanel({ leagues, games, rounds, matches, adminSecre
         )}
       </section>
 
-      {/* ── Sektion 3: Side-bet options ─────────────────────────── */}
-      <section>
-        <div className="mb-4">
-          <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Kampe</p>
-          <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide">Side-bet options</h2>
-        </div>
-
-        <div className="border border-warm-border bg-cream-dark p-5 space-y-4">
-          {/* Tilføj ny option */}
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
-            <div>
-              <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray mb-1.5">Kamp</label>
-              <select
-                value={sbMatchId}
-                onChange={(e) => setSbMatchId(e.target.value)}
-                className="w-full bg-white border border-warm-border text-ink font-body text-sm px-3 py-2.5 outline-none focus:border-forest"
-                style={{ borderRadius: '2px' }}
-              >
-                <option value="">Vælg kamp...</option>
-                {matches.filter((m) => m.status === 'scheduled').map((m) => (
-                  <option key={m.id} value={String(m.id)}>
-                    {m.game_name} · {m.round_name} · {m.home_team} vs {m.away_team}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray mb-1.5">Type</label>
-              <select
-                value={sbType}
-                onChange={(e) => setSbType(e.target.value)}
-                className="w-full bg-white border border-warm-border text-ink font-body text-sm px-3 py-2.5 outline-none focus:border-forest"
-                style={{ borderRadius: '2px' }}
-              >
-                <option value="">Vælg type...</option>
-                {SIDEBET_TYPES.map((t) => (
-                  <option key={t} value={t}>{BET_TYPE_LABELS[t]}</option>
-                ))}
-              </select>
-            </div>
-            <AdminBtn
-              onClick={addSidebetOption}
-              loading={sbLoading}
-              disabled={!sbMatchId || !sbType}
-              variant="primary"
-              size="sm"
-            >
-              Tilføj
-            </AdminBtn>
-          </div>
-
-          {messages['sidebet'] && <MsgBanner msg={messages['sidebet']} />}
-
-          {/* Eksisterende options */}
-          {matches.some((m) => m.existing_sidebet_types.length > 0) && (
-            <div className="pt-3 border-t border-warm-border">
-              <p className="font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray mb-3">Aktive side-bets</p>
-              <div className="space-y-2">
-                {matches.filter((m) => m.existing_sidebet_types.length > 0).map((m) => (
-                  <div key={m.id} className="flex items-start gap-3 bg-cream border border-warm-border px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <span className="font-condensed font-semibold text-sm text-ink">{m.home_team} vs {m.away_team}</span>
-                      <span className="font-body text-xs text-warm-gray ml-2">{m.game_name} · {m.round_name}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {m.existing_sidebet_types.map((t) => (
-                        <span key={t} className="font-condensed text-xs uppercase tracking-wide bg-forest/10 text-forest border border-forest/20 px-2 py-0.5"
-                          style={{ borderRadius: '2px' }}>
-                          {BET_TYPE_LABELS[t] ?? t}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── Sektion 4: Resultater ───────────────────────────────── */}
+      {/* ── Sektion 3: Resultater ───────────────────────────────── */}
       <section>
         <div className="mb-4">
           <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Kampe</p>

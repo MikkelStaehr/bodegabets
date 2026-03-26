@@ -68,6 +68,7 @@ export default function DashboardContent({
   leagueNamesByGame,
   top3ByGame,
   username,
+  activeBlockByGame,
 }: {
   games: GameRowWithSport[]
   activeRounds: Round[]
@@ -76,6 +77,7 @@ export default function DashboardContent({
   leagueNamesByGame: Record<number, string[]>
   top3ByGame: Record<number, Top3Entry[]>
   username: string
+  activeBlockByGame?: Record<number, { block_number: number; name: string; rounds_remaining: number }>
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>('all')
   const [transitioning, setTransitioning] = useState(false)
@@ -197,14 +199,14 @@ export default function DashboardContent({
             ) : (
               <>
                 {activeGames.map((row) => (
-                  <DashboardGameCard key={row.game.id} row={row} logoUrls={logoUrlsByGame[row.game.id]} leagueNames={leagueNamesByGame[row.game.id]} top3={top3ByGame[row.game.id]} />
+                  <DashboardGameCard key={row.game.id} row={row} logoUrls={logoUrlsByGame[row.game.id]} leagueNames={leagueNamesByGame[row.game.id]} top3={top3ByGame[row.game.id]} activeBlock={activeBlockByGame?.[row.game.id] ?? null} />
                 ))}
                 {finishedGames.length > 0 && (
                   <div className="mt-4">
                     <h3 className="text-[11px] font-bold text-[#7a7060] uppercase tracking-widest mb-3">Afsluttede spil</h3>
                     <div className="flex flex-col gap-4 opacity-75">
                       {finishedGames.map((row) => (
-                        <DashboardGameCard key={row.game.id} row={row} logoUrls={logoUrlsByGame[row.game.id]} leagueNames={leagueNamesByGame[row.game.id]} top3={top3ByGame[row.game.id]} />
+                        <DashboardGameCard key={row.game.id} row={row} logoUrls={logoUrlsByGame[row.game.id]} leagueNames={leagueNamesByGame[row.game.id]} top3={top3ByGame[row.game.id]} activeBlock={activeBlockByGame?.[row.game.id] ?? null} />
                       ))}
                     </div>
                   </div>

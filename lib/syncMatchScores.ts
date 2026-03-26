@@ -6,6 +6,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { calculateRoundPoints } from '@/lib/calculatePoints'
+import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -247,6 +248,19 @@ export async function syncMatchScores(options?: {
     }
   }
 
+  // Opdater block-statuser og evaluer færdige blocks
+  if (finishedRoundIds.size > 0 && !dryRun) {
+    const seasonIdsForBlocks = [...new Set(
+      activeMatches
+        .filter((m) => m.round_id !== null && finishedRoundIds.has(m.round_id))
+        .map((m) => m.season_id)
+    )]
+    for (const sid of seasonIdsForBlocks) {
+      await updateBlockStatuses(sid)
+      await evaluateFinishedBlocks(sid)
+    }
+  }
+
   // ─── Lås kampe hvor bet_lock_at er passeret ─────────────────────────────
   const { data: toLock } = await supabaseAdmin
     .from('matches')
@@ -259,6 +273,52 @@ export async function syncMatchScores(options?: {
       .from('matches')
       .update({ bet_open: false })
       .in('id', toLock.map((m) => m.id))
+
+    // Beregn og gem konsensus odds for alle match_result-bets på de låste kampe
+    if (!dryRun) {
+      const lockedMatchIds = toLock.map((m) => m.id)
+
+      const { data: lockedBets } = await supabaseAdmin
+        .from('bets')
+        .select('id, match_id, game_id, prediction')
+        .in('match_id', lockedMatchIds)
+        .eq('bet_type', 'match_result')
+
+      if (lockedBets?.length) {
+        // Gruppér per match + game
+        const groups = new Map<string, typeof lockedBets>()
+        for (const bet of lockedBets) {
+          const key = `${bet.match_id}:${bet.game_id}`
+          const group = groups.get(key) ?? []
+          group.push(bet)
+          groups.set(key, group)
+        }
+
+        for (const groupBets of groups.values()) {
+          const total = groupBets.length
+          const count: Record<string, number> = { '1': 0, 'X': 0, '2': 0 }
+          for (const bet of groupBets) {
+            if (bet.prediction in count) count[bet.prediction]++
+          }
+
+          const calcOdds = (pred: string): number => {
+            const n = count[pred] ?? 0
+            if (total === 0 || n === 0) return 1.8
+            const pct = n / total
+            return Math.round(Math.max(1.2, 1.8 - pct * 0.6) * 100) / 100
+          }
+
+          for (const bet of groupBets) {
+            await supabaseAdmin
+              .from('bets')
+              .update({ odds: calcOdds(bet.prediction) })
+              .eq('id', bet.id)
+          }
+        }
+
+        console.log(`[syncMatchScores] Konsensus odds beregnet for ${lockedBets.length} bets på ${lockedMatchIds.length} låste kampe`)
+      }
+    }
 
     // Opdater rounds.bet_open baseret på om der stadig er åbne kampe
     const roundIds = [...new Set(toLock.map((m) => m.round_id).filter(Boolean))]
@@ -383,6 +443,17 @@ export async function syncMatchScores(options?: {
         await calculateRoundPoints(catchupRoundId)
       } catch (e) {
         errors.push(`Catch-up calculateRoundPoints fejl for runde ${catchupRoundId}: ${e}`)
+      }
+    }
+
+    // Opdater block-statuser og evaluer færdige blocks for catch-up sæsoner
+    if (!dryRun) {
+      const catchupSeasonIds = [...new Set(
+        activeMatches.map((m) => m.season_id)
+      )]
+      for (const sid of catchupSeasonIds) {
+        await updateBlockStatuses(sid)
+        await evaluateFinishedBlocks(sid)
       }
     }
   }

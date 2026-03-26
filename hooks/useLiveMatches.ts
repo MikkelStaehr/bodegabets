@@ -19,7 +19,7 @@ export type LiveMatch = {
   tournamentLogo?: string | null
   userPrediction?: string | null
   bet_open?: boolean
-  distribution?: { '1': number; 'X': number; '2': number; total: number } | null
+  distribution?: { '1': number; 'X': number; '2': number; total: number; odds: { '1': number | null; 'X': number | null; '2': number | null } } | null
 }
 
 export type LiveSummary = {

@@ -41,7 +41,7 @@ export default async function RoundPage({ params }: Props) {
   const [{ data: round }, { data: membership }] = await Promise.all([
     supabase
       .from('rounds')
-      .select('id, name, season_id, status, betting_closes_at, bet_open')
+      .select('id, name, season_id, status, betting_closes_at, bet_open, block_id')
       .eq('id', roundIdNum)
       .in('season_id', seasonIds.length > 0 ? seasonIds : [0])
       .single(),
@@ -56,6 +56,21 @@ export default async function RoundPage({ params }: Props) {
 
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
+
+  // Hent block info hvis runden er tilknyttet en block
+  const roundBlockId = (round as typeof round & { block_id?: number | null }).block_id ?? null
+  let blockInfo: { block_number: number; block_name: string; is_last_in_block: boolean } | null = null
+  if (roundBlockId) {
+    const [{ data: block }, { data: blockRounds }] = await Promise.all([
+      supabase.from('blocks').select('id, block_number, name').eq('id', roundBlockId).single(),
+      supabase.from('rounds').select('id').eq('block_id', roundBlockId).order('id', { ascending: true }),
+    ])
+    if (block) {
+      const allBlockRoundIds = (blockRounds ?? []).map((r: { id: number }) => r.id)
+      const isLast = allBlockRoundIds.length > 0 && allBlockRoundIds[allBlockRoundIds.length - 1] === roundIdNum
+      blockInfo = { block_number: block.block_number, block_name: block.name, is_last_in_block: isLast }
+    }
+  }
 
   // Step 2: Hent matches via round_id med team joins
   const matchSelect = `
@@ -139,21 +154,26 @@ export default async function RoundPage({ params }: Props) {
   const typedBets = (betsData ?? []) as Bet[]
 
   // Hent bet-fordeling for låste kampe
+  const lockedMatchIds = matches.filter(m => !m.bet_open).map(m => m.id)
   const { data: distributionData } = await supabase
     .from('bets')
-    .select('match_id, prediction')
+    .select('match_id, prediction, odds')
     .eq('game_id', gameId)
     .eq('bet_type', 'match_result')
-    .in('match_id', matches.filter(m => !m.bet_open).map(m => m.id).length > 0 ? matches.filter(m => !m.bet_open).map(m => m.id) : [0])
+    .in('match_id', lockedMatchIds.length > 0 ? lockedMatchIds : [0])
 
-  const betDistribution: Record<number, { '1': number; 'X': number; '2': number; total: number }> = {}
+  type DistEntry = { '1': number; 'X': number; '2': number; total: number; odds: { '1': number | null; 'X': number | null; '2': number | null } }
+  const betDistribution: Record<number, DistEntry> = {}
   for (const bet of distributionData ?? []) {
     if (!betDistribution[bet.match_id]) {
-      betDistribution[bet.match_id] = { '1': 0, 'X': 0, '2': 0, total: 0 }
+      betDistribution[bet.match_id] = { '1': 0, 'X': 0, '2': 0, total: 0, odds: { '1': null, 'X': null, '2': null } }
     }
     if (bet.prediction === '1' || bet.prediction === 'X' || bet.prediction === '2') {
       betDistribution[bet.match_id][bet.prediction as '1' | 'X' | '2']++
       betDistribution[bet.match_id].total++
+      if (betDistribution[bet.match_id].odds[bet.prediction as '1' | 'X' | '2'] === null && (bet as { odds?: number | null }).odds != null) {
+        betDistribution[bet.match_id].odds[bet.prediction as '1' | 'X' | '2'] = (bet as { odds?: number | null }).odds!
+      }
     }
   }
 
@@ -234,6 +254,7 @@ export default async function RoundPage({ params }: Props) {
       rivalryInfo={rivalryInfo}
       totalMatchesInRound={matches.length}
       betDistribution={betDistribution}
+      blockInfo={blockInfo}
     />
   )
 }
