@@ -122,7 +122,7 @@ export default async function GamePage({ params }: Props) {
       .select('user_id, round_id, points_earned, earnings_delta')
       .eq('game_id', gameId),
 
-    supabase
+    supabaseAdmin
       .from('game_members')
       .select('user_id')
       .eq('game_id', gameId)
