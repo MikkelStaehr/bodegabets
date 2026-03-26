@@ -22,7 +22,7 @@ export default async function RoundPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: game } = await supabase
+  const { data: game } = await supabaseAdmin
     .from('games')
     .select('id, name, status')
     .eq('id', gameId)
@@ -31,7 +31,7 @@ export default async function RoundPage({ params }: Props) {
   if (!game) notFound()
 
   // Hent season_ids for dette game via game_seasons
-  const { data: gameSeasons } = await supabase
+  const { data: gameSeasons } = await supabaseAdmin
     .from('game_seasons')
     .select('season_id')
     .eq('game_id', gameId)
@@ -39,14 +39,14 @@ export default async function RoundPage({ params }: Props) {
 
   // Step 1: Hent round og membership parallelt
   const [{ data: round }, { data: membership }] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('rounds')
       .select('id, name, season_id, status, betting_closes_at, bet_open, block_id')
       .eq('id', roundIdNum)
       .in('season_id', seasonIds.length > 0 ? seasonIds : [0])
       .single(),
 
-    supabase
+    supabaseAdmin
       .from('game_members')
       .select('earnings')
       .eq('game_id', gameId)
@@ -62,8 +62,8 @@ export default async function RoundPage({ params }: Props) {
   let blockInfo: { block_number: number; block_name: string; is_last_in_block: boolean } | null = null
   if (roundBlockId) {
     const [{ data: block }, { data: blockRounds }] = await Promise.all([
-      supabase.from('blocks').select('id, block_number, name').eq('id', roundBlockId).single(),
-      supabase.from('rounds').select('id').eq('block_id', roundBlockId).order('id', { ascending: true }),
+      supabaseAdmin.from('blocks').select('id, block_number, name').eq('id', roundBlockId).single(),
+      supabaseAdmin.from('rounds').select('id').eq('block_id', roundBlockId).order('id', { ascending: true }),
     ])
     if (block) {
       const allBlockRoundIds = (blockRounds ?? []).map((r: { id: number }) => r.id)
@@ -112,7 +112,7 @@ export default async function RoundPage({ params }: Props) {
     }
   }
 
-  const { data: rawMatches, error: matchesError } = await supabase
+  const { data: rawMatches, error: matchesError } = await supabaseAdmin
     .from('matches')
     .select(matchSelect)
     .eq('round_id', roundIdNum)
@@ -122,7 +122,7 @@ export default async function RoundPage({ params }: Props) {
 
   if (matches.length === 0) {
     await syncMatchesForRound(supabaseAdmin, gameId, roundIdNum)
-    const { data: matchesRetry } = await supabase
+    const { data: matchesRetry } = await supabaseAdmin
       .from('matches')
       .select(matchSelect)
       .eq('round_id', roundIdNum)
@@ -131,7 +131,7 @@ export default async function RoundPage({ params }: Props) {
   }
 
   // Hent betting_balance fra round_members
-  const { data: roundMember } = await supabase
+  const { data: roundMember } = await supabaseAdmin
     .from('round_members')
     .select('betting_balance')
     .eq('user_id', user.id)
@@ -144,7 +144,7 @@ export default async function RoundPage({ params }: Props) {
   const typedRound = round as unknown as Round
   const matchIds = matches.map((m) => m.id)
 
-  const { data: betsData } = await supabase
+  const { data: betsData } = await supabaseAdmin
     .from('bets')
     .select('*')
     .eq('game_id', gameId)
@@ -155,7 +155,7 @@ export default async function RoundPage({ params }: Props) {
 
   // Hent bet-fordeling for låste kampe
   const lockedMatchIds = matches.filter(m => !m.bet_open).map(m => m.id)
-  const { data: distributionData } = await supabase
+  const { data: distributionData } = await supabaseAdmin
     .from('bets')
     .select('match_id, prediction, odds')
     .eq('game_id', gameId)
