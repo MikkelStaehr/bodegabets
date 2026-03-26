@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
 import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
@@ -79,7 +79,7 @@ export default async function GamePage({ params }: Props) {
   if (!user) redirect('/login')
 
   // Hent game
-  const { data: game } = await supabase
+  const { data: game } = await supabaseAdmin
     .from('games')
     .select('id, name, host_id, invite_code, status, created_at')
     .eq('id', gameId)
