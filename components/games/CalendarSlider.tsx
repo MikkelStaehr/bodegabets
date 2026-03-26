@@ -165,6 +165,11 @@ export default function CalendarSlider({
     selectedDayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [selectedDate, viewMonth])
 
+  // Scroll til valgt dag ved mount (ingen animation)
+  useEffect(() => {
+    selectedDayRef.current?.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' })
+  }, [])
+
   const prevMonth = () =>
     setViewMonth((prev) =>
       prev.month === 0 ? { year: prev.year - 1, month: 11 } : { year: prev.year, month: prev.month - 1 }
