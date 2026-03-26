@@ -187,6 +187,52 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     }
   }
 
+  // Tjek om alle kampe i runden er finished → sæt rundestatus og åbn næste runde
+  const { data: allRoundMatches } = await supabaseAdmin
+    .from('matches')
+    .select('id, status')
+    .eq('round_id', roundId)
+
+  const allFinished =
+    (allRoundMatches ?? []).length > 0 &&
+    (allRoundMatches ?? []).every((m) => m.status === 'finished')
+
+  if (allFinished) {
+    const { data: roundRow } = await supabaseAdmin
+      .from('rounds')
+      .select('season_id')
+      .eq('id', roundId)
+      .single()
+
+    await supabaseAdmin
+      .from('rounds')
+      .update({ status: 'finished' })
+      .eq('id', roundId)
+
+    console.log(`[calculateRoundPoints] Runde ${roundId} → status=finished`)
+
+    if (roundRow?.season_id) {
+      const { data: nextRound } = await supabaseAdmin
+        .from('rounds')
+        .select('id')
+        .eq('season_id', roundRow.season_id)
+        .neq('status', 'finished')
+        .gt('id', roundId)
+        .order('id', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (nextRound) {
+        await supabaseAdmin
+          .from('rounds')
+          .update({ bet_open: true })
+          .eq('id', nextRound.id)
+
+        console.log(`[calculateRoundPoints] Næste runde ${nextRound.id} → bet_open=true`)
+      }
+    }
+  }
+
   console.log(`[calculateRoundPoints] DONE roundId=${roundId}`)
 }
 
