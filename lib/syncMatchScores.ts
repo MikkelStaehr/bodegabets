@@ -264,7 +264,7 @@ export async function syncMatchScores(options?: {
   // ─── Lås kampe hvor bet_lock_at er passeret ─────────────────────────────
   const { data: toLock } = await supabaseAdmin
     .from('matches')
-    .select('id, round_id')
+    .select('id, round_id, home_team_id, away_team_id')
     .eq('bet_open', true)
     .lt('bet_lock_at', new Date().toISOString())
 
@@ -277,6 +277,32 @@ export async function syncMatchScores(options?: {
     // Beregn og gem konsensus odds for alle match_result-bets på de låste kampe
     if (!dryRun) {
       const lockedMatchIds = toLock.map((m) => m.id)
+
+      // Find rivalry-kampe i én query
+      const allTeamIds = [...new Set(
+        toLock.flatMap((m) => [m.home_team_id, m.away_team_id]).filter((id): id is number => id != null)
+      )]
+      const rivalryMatchIds = new Set<number>()
+      if (allTeamIds.length > 0) {
+        const { data: rivalries } = await supabaseAdmin
+          .from('rivalries')
+          .select('team_id, rival_team_id')
+          .in('team_id', allTeamIds)
+          .in('rival_team_id', allTeamIds)
+
+        const rivalryPairs = new Set<string>(
+          (rivalries ?? []).map((r) => `${r.team_id}:${r.rival_team_id}`)
+        )
+        for (const m of toLock) {
+          if (
+            m.home_team_id != null && m.away_team_id != null &&
+            (rivalryPairs.has(`${m.home_team_id}:${m.away_team_id}`) ||
+             rivalryPairs.has(`${m.away_team_id}:${m.home_team_id}`))
+          ) {
+            rivalryMatchIds.add(m.id)
+          }
+        }
+      }
 
       const { data: lockedBets } = await supabaseAdmin
         .from('bets')
@@ -301,11 +327,14 @@ export async function syncMatchScores(options?: {
             if (bet.prediction in count) count[bet.prediction]++
           }
 
+          const isRivalry = rivalryMatchIds.has(groupBets[0].match_id)
+          const [minOdds, baseOdds] = isRivalry ? [2.2, 2.8] : [1.2, 1.8]
+
           const calcOdds = (pred: string): number => {
             const n = count[pred] ?? 0
-            if (total === 0 || n === 0) return 1.8
+            if (total === 0 || n === 0) return baseOdds
             const pct = n / total
-            return Math.round(Math.max(1.2, 1.8 - pct * 0.6) * 100) / 100
+            return Math.round(Math.max(minOdds, baseOdds - pct * 0.6) * 100) / 100
           }
 
           for (const bet of groupBets) {

@@ -177,34 +177,39 @@ export default async function RoundPage({ params }: Props) {
     }
   }
 
-  // Hent rivalries via season → tournament → league
+  // Hent rivalries via team IDs
   const rivalryInfo: Record<number, { rivalry_name: string; multiplier: number }> = {}
-  if (round.season_id) {
-    // Hent tournament_id fra seasons
-    const { data: season } = await supabase
-      .from('seasons')
-      .select('tournament_id')
-      .eq('id', round.season_id)
-      .single()
+  if (matchIds.length > 0) {
+    const { data: matchTeamRows } = await supabaseAdmin
+      .from('matches')
+      .select('id, home_team_id, away_team_id')
+      .in('id', matchIds)
 
-    // Brug tournament_id som league_id (de mapper 1:1 i rivalries)
-    const tournamentId = season?.tournament_id
-    if (tournamentId) {
-      const { data: rivalries } = await supabase
+    const allTeamIds = [...new Set(
+      (matchTeamRows ?? [])
+        .flatMap((m) => [m.home_team_id, m.away_team_id])
+        .filter((id): id is number => id != null)
+    )]
+
+    if (allTeamIds.length > 0) {
+      const { data: rivalries } = await supabaseAdmin
         .from('rivalries')
-        .select('home_team, away_team, rivalry_name, multiplier')
-        .eq('league_id', tournamentId)
+        .select('team_id, rival_team_id, rivalry_name, multiplier')
+        .in('team_id', allTeamIds)
+        .in('rival_team_id', allTeamIds)
 
-      if (rivalries) {
-        const rivalryLookup = new Map<string, { rivalry_name: string; multiplier: number }>()
+      if (rivalries?.length) {
+        const rivalryPairs = new Map<string, { rivalry_name: string; multiplier: number }>()
         for (const r of rivalries) {
           const info = { rivalry_name: r.rivalry_name, multiplier: Number(r.multiplier) }
-          rivalryLookup.set(`${r.home_team}|${r.away_team}`, info)
-          rivalryLookup.set(`${r.away_team}|${r.home_team}`, info)
+          rivalryPairs.set(`${r.team_id}:${r.rival_team_id}`, info)
+          rivalryPairs.set(`${r.rival_team_id}:${r.team_id}`, info)
         }
-        for (const m of matches) {
-          const rivalry = rivalryLookup.get(`${m.home_team}|${m.away_team}`)
-          if (rivalry) rivalryInfo[m.id] = rivalry
+        for (const m of matchTeamRows ?? []) {
+          if (m.home_team_id != null && m.away_team_id != null) {
+            const rivalry = rivalryPairs.get(`${m.home_team_id}:${m.away_team_id}`)
+            if (rivalry) rivalryInfo[m.id] = rivalry
+          }
         }
       }
     }
