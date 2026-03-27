@@ -183,13 +183,22 @@ export async function GET(req: NextRequest, { params }: Props) {
   const alwaysShow = matchList.filter((m) => m.status === 'live' || m.status === 'halftime')
   const rest = matchList.filter((m) => m.status !== 'live' && m.status !== 'halftime')
 
+  const futureDates = [...new Set(rest.filter((m) => m.kickoff_at.slice(0, 10) >= todayStr).map((m) => m.kickoff_at.slice(0, 10)))].sort()
+  const pastDates = [...new Set(rest.filter((m) => m.kickoff_at.slice(0, 10) < todayStr).map((m) => m.kickoff_at.slice(0, 10)))].sort()
+
   let targetDate: string | null = null
-  if (rest.some((m) => m.kickoff_at.slice(0, 10) === todayStr)) {
+  if (futureDates.includes(todayStr)) {
     targetDate = todayStr
-  } else if (rest.some((m) => m.kickoff_at.slice(0, 10) === day1Str)) {
+  } else if (futureDates.includes(day1Str)) {
     targetDate = day1Str
-  } else if (rest.some((m) => m.kickoff_at.slice(0, 10) === day2Str)) {
+  } else if (futureDates.includes(day2Str)) {
     targetDate = day2Str
+  } else if (futureDates.length > 0) {
+    // Nærmeste fremtidige dag uanset afstand
+    targetDate = futureDates[0]
+  } else if (pastDates.length > 0) {
+    // Seneste dag med afsluttede kampe
+    targetDate = pastDates[pastDates.length - 1]
   }
 
   const filteredList = [

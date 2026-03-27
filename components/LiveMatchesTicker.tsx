@@ -236,6 +236,8 @@ export function LiveMatchesTicker({
   const n = hasLive ? liveCount : summary.total
   const plural = n !== 1 ? 'e' : ''
 
+  const futureDateBeyond2 = [...nonLiveDates].filter((d) => d > day2Str).sort()[0] ?? null
+
   const defaultTitle = hasLive
     ? `${liveCount} kamp${plural} live`
     : nonLiveDates.has(todayStr)
@@ -244,6 +246,8 @@ export function LiveMatchesTicker({
     ? `${n} kamp${plural} i morgen`
     : nonLiveDates.has(day2Str)
     ? `${n} kamp${plural} ${new Date(day2Str + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'long', timeZone: 'UTC' })}`
+    : futureDateBeyond2
+    ? `${n} kamp${plural} ${new Date(futureDateBeyond2 + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}`
     : `${summary.finished} kamp${summary.finished !== 1 ? 'e' : ''} afsluttet`
 
   const defaultRight = lastUpdate ? (
