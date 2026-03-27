@@ -226,10 +226,24 @@ export function LiveMatchesTicker({
 
   const hasLive = summary.live > 0 || summary.halftime > 0
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const tomorrowStr = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+  const day2Str = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
+  const nonLiveDates = new Set(
+    matches.filter((m) => m.status !== 'live' && m.status !== 'halftime').map((m) => m.kickoff_at.slice(0, 10))
+  )
+  const liveCount = summary.live + summary.halftime
+  const n = hasLive ? liveCount : summary.total
+  const plural = n !== 1 ? 'e' : ''
+
   const defaultTitle = hasLive
-    ? `${summary.live + summary.halftime} kamp${summary.live + summary.halftime !== 1 ? 'e' : ''} live`
-    : summary.total > 0
-    ? `${summary.total} kamp${summary.total !== 1 ? 'e' : ''} i dag`
+    ? `${liveCount} kamp${plural} live`
+    : nonLiveDates.has(todayStr)
+    ? `${n} kamp${plural} i dag`
+    : nonLiveDates.has(tomorrowStr)
+    ? `${n} kamp${plural} i morgen`
+    : nonLiveDates.has(day2Str)
+    ? `${n} kamp${plural} ${new Date(day2Str + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'long', timeZone: 'UTC' })}`
     : `${summary.finished} kamp${summary.finished !== 1 ? 'e' : ''} afsluttet`
 
   const defaultRight = lastUpdate ? (

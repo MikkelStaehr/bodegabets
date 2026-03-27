@@ -174,14 +174,37 @@ export async function GET(req: NextRequest, { params }: Props) {
     }
   })
 
-  const live = matchList.filter((m) => m.status === 'live').length
-  const halftime = matchList.filter((m) => m.status === 'halftime').length
-  const finished = matchList.filter((m) => m.status === 'finished').length
-  const scheduled = matchList.filter((m) => m.status === 'scheduled').length
-  const total = matchList.length
+  // Filtrer til relevante kampe: live/halftime altid + kun én dags kampe ad gangen
+  const nowUTC = new Date()
+  const todayStr = nowUTC.toISOString().slice(0, 10)
+  const day1Str = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate() + 1)).toISOString().slice(0, 10)
+  const day2Str = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate() + 2)).toISOString().slice(0, 10)
+
+  const alwaysShow = matchList.filter((m) => m.status === 'live' || m.status === 'halftime')
+  const rest = matchList.filter((m) => m.status !== 'live' && m.status !== 'halftime')
+
+  let targetDate: string | null = null
+  if (rest.some((m) => m.kickoff_at.slice(0, 10) === todayStr)) {
+    targetDate = todayStr
+  } else if (rest.some((m) => m.kickoff_at.slice(0, 10) === day1Str)) {
+    targetDate = day1Str
+  } else if (rest.some((m) => m.kickoff_at.slice(0, 10) === day2Str)) {
+    targetDate = day2Str
+  }
+
+  const filteredList = [
+    ...alwaysShow,
+    ...(targetDate ? rest.filter((m) => m.kickoff_at.slice(0, 10) === targetDate) : []),
+  ].sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))
+
+  const live = filteredList.filter((m) => m.status === 'live').length
+  const halftime = filteredList.filter((m) => m.status === 'halftime').length
+  const finished = filteredList.filter((m) => m.status === 'finished').length
+  const scheduled = filteredList.filter((m) => m.status === 'scheduled').length
+  const total = filteredList.length
 
   return NextResponse.json({
-    matches: matchList,
+    matches: filteredList,
     summary: { live, halftime, finished, scheduled, total },
   })
 }
