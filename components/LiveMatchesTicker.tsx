@@ -59,9 +59,11 @@ function MatchRow({ match }: { match: LiveMatch }) {
   const isHalftime = match.status === 'halftime'
   const isFinished = match.status === 'finished'
   const isScheduled = match.status === 'scheduled'
+  const isRivalry = match.isRivalry === true
 
   const rowBg = isLive ? 'bg-red-500/15'
     : isHalftime ? 'bg-amber-500/15'
+    : isRivalry ? 'bg-[#2C4A3E]/25'
     : isScheduled ? 'bg-white/[0.03]'
     : 'bg-white/5'
 
@@ -78,6 +80,13 @@ function MatchRow({ match }: { match: LiveMatch }) {
 
   return (
     <div className={`rounded-lg ${rowBg}`} style={{ borderLeft: `3px solid ${borderColor}` }}>
+      {isRivalry && match.rivalryName && (
+        <div className="flex items-center gap-1 px-2 pt-1.5 pb-0.5">
+          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700, color: '#C8B89A', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            🔥 {match.rivalryName}
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-2 pr-3 py-1.5" style={{ paddingLeft: 8 }}>
         {/* Tournament logo */}
         {match.tournamentLogo && (

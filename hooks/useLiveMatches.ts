@@ -20,6 +20,8 @@ export type LiveMatch = {
   userPrediction?: string | null
   bet_open?: boolean
   distribution?: { '1': number; 'X': number; '2': number; total: number; odds: { '1': number | null; 'X': number | null; '2': number | null } } | null
+  isRivalry?: boolean
+  rivalryName?: string | null
 }
 
 export type LiveSummary = {

@@ -12,6 +12,7 @@ export type ActiveRoundRow = {
   leagueAbbr: string
   leagueType: 'league' | 'cup'
   logo_url?: string | null
+  hasRivalry?: boolean
 }
 
 interface ActiveRoundsProps {
@@ -155,6 +156,18 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
               >
                 {round.userBets}/{round.totalMatches} kampe afgivet
               </div>
+              {round.hasRivalry && (
+                <div
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontSize: 10,
+                    color: '#B8963E',
+                    marginTop: 2,
+                  }}
+                >
+                  🔥 Indeholder rivalopgør
+                </div>
+              )}
             </div>
 
             {/* Status chip */}

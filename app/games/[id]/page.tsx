@@ -392,6 +392,39 @@ export default async function GamePage({ params }: Props) {
     if (rid != null) matchCountByRound[rid] = (matchCountByRound[rid] ?? 0) + 1
   }
 
+  // Rivalry lookup — én query for alle kampe
+  const rawMatchTeamIds = [...new Set(
+    typedRawMatches
+      .flatMap((m) => [m.home_team?.id, m.away_team?.id])
+      .filter((id): id is number => id != null)
+  )]
+  const rivalryPairs = new Set<string>()
+  if (rawMatchTeamIds.length > 0) {
+    const { data: rivalries } = await supabaseAdmin
+      .from('rivalries')
+      .select('team_id, rival_team_id')
+      .in('team_id', rawMatchTeamIds)
+      .in('rival_team_id', rawMatchTeamIds)
+    for (const r of rivalries ?? []) {
+      rivalryPairs.add(`${r.team_id}:${r.rival_team_id}`)
+      rivalryPairs.add(`${r.rival_team_id}:${r.team_id}`)
+    }
+  }
+  const rivalryMatchIds = new Set<number>(
+    typedRawMatches
+      .filter((m) => {
+        const h = m.home_team?.id
+        const a = m.away_team?.id
+        return h != null && a != null && rivalryPairs.has(`${h}:${a}`)
+      })
+      .map((m) => m.id)
+  )
+  const rivalryRoundIds = new Set<number>()
+  for (const matchId of rivalryMatchIds) {
+    const roundId = matchRoundMap.get(matchId)
+    if (roundId != null) rivalryRoundIds.add(roundId)
+  }
+
   // Map to CalendarMatch
   const allMatches: CalendarMatch[] = typedRawMatches.map((m) => ({
     id: m.id,
@@ -403,6 +436,7 @@ export default async function GamePage({ params }: Props) {
     away_team: m.away_team?.name ?? '',
     home_score: m.home_score,
     away_score: m.away_score,
+    isRivalry: rivalryMatchIds.has(m.id),
   }))
 
   const leagueInfo = defaultLeagueInfo
@@ -442,6 +476,7 @@ export default async function GamePage({ params }: Props) {
     leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
     leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
     logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
+    hasRivalry: rivalryRoundIds.has(r.id),
   }))
 
   const myEntry = ranked.find((r) => r.user_id === user.id)

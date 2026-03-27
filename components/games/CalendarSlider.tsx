@@ -12,6 +12,7 @@ export type CalendarMatch = {
   away_team: string
   home_score: number | null
   away_score: number | null
+  isRivalry?: boolean
 }
 
 export type CalendarRound = {
@@ -111,6 +112,7 @@ export default function CalendarSlider({
       blockId: number | null
       blockNum: number | null
       isBlockStart: boolean
+      hasRivalry: boolean
     }> = []
 
     let prevMatchBlockId: number | null | undefined = undefined
@@ -120,6 +122,7 @@ export default function CalendarSlider({
       const key = toDateKey(d)
       const dayMatches = matchesByDate.get(key) ?? []
       const hasLive = dayMatches.some((m) => m.status === 'live' || m.status === 'halftime')
+      const hasRivalry = dayMatches.some((m) => m.isRivalry === true)
 
       let logoUrl: string | null = null
       let roundNum: string | null = null
@@ -156,6 +159,7 @@ export default function CalendarSlider({
         blockId,
         blockNum,
         isBlockStart,
+        hasRivalry,
       })
     }
     return days
@@ -356,6 +360,11 @@ export default function CalendarSlider({
                 >
                   {day.dayNum}
                 </span>
+
+                {/* Rivalry indicator */}
+                {day.hasMatches && day.hasRivalry && (
+                  <span style={{ fontSize: 9, lineHeight: 1 }}>🔥</span>
+                )}
 
                 {/* Round number badge — only on match days */}
                 {day.hasMatches && day.roundNum && (

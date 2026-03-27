@@ -69,15 +69,37 @@ export async function GET(req: NextRequest, { params }: Props) {
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
     .select(`id, round_id, round_name, kickoff_at:kickoff, status, result, second_half_started_at, bet_open,
-      home_score, away_score, home_score_ht, away_score_ht,
+      home_score, away_score, home_score_ht, away_score_ht, home_team_id, away_team_id,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
     .in('round_id', openRoundIds)
     .neq('status', 'cancelled')
     .order('kickoff', { ascending: true })
 
-  // Hent brugerens match_result bets for disse kampe
+  // Rivalry lookup
   const matchIds = (roundMatches ?? []).map((m) => m.id)
+  const allMatchTeamIds = [...new Set(
+    (roundMatches ?? [])
+      .flatMap((m) => {
+        const mm = m as Record<string, unknown>
+        return [mm.home_team_id as number | null, mm.away_team_id as number | null]
+      })
+      .filter((id): id is number => id != null)
+  )]
+  const rivalryInfo = new Map<string, string>()
+  if (allMatchTeamIds.length > 0) {
+    const { data: rivalries } = await supabaseAdmin
+      .from('rivalries')
+      .select('team_id, rival_team_id, rivalry_name')
+      .in('team_id', allMatchTeamIds)
+      .in('rival_team_id', allMatchTeamIds)
+    for (const r of rivalries ?? []) {
+      rivalryInfo.set(`${r.team_id}:${r.rival_team_id}`, r.rivalry_name)
+      rivalryInfo.set(`${r.rival_team_id}:${r.team_id}`, r.rivalry_name)
+    }
+  }
+
+  // Hent brugerens match_result bets for disse kampe
   const { data: userBets } = matchIds.length > 0
     ? await supabaseAdmin
         .from('bets')
@@ -124,6 +146,10 @@ export async function GET(req: NextRequest, { params }: Props) {
   const matchList = (roundMatches ?? []).map((m) => {
     const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
     const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
+    const mm = m as Record<string, unknown>
+    const hId = mm.home_team_id as number | null
+    const aId = mm.away_team_id as number | null
+    const rivalryName = (hId && aId) ? (rivalryInfo.get(`${hId}:${aId}`) ?? null) : null
     return {
       id: m.id,
       round_id: m.round_id,
@@ -136,13 +162,15 @@ export async function GET(req: NextRequest, { params }: Props) {
       away_score_ht: m.away_score_ht,
       status: m.status,
       kickoff_at: m.kickoff_at,
-      second_half_started_at: (m as Record<string, unknown>).second_half_started_at ?? null,
+      second_half_started_at: mm.second_half_started_at ?? null,
       home_team_logo: homeRef?.logo_url ?? null,
       away_team_logo: awayRef?.logo_url ?? null,
       tournamentLogo: tournamentLogoMap.get(roundSeasonMap.get(m.round_id) ?? 0) ?? null,
       userPrediction: betMap.get(m.id) ?? null,
-      bet_open: (m as Record<string, unknown>).bet_open ?? true,
+      bet_open: mm.bet_open ?? true,
       distribution: betDistribution[m.id] ?? null,
+      isRivalry: rivalryName != null,
+      rivalryName,
     }
   })
 
