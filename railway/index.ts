@@ -5,13 +5,12 @@
  * Erstatter Vercel cron (som kun tillader daglige jobs på Hobby).
  *
  * Endpoints:
- *   GET /sync-scores       — hvert 5. min (sync live scores fra Bold API)
- *   GET /sync-fixtures     — dagligt 06:00 (sync fixtures fra Bold API)
- *   GET /update-rounds     — dagligt 08:00 (opdater runde-status)
- *   GET /update-bet-open   — dagligt 07:05 (åbn betting for næste runder)
- *   GET /calculate-points  — dagligt 09:00 (beregn points)
+ *   GET /sync-scores       — dynamisk polling (hvert min, hvert 5. min ved ro)
+ *   GET /batch-sync        — hver 3. time (sync fixtures + resultater for alle ligaer)
+ *   GET /update-rounds     — dagligt 07:00 (opdater runde-status)
+ *   GET /update-bet-open   — dagligt 07:05 (opret round_members for åbne runder)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
- *   GET /batch-sync        — hver 3. time (opdater alle kampe på tværs af ligaer)
+ *   GET /calculate-points  — manuel fallback (catch-up håndteres af sync-scores)
  *   GET /health            — health check
  *
  * Environment:
@@ -114,47 +113,6 @@ app.get('/batch-sync', async (_req, res) => {
     res.json({ ok: true, ...totals })
   } catch (err) {
     console.error('[batch-sync]', err)
-    res.status(500).json({ error: String(err) })
-  }
-})
-
-// ─── GET /sync-fixtures ─────────────────────────────────────────────────────
-
-app.get('/sync-fixtures', async (_req, res) => {
-  try {
-    const results = await runLeagueSync()
-
-    const totals = results.reduce(
-      (acc, r) => ({
-        synced: acc.synced + r.synced,
-        rounds_created: acc.rounds_created + r.rounds_created,
-        matches_created: acc.matches_created + r.matches_created,
-        matches_updated: acc.matches_updated + r.matches_updated,
-      }),
-      { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0 }
-    )
-
-    await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
-      status: totals.synced > 0 ? 'success' : 'info',
-      message: `sync-fixtures: ${results.length} leagues, ${totals.matches_created} created, ${totals.matches_updated} updated`,
-      metadata: { leagues_synced: results.length, ...totals },
-    })
-
-    res.json({
-      ok: true,
-      synced_at: new Date().toISOString(),
-      leagues_synced: results.length,
-      ...totals,
-      details: results,
-    })
-  } catch (err) {
-    console.error('[sync-fixtures]', err)
-    await supabaseAdmin.from('admin_logs').insert({
-      type: 'cron_sync',
-      status: 'error',
-      message: `sync-fixtures failed: ${String(err)}`,
-    })
     res.status(500).json({ error: String(err) })
   }
 })
@@ -645,9 +603,6 @@ app.listen(PORT, () => {
     }
   })
 
-  // Dagligt kl. 06:00 UTC — sync fixtures
-  cron.schedule('0 6 * * *', () => callEndpoint('/sync-fixtures'))
-
   // Hver 3. time — batch sync af alle kampe
   cron.schedule('0 */3 * * *', () => callEndpoint('/batch-sync'))
 
@@ -656,9 +611,6 @@ app.listen(PORT, () => {
 
   // Dagligt kl. 07:05 UTC — update bet-open (efter update-rounds)
   cron.schedule('5 7 * * *', () => callEndpoint('/update-bet-open'))
-
-  // Dagligt kl. 08:00 UTC — calculate points
-  cron.schedule('0 8 * * *', () => callEndpoint('/calculate-points'))
 
   // Dagligt kl. 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
