@@ -2,7 +2,6 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import AfgivBets from '@/components/AfgivBets'
-import { syncMatchesForRound } from '@/lib/syncMatchesForRound'
 import type { Match, Bet, Round } from '@/types'
 
 type Props = {
@@ -118,17 +117,8 @@ export default async function RoundPage({ params }: Props) {
     .eq('round_id', roundIdNum)
     .order('kickoff', { ascending: true })
 
-  let matches = (rawMatches ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
+  const matches = (rawMatches ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
 
-  if (matches.length === 0) {
-    await syncMatchesForRound(supabaseAdmin, gameId, roundIdNum)
-    const { data: matchesRetry } = await supabaseAdmin
-      .from('matches')
-      .select(matchSelect)
-      .eq('round_id', roundIdNum)
-      .order('kickoff', { ascending: true })
-    matches = (matchesRetry ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
-  }
 
   // Hent betting_balance fra round_members
   const { data: roundMember } = await supabaseAdmin
