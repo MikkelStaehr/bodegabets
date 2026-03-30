@@ -445,6 +445,7 @@ export async function syncBoldFixtures(
     .filter((p) => !existingBoldIds.has(p.bold_match_id))
     .map((p) => ({
       season_id: seasonId,
+      round_id: roundMap.get(p.round_name) ?? null,
       round_name: p.round_name,
       home_team_id: p.home_team_id,
       away_team_id: p.away_team_id,
@@ -463,6 +464,7 @@ export async function syncBoldFixtures(
     .filter((p) => existingBoldIds.has(p.bold_match_id))
     .map((p) => ({
       season_id: seasonId,
+      round_id: roundMap.get(p.round_name) ?? null,
       round_name: p.round_name,
       home_team_id: p.home_team_id,
       away_team_id: p.away_team_id,
