@@ -47,21 +47,32 @@ export async function GET(req: NextRequest, { params }: Props) {
     tournamentLogoMap.set(st.id, tournament?.logo_url ?? null)
   }
 
-  // Hent kun runder med status = 'open' (ikke upcoming/bet_open)
-  const { data: openRounds } = await supabaseAdmin
+  // Hent aktive runder: status='open' eller bet_open=true
+  let { data: activeRounds } = await supabaseAdmin
     .from('rounds')
     .select('id, name, season_id')
     .in('season_id', seasonIds)
-    .eq('status', 'open')
+    .or('status.eq.open,bet_open.eq.true')
 
-  const openRoundIds = (openRounds ?? []).map((r: { id: number }) => r.id)
-  if (openRoundIds.length === 0) {
-    return NextResponse.json({ matches: [], summary: { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0 } })
+  // Fallback: næste upcoming runde
+  if (!activeRounds?.length) {
+    const { data: upcomingRounds } = await supabaseAdmin
+      .from('rounds')
+      .select('id, name, season_id')
+      .in('season_id', seasonIds)
+      .eq('status', 'upcoming')
+      .order('betting_closes_at', { ascending: true, nullsFirst: false })
+    activeRounds = upcomingRounds ?? []
+  }
+
+  const activeRoundIds = (activeRounds ?? []).map((r: { id: number }) => r.id)
+  if (activeRoundIds.length === 0) {
+    return NextResponse.json({ matches: [], summary: { live: 0, halftime: 0, finished: 0, scheduled: 0, total: 0, roundName: null } })
   }
 
   // Map round_id → season_id for tournament logo lookup
   const roundSeasonMap = new Map<number, number>()
-  for (const r of openRounds ?? []) {
+  for (const r of activeRounds ?? []) {
     roundSeasonMap.set(r.id, r.season_id)
   }
 
@@ -72,7 +83,7 @@ export async function GET(req: NextRequest, { params }: Props) {
       home_score, away_score, home_score_ht, away_score_ht, home_team_id, away_team_id,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
-    .in('round_id', openRoundIds)
+    .in('round_id', activeRoundIds)
     .neq('status', 'cancelled')
     .order('kickoff', { ascending: true })
 
@@ -174,37 +185,25 @@ export async function GET(req: NextRequest, { params }: Props) {
     }
   })
 
-  // Filtrer til relevante kampe: live/halftime altid + kun én dags kampe ad gangen
-  const nowUTC = new Date()
-  const todayStr = nowUTC.toISOString().slice(0, 10)
-  const day1Str = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate() + 1)).toISOString().slice(0, 10)
-  const day2Str = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate() + 2)).toISOString().slice(0, 10)
-
+  // Find target runde: åben runde med tidligste kommende kickoff
   const alwaysShow = matchList.filter((m) => m.status === 'live' || m.status === 'halftime')
-  const rest = matchList.filter((m) => m.status !== 'live' && m.status !== 'halftime')
 
-  const futureDates = [...new Set(rest.filter((m) => m.kickoff_at.slice(0, 10) >= todayStr).map((m) => m.kickoff_at.slice(0, 10)))].sort()
-  const pastDates = [...new Set(rest.filter((m) => m.kickoff_at.slice(0, 10) < todayStr).map((m) => m.kickoff_at.slice(0, 10)))].sort()
-
-  let targetDate: string | null = null
-  if (futureDates.includes(todayStr)) {
-    targetDate = todayStr
-  } else if (futureDates.includes(day1Str)) {
-    targetDate = day1Str
-  } else if (futureDates.includes(day2Str)) {
-    targetDate = day2Str
-  } else if (futureDates.length > 0) {
-    // Nærmeste fremtidige dag uanset afstand
-    targetDate = futureDates[0]
-  } else if (pastDates.length > 0) {
-    // Seneste dag med afsluttede kampe
-    targetDate = pastDates[pastDates.length - 1]
+  let targetRoundId: number | null = null
+  if (alwaysShow.length > 0) {
+    targetRoundId = alwaysShow[0].round_id
+  } else {
+    const earliest = matchList
+      .filter((m) => m.status !== 'finished')
+      .sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))[0]
+    targetRoundId = earliest?.round_id ?? matchList[0]?.round_id ?? null
   }
 
   const filteredList = [
     ...alwaysShow,
-    ...(targetDate ? rest.filter((m) => m.kickoff_at.slice(0, 10) === targetDate) : []),
+    ...matchList.filter((m) => m.round_id === targetRoundId && m.status !== 'live' && m.status !== 'halftime'),
   ].sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))
+
+  const roundName = (activeRounds ?? []).find((r) => r.id === targetRoundId)?.name ?? null
 
   const live = filteredList.filter((m) => m.status === 'live').length
   const halftime = filteredList.filter((m) => m.status === 'halftime').length
@@ -214,6 +213,6 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   return NextResponse.json({
     matches: filteredList,
-    summary: { live, halftime, finished, scheduled, total },
+    summary: { live, halftime, finished, scheduled, total, roundName },
   })
 }

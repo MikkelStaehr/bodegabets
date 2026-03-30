@@ -225,30 +225,12 @@ export function LiveMatchesTicker({
   if (matches.length === 0) return null
 
   const hasLive = summary.live > 0 || summary.halftime > 0
-
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const tomorrowStr = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-  const day2Str = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
-  const nonLiveDates = new Set(
-    matches.filter((m) => m.status !== 'live' && m.status !== 'halftime').map((m) => m.kickoff_at.slice(0, 10))
-  )
   const liveCount = summary.live + summary.halftime
-  const n = hasLive ? liveCount : summary.total
-  const plural = n !== 1 ? 'e' : ''
-
-  const futureDateBeyond2 = [...nonLiveDates].filter((d) => d > day2Str).sort()[0] ?? null
+  const plural = liveCount !== 1 ? 'e' : ''
 
   const defaultTitle = hasLive
     ? `${liveCount} kamp${plural} live`
-    : nonLiveDates.has(todayStr)
-    ? `${n} kamp${plural} i dag`
-    : nonLiveDates.has(tomorrowStr)
-    ? `${n} kamp${plural} i morgen`
-    : nonLiveDates.has(day2Str)
-    ? `${n} kamp${plural} ${new Date(day2Str + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'long', timeZone: 'UTC' })}`
-    : futureDateBeyond2
-    ? `${n} kamp${plural} ${new Date(futureDateBeyond2 + 'T12:00:00Z').toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}`
-    : `${summary.finished} kamp${summary.finished !== 1 ? 'e' : ''} afsluttet`
+    : summary.roundName ?? 'Ingen kommende kampe'
 
   const defaultRight = lastUpdate ? (
     <span className="text-[9px] text-[#7a7060]">

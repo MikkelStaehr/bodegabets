@@ -30,6 +30,7 @@ export type LiveSummary = {
   finished: number
   scheduled: number
   total: number
+  roundName?: string | null
 }
 
 function hasActiveMatches(matches: LiveMatch[]): boolean {
