@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Playfair_Display, Barlow_Condensed, Barlow, Lobster, Pacifico } from 'next/font/google'
+import { Playfair_Display, Barlow_Condensed, Barlow } from 'next/font/google'
 import { ToastProvider } from '@/components/ui/Toast'
 import Navbar from '@/components/ui/Navbar'
 import Footer from '@/components/layout/Footer'
@@ -7,20 +7,6 @@ import NavbarScrollHandler from '@/components/layout/NavbarScrollHandler'
 import OnboardingProvider from '@/components/layout/OnboardingProvider'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import './globals.css'
-
-const lobster = Lobster({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-lobster',
-  display: 'swap',
-})
-
-const pacifico = Pacifico({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-pacifico',
-  display: 'swap',
-})
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -62,7 +48,7 @@ export default async function RootLayout({
   return (
     <html
       lang="da"
-      className={`${playfair.variable} ${barlowCondensed.variable} ${barlow.variable} ${lobster.variable} ${pacifico.variable}`}
+      className={`${playfair.variable} ${barlowCondensed.variable} ${barlow.variable}`}
     >
       <body className="antialiased">
         <NavbarScrollHandler />

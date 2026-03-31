@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Kingdrops Script';
+  src: url('/fonts/kingdrops_script/Kingdrops Script DEMO.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   /* ── Fonte ─────────────────────────────────────────────── */
   --font-display:   var(--ff-display,   'Playfair Display', serif);

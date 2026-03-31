@@ -59,12 +59,8 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
-            <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}>
-              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '40px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
-              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '20px', color: '#2C4A3E' }}>odega</span>
-              <span style={{ display: 'inline-block', width: '5px' }} />
-              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '40px', color: '#2C4A3E', marginRight: '-4px' }}>B</span>
-              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '20px', color: '#2C4A3E' }}>ets</span>
+            <span style={{ fontFamily: "'Kingdrops Script', cursive", fontSize: '40px', letterSpacing: '-1px', lineHeight: 1, color: '#2C4A3E' }}>
+              Bodega Bets
             </span>
           </Link>
         </div>

@@ -5,14 +5,8 @@ export default function GameRoomLoading() {
     <div className="fixed inset-0 z-[300] bg-[#1a3329] flex flex-col items-center justify-center gap-6">
       <HideNav />
       <div className="flex flex-col items-center gap-4">
-        <span
-          style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}
-        >
-          <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: 'clamp(48px, 12vw, 96px)', color: '#F2EDE4', marginRight: '-4px' }}>B</span>
-          <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: 'clamp(24px, 6vw, 48px)', color: '#F2EDE4' }}>odega</span>
-          <span style={{ display: 'inline-block', width: 'clamp(4px, 1vw, 8px)' }} />
-          <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: 'clamp(48px, 12vw, 96px)', color: '#F2EDE4', marginRight: '-4px' }}>B</span>
-          <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: 'clamp(24px, 6vw, 48px)', color: '#F2EDE4' }}>ets</span>
+        <span style={{ fontFamily: "'Kingdrops Script', cursive", fontSize: 'clamp(48px, 12vw, 96px)', letterSpacing: '-1px', lineHeight: 1, color: '#F2EDE4' }}>
+          Bodega Bets
         </span>
         <span
           className="font-['Barlow_Condensed'] text-[13px] font-bold tracking-widest uppercase text-[#B8963E]"

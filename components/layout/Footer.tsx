@@ -10,12 +10,8 @@ export default function Footer() {
 
           {/* Logo */}
           <Link href="/" aria-label="Bodega Bets">
-            <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1, whiteSpace: 'nowrap' }}>
-              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '20px', color: '#1e2a1e', marginRight: '-4px' }}>B</span>
-              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '10px', color: '#1e2a1e' }}>odega</span>
-              <span style={{ display: 'inline-block', width: '4px' }} />
-              <span style={{ fontFamily: "var(--font-lobster), 'Lobster', cursive", fontSize: '20px', color: '#1e2a1e', marginRight: '-4px' }}>B</span>
-              <span style={{ fontFamily: "var(--font-pacifico), 'Pacifico', cursive", fontSize: '10px', color: '#1e2a1e' }}>ets</span>
+            <span style={{ fontFamily: "'Kingdrops Script', cursive", fontSize: '20px', letterSpacing: '-1px', lineHeight: 1, color: '#1C3829' }}>
+              Bodega Bets
             </span>
           </Link>
 
