@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AdminOverviewTab } from './tabs/AdminOverviewTab'
-import LeagueHubClient from './LeagueHubClient'
+import LeagueHubClient, { TournamentRow } from './LeagueHubClient'
 import { AdminGamesTab } from './tabs/AdminGamesTab'
 import { AdminUsersTab } from './tabs/AdminUsersTab'
 import { AdminLogsTab } from './tabs/AdminLogsTab'
@@ -20,76 +20,15 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id']
 
-export type LeagueRow = {
-  id: number
-  name: string
-  country: string
-  bold_slug: string | null
-  fixturedownload_slug?: string | null
-  last_synced_at?: string | null
-  total_matches?: number
-}
-
-export type SyncLog = {
-  id: number
-  league_id: number
-  synced_at: string
-  matches_imported: number
-  status: string
-  message: string
-}
-
-export type GameRow = {
-  id: number
-  name: string
-  status: string
-  invite_code: string
-  created_at: string
-  league_name: string
-  member_count: number
-  round_count: number
-}
-
-export type RoundRow = {
-  id: number
-  name: string
-  status: 'upcoming' | 'open' | 'closed' | 'finished'
-  betting_closes_at: string | null
-  league_id: number
-  game_name: string
-  league_name: string
-  match_count: number
-}
-
-export type MatchRow = {
-  id: number
-  round_id: number
-  round_name: string
-  game_name: string
-  home_team: string
-  away_team: string
-  kickoff_at: string | null
-  home_score: number | null
-  away_score: number | null
-  status: 'scheduled' | 'finished'
-  existing_sidebet_types: string[]
-}
-
 type Props = {
-  leagues: LeagueRow[]
-  syncLogs: SyncLog[]
-  games: GameRow[]
-  rounds: RoundRow[]
-  matches: MatchRow[]
+  tournaments: TournamentRow[]
+  lastSync: string | null
   adminSecret: string
 }
 
 export default function AdminTabClient({
-  leagues,
-  syncLogs,
-  games,
-  rounds,
-  matches,
+  tournaments,
+  lastSync,
   adminSecret,
 }: Props) {
   const searchParams = useSearchParams()
@@ -122,16 +61,8 @@ export default function AdminTabClient({
       )}
       {validTab === 'fixtures' && (
         <LeagueHubClient
-          leagues={leagues.map((l) => ({
-            id: l.id,
-            name: l.name,
-            country: l.country,
-            bold_slug: l.bold_slug,
-            fixturedownload_slug: l.fixturedownload_slug ?? null,
-            last_synced_at: l.last_synced_at ?? null,
-            total_matches: l.total_matches ?? 0,
-          }))}
-          logs={syncLogs}
+          tournaments={tournaments}
+          lastSync={lastSync}
         />
       )}
       {validTab === 'games' && (
