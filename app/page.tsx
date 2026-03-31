@@ -27,7 +27,6 @@ export default async function HomePage() {
     .order('points', { ascending: false })
     .limit(10)
 
-  // Hent seneste resultater på tværs af alle ligaer til ticker
   const { data: tickerMatches } = await supabase
     .from('matches')
     .select('home_team, away_team, home_score, away_score, match_date, round:rounds!inner(status, betting_closes_at)')
@@ -49,7 +48,7 @@ export default async function HomePage() {
       : (round?.betting_closes_at
         ? new Date(round.betting_closes_at).toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
         : '')
-    return `⚽ ${m.home_team} ${m.home_score ?? '?'}–${m.away_score ?? '?'} ${m.away_team}${dateStr ? ` · ${dateStr}` : ''}`
+    return `${m.home_team} ${m.home_score ?? '?'}–${m.away_score ?? '?'} ${m.away_team}${dateStr ? ` · ${dateStr}` : ''}`
   })
 
   const ranked = assignRanks((profiles as Profile[]) ?? [])
@@ -57,193 +56,169 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-cream">
 
-      {/* ── 1. Ticker + Hero wrapper (pulls up behind sticky navbar) ── */}
+      {/* ── Ticker + Hero ─────────────────────────────────────── */}
       <div className="-mt-14 bg-forest">
-        {/* ── 1. Ticker bar ──────────────────────────────────────── */}
         <div className="pt-14">
           {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
         </div>
 
-        {/* ── 2. Hero ────────────────────────────────────────────── */}
-        <header className="relative overflow-hidden" style={{ minHeight: '100vh' }}>
-        <div className="max-w-6xl mx-auto px-6 lg:px-8 flex items-center" style={{ minHeight: '100vh' }}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center w-full py-20">
+        <header className="relative overflow-hidden min-h-screen">
+          <div className="max-w-6xl mx-auto px-6 lg:px-8 flex items-center min-h-screen">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center w-full py-20">
 
-            {/* Venstre — tekst */}
-            <div className="animate-fadeUp text-center lg:text-left">
-              {/* Eyebrow */}
-              <div className="flex items-center justify-center lg:justify-start gap-3 mb-8">
-                <span className="block w-8 h-[2px] bg-gold" />
-                <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
-                  Privat sport-betting
-                </span>
-              </div>
+              {/* Left — copy */}
+              <div className="animate-fadeUp text-center lg:text-left">
+                <div className="flex items-center justify-center lg:justify-start gap-3 mb-8">
+                  <span className="block w-8 h-[2px] bg-gold" />
+                  <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
+                    Privat sport-betting
+                  </span>
+                </div>
 
-              <h1 className="mb-8">
-                <span
-                  className="block font-condensed text-cream uppercase leading-[0.95]"
-                  style={{ fontWeight: 800, fontSize: 'clamp(56px, 8vw, 88px)' }}
-                >
-                  Spil mod
-                </span>
-                <span
-                  className="block font-display italic text-gold leading-[1.05]"
-                  style={{ fontWeight: 900, fontSize: 'clamp(60px, 8.5vw, 96px)' }}
-                >
-                  <RotatingWord />
-                </span>
-              </h1>
+                <h1 className="mb-8">
+                  <span className="block font-condensed text-cream uppercase leading-[0.95] font-[800] text-[clamp(56px,8vw,88px)]">
+                    Spil mod
+                  </span>
+                  <span className="block font-display italic text-gold leading-[1.05] font-[900] text-[clamp(60px,8.5vw,96px)]">
+                    <RotatingWord />
+                  </span>
+                </h1>
 
-              <p className="font-body text-cream/50 text-lg max-w-md mx-auto lg:mx-0 mb-2 leading-relaxed" style={{ fontWeight: 500 }}>
-                Ingen rigtige penge. Al prestige.
-              </p>
-              <p className="font-body text-cream/40 text-base max-w-md mx-auto lg:mx-0 mb-10 leading-relaxed">
-                Opret private spilrum, afgiv bets på sportskampe og kæmp om point og ære med vennerne.
-              </p>
+                <p className="font-body text-cream/50 text-lg max-w-md mx-auto lg:mx-0 mb-2 leading-relaxed font-medium">
+                  Ingen rigtige penge. Al prestige.
+                </p>
+                <p className="font-body text-cream/40 text-base max-w-md mx-auto lg:mx-0 mb-10 leading-relaxed">
+                  Opret private spilrum, afgiv bets på sportskampe og kæmp om point og ære med vennerne.
+                </p>
 
-              {/* CTAs */}
-              {user ? (
-                <Link
-                  href="/dashboard"
-                  className="inline-flex items-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-90 transition-opacity"
-                  style={{ fontWeight: 700, fontSize: '15px' }}
-                >
-                  Gå til dashboard
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              ) : (
-                <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                {/* CTAs */}
+                {user ? (
                   <Link
-                    href="/register"
-                    className="inline-flex items-center justify-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-90 transition-opacity"
-                    style={{ fontWeight: 700, fontSize: '15px' }}
+                    href="/dashboard"
+                    className="inline-flex items-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-85 transition-opacity font-bold text-[15px]"
                   >
-                    Opret profil gratis
+                    Gå til dashboard
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center justify-center bg-transparent border-[1.5px] border-cream/30 text-cream font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:border-cream/60 transition-colors"
-                    style={{ fontWeight: 600, fontSize: '15px' }}
-                  >
-                    Log ind
-                  </Link>
-                </div>
-              )}
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                    <Link
+                      href="/register"
+                      className="inline-flex items-center justify-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-85 transition-opacity font-bold text-[15px]"
+                    >
+                      Opret profil gratis
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                    <Link
+                      href="/login"
+                      className="inline-flex items-center justify-center bg-transparent border-[1.5px] border-cream/30 text-cream font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:border-cream/60 transition-colors font-semibold text-[15px]"
+                    >
+                      Log ind
+                    </Link>
+                  </div>
+                )}
 
-              {/* Pills */}
-              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mt-10 justify-center lg:justify-start">
-                {['Sport & ligaer', 'Konsensus-odds', 'Live resultater', 'Gratis'].map((pill) => (
-                  <span
-                    key={pill}
-                    className="font-condensed text-xs uppercase tracking-[0.08em] text-cream/50 border border-cream/15 px-3 py-1.5 rounded-full"
-                    style={{ fontWeight: 600 }}
-                  >
-                    {pill}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Højre — kupon-mockup (skjult på mobil) */}
-            <div className="hidden lg:flex justify-center animate-fadeUp" style={{ animationDelay: '0.2s' }}>
-              <div
-                className="w-[340px] rounded-lg overflow-hidden transition-transform duration-500 hover:rotate-0"
-                style={{
-                  transform: 'rotate(5deg)',
-                  boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
-                  background: '#F2EDE4',
-                }}
-              >
-                {/* Kupon header */}
-                <div className="flex items-center justify-between px-5 py-3" style={{ background: '#1a3329' }}>
-                  <span className="font-condensed text-cream text-sm uppercase tracking-[0.08em]" style={{ fontWeight: 700 }}>
-                    Min kupon
-                  </span>
-                  <span
-                    className="font-condensed text-xs uppercase tracking-[0.08em] px-2.5 py-0.5 rounded-full"
-                    style={{ fontWeight: 700, background: 'rgba(184,150,62,0.2)', color: '#B8963E' }}
-                  >
-                    Aktiv
-                  </span>
-                </div>
-
-                {/* Kampe */}
-                <div className="divide-y divide-black/[0.06]">
-                  {[
-                    { home: 'Liverpool', away: 'Man United', selected: '1', correct: 'X' },
-                    { home: 'Real Madrid', away: 'Barcelona', selected: null, correct: null },
-                    { home: 'PSG', away: 'Marseille', selected: null, correct: null },
-                  ].map((match, i) => (
-                    <div key={i} className="px-5 py-3.5">
-                      <p className="font-body text-xs text-ink/60 mb-2">
-                        {match.home} – {match.away}
-                      </p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {['1', 'X', '2'].map((opt) => {
-                          const isSelected = match.selected === opt
-                          const isCorrect = match.correct === opt
-                          return (
-                            <div
-                              key={opt}
-                              className="font-condensed text-center text-sm py-2 rounded-sm"
-                              style={{
-                                fontWeight: 700,
-                                background: isSelected ? '#1a3329' : '#EDE8DF',
-                                color: isSelected ? '#F2EDE4' : '#5C5C4A',
-                                border: isCorrect ? '2px solid #B8963E' : '2px solid transparent',
-                              }}
-                            >
-                              {opt}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+                {/* Pills */}
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mt-10 justify-center lg:justify-start">
+                  {['Sport & ligaer', 'Konsensus-odds', 'Live resultater', 'Gratis'].map((pill) => (
+                    <span
+                      key={pill}
+                      className="font-condensed text-xs uppercase tracking-[0.08em] text-cream/50 border border-cream/15 px-3 py-1.5 rounded-full font-semibold"
+                    >
+                      {pill}
+                    </span>
                   ))}
                 </div>
+              </div>
 
-                {/* Kupon footer */}
-                <div className="flex items-center justify-between px-5 py-3 border-t border-black/[0.06]">
-                  <span className="font-body text-sm text-ink/60">300 pt indsats</span>
-                  <span
-                    className="font-condensed text-xs uppercase tracking-[0.08em] px-4 py-2 rounded-sm cursor-pointer"
-                    style={{ fontWeight: 700, background: '#B8963E', color: '#1a3329' }}
-                  >
-                    Lås valg →
-                  </span>
+              {/* Right — coupon mockup (hidden on mobile) */}
+              <div className="hidden lg:flex justify-center animate-fadeUp" style={{ animationDelay: '0.2s' }}>
+                <div
+                  className="w-[340px] rounded-sm overflow-hidden transition-transform duration-500 hover:rotate-0 bg-cream shadow-2xl"
+                  style={{ transform: 'rotate(5deg)' }}
+                >
+                  {/* Coupon header */}
+                  <div className="flex items-center justify-between px-5 py-3 bg-forest">
+                    <span className="font-condensed text-cream text-sm uppercase tracking-[0.08em] font-bold">
+                      Min kupon
+                    </span>
+                    <span className="font-condensed text-xs uppercase tracking-[0.08em] px-2.5 py-0.5 rounded-full font-bold bg-gold/20 text-gold">
+                      Aktiv
+                    </span>
+                  </div>
+
+                  {/* Matches */}
+                  <div className="divide-y divide-ink/[0.06]">
+                    {[
+                      { home: 'Liverpool', away: 'Man United', selected: '1', correct: 'X' },
+                      { home: 'Real Madrid', away: 'Barcelona', selected: null, correct: null },
+                      { home: 'PSG', away: 'Marseille', selected: null, correct: null },
+                    ].map((match, i) => (
+                      <div key={i} className="px-5 py-3.5">
+                        <p className="font-body text-xs text-ink/60 mb-2">
+                          {match.home} – {match.away}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['1', 'X', '2'].map((opt) => {
+                            const isSelected = match.selected === opt
+                            const isCorrect = match.correct === opt
+                            return (
+                              <div
+                                key={opt}
+                                className={[
+                                  'font-condensed text-center text-sm py-2 rounded-sm font-bold border-2',
+                                  isSelected
+                                    ? 'bg-forest text-cream border-transparent'
+                                    : 'bg-cream-dark text-warm-gray border-transparent',
+                                  isCorrect ? 'border-gold' : '',
+                                ].join(' ')}
+                              >
+                                {opt}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Coupon footer */}
+                  <div className="flex items-center justify-between px-5 py-3 border-t border-ink/[0.06]">
+                    <span className="font-body text-sm text-ink/60">300 pt indsats</span>
+                    <span className="font-condensed text-xs uppercase tracking-[0.08em] px-4 py-2 rounded-sm cursor-pointer font-bold bg-gold text-forest">
+                      Lås valg
+                      <svg className="w-3 h-3 inline ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
         </header>
       </div>
 
-      {/* ── 3. Sådan virker det ─────────────────────────────────── */}
+      {/* ── Sådan virker det ──────────────────────────────────── */}
       <section className="bg-cream">
         <div className="max-w-5xl mx-auto px-6 lg:px-8 py-12 lg:py-24">
-          {/* Eyebrow */}
           <div className="flex items-center gap-3 mb-3">
             <span className="block w-6 h-[2px] bg-gold" />
             <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
               Kom i gang
             </span>
           </div>
-          <h2 className="font-display italic text-ink mb-16" style={{ fontWeight: 700, fontSize: 'clamp(28px, 4vw, 40px)' }}>
+          <h2 className="font-display italic text-ink mb-16 font-bold text-[clamp(28px,4vw,40px)]">
             På 2 minutter er du klar.
           </h2>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-12 gap-x-6 relative">
-            {/* Connector-linje */}
-            <div
-              className="hidden lg:block absolute top-9 left-[12.5%] right-[12.5%] h-[2px]"
-              style={{ background: 'linear-gradient(to right, #B8963E, #B8963E)', opacity: 0.15 }}
-            />
+            {/* Connector line */}
+            <div className="hidden lg:block absolute top-9 left-[12.5%] right-[12.5%] h-[2px] bg-gold/15" />
 
             {[
               { step: 1, title: 'Opret profil', desc: 'Tilmeld dig gratis med e-mail' },
@@ -252,13 +227,10 @@ export default async function HomePage() {
               { step: 4, title: 'Høst prestige', desc: 'Følg med live og kæmp om førstepladsen' },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex flex-col relative">
-                <span
-                  className="font-display italic text-gold leading-none mb-4"
-                  style={{ fontWeight: 900, fontSize: '72px', opacity: 0.25 }}
-                >
+                <span className="font-display italic text-gold/25 leading-none mb-4 font-[900] text-[72px]">
                   {step}
                 </span>
-                <h3 className="font-condensed text-ink text-sm uppercase tracking-[0.08em] mb-2" style={{ fontWeight: 700 }}>
+                <h3 className="font-condensed text-ink text-sm uppercase tracking-[0.08em] mb-2 font-bold">
                   {title}
                 </h3>
                 <p className="font-body text-warm-gray text-sm leading-relaxed">{desc}</p>
@@ -268,12 +240,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 4. Features ────────────────────────────────────────── */}
-      <section style={{ background: '#2C4A3E' }}>
+      {/* ── Features ──────────────────────────────────────────── */}
+      <section className="bg-forest-light">
         <div className="max-w-5xl mx-auto px-6 lg:px-8 py-12 lg:py-24">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
 
-            {/* Venstre */}
+            {/* Left */}
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <span className="block w-6 h-[2px] bg-gold" />
@@ -281,16 +253,16 @@ export default async function HomePage() {
                   Pointsystem
                 </span>
               </div>
-              <h2 className="text-cream mb-6" style={{ fontSize: 'clamp(28px, 4vw, 40px)', lineHeight: 1.15 }}>
-                <span className="font-condensed block uppercase" style={{ fontWeight: 800 }}>Ikke bare</span>
-                <span className="font-display italic text-gold" style={{ fontWeight: 700 }}>1-X-2.</span>
+              <h2 className="text-cream mb-6 text-[clamp(28px,4vw,40px)] leading-[1.15]">
+                <span className="font-condensed block uppercase font-[800]">Ikke bare</span>
+                <span className="font-display italic text-gold font-bold">1-X-2.</span>
               </h2>
               <p className="font-body text-cream/50 text-base leading-relaxed max-w-sm">
                 Vores pointsystem belønner modige tips. Jo sjældnere dit valg, jo flere point kan du score — og med streaks, side-bets og wildcards er der altid nye måder at komme foran.
               </p>
             </div>
 
-            {/* Højre — feature liste */}
+            {/* Right — feature list */}
             <div className="space-y-6">
               {[
                 { title: 'Konsensus-odds', desc: 'Jo sjældnere dit valg, jo højere din potentielle gevinst — op til ×1.8' },
@@ -300,17 +272,13 @@ export default async function HomePage() {
                 { title: 'Profilrammer', desc: 'Jo mere du vinder, jo mere eksklusiv bliver din profil' },
               ].map(({ title, desc }) => (
                 <div key={title} className="flex items-start gap-4">
-                  {/* Gold checkmark circle */}
-                  <span
-                    className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5"
-                    style={{ background: 'rgba(184,150,62,0.15)', border: '1.5px solid rgba(184,150,62,0.4)' }}
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
-                      <path d="M3.5 7.5L5.5 9.5L10.5 4.5" stroke="#B8963E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <span className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5 bg-gold/15 border-[1.5px] border-gold/40">
+                    <svg className="w-3.5 h-3.5 text-gold" viewBox="0 0 14 14" fill="none">
+                      <path d="M3.5 7.5L5.5 9.5L10.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </span>
                   <div>
-                    <p className="font-condensed text-cream text-sm uppercase tracking-[0.06em] mb-0.5" style={{ fontWeight: 700 }}>
+                    <p className="font-condensed text-cream text-sm uppercase tracking-[0.06em] mb-0.5 font-bold">
                       {title}
                     </p>
                     <p className="font-body text-cream/45 text-sm leading-relaxed">{desc}</p>
@@ -322,7 +290,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 5. Leaderboard ─────────────────────────────────────── */}
+      {/* ── Leaderboard ───────────────────────────────────────── */}
       <section className="bg-cream-dark">
         <div className="max-w-[640px] mx-auto px-6 lg:px-8 py-12 lg:py-24">
           <div className="flex items-center gap-3 mb-3">
@@ -331,7 +299,7 @@ export default async function HomePage() {
               Platform
             </span>
           </div>
-          <h2 className="font-display italic text-ink mb-12" style={{ fontWeight: 700, fontSize: 'clamp(28px, 4vw, 40px)' }}>
+          <h2 className="font-display italic text-ink mb-12 font-bold text-[clamp(28px,4vw,40px)]">
             Globalt leaderboard
           </h2>
 
@@ -341,7 +309,7 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="border border-warm-border rounded-sm overflow-hidden bg-cream">
-              {/* Tabel-header */}
+              {/* Table header */}
               <div className="grid grid-cols-[2.5rem_1fr_auto] items-center px-5 py-3 bg-cream-dark border-b border-warm-border">
                 <span className="label-caps text-warm-gray">#</span>
                 <span className="label-caps text-warm-gray">Spiller</span>
@@ -351,14 +319,16 @@ export default async function HomePage() {
               <ul>
                 {ranked.map((profile, index) => {
                   const isCurrentUser = user?.id === profile.id
-                  const rankColor =
+                  const rankClasses =
                     profile.rank === 1
-                      ? '#B8963E'
+                      ? 'text-gold'
                       : profile.rank === 2
-                      ? '#8A9BA8'
+                      ? 'text-warm-gray'
                       : profile.rank === 3
-                      ? '#A0785A'
-                      : undefined
+                      ? 'text-vintage-red/60'
+                      : isCurrentUser
+                      ? 'text-cream/50'
+                      : 'text-warm-gray'
 
                   return (
                     <li
@@ -370,23 +340,21 @@ export default async function HomePage() {
                       ].filter(Boolean).join(' ')}
                     >
                       {/* Rank */}
-                      <span
-                        className="stat-number text-sm w-8 text-center"
-                        style={{ color: isCurrentUser ? (rankColor ?? 'rgba(242,237,228,0.5)') : (rankColor ?? '#5C5C4A') }}
-                      >
+                      <span className={`stat-number text-sm w-8 text-center ${rankClasses}`}>
                         {profile.rank}
                       </span>
 
                       {/* User */}
                       <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className="w-8 h-8 flex items-center justify-center text-xs font-condensed shrink-0 rounded-full"
-                          style={{
-                            fontWeight: 700,
-                            background: profile.rank === 1 ? 'rgba(184,150,62,0.2)' : isCurrentUser ? '#2E5040' : '#EDE8DF',
-                            color: profile.rank === 1 ? '#B8963E' : isCurrentUser ? '#B8963E' : '#5C5C4A',
-                            border: profile.rank === 1 ? '1.5px solid rgba(184,150,62,0.4)' : isCurrentUser ? 'none' : '1px solid #D4CFC4',
-                          }}
+                          className={[
+                            'w-8 h-8 flex items-center justify-center text-xs font-condensed shrink-0 rounded-full font-bold',
+                            profile.rank === 1
+                              ? 'bg-gold/20 text-gold border-[1.5px] border-gold/40'
+                              : isCurrentUser
+                              ? 'bg-forest-light text-gold'
+                              : 'bg-cream-dark text-warm-gray border border-warm-border',
+                          ].join(' ')}
                         >
                           {profile.username[0].toUpperCase()}
                         </div>
@@ -395,16 +363,13 @@ export default async function HomePage() {
                             {profile.username}
                           </span>
                           {isCurrentUser && (
-                            <span className="label-caps text-gold/70" style={{ fontSize: 9 }}>dig</span>
+                            <span className="label-caps text-gold/70 text-[9px]">dig</span>
                           )}
                         </div>
                       </div>
 
                       {/* Points */}
-                      <span
-                        className="stat-number text-base"
-                        style={{ color: isCurrentUser ? (rankColor ?? '#F2EDE4') : (rankColor ?? '#1A1A1A') }}
-                      >
+                      <span className={`stat-number text-base ${isCurrentUser ? (profile.rank === 1 ? 'text-gold' : 'text-cream') : (profile.rank === 1 ? 'text-gold' : 'text-ink')}`}>
                         {profile.points.toLocaleString('da-DK')}
                       </span>
                     </li>
@@ -416,7 +381,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 5b. FAQ ──────────────────────────────────────────── */}
+      {/* ── FAQ ────────────────────────────────────────────────── */}
       <section className="bg-cream">
         <div className="max-w-[640px] mx-auto px-6 lg:px-8 py-12 lg:py-24">
           <div className="flex items-center gap-3 mb-3">
@@ -425,11 +390,11 @@ export default async function HomePage() {
               FAQ
             </span>
           </div>
-          <h2 className="font-display italic text-ink mb-12" style={{ fontWeight: 700, fontSize: 'clamp(28px, 4vw, 40px)' }}>
+          <h2 className="font-display italic text-ink mb-12 font-bold text-[clamp(28px,4vw,40px)]">
             Ofte stillede spørgsmål.
           </h2>
 
-          <div className="flex flex-col divide-y divide-black/[0.07]">
+          <div className="flex flex-col divide-y divide-ink/[0.07]">
             {[
               {
                 q: 'Er Bodega Bets gratis?',
@@ -457,7 +422,7 @@ export default async function HomePage() {
               },
             ].map(({ q, a }) => (
               <div key={q} className="py-5">
-                <p className="font-condensed text-ink text-sm uppercase tracking-[0.06em] mb-2" style={{ fontWeight: 700 }}>
+                <p className="font-condensed text-ink text-sm uppercase tracking-[0.06em] mb-2 font-bold">
                   {q}
                 </p>
                 <p className="font-body text-warm-gray text-sm leading-relaxed">{a}</p>
@@ -467,19 +432,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── 6. Final CTA ───────────────────────────────────────── */}
+      {/* ── Final CTA ─────────────────────────────────────────── */}
       {!user && (
-        <section className="relative overflow-hidden" style={{ background: '#0d1f18' }}>
+        <section className="relative overflow-hidden bg-forest">
           {/* Radial glow */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: 'radial-gradient(ellipse at center, rgba(184,150,62,0.07) 0%, transparent 70%)' }}
-          />
-          <div className="relative max-w-4xl mx-auto px-6 lg:px-8 py-16 lg:py-28 text-center">
-            <h2
-              className="font-display italic text-cream mb-5"
-              style={{ fontWeight: 900, fontSize: 'clamp(72px, 10vw, 120px)', lineHeight: 1 }}
-            >
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gold/[0.07] to-transparent" />
+          <div className="relative max-w-5xl mx-auto px-6 lg:px-8 py-16 lg:py-28 text-center">
+            <h2 className="font-display italic text-cream mb-5 font-[900] text-[clamp(72px,10vw,120px)] leading-none">
               Klar?
             </h2>
             <p className="font-body text-cream/40 text-lg mb-12 max-w-md mx-auto">
@@ -487,8 +446,7 @@ export default async function HomePage() {
             </p>
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-90 transition-opacity"
-              style={{ fontWeight: 700, fontSize: '15px' }}
+              className="inline-flex items-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-85 transition-opacity font-bold text-[15px]"
             >
               Opret profil gratis
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
