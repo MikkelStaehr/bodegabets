@@ -349,7 +349,7 @@ export function AdminOverviewTab({ adminSecret }: Props) {
         <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Cron jobs</h2>
         <div className="flex flex-wrap gap-3">
           {[
-            { key: 'sync-fixtures', label: 'Sync fixtures' },
+            { key: 'batch-sync', label: 'Batch sync' },
             { key: 'sync-scores', label: 'Sync scores' },
             { key: 'update-rounds', label: 'Opdater runder' },
             { key: 'calculate-points', label: 'Beregn point' },
