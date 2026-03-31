@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AdminOverviewTab } from './tabs/AdminOverviewTab'
 import LeagueHubClient, { TournamentRow } from './LeagueHubClient'
+import { AdminSeasonsTab } from './tabs/AdminSeasonsTab'
 import { AdminGamesTab } from './tabs/AdminGamesTab'
 import { AdminUsersTab } from './tabs/AdminUsersTab'
 import { AdminLogsTab } from './tabs/AdminLogsTab'
@@ -12,6 +13,7 @@ import { LiveTestTab } from './tabs/LiveTestTab'
 const TABS = [
   { id: 'overview', label: 'Overblik', icon: '◉' },
   { id: 'fixtures', label: 'Kampprogrammer', icon: '⚽' },
+  { id: 'seasons', label: 'Sæsoner', icon: '📅' },
   { id: 'games', label: 'Spilrum', icon: '🏆' },
   { id: 'users', label: 'Brugere', icon: '👤' },
   { id: 'logs', label: 'Logs', icon: '📋' },
@@ -64,6 +66,9 @@ export default function AdminTabClient({
           tournaments={tournaments}
           lastSync={lastSync}
         />
+      )}
+      {validTab === 'seasons' && (
+        <AdminSeasonsTab adminSecret={adminSecret} />
       )}
       {validTab === 'games' && (
         <AdminGamesTab adminSecret={adminSecret} />
