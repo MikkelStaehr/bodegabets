@@ -2,17 +2,17 @@
  * POST /api/admin/run-cron
  * Manuelt kør cron jobs (kræver admin).
  *
- * Body: { cron: 'sync-fixtures' | 'sync-scores' | 'update-rounds' | 'calculate-points' }
+ * Body: { cron: 'batch-sync' | 'sync-scores' | 'update-rounds' | 'calculate-points' }
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 
-const CRON_ROUTES: Record<string, string> = {
-  'sync-fixtures': '/api/cron/sync-fixtures',
-  'sync-scores': '/api/cron/sync-scores',
-  'update-rounds': '/api/cron/update-rounds',
-  'calculate-points': '/api/cron/calculate-points',
-}
+const ALLOWED_CRONS = new Set([
+  'batch-sync',
+  'sync-scores',
+  'update-rounds',
+  'calculate-points',
+])
 
 export const maxDuration = 65
 
@@ -23,41 +23,40 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { cron?: string }
   const cron = body.cron
 
-  if (!cron || !CRON_ROUTES[cron]) {
+  if (!cron || !ALLOWED_CRONS.has(cron)) {
     return NextResponse.json(
-      { ok: false, error: `Ugyldig cron. Brug: ${Object.keys(CRON_ROUTES).join(', ')}` },
+      { ok: false, error: `Ugyldig cron. Brug: ${[...ALLOWED_CRONS].join(', ')}` },
       { status: 400 }
     )
   }
 
-  const secret = process.env.CRON_SECRET
-  if (!secret) {
+  const railwayUrl = process.env.RAILWAY_URL
+  const cronSecret = process.env.CRON_SECRET
+
+  if (!railwayUrl) {
+    return NextResponse.json({ ok: false, error: 'RAILWAY_URL ikke konfigureret' }, { status: 500 })
+  }
+  if (!cronSecret) {
     return NextResponse.json({ ok: false, error: 'CRON_SECRET ikke konfigureret' }, { status: 500 })
   }
 
-  const origin = req.nextUrl.origin
-  const url = `${origin}${CRON_ROUTES[cron]}`
-
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${railwayUrl}/${cron}`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${secret}` },
-      cache: 'no-store',
+      headers: { Authorization: `Bearer ${cronSecret}` },
     })
     const data = await res.json().catch(() => ({}))
-    const output = JSON.stringify(data, null, 2)
 
     if (!res.ok) {
-      return NextResponse.json({
-        ok: false,
-        error: (data as { error?: string }).error ?? `HTTP ${res.status}`,
-        output,
-      })
+      return NextResponse.json(
+        { ok: false, error: (data as { error?: string }).error ?? `HTTP ${res.status}`, output: JSON.stringify(data) },
+        { status: 502 }
+      )
     }
 
-    return NextResponse.json({ ok: true, output })
+    return NextResponse.json({ ok: true, ...data })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ ok: false, error: msg })
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 }
