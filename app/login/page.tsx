@@ -59,8 +59,8 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
-            <span style={{ fontFamily: "'Kingdrops Script', cursive", fontSize: '40px', letterSpacing: '-1px', lineHeight: 1, color: '#2C4A3E' }}>
-              Bodega Bets
+            <span style={{ fontFamily: "'Cocogoose', sans-serif", fontWeight: 700, fontSize: '40px', letterSpacing: '-0.03em', textTransform: 'lowercase' as const, lineHeight: 1, color: '#2C4A3E' }}>
+              bodega bets
             </span>
           </Link>
         </div>
