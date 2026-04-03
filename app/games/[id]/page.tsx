@@ -197,7 +197,7 @@ export default async function GamePage({ params }: Props) {
       : Promise.resolve({ data: [] }),
 
     activeRoundEarly
-      ? supabase
+      ? supabaseAdmin
           .from('matches')
           .select('id')
           .eq('round_id', activeRoundEarly.id)
@@ -208,7 +208,7 @@ export default async function GamePage({ params }: Props) {
   const activeMatchIds = (activeRoundMatches ?? []).map((m: { id: number }) => m.id)
   const { data: roundBets } =
     activeMatchIds.length > 0
-      ? await supabase
+      ? await supabaseAdmin
           .from('bets')
           .select('id, user_id')
           .eq('game_id', gameId)
