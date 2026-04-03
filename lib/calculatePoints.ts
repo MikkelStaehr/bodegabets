@@ -6,8 +6,9 @@ import { evaluateAchievements } from '@/lib/evaluateAchievements'
  * V1 — Simpel, idempotent pointberegning.
  *
  * PRINCIP:
- *   Korrekt bet → stake × 2 (stake + gevinst)
- *   Forkert bet → 0 (stake mistes ikke)
+ *   Korrekt match_result → stake × consensus odds
+ *   Korrekt ekstra bet → stake × consensus odds (fallback 2.0)
+ *   Forkert bet → 0 (stake tabt)
  *   earnings_delta = SUM(points_earned) per runde
  *   game_members.earnings = SUM(round_scores.earnings_delta) (absolut, aldrig relativt)
  *
@@ -83,7 +84,9 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           const odds = (bet as { odds?: number | null }).odds ?? 1.0
           pointsEarned = Math.round(stake * odds)
         } else {
-          pointsEarned = stake * 2
+          // Ekstra bets: brug konsensus odds med fallback 2.0
+          const odds = (bet as { odds?: number | null }).odds ?? 2.0
+          pointsEarned = Math.round(stake * odds)
         }
         const result = correct ? 'win' : 'loss'
 

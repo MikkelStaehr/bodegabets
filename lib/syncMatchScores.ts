@@ -212,7 +212,7 @@ export async function syncMatchScores(options?: {
       result,
       current_minute: typeof boldData.time === 'number' ? boldData.time : null,
       goals_3plus_result: h >= 3 ? '1' : a >= 3 ? '2' : null,
-      clean_sheet_result: a === 0 && h > 0 ? '1' : h === 0 && a > 0 ? '2' : null,
+      clean_sheet_result: a === 0 ? '1' : h === 0 ? '2' : null,
       win_margin_result: h - a >= 2 ? '1' : a - h >= 2 ? '2' : null,
       updated_at: new Date().toISOString(),
     }
@@ -345,7 +345,52 @@ export async function syncMatchScores(options?: {
           }
         }
 
-        console.log(`[syncMatchScores] Konsensus odds beregnet for ${lockedBets.length} bets på ${lockedMatchIds.length} låste kampe`)
+        console.log(`[syncMatchScores] Konsensus odds beregnet for ${lockedBets.length} match_result bets på ${lockedMatchIds.length} låste kampe`)
+      }
+
+      // Beregn konsensus odds for ekstra bets (goals_3plus, clean_sheet, win_margin)
+      const extraBetTypes = ['goals_3plus', 'clean_sheet', 'win_margin']
+      for (const betType of extraBetTypes) {
+        const { data: extraBets } = await supabaseAdmin
+          .from('bets')
+          .select('id, match_id, game_id, prediction')
+          .in('match_id', lockedMatchIds)
+          .eq('bet_type', betType)
+
+        if (!extraBets?.length) continue
+
+        // Gruppér per match + game
+        const groups = new Map<string, typeof extraBets>()
+        for (const bet of extraBets) {
+          const key = `${bet.match_id}:${bet.game_id}`
+          const group = groups.get(key) ?? []
+          group.push(bet)
+          groups.set(key, group)
+        }
+
+        for (const groupBets of groups.values()) {
+          const total = groupBets.length
+          const count: Record<string, number> = { '1': 0, '2': 0 }
+          for (const bet of groupBets) {
+            if (bet.prediction in count) count[bet.prediction]++
+          }
+
+          const calcOdds = (pred: string): number => {
+            const n = count[pred] ?? 0
+            if (total === 0 || n === 0) return 2.0
+            const pct = n / total
+            return Math.round(Math.max(1.5, 2.0 - pct * 0.5) * 100) / 100
+          }
+
+          for (const bet of groupBets) {
+            await supabaseAdmin
+              .from('bets')
+              .update({ odds: calcOdds(bet.prediction) })
+              .eq('id', bet.id)
+          }
+        }
+
+        console.log(`[syncMatchScores] Konsensus odds beregnet for ${extraBets.length} ${betType} bets`)
       }
     }
 

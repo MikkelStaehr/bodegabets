@@ -22,8 +22,8 @@ export function isBetCorrect(
       return false
 
     case BET_TYPES.CLEAN_SHEET:
-      if (prediction === '1') return awayScore === 0 && homeScore > 0
-      if (prediction === '2') return homeScore === 0 && awayScore > 0
+      if (prediction === '1') return awayScore === 0
+      if (prediction === '2') return homeScore === 0
       return false
 
     case BET_TYPES.WIN_MARGIN:

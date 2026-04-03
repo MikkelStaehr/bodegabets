@@ -242,13 +242,17 @@ function InlineExtraBets({
   )
 }
 
+type ExtraBetData = { prediction: string; stake: number; points_earned: number | null; result: string | null }
+
 /* ─── Read-only Extra Bets for Finished Matches ─── */
 function FinishedExtraBets({
   match,
   userExtraPicks,
+  userExtraBetData,
 }: {
   match: Match
   userExtraPicks: Record<string, string>
+  userExtraBetData: Record<string, ExtraBetData>
 }) {
   if (Object.keys(userExtraPicks).length === 0) return null
   return (
@@ -257,12 +261,22 @@ function FinishedExtraBets({
         .filter((row) => userExtraPicks[row.key])
         .map((row) => {
           const userValue = userExtraPicks[row.key]
+          const betData = userExtraBetData[row.key]
           const canCheck = match.home_score != null && match.away_score != null
+          const isWin = betData?.result === 'win'
+          const isLoss = betData?.result === 'loss'
           return (
             <div key={row.key}>
-              <span className="text-[9px] font-bold tracking-wider uppercase mb-1 block text-[#7a7060]">
-                {row.label}
-              </span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] font-bold tracking-wider uppercase block text-[#7a7060]">
+                  {row.label}
+                </span>
+                {betData && (isWin || isLoss) && (
+                  <span className={`text-[9px] font-bold tracking-wide ${isWin ? 'text-[#27ae60]' : 'text-vintage-red'}`}>
+                    {isWin ? `+${betData.points_earned ?? 0} pt` : `-${betData.stake} pt`}
+                  </span>
+                )}
+              </div>
               <div className="flex gap-1">
                 {row.opts.map((opt) => {
                   const isUserPick = userValue === opt.value
@@ -316,6 +330,7 @@ function MatchCard({
   correctOutcome,
   userPrediction,
   userExtraPicks,
+  userExtraBetData,
   matchResultBet,
   selectOutcome,
   toggleExtra,
@@ -339,6 +354,7 @@ function MatchCard({
   correctOutcome: '1' | 'X' | '2' | null
   userPrediction: '1' | 'X' | '2' | null
   userExtraPicks: Record<string, string>
+  userExtraBetData: Record<string, ExtraBetData>
   matchResultBet: Bet | undefined
   selectOutcome: (matchId: number, outcome: '1' | 'X' | '2') => void
   toggleExtra: (matchId: number, key: ExtraBetType, value: string) => void
@@ -518,7 +534,7 @@ function MatchCard({
       )}
 
       {/* Finished match: show user extra picks read-only */}
-      {isFinished && <FinishedExtraBets match={match} userExtraPicks={userExtraPicks} />}
+      {isFinished && <FinishedExtraBets match={match} userExtraPicks={userExtraPicks} userExtraBetData={userExtraBetData} />}
 
       {/* Inline stake — mobile only (controlled via showInlineStake) */}
       {showInlineStake && isOpen && sel && (
@@ -908,9 +924,16 @@ export default function AfgivBets({
         (b) => b.match_id === match.id && b.bet_type === 'match_result'
       )
       const userExtraPicks: Record<string, string> = {}
+      const userExtraBetData: Record<string, ExtraBetData> = {}
       for (const b of existingBets) {
         if (b.match_id === match.id && EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType)) {
           userExtraPicks[b.bet_type] = b.prediction
+          userExtraBetData[b.bet_type] = {
+            prediction: b.prediction,
+            stake: b.stake,
+            points_earned: b.points_earned,
+            result: b.result,
+          }
         }
       }
       return {
@@ -922,6 +945,7 @@ export default function AfgivBets({
         correctOutcome: getCorrectOutcome(match),
         userPrediction: (matchResultBet?.prediction as '1' | 'X' | '2') ?? null,
         userExtraPicks,
+        userExtraBetData,
         matchResultBet,
       }
     })
@@ -968,6 +992,7 @@ export default function AfgivBets({
           correctOutcome={md.correctOutcome}
           userPrediction={md.userPrediction}
           userExtraPicks={md.userExtraPicks}
+          userExtraBetData={md.userExtraBetData}
           matchResultBet={md.matchResultBet}
           selectOutcome={selectOutcome}
           toggleExtra={toggleExtra}
