@@ -232,6 +232,39 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           .eq('id', nextRound.id)
 
         console.log(`[calculateRoundPoints] Næste runde ${nextRound.id} → bet_open=true`)
+
+        // Opret round_members for alle spillere i spilrum der følger denne sæson
+        const { data: gameSeasons } = await supabaseAdmin
+          .from('game_seasons')
+          .select('game_id')
+          .eq('season_id', roundRow.season_id)
+
+        const gsGameIds = (gameSeasons ?? []).map((gs) => gs.game_id as number)
+        if (gsGameIds.length > 0) {
+          const { data: members } = await supabaseAdmin
+            .from('game_members')
+            .select('game_id, user_id')
+            .in('game_id', gsGameIds)
+
+          if (members?.length) {
+            const rows = members.map((m) => ({
+              round_id: nextRound.id,
+              game_id: m.game_id as number,
+              user_id: m.user_id as string,
+              betting_balance: 1000,
+            }))
+
+            const { error: rmError } = await supabaseAdmin
+              .from('round_members')
+              .upsert(rows, { onConflict: 'round_id,game_id,user_id', ignoreDuplicates: true })
+
+            if (rmError) {
+              console.error(`[calculateRoundPoints] round_members upsert fejl:`, rmError)
+            } else {
+              console.log(`[calculateRoundPoints] Oprettet ${rows.length} round_members for runde ${nextRound.id}`)
+            }
+          }
+        }
       }
     }
   }
