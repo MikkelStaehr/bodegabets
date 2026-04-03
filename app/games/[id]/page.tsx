@@ -110,7 +110,7 @@ export default async function GamePage({ params }: Props) {
       .order('earnings', { ascending: false }),
 
     seasonIds.length > 0
-      ? supabase
+      ? supabaseAdmin
           .from('rounds')
           .select('id, name, status, betting_closes_at, season_id, bet_open, block_id')
           .in('season_id', seasonIds)
