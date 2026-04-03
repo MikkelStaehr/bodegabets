@@ -177,10 +177,7 @@ export default async function GamePage({ params }: Props) {
   const defaultLeagueInfo = seasonLeagueMap.values().next().value ?? { abbr: '??', type: 'league' as const }
 
   const activeRoundEarly =
-    typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'open') ??
-    typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'active') ??
-    typedRoundsEarly.find((r) => computeRoundStatus(r, new Date()) === 'upcoming') ??
-    null
+    typedRoundsEarly.find((r) => r.bet_open === true) ?? null
   console.log('activeRoundEarly:', activeRoundEarly?.id, activeRoundEarly?.name)
   const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string; season_id: number } | null) ?? null
 
