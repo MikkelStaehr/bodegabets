@@ -1,19 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-type GameDetail = {
+type GameSummary = {
   id: number
   name: string
   invite_code: string
   status: string
   created_at: string
-  league_name: string
   member_count: number
-  current_round_name: string
-  total_bets: number
-  members: Array<{ id: string; username: string; rank: number; points: number }>
 }
 
 type Props = {
@@ -29,141 +25,35 @@ function formatDate(iso: string): string {
   })
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const colors =
-    status === 'active'
-      ? 'bg-forest/10 text-forest border-forest/30'
-      : 'bg-cream-dark text-warm-gray border-warm-border'
-  return (
-    <span
-      className={`font-condensed text-xs uppercase tracking-wide border px-2 py-0.5 ${colors}`}
-      style={{ borderRadius: '2px' }}
-    >
-      {status === 'active' ? 'Aktiv' : 'Afsluttet'}
-    </span>
-  )
-}
-
-function GameDetailCard({
-  game,
-  onDelete,
-}: {
-  game: GameDetail
-  onDelete: (id: number, name: string) => void
-}) {
-  return (
-    <div className="border border-warm-border overflow-hidden" style={{ borderRadius: '2px' }}>
-      <div className="bg-forest px-5 py-4 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="font-condensed text-xl font-bold text-cream uppercase">
-            {game.name}
-          </h3>
-          <p className="font-body text-cream/60 text-[12px] mt-0.5">
-            {game.league_name} · Oprettet {formatDate(game.created_at)}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="font-condensed text-[10px] text-cream/50 uppercase tracking-wider">Kode</p>
-          <p className="font-condensed text-xl font-bold text-gold">
-            {game.invite_code}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-warm-border border-b border-warm-border bg-cream">
-        {[
-          { label: 'Deltagere', value: String(game.member_count) },
-          { label: 'Aktiv runde', value: game.current_round_name },
-          { label: 'Afgivne bets', value: game.total_bets.toLocaleString('da-DK') },
-          { label: 'Status', value: <StatusBadge status={game.status} /> },
-        ].map(({ label, value }) => (
-          <div key={label} className="px-4 py-3 text-center">
-            <p className="font-condensed text-[9px] font-bold text-warm-gray uppercase tracking-wider mb-1">
-              {label}
-            </p>
-            <div className="font-condensed text-[15px] font-bold text-ink">
-              {value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="px-5 py-4 bg-cream">
-        <p className="font-condensed text-[11px] font-bold text-warm-gray uppercase tracking-wider mb-3">
-          Deltagere
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {game.members.map((member) => (
-            <div
-              key={member.id}
-              className="flex items-center gap-2 px-3 py-1.5 bg-cream-dark"
-              style={{ borderRadius: '2px' }}
-            >
-              <span className="font-body text-[12px] font-medium text-ink">
-                {member.username}
-              </span>
-              <span className="font-body text-[11px] text-warm-gray">
-                #{member.rank} · {member.points.toLocaleString('da-DK')} pt
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="px-5 py-3 bg-cream-dark border-t border-warm-border flex justify-end">
-        <button
-          onClick={() => onDelete(game.id, game.name)}
-          className="font-condensed text-[12px] font-semibold text-vintage-red hover:text-vintage-red/90 px-4 py-2 border border-vintage-red/30 hover:border-vintage-red/50 transition-colors"
-          style={{ borderRadius: '2px' }}
-        >
-          Slet rum
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export function AdminGamesTab({ adminSecret }: Props) {
   const router = useRouter()
+  const [games, setGames] = useState<GameSummary[]>([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
-  const [result, setResult] = useState<GameDetail | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [notFound, setNotFound] = useState(false)
-  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState<Set<number>>(new Set())
 
   const authHeader = { Authorization: `Bearer ${adminSecret}` }
 
-  async function handleSearch() {
-    if (query.trim().length < 3) return
+  useEffect(() => {
+    fetchGames()
+  }, [])
+
+  async function fetchGames() {
     setLoading(true)
-    setResult(null)
-    setNotFound(false)
     try {
-      const res = await fetch(
-        `/api/admin/games/search?q=${encodeURIComponent(query.trim())}`,
-        { headers: authHeader }
-      )
+      const res = await fetch('/api/admin/games', { headers: authHeader })
       const data = await res.json()
-      if (data.notFound) {
-        setNotFound(true)
-      } else if (data.game) {
-        setResult(data.game)
-      }
+      if (data.games) setGames(data.games)
     } catch {
-      setNotFound(true)
+      // silent
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleDelete(gameId: number, gameName: string) {
-    if (
-      !confirm(
-        `Er du sikker på du vil slette "${gameName}"?\n\nDette sletter også alle runder og bets. Dette kan ikke fortrydes.`
-      )
-    )
-      return
-    setDeleteLoading(true)
+  async function handleDelete(gameId: number) {
+    setDeleteLoading((s) => new Set(s).add(gameId))
     try {
       const res = await fetch(`/api/admin/games/${gameId}`, {
         method: 'DELETE',
@@ -171,8 +61,8 @@ export function AdminGamesTab({ adminSecret }: Props) {
       })
       const data = await res.json()
       if (data.ok) {
-        setResult(null)
-        setNotFound(false)
+        setGames((prev) => prev.filter((g) => g.id !== gameId))
+        setDeleteConfirm(null)
         router.refresh()
       } else {
         alert(data.error ?? 'Fejl ved sletning')
@@ -180,42 +70,115 @@ export function AdminGamesTab({ adminSecret }: Props) {
     } catch {
       alert('Netværksfejl')
     } finally {
-      setDeleteLoading(false)
+      setDeleteLoading((s) => { const n = new Set(s); n.delete(gameId); return n })
     }
   }
+
+  const filtered = query.trim().length > 0
+    ? games.filter((g) =>
+        g.name.toLowerCase().includes(query.toLowerCase()) ||
+        g.invite_code.toLowerCase().includes(query.toLowerCase())
+      )
+    : games
 
   return (
     <div>
       <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Administration</p>
-      <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Søg rum</h2>
+      <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Spilrum</h2>
 
-      <div className="flex gap-3 mb-8">
+      {/* Filter */}
+      <div className="mb-6">
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value.toUpperCase())}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Invitationskode (fx. ABC123) eller rum-navn..."
-          className="flex-1 font-condensed text-[14px] tracking-widest text-ink border border-warm-border bg-cream px-4 py-3 placeholder:font-body placeholder:tracking-normal placeholder:text-warm-gray/50 focus:outline-none focus:border-forest"
-          style={{ borderRadius: '2px' }}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filtrer på navn eller kode..."
+          className="w-full font-body text-sm text-ink border border-warm-border bg-cream px-4 py-3 placeholder:text-warm-gray/50 focus:outline-none focus:border-forest rounded-sm"
         />
-        <button
-          onClick={handleSearch}
-          disabled={query.trim().length < 3 || loading}
-          className="font-condensed px-6 py-3 bg-forest text-cream text-[13px] font-bold disabled:opacity-40 hover:bg-ink transition-colors"
-          style={{ borderRadius: '2px' }}
-        >
-          {loading ? 'Søger...' : 'Søg'}
-        </button>
       </div>
 
-      {notFound && (
-        <p className="font-body text-[13px] text-warm-gray text-center py-8">
-          Intet rum fundet med koden eller navnet &quot;{query}&quot;
-        </p>
-      )}
+      {/* List */}
+      {loading ? (
+        <div className="text-center py-12">
+          <span className="font-condensed text-sm text-warm-gray uppercase tracking-wide">Henter spilrum...</span>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="border border-warm-border bg-cream-dark p-10 text-center rounded-sm">
+          <p className="font-body text-warm-gray text-sm">
+            {query.trim() ? `Ingen rum matcher "${query}"` : 'Ingen spilrum oprettet endnu.'}
+          </p>
+        </div>
+      ) : (
+        <div className="border border-warm-border overflow-x-auto rounded-sm">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-cream-dark border-b border-warm-border">
+                {['Navn', 'Kode', 'Deltagere', 'Oprettet', 'Status', ''].map((h) => (
+                  <th key={h} className="px-4 py-2.5 font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-warm-border">
+              {filtered.map((game) => {
+                const isConfirming = deleteConfirm === game.id
+                const isDeleting = deleteLoading.has(game.id)
 
-      {result && (
-        <GameDetailCard game={result} onDelete={handleDelete} />
+                return (
+                  <tr key={game.id} className="bg-cream hover:bg-cream-dark/40 transition-colors">
+                    <td className="px-4 py-3">
+                      <a
+                        href={`/games/${game.id}`}
+                        className="font-body text-sm font-medium text-ink hover:text-forest transition-colors"
+                      >
+                        {game.name}
+                      </a>
+                    </td>
+                    <td className="px-4 py-3 font-condensed text-sm tracking-widest text-ink">{game.invite_code}</td>
+                    <td className="px-4 py-3 font-condensed text-sm text-center text-ink">{game.member_count}</td>
+                    <td className="px-4 py-3 font-body text-sm text-warm-gray">{formatDate(game.created_at)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`font-condensed text-xs uppercase tracking-wide px-2 py-0.5 rounded-sm border ${
+                        game.status === 'active'
+                          ? 'text-forest bg-forest/10 border-forest/30'
+                          : 'text-warm-gray bg-warm-border/40 border-warm-border'
+                      }`}>
+                        {game.status === 'active' ? 'Aktiv' : 'Afsluttet'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {isConfirming ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="font-body text-xs text-vintage-red">Er du sikker?</span>
+                          <button
+                            onClick={() => handleDelete(game.id)}
+                            disabled={isDeleting}
+                            className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 bg-vintage-red text-cream rounded-sm hover:opacity-85 disabled:opacity-40 transition-opacity cursor-pointer"
+                          >
+                            {isDeleting ? 'Sletter...' : 'Ja, slet'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 border border-warm-border text-warm-gray rounded-sm hover:border-ink transition-colors cursor-pointer"
+                          >
+                            Annullér
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirm(game.id)}
+                          className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 border border-vintage-red/40 text-vintage-red rounded-sm hover:bg-vintage-red hover:text-cream transition-colors cursor-pointer"
+                        >
+                          Slet
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
