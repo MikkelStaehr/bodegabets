@@ -93,7 +93,6 @@ export default async function GamePage({ params }: Props) {
     .select('season_id')
     .eq('game_id', gameId)
   const seasonIds = (gameSeasons ?? []).map(gs => gs.season_id as number)
-  console.log('seasonIds:', seasonIds)
 
   const [
     { data: rawMembers },
@@ -157,7 +156,6 @@ export default async function GamePage({ params }: Props) {
 
   if (!myMembership) redirect('/dashboard')
 
-  console.log('rounds count:', rounds?.length, 'rounds:', rounds?.map((r: { id: number }) => r.id))
   const typedRoundsEarly = (rounds ?? []) as Round[]
 
   // Hent liga-info via seasons → tournaments
@@ -178,7 +176,6 @@ export default async function GamePage({ params }: Props) {
 
   const activeRoundEarly =
     typedRoundsEarly.find((r) => r.bet_open === true) ?? null
-  console.log('activeRoundEarly:', activeRoundEarly?.id, activeRoundEarly?.name)
   const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string; season_id: number } | null) ?? null
 
   const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
@@ -206,7 +203,6 @@ export default async function GamePage({ params }: Props) {
 
   // Bets har ikke round_id — hent via match_ids
   const activeMatchIds = (activeRoundMatches ?? []).map((m: { id: number }) => m.id)
-  console.log('activeMatchIds:', activeMatchIds)
   const { data: roundBets } =
     activeMatchIds.length > 0
       ? await supabaseAdmin
@@ -215,10 +211,6 @@ export default async function GamePage({ params }: Props) {
           .eq('game_id', gameId)
           .in('match_id', activeMatchIds)
       : { data: [] as { id: number; user_id: string }[] }
-
-  console.log('activeRoundEarly:', activeRoundEarly)
-  console.log('activeRoundMatches:', activeRoundMatches)
-  console.log('roundBets:', roundBets)
 
   // ── Achievements til leaderboard ────────────────────────────────────────────
   const ACHIEVEMENT_PRIORITY = [
