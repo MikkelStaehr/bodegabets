@@ -103,7 +103,7 @@ export default async function GamePage({ params }: Props) {
     { data: latestFinishedRoundByStatus },
     { data: blocks },
   ] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from('game_members')
       .select('user_id, earnings, profile:profiles(username)')
       .eq('game_id', gameId)
