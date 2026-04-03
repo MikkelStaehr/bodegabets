@@ -215,6 +215,10 @@ export default async function GamePage({ params }: Props) {
           .in('match_id', activeMatchIds)
       : { data: [] as { id: number; user_id: string }[] }
 
+  console.log('activeRoundEarly:', activeRoundEarly)
+  console.log('activeRoundMatches:', activeRoundMatches)
+  console.log('roundBets:', roundBets)
+
   // ── Achievements til leaderboard ────────────────────────────────────────────
   const ACHIEVEMENT_PRIORITY = [
     'maskinen', 'oraklet', 'analytikeren', 'hattrick', 'blokkongen',
