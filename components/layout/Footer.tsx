@@ -20,10 +20,25 @@ export default function Footer() {
             Spil med vennerne. Ingen rigtige penge.
           </p>
 
-          {/* Copyright */}
-          <p className="text-[10px] text-[#b0a898]">
-            © {new Date().getFullYear()} Bodega Bets
-          </p>
+          {/* Copyright + Stæhrs branding */}
+          <div className="text-right">
+            <p className="text-[10px] text-[#b0a898]">
+              © {new Date().getFullYear()} Bodega Bets
+            </p>
+            <p className="text-[10px] text-[#b0a898]">
+              A{' '}
+              <a
+                href="https://xn--sthrs-tra.dk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-ink transition-colors"
+                style={{ fontFamily: "'Archivo Black', sans-serif", fontWeight: 400, color: 'inherit' }}
+              >
+                Stæhrs.
+              </a>
+              {' '}product
+            </p>
+          </div>
 
         </div>
 
@@ -39,21 +54,6 @@ export default function Footer() {
             Vilkår og betingelser
           </Link>
         </div>
-
-        {/* Stæhrs branding */}
-        <p className="text-[10px] text-[#b0a898] text-center mt-4">
-          A{' '}
-          <a
-            href="https://xn--sthrs-tra.dk"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-ink transition-colors"
-            style={{ fontFamily: "'Archivo Black', sans-serif", color: 'inherit' }}
-          >
-            Stæhrs.
-          </a>
-          {' '}product
-        </p>
       </div>
     </footer>
   )
