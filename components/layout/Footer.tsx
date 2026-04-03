@@ -25,7 +25,7 @@ export default function Footer() {
             <p className="text-[10px] text-[#b0a898]">
               © {new Date().getFullYear()} Bodega Bets
             </p>
-            <p className="text-[10px] text-[#b0a898]">
+            <p className="text-[10px] text-[#1C3829]">
               A{' '}
               <a
                 href="https://xn--sthrs-tra.dk"
