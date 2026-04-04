@@ -187,6 +187,27 @@ async function resolveAllTeams(
   }
 }
 
+// ─── Danish timezone helper ─────────────────────────────────────────────────
+
+function getLastSunday(year: number, month: number): number {
+  const date = new Date(Date.UTC(year, month + 1, 0))
+  return date.getUTCDate() - date.getUTCDay()
+}
+
+function isDanishSummerTime(date: Date): boolean {
+  const month = date.getUTCMonth() // 0-indexed
+  if (month > 2 && month < 9) return true
+  if (month < 2 || month > 9) return false
+  const lastSunday = getLastSunday(date.getUTCFullYear(), month)
+  if (month === 2) return date.getUTCDate() >= lastSunday
+  return date.getUTCDate() < lastSunday
+}
+
+function danishToUtc(date: Date): Date {
+  const offset = isDanishSummerTime(date) ? 2 : 1
+  return new Date(date.getTime() - offset * 60 * 60 * 1000)
+}
+
 // ─── syncBoldFixtures ───────────────────────────────────────────────────────
 
 /**
@@ -300,11 +321,14 @@ export async function syncBoldFixtures(
       continue
     }
 
-    // Parse date — Bold API returns UTC dates like "2026-03-17 18:45"
+    // Parse date — Bold API returns Danish local time (CET/CEST), convert to UTC
     const kickoff = (() => {
       const ma = mt.date.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/)
-      if (ma) return new Date(`${ma[1]}T${ma[2].padStart(2, '0')}:${ma[3]}:00Z`).toISOString()
-      return new Date(`${mt.date.slice(0, 10)}T15:00:00Z`).toISOString()
+      if (ma) {
+        const danishAsUtc = new Date(`${ma[1]}T${ma[2].padStart(2, '0')}:${ma[3]}:00Z`)
+        return danishToUtc(danishAsUtc).toISOString()
+      }
+      return danishToUtc(new Date(`${mt.date.slice(0, 10)}T15:00:00Z`)).toISOString()
     })()
 
     // Status
