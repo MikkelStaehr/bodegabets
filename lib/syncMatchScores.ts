@@ -268,11 +268,17 @@ export async function syncMatchScores(options?: {
     .eq('bet_open', true)
     .lt('bet_lock_at', new Date().toISOString())
 
-  if (toLock?.length) {
-    await supabaseAdmin
+  if (toLock && toLock.length > 0) {
+    console.log('[syncMatchScores] Låser kamp IDs:', toLock.map((m) => m.id))
+
+    const { error: lockError } = await supabaseAdmin
       .from('matches')
       .update({ bet_open: false })
       .in('id', toLock.map((m) => m.id))
+
+    if (lockError) {
+      console.error('[syncMatchScores] Bet-lock UPDATE fejl:', lockError)
+    }
 
     // Beregn og gem konsensus odds for alle match_result-bets på de låste kampe
     if (!dryRun) {
