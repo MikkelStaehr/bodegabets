@@ -26,7 +26,7 @@ const TYPE_MAP: Record<string, string> = {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString('da-DK', {
-    timeZone: 'UTC',
+    timeZone: 'Europe/Copenhagen',
     day: 'numeric',
     month: 'short',
     hour: '2-digit',

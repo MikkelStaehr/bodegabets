@@ -210,7 +210,7 @@ export default async function RoundPage({ params }: Props) {
   if (typedRound.betting_closes_at && typedRound.status === 'open') {
     const dl = new Date(typedRound.betting_closes_at)
     const dlStr = dl.toLocaleString('da-DK', {
-      timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+      timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
     })
     tickerItems.push(`Bets til ${typedRound.name} er åbne — deadline ${dlStr}`)
   }

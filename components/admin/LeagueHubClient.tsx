@@ -24,7 +24,7 @@ interface Props {
 function formatDate(iso: string | null) {
   if (!iso) return '—'
   return new Intl.DateTimeFormat('da-DK', {
-    timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   }).format(new Date(iso))
 }
 

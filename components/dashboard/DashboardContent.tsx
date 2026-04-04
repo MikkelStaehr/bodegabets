@@ -131,7 +131,7 @@ export default function DashboardContent({
             {username}
           </h1>
           <p className="text-[13px] text-[#7a7060] mt-1">
-            {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' })}
+            {games.length} {games.length === 1 ? 'spilrum' : 'spilrum'} · {new Date().toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
         <Link

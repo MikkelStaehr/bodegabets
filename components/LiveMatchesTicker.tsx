@@ -18,7 +18,7 @@ function StatusBadge({ status, kickoff }: { status: LiveMatch['status']; kickoff
   if (status === 'scheduled') return (
     <span style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, fontWeight: 700, color: '#9ca3af' }}>
       {kickoff
-        ? new Date(kickoff).toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
+        ? new Date(kickoff).toLocaleTimeString('da-DK', { timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit' })
         : '—'}
     </span>
   )
@@ -173,7 +173,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
 function DateSeparator({ date }: { date: string }) {
   const d = new Date(date)
   const label = d.toLocaleDateString('da-DK', {
-    timeZone: 'UTC',
+    timeZone: 'Europe/Copenhagen',
     weekday: 'long',
     day: 'numeric',
     month: 'long',

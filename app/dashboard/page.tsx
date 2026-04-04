@@ -370,7 +370,7 @@ export default async function DashboardPage() {
       .map((r) => r.betting_closes_at!)
       .sort()[0]
     if (!future) return null
-    return new Date(future).toLocaleDateString('da-DK', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    return new Date(future).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   })()
 
   return (

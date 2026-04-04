@@ -23,7 +23,7 @@ function teamShort(team: { short_name: string | null; name?: string } | null): s
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleTimeString('da-DK', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleTimeString('da-DK', { timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit' })
 }
 
 function getLeague(m: ScheduleMatch): League | null {
