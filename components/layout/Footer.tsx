@@ -10,7 +10,7 @@ export default function Footer() {
 
           {/* Logo */}
           <Link href="/" aria-label="Bodega Bets">
-            <span style={{ fontFamily: "'Cocogoose', sans-serif", fontWeight: 700, fontSize: '20px', letterSpacing: '-0.03em', textTransform: 'lowercase' as const, lineHeight: 1, color: '#1C3829' }}>
+            <span className="logo-font" style={{ fontSize: '20px', color: '#1C3829' }}>
               bodega bets
             </span>
           </Link>

@@ -200,7 +200,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
-            <span style={{ fontFamily: "'Cocogoose', sans-serif", fontWeight: 700, fontSize: '28px', letterSpacing: '-0.03em', textTransform: 'lowercase' as const, lineHeight: 1, color: '#2C4A3E' }}>
+            <span className="logo-font" style={{ fontSize: '28px', color: '#2C4A3E' }}>
               bodega bets
             </span>
           </Link>

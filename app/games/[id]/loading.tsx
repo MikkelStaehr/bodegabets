@@ -5,7 +5,7 @@ export default function GameRoomLoading() {
     <div className="fixed inset-0 z-[300] bg-[#1a3329] flex flex-col items-center justify-center gap-6">
       <HideNav />
       <div className="flex flex-col items-center gap-4">
-        <span style={{ fontFamily: "'Cocogoose', sans-serif", fontWeight: 700, fontSize: 'clamp(48px, 12vw, 96px)', letterSpacing: '-0.03em', textTransform: 'lowercase' as const, lineHeight: 1, color: '#F2EDE4' }}>
+        <span className="logo-font" style={{ fontSize: 'clamp(48px, 12vw, 96px)', color: '#F2EDE4' }}>
           bodega bets
         </span>
         <span

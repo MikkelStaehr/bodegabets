@@ -1,6 +1,7 @@
 'use client'
 
 import { LiveMatch, LiveSummary } from '@/hooks/useLiveMatches'
+import { isBetCorrect } from '@/lib/betUtils'
 
 function StatusBadge({ status, kickoff }: { status: LiveMatch['status']; kickoff?: string }) {
   if (status === 'live') return (
@@ -183,12 +184,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
             let finishedIcon: string | null = null
             let finishedColor = 'text-[#F2EDE4]/40'
             if (match.status === 'finished' && match.home_score != null && match.away_score != null) {
-              const h = match.home_score
-              const a = match.away_score
-              let correct = false
-              if (row.key === 'goals_3plus') correct = userPick === '1' ? h >= 3 : a >= 3
-              else if (row.key === 'clean_sheet') correct = userPick === '1' ? a === 0 : h === 0
-              else if (row.key === 'win_margin') correct = userPick === '1' ? h - a >= 2 : a - h >= 2
+              const correct = isBetCorrect(row.key, userPick, match.home_score, match.away_score)
               finishedIcon = correct ? '✓' : '✗'
               finishedColor = correct ? 'text-[#4CAF50]' : 'text-[#E53935]'
             }
