@@ -169,7 +169,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
 
       {/* Ekstra bets — kun brugerens egne, på låste kampe */}
       {match.bet_open === false && match.userExtraPicks && Object.keys(match.userExtraPicks).length > 0 && (
-        <div className="px-3 pb-1.5 flex flex-col gap-0.5 border-t border-white/[0.06] pt-1">
+        <div className="px-3 pb-2 flex flex-col gap-1 border-t border-white/10 pt-2">
           {([
             { key: 'goals_3plus', label: 'Mål 3+' },
             { key: 'clean_sheet', label: 'Clean sheet' },
@@ -190,17 +190,17 @@ function MatchRow({ match }: { match: LiveMatch }) {
               else if (row.key === 'clean_sheet') correct = userPick === '1' ? a === 0 : h === 0
               else if (row.key === 'win_margin') correct = userPick === '1' ? h - a >= 2 : a - h >= 2
               finishedIcon = correct ? '✓' : '✗'
-              finishedColor = correct ? 'text-[#27ae60]' : 'text-[#c0392b]'
+              finishedColor = correct ? 'text-[#4CAF50]' : 'text-[#E53935]'
             }
             return (
-              <div key={row.key} className="flex items-center gap-2 py-0.5">
-                <span className="text-[8px] font-bold tracking-wider uppercase text-[#F2EDE4]/30 w-[68px] shrink-0">
+              <div key={row.key} className="flex items-center gap-2 py-1">
+                <span className="text-[9px] font-bold tracking-wider uppercase text-[#C8B89A] w-[72px] shrink-0">
                   {row.label}
                 </span>
-                <span className="text-[9px] font-medium text-[#F2EDE4]/60 truncate flex-1">
+                <span className="text-[10px] font-medium text-[#F2EDE4] truncate flex-1">
                   {teamName} ({userPick})
                 </span>
-                <span className={`text-[10px] font-bold shrink-0 w-4 text-center ${finishedIcon ? finishedColor : 'text-[#F2EDE4]/30'}`}>
+                <span className={`text-[13px] font-bold shrink-0 w-5 text-center ${finishedIcon ? finishedColor : 'text-[#F2EDE4]/30'}`}>
                   {finishedIcon ?? resultIcon}
                 </span>
               </div>
