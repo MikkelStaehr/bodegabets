@@ -9,6 +9,7 @@ import { AdminGamesTab } from './tabs/AdminGamesTab'
 import { AdminUsersTab } from './tabs/AdminUsersTab'
 import { AdminLogsTab } from './tabs/AdminLogsTab'
 import { LiveTestTab } from './tabs/LiveTestTab'
+import { AdminChampionshipTab } from './tabs/AdminChampionshipTab'
 
 const TABS = [
   { id: 'overview', label: 'Overblik', icon: '◉' },
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'games', label: 'Spilrum', icon: '🏆' },
   { id: 'users', label: 'Brugere', icon: '👤' },
   { id: 'logs', label: 'Logs', icon: '📋' },
+  { id: 'championship', label: 'Mesterskabet', icon: '🏅' },
   { id: 'live-test', label: 'LIVE TEST', icon: '🔴' },
 ] as const
 
@@ -75,6 +77,7 @@ export default function AdminTabClient({
       )}
       {validTab === 'users' && <AdminUsersTab adminSecret={adminSecret} />}
       {validTab === 'logs' && <AdminLogsTab adminSecret={adminSecret} />}
+      {validTab === 'championship' && <AdminChampionshipTab adminSecret={adminSecret} />}
       {validTab === 'live-test' && <LiveTestTab />}
     </div>
   )
