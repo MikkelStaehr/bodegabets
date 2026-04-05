@@ -20,6 +20,8 @@ export type LiveMatch = {
   userPrediction?: string | null
   bet_open?: boolean
   distribution?: { '1': number; 'X': number; '2': number; total: number; odds: { '1': number | null; 'X': number | null; '2': number | null } } | null
+  extraBetDist?: Record<string, { pct_1: number; pct_2: number; odds_1: number | null; odds_2: number | null }> | null
+  userExtraPicks?: Record<string, string> | null
   isRivalry?: boolean
   rivalryName?: string | null
 }

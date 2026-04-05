@@ -154,6 +154,58 @@ export async function GET(req: NextRequest, { params }: Props) {
     }
   }
 
+  // Hent ekstra bets fordeling for låste kampe
+  type ExtraBetDistEntry = { pct_1: number; pct_2: number; odds_1: number | null; odds_2: number | null }
+  const extraBetDistribution: Record<number, Record<string, ExtraBetDistEntry>> = {}
+
+  if (lockedMatchIds.length > 0) {
+    const { data: extraDistData } = await supabaseAdmin
+      .from('bets')
+      .select('match_id, bet_type, prediction, odds')
+      .eq('game_id', gameId)
+      .in('bet_type', ['goals_3plus', 'clean_sheet', 'win_margin'])
+      .in('match_id', lockedMatchIds)
+
+    const groups = new Map<string, { count_1: number; count_2: number; total: number; odds_1: number | null; odds_2: number | null }>()
+    for (const bet of extraDistData ?? []) {
+      const key = `${bet.match_id}:${bet.bet_type}`
+      if (!groups.has(key)) groups.set(key, { count_1: 0, count_2: 0, total: 0, odds_1: null, odds_2: null })
+      const g = groups.get(key)!
+      if (bet.prediction === '1') { g.count_1++; if (g.odds_1 === null && bet.odds != null) g.odds_1 = bet.odds as number }
+      if (bet.prediction === '2') { g.count_2++; if (g.odds_2 === null && bet.odds != null) g.odds_2 = bet.odds as number }
+      g.total++
+    }
+
+    for (const [key, g] of groups) {
+      const [matchIdStr, betType] = key.split(':')
+      const matchId = parseInt(matchIdStr)
+      if (!extraBetDistribution[matchId]) extraBetDistribution[matchId] = {}
+      extraBetDistribution[matchId][betType] = {
+        pct_1: g.total > 0 ? Math.round((g.count_1 / g.total) * 100) : 0,
+        pct_2: g.total > 0 ? Math.round((g.count_2 / g.total) * 100) : 0,
+        odds_1: g.odds_1,
+        odds_2: g.odds_2,
+      }
+    }
+  }
+
+  // Hent brugerens ekstra bets
+  const { data: userExtraBets } = matchIds.length > 0
+    ? await supabaseAdmin
+        .from('bets')
+        .select('match_id, bet_type, prediction')
+        .eq('user_id', user.id)
+        .eq('game_id', gameId)
+        .in('bet_type', ['goals_3plus', 'clean_sheet', 'win_margin'])
+        .in('match_id', matchIds)
+    : { data: [] }
+
+  const extraBetMap = new Map<number, Record<string, string>>()
+  for (const b of userExtraBets ?? []) {
+    if (!extraBetMap.has(b.match_id)) extraBetMap.set(b.match_id, {})
+    extraBetMap.get(b.match_id)![b.bet_type] = b.prediction
+  }
+
   const matchList = (roundMatches ?? []).map((m) => {
     const homeRef = m.home_team_ref as unknown as { name: string; logo_url: string | null } | null
     const awayRef = m.away_team_ref as unknown as { name: string; logo_url: string | null } | null
@@ -180,6 +232,8 @@ export async function GET(req: NextRequest, { params }: Props) {
       userPrediction: betMap.get(m.id) ?? null,
       bet_open: mm.bet_open ?? true,
       distribution: betDistribution[m.id] ?? null,
+      extraBetDist: extraBetDistribution[m.id] ?? null,
+      userExtraPicks: extraBetMap.get(m.id) ?? null,
       isRivalry: rivalryName != null,
       rivalryName,
     }

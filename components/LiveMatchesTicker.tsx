@@ -166,6 +166,58 @@ function MatchRow({ match }: { match: LiveMatch }) {
           })}
         </div>
       )}
+
+      {/* Ekstra bets fordeling — kun på låste kampe */}
+      {showDistribution && match.extraBetDist && Object.keys(match.extraBetDist).length > 0 && (
+        <div className="px-3 pb-1.5 flex flex-col gap-1">
+          {([
+            { key: 'goals_3plus', label: 'Mål 3+' },
+            { key: 'clean_sheet', label: 'Clean sheet' },
+            { key: 'win_margin', label: 'Sejr margin' },
+          ] as const).map((row) => {
+            const dist = match.extraBetDist![row.key]
+            if (!dist) return null
+            const userPick = match.userExtraPicks?.[row.key]
+            return (
+              <div key={row.key}>
+                <span className="text-[8px] font-bold tracking-wider uppercase block text-[#F2EDE4]/30 mb-0.5">
+                  {row.label}
+                </span>
+                <div className="flex gap-1">
+                  {(['1', '2'] as const).map((side) => {
+                    const pct = side === '1' ? dist.pct_1 : dist.pct_2
+                    const odds = side === '1' ? dist.odds_1 : dist.odds_2
+                    const isUserPick = userPick === side
+                    const otherPct = side === '1' ? dist.pct_2 : dist.pct_1
+                    const isHighest = pct > otherPct
+                    return (
+                      <div key={side} className="flex-1 text-center">
+                        <div
+                          className={`text-[9px] font-bold rounded py-0.5 ${
+                            isUserPick
+                              ? 'bg-[#F2EDE4]/15 text-[#F2EDE4]'
+                              : 'text-[#F2EDE4]/30'
+                          }`}
+                        >
+                          {side}
+                        </div>
+                        {odds != null && (
+                          <div className="font-condensed text-[10px] text-[#F2EDE4]/40 mt-0.5">
+                            {odds.toFixed(2)}
+                          </div>
+                        )}
+                        <div className={`font-condensed text-[10px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#F2EDE4]/40'}`}>
+                          {pct}%
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
