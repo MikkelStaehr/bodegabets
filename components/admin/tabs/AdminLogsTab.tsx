@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { formatTimeWithSeconds } from '@/lib/dateUtils'
 
 type Log = {
   id: number
@@ -24,16 +25,7 @@ const TYPE_MAP: Record<string, string> = {
   Brugere: 'user_action',
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
-}
+
 
 function StatusIcon({ status }: { status: string }) {
   if (status === 'success') {
@@ -114,7 +106,7 @@ export function AdminLogsTab({ adminSecret }: Props) {
                         {log.type}
                       </span>
                       <span className="font-body text-[11px] text-warm-gray">
-                        {formatTime(log.created_at)}
+                        {formatTimeWithSeconds(log.created_at)}
                       </span>
                     </div>
                     <p className="font-body text-[13px] text-ink mt-0.5 truncate">

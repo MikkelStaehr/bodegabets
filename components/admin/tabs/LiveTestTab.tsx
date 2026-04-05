@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { formatKickoff } from '@/lib/dateUtils'
 
 type LiveMatch = {
   id: number
@@ -41,17 +42,6 @@ type LiveTestData = {
   timestamp: string
 }
 
-function formatKickoff(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function formatUpdatedAgo(iso: string | null): string {
   if (!iso) return '—'
@@ -205,7 +195,7 @@ export function LiveTestTab() {
                     <td className="px-4 py-3 font-mono text-xs">{m.bold_match_id ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs">{m.home_bold_team_id ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs">{m.away_bold_team_id ?? '—'}</td>
-                    <td className="px-4 py-3">{formatKickoff(m.kickoff_at)}</td>
+                    <td className="px-4 py-3">{m.kickoff_at ? formatKickoff(m.kickoff_at) : '—'}</td>
                     <td className="px-4 py-3 text-[#7a7060]">{formatUpdatedAgo(m.updated_at)}</td>
                   </tr>
                 ))

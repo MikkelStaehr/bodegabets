@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatDateTime } from '@/lib/dateUtils'
 
 type Props = {
   adminSecret: string
@@ -55,16 +56,7 @@ function formatRelative(iso: string | null): string {
   return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
 }
 
-function formatTime(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+
 
 function StatusCard({
   title,
@@ -388,7 +380,7 @@ export function AdminOverviewTab({ adminSecret }: Props) {
           title="Cron · sync-results"
           status={status?.cron.isHealthy ? 'ok' : 'error'}
           detail={`Sidst kørt: ${formatRelative(status?.cron.lastRun ?? null)}`}
-          sub={`Næste: ${formatTime(status?.cron.nextRun ?? null)}`}
+          sub={`Næste: ${formatDateTime(status?.cron.nextRun ?? null)}`}
         />
         <StatusCard
           title="Bold API"

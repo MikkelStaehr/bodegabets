@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatDate } from '@/lib/dateUtils'
 
 type User = {
   id: string
@@ -17,14 +18,6 @@ type Props = {
   adminSecret: string
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
 
 export function AdminUsersTab({ adminSecret }: Props) {
   const router = useRouter()

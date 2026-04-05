@@ -7,6 +7,7 @@ import InviteCodeShare from '@/components/games/InviteCodeShare'
 import CalendarSlider from '@/components/games/CalendarSlider'
 import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
 import ActiveRounds from '@/components/games/ActiveRounds'
+import { formatDateTime } from '@/lib/dateUtils'
 import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
 
@@ -36,14 +37,7 @@ function assignRanks<T extends { earnings: number }>(rows: T[]): (T & { rank: nu
   }))
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso)
-  const isMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
-  if (isMidnight) {
-    return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
-  }
-  return d.toLocaleString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
+
 
 // Beregn dynamisk rundestatus baseret på betting_closes_at og DB-status
 function computeRoundStatus(round: Round, now: Date): 'upcoming' | 'open' | 'active' | 'finished' {
@@ -498,7 +492,7 @@ export default async function GamePage({ params }: Props) {
   // Bet-deadline
   if (activeRound && activeRound.computedStatus === 'open' && activeRound.betting_closes_at) {
     tickerItems.push(
-      `🔓 Bets til ${activeRound.name} er åbne — deadline ${formatDate(activeRound.betting_closes_at)}`
+      `🔓 Bets til ${activeRound.name} er åbne — deadline ${formatDateTime(activeRound.betting_closes_at)}`
     )
   }
 

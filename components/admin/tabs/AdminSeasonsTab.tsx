@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { formatDate } from '@/lib/dateUtils'
 
 type Season = {
   id: number
@@ -27,15 +28,6 @@ type Props = {
   adminSecret: string
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
 
 function Modal({
   state,

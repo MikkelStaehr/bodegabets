@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatDateTime } from '@/lib/dateUtils'
 
 export type SeasonRow = {
   id: number
@@ -21,12 +22,7 @@ interface Props {
   lastSync: string | null
 }
 
-function formatDate(iso: string | null) {
-  if (!iso) return '—'
-  return new Intl.DateTimeFormat('da-DK', {
-    timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  }).format(new Date(iso))
-}
+
 
 export default function LeagueHubClient({ tournaments, lastSync }: Props) {
   const router = useRouter()
@@ -115,7 +111,7 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
           <div className="flex items-center gap-6 flex-wrap">
             <div>
               <p className="font-condensed text-[9px] uppercase tracking-[0.14em] text-cream/50 mb-0.5">Sidst synket</p>
-              <p className="font-condensed font-bold text-sm text-cream">{formatDate(lastSync)}</p>
+              <p className="font-condensed font-bold text-sm text-cream">{formatDateTime(lastSync)}</p>
             </div>
             <div className="w-px h-8 bg-cream/10 hidden sm:block" />
             <div>

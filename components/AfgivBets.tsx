@@ -6,6 +6,7 @@ import type { Match, Bet } from '@/types'
 import { BET_TYPE_LABELS, PREDICTION_LABELS } from '@/lib/betTypes'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
+import { formatKickoff } from '@/lib/dateUtils'
 import GameTicker from '@/components/GameTicker'
 
 type MatchWithOptions = Match
@@ -92,21 +93,7 @@ function initSelections(_matches: MatchWithOptions[], _existing: Bet[]): BetEntr
   return []
 }
 
-function formatKickoff(iso: string) {
-  const d = new Date(iso)
-  const isMidnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
-  if (isMidnight) {
-    return d.toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', weekday: 'short', day: 'numeric', month: 'short' })
-  }
-  return d.toLocaleString('da-DK', {
-    timeZone: 'Europe/Copenhagen',
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+
 
 function formatDeadline(iso: string | null) {
   if (!iso) return { time: '—', date: '' }
