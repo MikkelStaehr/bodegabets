@@ -167,52 +167,42 @@ function MatchRow({ match }: { match: LiveMatch }) {
         </div>
       )}
 
-      {/* Ekstra bets fordeling — kun på låste kampe */}
-      {showDistribution && match.extraBetDist && Object.keys(match.extraBetDist).length > 0 && (
-        <div className="px-3 pb-1.5 flex flex-col gap-1">
+      {/* Ekstra bets — kun brugerens egne, på låste kampe */}
+      {match.bet_open === false && match.userExtraPicks && Object.keys(match.userExtraPicks).length > 0 && (
+        <div className="px-3 pb-1.5 flex flex-col gap-0.5 border-t border-white/[0.06] pt-1">
           {([
             { key: 'goals_3plus', label: 'Mål 3+' },
             { key: 'clean_sheet', label: 'Clean sheet' },
             { key: 'win_margin', label: 'Sejr margin' },
           ] as const).map((row) => {
-            const dist = match.extraBetDist![row.key]
-            if (!dist) return null
             const userPick = match.userExtraPicks?.[row.key]
+            if (!userPick) return null
+            const teamName = userPick === '1' ? match.home_team : match.away_team
+            const resultIcon = match.status !== 'finished' ? '—' : null
+            // For finished: determine win/loss from scores
+            let finishedIcon: string | null = null
+            let finishedColor = 'text-[#F2EDE4]/40'
+            if (match.status === 'finished' && match.home_score != null && match.away_score != null) {
+              const h = match.home_score
+              const a = match.away_score
+              let correct = false
+              if (row.key === 'goals_3plus') correct = userPick === '1' ? h >= 3 : a >= 3
+              else if (row.key === 'clean_sheet') correct = userPick === '1' ? a === 0 : h === 0
+              else if (row.key === 'win_margin') correct = userPick === '1' ? h - a >= 2 : a - h >= 2
+              finishedIcon = correct ? '✓' : '✗'
+              finishedColor = correct ? 'text-[#27ae60]' : 'text-[#c0392b]'
+            }
             return (
-              <div key={row.key}>
-                <span className="text-[8px] font-bold tracking-wider uppercase block text-[#F2EDE4]/30 mb-0.5">
+              <div key={row.key} className="flex items-center gap-2 py-0.5">
+                <span className="text-[8px] font-bold tracking-wider uppercase text-[#F2EDE4]/30 w-[68px] shrink-0">
                   {row.label}
                 </span>
-                <div className="flex gap-1">
-                  {(['1', '2'] as const).map((side) => {
-                    const pct = side === '1' ? dist.pct_1 : dist.pct_2
-                    const odds = side === '1' ? dist.odds_1 : dist.odds_2
-                    const isUserPick = userPick === side
-                    const otherPct = side === '1' ? dist.pct_2 : dist.pct_1
-                    const isHighest = pct > otherPct
-                    return (
-                      <div key={side} className="flex-1 text-center">
-                        <div
-                          className={`text-[9px] font-bold rounded py-0.5 ${
-                            isUserPick
-                              ? 'bg-[#F2EDE4]/15 text-[#F2EDE4]'
-                              : 'text-[#F2EDE4]/30'
-                          }`}
-                        >
-                          {side}
-                        </div>
-                        {odds != null && (
-                          <div className="font-condensed text-[10px] text-[#F2EDE4]/40 mt-0.5">
-                            {odds.toFixed(2)}
-                          </div>
-                        )}
-                        <div className={`font-condensed text-[10px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#F2EDE4]/40'}`}>
-                          {pct}%
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                <span className="text-[9px] font-medium text-[#F2EDE4]/60 truncate flex-1">
+                  {teamName} ({userPick})
+                </span>
+                <span className={`text-[10px] font-bold shrink-0 w-4 text-center ${finishedIcon ? finishedColor : 'text-[#F2EDE4]/30'}`}>
+                  {finishedIcon ?? resultIcon}
+                </span>
               </div>
             )
           })}
