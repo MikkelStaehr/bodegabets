@@ -66,6 +66,9 @@ type RivalryInfo = { rivalry_name: string; multiplier: number }
 
 type BetDistribution = Record<number, { '1': number; 'X': number; '2': number; total: number; odds?: { '1': number | null; 'X': number | null; '2': number | null } }>
 
+type ExtraBetDistEntry = { pct_1: number; pct_2: number; odds_1: number | null; odds_2: number | null }
+type ExtraBetDistMap = Record<number, Record<string, ExtraBetDistEntry>>
+
 type Props = {
   gameId: number
   roundId: number
@@ -82,6 +85,7 @@ type Props = {
   rivalryInfo?: Record<number, RivalryInfo>
   totalMatchesInRound?: number
   betDistribution?: BetDistribution
+  extraBetDistribution?: ExtraBetDistMap
   blockInfo?: { block_number: number; block_name: string; is_last_in_block: boolean } | null
 }
 
@@ -242,7 +246,7 @@ function InlineExtraBets({
   )
 }
 
-type ExtraBetData = { prediction: string; stake: number; points_earned: number | null; result: string | null }
+type ExtraBetData = { prediction: string; stake: number; points_earned: number | null; result: string | null; odds: number | null }
 
 /* ─── Read-only Extra Bets for Finished Matches ─── */
 function FinishedExtraBets({
@@ -271,9 +275,16 @@ function FinishedExtraBets({
                 <span className="text-[9px] font-bold tracking-wider uppercase block text-[#7a7060]">
                   {row.label}
                 </span>
-                {betData && (isWin || isLoss) && (
-                  <span className={`text-[9px] font-bold tracking-wide ${isWin ? 'text-[#27ae60]' : 'text-vintage-red'}`}>
-                    {isWin ? `+${betData.points_earned ?? 0} pt` : `-${betData.stake} pt`}
+                {betData && (
+                  <span className="flex items-center gap-1.5">
+                    {betData.odds != null && (
+                      <span className="text-[9px] font-bold text-[#9E9486]">×{betData.odds.toFixed(2)}</span>
+                    )}
+                    {(isWin || isLoss) && (
+                      <span className={`text-[9px] font-bold tracking-wide ${isWin ? 'text-[#27ae60]' : 'text-vintage-red'}`}>
+                        {isWin ? `+${betData.points_earned ?? 0} pt` : `-${betData.stake} pt`}
+                      </span>
+                    )}
                   </span>
                 )}
               </div>
@@ -331,6 +342,7 @@ function MatchCard({
   userPrediction,
   userExtraPicks,
   userExtraBetData,
+  extraBetDist,
   matchResultBet,
   selectOutcome,
   toggleExtra,
@@ -355,6 +367,7 @@ function MatchCard({
   userPrediction: '1' | 'X' | '2' | null
   userExtraPicks: Record<string, string>
   userExtraBetData: Record<string, ExtraBetData>
+  extraBetDist?: Record<string, ExtraBetDistEntry>
   matchResultBet: Bet | undefined
   selectOutcome: (matchId: number, outcome: '1' | 'X' | '2') => void
   toggleExtra: (matchId: number, key: ExtraBetType, value: string) => void
@@ -654,6 +667,60 @@ function MatchCard({
           </div>
         </div>
       )}
+
+      {/* Ekstra bets — låste kampe (read-only med fordeling + odds) */}
+      {!isOpen && !isFinished && (Object.keys(userExtraPicks).length > 0 || (extraBetDist && Object.keys(extraBetDist).length > 0)) && (
+        <div className="px-3 pb-2 flex flex-col gap-1 border-t border-black/[0.06] pt-1.5">
+          {EXTRA_BET_ROWS
+            .filter((row) => userExtraPicks[row.key] || extraBetDist?.[row.key])
+            .map((row) => {
+              const dist = extraBetDist?.[row.key]
+              return (
+                <div key={row.key}>
+                  <span className="text-[9px] font-bold tracking-wider uppercase mb-1 block text-[#7a7060]">
+                    {row.label}
+                  </span>
+                  <div className="flex gap-1">
+                    {row.opts.map((opt) => {
+                      const isUserPick = userExtraPicks[row.key] === opt.value
+                      const pct = opt.value === '1' ? dist?.pct_1 : dist?.pct_2
+                      const odds = opt.value === '1' ? dist?.odds_1 : dist?.odds_2
+                      const otherPct = opt.value === '1' ? dist?.pct_2 : dist?.pct_1
+                      const isHighest = pct != null && otherPct != null && pct > otherPct
+                      return (
+                        <div key={opt.value} className="flex-1 text-center">
+                          <button
+                            type="button"
+                            disabled
+                            className={`w-full py-1 border-[1.5px] rounded text-[10px] font-semibold cursor-not-allowed ${
+                              isUserPick
+                                ? 'bg-[#2C4A3E] border-[#2C4A3E] text-white'
+                                : 'bg-white border-black/10 text-[#7a7060]/40'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                          {dist && (
+                            <div className="mt-0.5">
+                              {odds != null && (
+                                <div className="font-condensed text-[10px] text-[#9E9486]">
+                                  {odds.toFixed(2)}
+                                </div>
+                              )}
+                              <div className={`font-condensed text-[10px] font-bold ${isHighest && pct != null && pct > 0 ? 'text-[#B8963E]' : 'text-[#9E9486]'}`}>
+                                {pct ?? 0}%
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+        </div>
+      )}
     </div>
   )
 }
@@ -674,6 +741,7 @@ export default function AfgivBets({
   rivalryInfo = {},
   totalMatchesInRound,
   betDistribution,
+  extraBetDistribution,
   blockInfo,
 }: Props) {
   const router = useRouter()
@@ -933,6 +1001,7 @@ export default function AfgivBets({
             stake: b.stake,
             points_earned: b.points_earned,
             result: b.result,
+            odds: (b as unknown as { odds?: number | null }).odds ?? null,
           }
         }
       }
@@ -1004,6 +1073,7 @@ export default function AfgivBets({
           onCancelEdit={cancelEditing}
           showInlineStake={showInlineStake}
           distribution={betDistribution?.[md.match.id]}
+          extraBetDist={extraBetDistribution?.[md.match.id]}
         />
       )
     }
