@@ -17,7 +17,16 @@ type MatchOption = {
   rivalry_name: string | null
 }
 
-type Tournament = { id: number; name: string; logo_url: string | null }
+type RoundOverview = {
+  id: number
+  name: string
+  season_id: number
+  status: string
+  tournament_name: string | null
+  tournament_id: number | null
+  first_kickoff: string | null
+  last_kickoff: string | null
+}
 
 type RoundMatch = {
   id: number
@@ -37,20 +46,13 @@ type ChampionshipRound = {
 
 type Props = { adminSecret: string }
 
-function getWeekRange(offset: number): { from: string; to: string; label: string } {
-  const now = new Date()
-  const monday = new Date(now)
-  monday.setDate(now.getDate() - now.getDay() + 1 + offset * 7)
-  monday.setHours(0, 0, 0, 0)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  sunday.setHours(23, 59, 59, 999)
-  const label = `${monday.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })} – ${sunday.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })}`
-  return {
-    from: monday.toISOString(),
-    to: sunday.toISOString(),
-    label,
-  }
+function formatDateRange(first: string | null, last: string | null): string {
+  if (!first) return ''
+  const f = new Date(first)
+  const l = last ? new Date(last) : f
+  const fStr = f.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+  const lStr = l.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+  return fStr === lStr ? fStr : `${fStr} – ${lStr}`
 }
 
 export function AdminChampionshipTab({ adminSecret }: Props) {
@@ -58,10 +60,10 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
   const authHeader = { Authorization: `Bearer ${adminSecret}` }
 
   // State — kamp-browser
-  const [weekOffset, setWeekOffset] = useState(0)
-  const [tournamentFilter, setTournamentFilter] = useState<string>('')
+  const [roundOptions, setRoundOptions] = useState<RoundOverview[]>([])
+  const [selectedRoundId, setSelectedRoundId] = useState<string>('')
   const [availableMatches, setAvailableMatches] = useState<MatchOption[]>([])
-  const [tournaments, setTournaments] = useState<Tournament[]>([])
+  const [loadingRoundOptions, setLoadingRoundOptions] = useState(true)
   const [loadingMatches, setLoadingMatches] = useState(false)
 
   // State — runde builder
@@ -76,27 +78,45 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<Set<number>>(new Set())
 
-  const week = getWeekRange(weekOffset)
-
-  // Hent kampe for valgt uge
+  // Hent runde-oversigt for dropdown
   useEffect(() => {
-    fetchMatches()
-  }, [weekOffset, tournamentFilter])
-
-  // Hent eksisterende runder
-  useEffect(() => {
+    fetchRoundOptions()
     fetchRounds()
   }, [])
 
-  async function fetchMatches() {
+  // Hent kampe når runde vælges
+  useEffect(() => {
+    if (selectedRoundId) fetchMatchesForRound(selectedRoundId)
+    else setAvailableMatches([])
+  }, [selectedRoundId])
+
+  async function fetchRoundOptions() {
+    setLoadingRoundOptions(true)
+    try {
+      const res = await fetch('/api/admin/championship/rounds-overview', { headers: authHeader })
+      const data = await res.json()
+      if (data.rounds) setRoundOptions(data.rounds)
+    } catch { /* silent */ } finally {
+      setLoadingRoundOptions(false)
+    }
+  }
+
+  async function fetchMatchesForRound(roundId: string) {
+    const round = roundOptions.find((r) => String(r.id) === roundId)
+    if (!round?.first_kickoff || !round?.last_kickoff) {
+      setAvailableMatches([])
+      return
+    }
     setLoadingMatches(true)
     try {
-      const params = new URLSearchParams({ from: week.from, to: week.to })
-      if (tournamentFilter) params.set('tournament_id', tournamentFilter)
+      // Expand range by 1 day each side to catch edge cases
+      const from = new Date(new Date(round.first_kickoff).getTime() - 24 * 60 * 60 * 1000).toISOString()
+      const to = new Date(new Date(round.last_kickoff).getTime() + 24 * 60 * 60 * 1000).toISOString()
+      const params = new URLSearchParams({ from, to })
+      if (round.tournament_id) params.set('tournament_id', String(round.tournament_id))
       const res = await fetch(`/api/admin/championship/matches?${params}`, { headers: authHeader })
       const data = await res.json()
       if (data.matches) setAvailableMatches(data.matches)
-      if (data.tournaments) setTournaments(data.tournaments)
     } catch { /* silent */ } finally {
       setLoadingMatches(false)
     }
@@ -186,45 +206,35 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
 
         {/* ── Venstre: Kamp-browser ──────────────────────────── */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide">Kampe</h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setWeekOffset((w) => w - 1)}
-                className="font-condensed text-xs px-2 py-1 border border-warm-border rounded-sm hover:border-ink transition-colors cursor-pointer"
-              >
-                ← Forrige
-              </button>
-              <span className="font-condensed text-xs text-warm-gray">{week.label}</span>
-              <button
-                onClick={() => setWeekOffset((w) => w + 1)}
-                className="font-condensed text-xs px-2 py-1 border border-warm-border rounded-sm hover:border-ink transition-colors cursor-pointer"
-              >
-                Næste →
-              </button>
-            </div>
-          </div>
+          <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide mb-3">Kampe</h3>
 
-          {/* Liga-filter */}
+          {/* Runde-dropdown */}
           <select
-            value={tournamentFilter}
-            onChange={(e) => setTournamentFilter(e.target.value)}
+            value={selectedRoundId}
+            onChange={(e) => setSelectedRoundId(e.target.value)}
+            disabled={loadingRoundOptions}
             className="w-full font-body text-sm text-ink border border-warm-border bg-cream px-3 py-2 rounded-sm mb-4 cursor-pointer"
           >
-            <option value="">Alle ligaer</option>
-            {tournaments.map((t) => (
-              <option key={t.id} value={String(t.id)}>{t.name}</option>
+            <option value="">Vælg en runde...</option>
+            {roundOptions.map((r) => (
+              <option key={r.id} value={String(r.id)}>
+                {r.tournament_name ?? 'Ukendt'} — {r.name} ({formatDateRange(r.first_kickoff, r.last_kickoff)})
+              </option>
             ))}
           </select>
 
           {/* Kampliste */}
-          {loadingMatches ? (
+          {!selectedRoundId ? (
+            <div className="border border-warm-border bg-cream-dark p-8 text-center rounded-sm">
+              <p className="font-body text-warm-gray text-sm">Vælg en runde ovenfor for at se kampe</p>
+            </div>
+          ) : loadingMatches ? (
             <div className="text-center py-8">
               <span className="font-condensed text-sm text-warm-gray uppercase tracking-wide">Henter kampe...</span>
             </div>
           ) : availableMatches.length === 0 ? (
             <div className="border border-warm-border bg-cream-dark p-8 text-center rounded-sm">
-              <p className="font-body text-warm-gray text-sm">Ingen kampe i denne uge</p>
+              <p className="font-body text-warm-gray text-sm">Ingen kampe fundet for denne runde</p>
             </div>
           ) : (
             <div className="border border-warm-border rounded-sm overflow-hidden">
