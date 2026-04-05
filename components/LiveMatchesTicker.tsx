@@ -192,6 +192,9 @@ function MatchRow({ match }: { match: LiveMatch }) {
               finishedIcon = correct ? '✓' : '✗'
               finishedColor = correct ? 'text-[#4CAF50]' : 'text-[#E53935]'
             }
+            const dist = match.extraBetDist?.[row.key]
+            const odds = dist ? (userPick === '1' ? dist.odds_1 : dist.odds_2) : null
+            const betCount = dist ? (userPick === '1' ? dist.count_1 : dist.count_2) : null
             return (
               <div key={row.key} className="flex items-center gap-2 py-1">
                 <span className="text-[9px] font-bold tracking-wider uppercase text-[#C8B89A] w-[72px] shrink-0">
@@ -200,6 +203,12 @@ function MatchRow({ match }: { match: LiveMatch }) {
                 <span className="text-[10px] font-medium text-[#F2EDE4] truncate flex-1">
                   {teamName} ({userPick})
                 </span>
+                {odds != null && (
+                  <span className="text-[9px] font-bold text-[#9E9486] shrink-0">{odds.toFixed(2)}</span>
+                )}
+                {betCount != null && (
+                  <span className="text-[9px] text-[#9E9486] shrink-0">{betCount} {betCount === 1 ? 'bet' : 'bets'}</span>
+                )}
                 <span className={`text-[13px] font-bold shrink-0 w-5 text-center ${finishedIcon ? finishedColor : 'text-[#F2EDE4]/30'}`}>
                   {finishedIcon ?? resultIcon}
                 </span>

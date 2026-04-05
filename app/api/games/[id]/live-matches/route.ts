@@ -155,7 +155,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   }
 
   // Hent ekstra bets fordeling for låste kampe
-  type ExtraBetDistEntry = { pct_1: number; pct_2: number; odds_1: number | null; odds_2: number | null }
+  type ExtraBetDistEntry = { count_1: number; count_2: number; odds_1: number | null; odds_2: number | null }
   const extraBetDistribution: Record<number, Record<string, ExtraBetDistEntry>> = {}
 
   if (lockedMatchIds.length > 0) {
@@ -166,14 +166,13 @@ export async function GET(req: NextRequest, { params }: Props) {
       .in('bet_type', ['goals_3plus', 'clean_sheet', 'win_margin'])
       .in('match_id', lockedMatchIds)
 
-    const groups = new Map<string, { count_1: number; count_2: number; total: number; odds_1: number | null; odds_2: number | null }>()
+    const groups = new Map<string, { count_1: number; count_2: number; odds_1: number | null; odds_2: number | null }>()
     for (const bet of extraDistData ?? []) {
       const key = `${bet.match_id}:${bet.bet_type}`
-      if (!groups.has(key)) groups.set(key, { count_1: 0, count_2: 0, total: 0, odds_1: null, odds_2: null })
+      if (!groups.has(key)) groups.set(key, { count_1: 0, count_2: 0, odds_1: null, odds_2: null })
       const g = groups.get(key)!
       if (bet.prediction === '1') { g.count_1++; if (g.odds_1 === null && bet.odds != null) g.odds_1 = bet.odds as number }
       if (bet.prediction === '2') { g.count_2++; if (g.odds_2 === null && bet.odds != null) g.odds_2 = bet.odds as number }
-      g.total++
     }
 
     for (const [key, g] of groups) {
@@ -181,8 +180,8 @@ export async function GET(req: NextRequest, { params }: Props) {
       const matchId = parseInt(matchIdStr)
       if (!extraBetDistribution[matchId]) extraBetDistribution[matchId] = {}
       extraBetDistribution[matchId][betType] = {
-        pct_1: g.total > 0 ? Math.round((g.count_1 / g.total) * 100) : 0,
-        pct_2: g.total > 0 ? Math.round((g.count_2 / g.total) * 100) : 0,
+        count_1: g.count_1,
+        count_2: g.count_2,
         odds_1: g.odds_1,
         odds_2: g.odds_2,
       }
