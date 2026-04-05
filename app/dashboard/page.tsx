@@ -103,13 +103,13 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-center gap-3">
               <Link
                 href="/games/new"
-                className="inline-flex items-center justify-center gap-2 font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-[0.08em] px-6 py-3 rounded-sm transition-colors min-h-[44px] bg-[#2C4A3E] text-[#F2EDE4] hover:bg-[#1a3329]"
+                className="inline-flex items-center justify-center gap-2 font-condensed font-bold text-sm uppercase tracking-[0.08em] px-6 py-3 rounded-sm transition-colors min-h-[44px] bg-[#2C4A3E] text-[#F2EDE4] hover:bg-[#1a3329]"
               >
                 + Opret spilrum
               </Link>
               <a
                 href="#join-section"
-                className="inline-flex items-center justify-center gap-2 font-['Barlow_Condensed'] font-bold text-sm uppercase tracking-[0.08em] px-6 py-3 rounded-sm transition-colors min-h-[44px] bg-transparent text-[#2C4A3E] border-[1.5px] border-[#2C4A3E] hover:bg-[#2C4A3E]/5"
+                className="inline-flex items-center justify-center gap-2 font-condensed font-bold text-sm uppercase tracking-[0.08em] px-6 py-3 rounded-sm transition-colors min-h-[44px] bg-transparent text-[#2C4A3E] border-[1.5px] border-[#2C4A3E] hover:bg-[#2C4A3E]/5"
               >
                 Join med kode
               </a>

@@ -136,7 +136,7 @@ export default function DashboardContent({
         </div>
         <Link
           href="/games/new"
-          className="shrink-0 flex items-center gap-1.5 text-[13px] font-semibold text-[#2C4A3E] border border-[#2C4A3E]/30 px-4 py-2 rounded-lg hover:bg-[#2C4A3E]/5 transition-colors"
+          className="shrink-0 flex items-center gap-1.5 text-[13px] font-semibold text-[#2C4A3E] border border-[#2C4A3E]/30 px-4 py-2 rounded-sm hover:bg-[#2C4A3E]/5 transition-colors"
         >
           + Opret spil
         </Link>
@@ -153,7 +153,7 @@ export default function DashboardContent({
               <button
                 key={tab.key}
                 onClick={() => handleTabChange(tab.key)}
-                className="relative flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold rounded-lg transition-all duration-300 whitespace-nowrap"
+                className="relative flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold rounded-sm transition-all duration-300 whitespace-nowrap"
                 style={{
                   minHeight: '44px',
                   background: isActive ? 'var(--accent-light)' : 'transparent',
@@ -189,7 +189,7 @@ export default function DashboardContent({
             style={{ opacity: transitioning ? 0 : 1 }}
           >
             {activeGames.length === 0 && finishedGames.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-black/8 p-12 text-center">
+              <div className="bg-white rounded-sm border border-black/8 p-12 text-center">
                 <p className="text-[#7a7060] mb-4">
                   {activeTab === 'all'
                     ? 'Du er ikke med i nogen spilrum endnu'

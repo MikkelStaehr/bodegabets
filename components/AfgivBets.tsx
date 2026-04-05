@@ -134,16 +134,16 @@ function InlineExtraBets({
   const [open, setOpen] = useState(sel.extraBets.length > 0)
 
   return (
-    <div className={`border-t ${isRivalry ? 'border-[#B8963E]/20' : 'border-black/[0.06]'}`}>
+    <div className={`border-t ${isRivalry ? 'border-gold/20' : 'border-black/[0.06]'}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left"
       >
-        <span className={`text-[9px] font-bold tracking-widest uppercase flex-1 ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
+        <span className={`text-[9px] font-bold tracking-widest uppercase flex-1 ${isRivalry ? 'text-gold/70' : 'text-[var(--color-warm-taupe)]'}`}>
           + Ekstra valg
         </span>
-        <span className={`text-[9px] transition-transform ${isRivalry ? 'text-[#B8963E]/50' : 'text-[#7a7060]'} ${open ? 'rotate-180' : ''}`}>
+        <span className={`text-[9px] transition-transform ${isRivalry ? 'text-gold/50' : 'text-[var(--color-warm-taupe)]'} ${open ? 'rotate-180' : ''}`}>
           ▼
         </span>
       </button>
@@ -153,7 +153,7 @@ function InlineExtraBets({
             const pick = sel.extraBets.find((eb) => eb.type === row.key)?.prediction
             return (
               <div key={row.key}>
-                <span className={`text-[9px] font-bold tracking-wider uppercase mb-1 block ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
+                <span className={`text-[9px] font-bold tracking-wider uppercase mb-1 block ${isRivalry ? 'text-gold/70' : 'text-[var(--color-warm-taupe)]'}`}>
                   {row.label}
                 </span>
                 <div className="flex gap-1">
@@ -162,12 +162,12 @@ function InlineExtraBets({
                     let cls: string
                     if (active) {
                       cls = isRivalry
-                        ? 'bg-[#B8963E] border-[#B8963E] text-[#1a3329]'
-                        : 'bg-[#2C4A3E] border-[#2C4A3E] text-white'
+                        ? 'bg-gold border-gold text-[var(--color-dark-green)]'
+                        : 'bg-[var(--color-card-green)] border-[#2C4A3E] text-white'
                     } else {
                       cls = isRivalry
-                        ? 'bg-[#2C4A3E] border-[#B8963E]/20 text-[#F2EDE4]/60 hover:border-[#B8963E]/50'
-                        : 'bg-white border-black/10 text-[#7a7060] hover:border-[#2C4A3E] hover:text-[#1a3329]'
+                        ? 'bg-[var(--color-card-green)] border-gold/20 text-[var(--color-cream)]/60 hover:border-gold/50'
+                        : 'bg-white border-black/10 text-[var(--color-warm-taupe)] hover:border-[#2C4A3E] hover:text-[var(--color-dark-green)]'
                     }
                     return (
                       <button
@@ -188,8 +188,8 @@ function InlineExtraBets({
                       onClick={() => adjustExtraStake(matchId, row.key, -50)}
                       className={`w-6 h-6 border rounded font-bold text-sm flex items-center justify-center ${
                         isRivalry
-                          ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
-                          : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                          ? 'border-gold/30 bg-[var(--color-card-green)] text-[var(--color-cream)]'
+                          : 'border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)]'
                       }`}
                     >
                       −
@@ -201,11 +201,11 @@ function InlineExtraBets({
                       onChange={(e) => setExtraStake(matchId, row.key, parseInt(e.target.value) || 10)}
                       className={`w-14 text-center font-condensed text-[13px] font-bold border rounded h-6 ${
                         isRivalry
-                          ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
-                          : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                          ? 'border-gold/30 bg-[var(--color-card-green)] text-[var(--color-cream)]'
+                          : 'border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)]'
                       }`}
                     />
-                    <span className={`text-[10px] font-semibold ${isRivalry ? 'text-[#F2EDE4]/50' : 'text-[#7a7060]'}`}>
+                    <span className={`text-[10px] font-semibold ${isRivalry ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'}`}>
                       pt
                     </span>
                     <button
@@ -213,8 +213,8 @@ function InlineExtraBets({
                       onClick={() => adjustExtraStake(matchId, row.key, 50)}
                       className={`w-6 h-6 border rounded font-bold text-sm flex items-center justify-center ${
                         isRivalry
-                          ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
-                          : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                          ? 'border-gold/30 bg-[var(--color-card-green)] text-[var(--color-cream)]'
+                          : 'border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)]'
                       }`}
                     >
                       +
@@ -256,21 +256,21 @@ function ExtraBetRows({
           const isWin = betData?.result === 'win'
           const isLoss = betData?.result === 'loss'
           const resultIcon = !isFinished ? '—' : isWin ? '✓' : '✗'
-          const resultColor = !isFinished ? 'text-[#9E9486]' : isWin ? 'text-[#27ae60]' : 'text-[#c0392b]'
+          const resultColor = !isFinished ? 'text-[var(--color-muted)]' : isWin ? 'text-[var(--color-green-dark)]' : 'text-[var(--color-red-dark)]'
 
           return (
             <div key={row.key} className="flex items-center gap-2 py-0.5">
-              <span className="text-[9px] font-bold tracking-wider uppercase text-[#7a7060] w-[72px] shrink-0">
+              <span className="text-[9px] font-bold tracking-wider uppercase text-[var(--color-warm-taupe)] w-[72px] shrink-0">
                 {row.label}
               </span>
               <span className="text-[10px] font-medium text-[#5C5C4A] truncate flex-1">
                 {teamName(userValue)} ({userValue})
               </span>
               {betData?.odds != null && (
-                <span className="text-[9px] font-bold text-[#9E9486] shrink-0">×{betData.odds.toFixed(2)}</span>
+                <span className="text-[9px] font-bold text-[var(--color-muted)] shrink-0">×{betData.odds.toFixed(2)}</span>
               )}
               {isFinished && betData && (isWin || isLoss) && (
-                <span className={`text-[9px] font-bold shrink-0 ${isWin ? 'text-[#27ae60]' : 'text-[#c0392b]'}`}>
+                <span className={`text-[9px] font-bold shrink-0 ${isWin ? 'text-[var(--color-green-dark)]' : 'text-[var(--color-red-dark)]'}`}>
                   {isWin ? `+${betData.points_earned ?? 0}` : `-${betData.stake}`}
                 </span>
               )}
@@ -338,24 +338,24 @@ function MatchCard({
   const hasExistingBet = isOpen && !!matchResultBet
   const displayOutcome = isFinished ? userPrediction : (sel?.outcome ?? userPrediction)
 
-  const cardBg = isRivalry ? 'bg-[#1a3329]' : 'bg-white'
+  const cardBg = isRivalry ? 'bg-[var(--color-dark-green)]' : 'bg-white'
   const hasSelection = !!sel || (!isFinished && !!userPrediction)
   const cardBorder = isRivalry
-    ? 'border-[#B8963E]'
+    ? 'border-gold'
     : hasSelection
       ? 'border-[#2C4A3E] shadow-[0_0_0_1px_#2C4A3E]'
       : 'border-black/10'
-  const textPrimary = isRivalry ? 'text-[#F2EDE4]' : 'text-[#1a3329]'
-  const textSecondary = isRivalry ? 'text-[#F2EDE4]/50' : 'text-[#7a7060]'
-  const scoreSep = isRivalry ? 'text-[#F2EDE4]/60' : 'text-[#7a7060]'
+  const textPrimary = isRivalry ? 'text-[var(--color-cream)]' : 'text-[var(--color-dark-green)]'
+  const textSecondary = isRivalry ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'
+  const scoreSep = isRivalry ? 'text-[var(--color-cream)]/60' : 'text-[var(--color-warm-taupe)]'
 
   return (
-    <div className={`${cardBg} border rounded-lg mb-2 overflow-hidden transition-all ${cardBorder}`}>
+    <div className={`${cardBg} border rounded-sm mb-2 overflow-hidden transition-all ${cardBorder}`}>
       {/* Rivalry badge */}
       {isRivalry && (
         <div className="flex items-center gap-2 px-3 pt-2.5 pb-0.5">
           <span className="text-[12px]">🔥</span>
-          <span className="font-['Barlow_Condensed'] text-[11px] font-bold text-[#B8963E] uppercase tracking-widest">
+          <span className="font-condensed text-[11px] font-bold text-gold uppercase tracking-widest">
             {rivalry.rivalry_name} · {rivalry.multiplier}×
           </span>
         </div>
@@ -406,22 +406,22 @@ function MatchCard({
           let btnClass: string
           if (isFinished && (isUserPick || isCorrect)) {
             if (isUserCorrect) {
-              btnClass = 'bg-[#27ae60] border-[#B8963E] border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
+              btnClass = 'bg-[var(--color-green-dark)] border-gold border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
             } else if (isUserPick) {
-              btnClass = 'bg-[#27ae60] border-[#27ae60]'
+              btnClass = 'bg-[var(--color-green-dark)] border-[var(--color-green-dark)]'
             } else if (isRivalry) {
-              btnClass = 'bg-[#2C4A3E] border-[#B8963E] border-[2.5px]'
+              btnClass = 'bg-[var(--color-card-green)] border-gold border-[2.5px]'
             } else {
-              btnClass = 'bg-[#F2EDE4] border-[#B8963E] border-[2.5px]'
+              btnClass = 'bg-[var(--color-cream)] border-gold border-[2.5px]'
             }
           } else if (active) {
             btnClass = isRivalry
-              ? 'bg-[#B8963E] border-[#B8963E]'
-              : 'bg-[#1a3329] border-[#1a3329]'
+              ? 'bg-gold border-gold'
+              : 'bg-[var(--color-dark-green)] border-[#1a3329]'
           } else {
             btnClass = isRivalry
-              ? 'bg-[#2C4A3E] border-[#B8963E]/30 hover:border-[#B8963E]'
-              : 'bg-[#F2EDE4] border-black/10 hover:border-[#2C4A3E]'
+              ? 'bg-[var(--color-card-green)] border-gold/30 hover:border-gold'
+              : 'bg-[var(--color-cream)] border-black/10 hover:border-[#2C4A3E]'
           }
 
           const textLight = active || isUserPick
@@ -439,15 +439,15 @@ function MatchCard({
             >
               <span className={`font-condensed text-[17px] font-bold leading-none ${
                 textLight
-                  ? isRivalry ? 'text-[#1a3329]' : 'text-white'
-                  : isRivalry ? 'text-[#F2EDE4]/70' : 'text-[#7a7060]'
+                  ? isRivalry ? 'text-[var(--color-dark-green)]' : 'text-white'
+                  : isRivalry ? 'text-[var(--color-cream)]/70' : 'text-[var(--color-warm-taupe)]'
               }`}>
                 {o}
               </span>
               <span className={`text-[8px] font-medium ${
                 textLight
-                  ? isRivalry ? 'text-[#1a3329]/60' : 'text-white/60'
-                  : isRivalry ? 'text-[#F2EDE4]/40' : 'text-[#7a7060]'
+                  ? isRivalry ? 'text-[var(--color-dark-green)]/60' : 'text-white/60'
+                  : isRivalry ? 'text-[var(--color-cream)]/40' : 'text-[var(--color-warm-taupe)]'
               }`}>
                 {sub}
               </span>
@@ -470,12 +470,12 @@ function MatchCard({
 
       {/* Existing extra bets on open match with no new selection — read-only */}
       {isOpen && !sel && Object.keys(userExtraPicks).length > 0 && (
-        <div className={`px-3 pb-2 ${isRivalry ? 'border-t border-[#B8963E]/20' : ''}`}>
+        <div className={`px-3 pb-2 ${isRivalry ? 'border-t border-gold/20' : ''}`}>
           {EXTRA_BET_ROWS
             .filter((row) => userExtraPicks[row.key])
             .map((row) => (
               <div key={row.key} className="mb-1">
-                <span className={`text-[9px] font-bold tracking-wider uppercase mb-0.5 block ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
+                <span className={`text-[9px] font-bold tracking-wider uppercase mb-0.5 block ${isRivalry ? 'text-gold/70' : 'text-[var(--color-warm-taupe)]'}`}>
                   {row.label}
                 </span>
                 <div className="flex gap-1">
@@ -483,11 +483,11 @@ function MatchCard({
                     const isUserPick = userExtraPicks[row.key] === opt.value
                     const cls = isUserPick
                       ? isRivalry
-                        ? 'bg-[#B8963E] border-[#B8963E] text-[#1a3329]'
-                        : 'bg-[#2C4A3E] border-[#2C4A3E] text-white'
+                        ? 'bg-gold border-gold text-[var(--color-dark-green)]'
+                        : 'bg-[var(--color-card-green)] border-[#2C4A3E] text-white'
                       : isRivalry
-                        ? 'bg-[#2C4A3E] border-[#B8963E]/20 text-[#F2EDE4]/40'
-                        : 'bg-white border-black/10 text-[#7a7060]/40'
+                        ? 'bg-[var(--color-card-green)] border-gold/20 text-[var(--color-cream)]/40'
+                        : 'bg-white border-black/10 text-[var(--color-warm-taupe)]/40'
                     return (
                       <button key={opt.value} type="button" disabled className={`flex-1 py-1 border-[1.5px] rounded text-[10px] font-semibold cursor-not-allowed opacity-80 ${cls}`}>
                         {opt.label}
@@ -505,8 +505,8 @@ function MatchCard({
 
       {/* Inline stake — mobile only (controlled via showInlineStake) */}
       {showInlineStake && isOpen && sel && (
-        <div className={`flex items-center gap-2 px-3 py-2 ${isRivalry ? 'border-t border-[#B8963E]/20' : 'border-t border-black/[0.06]'}`}>
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
+        <div className={`flex items-center gap-2 px-3 py-2 ${isRivalry ? 'border-t border-gold/20' : 'border-t border-black/[0.06]'}`}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${isRivalry ? 'text-gold/70' : 'text-[var(--color-warm-taupe)]'}`}>
             Stake
           </span>
           <div className="flex items-center gap-1 ml-auto">
@@ -515,8 +515,8 @@ function MatchCard({
               onClick={() => adjustStake(match.id, -50)}
               className={`w-7 h-7 border rounded font-bold text-sm flex items-center justify-center ${
                 isRivalry
-                  ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
-                  : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                  ? 'border-gold/30 bg-[var(--color-card-green)] text-[var(--color-cream)]'
+                  : 'border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)]'
               }`}
             >
               −
@@ -528,11 +528,11 @@ function MatchCard({
               onChange={(e) => setStake(match.id, parseInt(e.target.value) || 10)}
               className={`w-16 text-center font-condensed text-[15px] font-bold border rounded h-7 ${
                 isRivalry
-                  ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
-                  : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                  ? 'border-gold/30 bg-[var(--color-card-green)] text-[var(--color-cream)]'
+                  : 'border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)]'
               }`}
             />
-            <span className={`text-[10px] font-semibold ${isRivalry ? 'text-[#F2EDE4]/50' : 'text-[#7a7060]'}`}>
+            <span className={`text-[10px] font-semibold ${isRivalry ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'}`}>
               pt
             </span>
             <button
@@ -540,8 +540,8 @@ function MatchCard({
               onClick={() => adjustStake(match.id, 50)}
               className={`w-7 h-7 border rounded font-bold text-sm flex items-center justify-center ${
                 isRivalry
-                  ? 'border-[#B8963E]/30 bg-[#2C4A3E] text-[#F2EDE4]'
-                  : 'border-black/10 bg-[#F2EDE4] text-[#1a3329]'
+                  ? 'border-gold/30 bg-[var(--color-card-green)] text-[var(--color-cream)]'
+                  : 'border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)]'
               }`}
             >
               +
@@ -552,12 +552,12 @@ function MatchCard({
 
       {/* Open match with existing bet: show stake + Ændre/Fortryd button */}
       {hasExistingBet && (
-        <div className={`flex items-center justify-between px-3 py-1.5 ${isRivalry ? 'border-t border-[#B8963E]/20' : 'border-t border-black/[0.06]'}`}>
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${isRivalry ? 'text-[#B8963E]/70' : 'text-[#7a7060]'}`}>
+        <div className={`flex items-center justify-between px-3 py-1.5 ${isRivalry ? 'border-t border-gold/20' : 'border-t border-black/[0.06]'}`}>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${isRivalry ? 'text-gold/70' : 'text-[var(--color-warm-taupe)]'}`}>
             Dit valg
           </span>
           <div className="flex items-center gap-2">
-            <span className={`font-condensed text-[14px] font-bold ${isRivalry ? 'text-[#F2EDE4]/70' : 'text-[#7a7060]'}`}>
+            <span className={`font-condensed text-[14px] font-bold ${isRivalry ? 'text-[var(--color-cream)]/70' : 'text-[var(--color-warm-taupe)]'}`}>
               {matchResultBet.stake} pt
             </span>
             {!isReadOnly && (
@@ -567,10 +567,10 @@ function MatchCard({
                 className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all ${
                   isEditing
                     ? isRivalry
-                      ? 'text-[#F2EDE4]/70 hover:text-[#F2EDE4] border border-[#B8963E]/30'
-                      : 'text-[#c0392b] hover:text-[#c0392b]/80 border border-[#c0392b]/30'
+                      ? 'text-[var(--color-cream)]/70 hover:text-[var(--color-cream)] border border-gold/30'
+                      : 'text-[var(--color-red-dark)] hover:text-[var(--color-red-dark)]/80 border border-[#c0392b]/30'
                     : isRivalry
-                      ? 'text-[#B8963E] hover:text-[#B8963E]/80 border border-[#B8963E]/30'
+                      ? 'text-gold hover:text-gold/80 border border-gold/30'
                       : 'text-[#2C4A3E] hover:text-[#2C4A3E]/80 border border-[#2C4A3E]/30'
                 }`}
               >
@@ -584,10 +584,10 @@ function MatchCard({
       {/* Locked match: show stake read-only */}
       {!isOpen && matchResultBet && (
         <div className="flex items-center justify-between px-3 py-1.5 border-t border-black/[0.06]">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#7a7060]">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-warm-taupe)]">
             Stake
           </span>
-          <span className="font-condensed text-[14px] font-bold text-[#7a7060]">
+          <span className="font-condensed text-[14px] font-bold text-[var(--color-warm-taupe)]">
             {matchResultBet.stake} pt
           </span>
         </div>
@@ -604,15 +604,15 @@ function MatchCard({
               const odds = distribution.odds?.[opt] ?? null
               return (
                 <div key={opt} className="flex-1 text-center">
-                  <div className="font-condensed text-[11px] font-bold text-[#9E9486] uppercase">
+                  <div className="font-condensed text-[11px] font-bold text-[var(--color-muted)] uppercase">
                     {opt}
                   </div>
                   {odds !== null && (
-                    <div className="font-condensed text-[12px] text-[#9E9486]">
+                    <div className="font-condensed text-[12px] text-[var(--color-muted)]">
                       {odds.toFixed(2)}
                     </div>
                   )}
-                  <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#9E9486]'}`}>
+                  <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-gold' : 'text-[var(--color-muted)]'}`}>
                     {pct}%
                   </div>
                 </div>
@@ -943,7 +943,7 @@ export default function AfgivBets({
         elements.push(
           <div key={`sep-${dateKey}`} className="flex items-center gap-2 my-3">
             <div className="flex-1 h-px bg-[#e5e0d8]" />
-            <span className="text-[11px] font-semibold text-[#9E9486] uppercase tracking-wide whitespace-nowrap">
+            <span className="text-[11px] font-semibold text-[var(--color-muted)] uppercase tracking-wide whitespace-nowrap">
               {label}
             </span>
             <div className="flex-1 h-px bg-[#e5e0d8]" />
@@ -984,13 +984,13 @@ export default function AfgivBets({
   }
 
   return (
-    <div className="min-h-screen bg-[#F2EDE4]">
+    <div className="min-h-screen bg-[var(--color-cream)]">
       {/* Ticker */}
       {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
 
       {/* Read-only banner */}
       {isReadOnly && (
-        <div className="w-full bg-[#c0392b]/15 border-b border-[#c0392b]/30 px-4 py-3 text-[#c0392b] text-sm text-center">
+        <div className="w-full bg-[#c0392b]/15 border-b border-[#c0392b]/30 px-4 py-3 text-[var(--color-red-dark)] text-sm text-center">
           Denne runde er lukket for valg
         </div>
       )}
@@ -1000,7 +1000,7 @@ export default function AfgivBets({
         <div className="max-w-[960px] mx-auto px-4 py-3 flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-1.5 mb-1">
-              <p className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase">
+              <p className="text-[9px] font-bold tracking-widest text-[var(--color-warm-taupe)] uppercase">
                 {gameName} · {round.name}
               </p>
               {blockInfo?.is_last_in_block && (
@@ -1009,7 +1009,7 @@ export default function AfgivBets({
                 </span>
               )}
             </div>
-            <h1 className="font-condensed text-[28px] md:text-[32px] font-extrabold text-[#1a3329] leading-none">
+            <h1 className="font-condensed text-[28px] md:text-[32px] font-extrabold text-[var(--color-dark-green)] leading-none">
               Afgiv dine valg
             </h1>
             {blockInfo && (
@@ -1017,18 +1017,18 @@ export default function AfgivBets({
                 Block {blockInfo.block_number} · {round.name}
               </p>
             )}
-            <p className="text-[11px] text-[#7a7060] mt-1">
+            <p className="text-[11px] text-[var(--color-warm-taupe)] mt-1">
               {totalMatches} kampe
             </p>
           </div>
-          <div className="bg-[#F2EDE4] border border-black/10 rounded-lg px-3 py-2 text-right shrink-0">
-            <div className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
+          <div className="bg-[var(--color-cream)] border border-black/10 rounded-sm px-3 py-2 text-right shrink-0">
+            <div className="text-[8px] font-bold tracking-widest text-[var(--color-warm-taupe)] uppercase">
               Deadline
             </div>
-            <span className="font-condensed text-[20px] font-bold text-[#c0392b] block leading-tight">
+            <span className="font-condensed text-[20px] font-bold text-[var(--color-red-dark)] block leading-tight">
               {deadline.time}
             </span>
-            <div className="text-[10px] text-[#7a7060]">{deadline.date}</div>
+            <div className="text-[10px] text-[var(--color-warm-taupe)]">{deadline.date}</div>
           </div>
         </div>
       </div>
@@ -1043,7 +1043,7 @@ export default function AfgivBets({
         {!isReadOnly && (
           <div
             className={`fixed bottom-0 left-0 right-0 z-[90] border-t-2 transition-colors ${
-              isOverBudget ? 'bg-[#c0392b] border-[#c0392b]' : 'bg-[#1a3329] border-[#1a3329]'
+              isOverBudget ? 'bg-[#c0392b] border-[#c0392b]' : 'bg-[var(--color-dark-green)] border-[#1a3329]'
             }`}
           >
             <div className="max-w-[680px] mx-auto px-4 py-3 flex items-center justify-between gap-3">
@@ -1052,7 +1052,7 @@ export default function AfgivBets({
                   Dine credits
                 </span>
                 <span className={`font-condensed text-[20px] font-extrabold leading-none ${
-                  isOverBudget ? 'text-white' : 'text-[#B8963E]'
+                  isOverBudget ? 'text-white' : 'text-gold'
                 }`}>
                   {displayCredits} pt
                 </span>
@@ -1061,10 +1061,10 @@ export default function AfgivBets({
                 type="button"
                 onClick={handleSubmit}
                 disabled={selections.length === 0 || isSubmitting || isOverBudget}
-                className={`h-[42px] px-5 rounded-lg font-condensed text-[14px] font-bold tracking-wider transition-all ${
+                className={`h-[42px] px-5 rounded-sm font-condensed text-[14px] font-bold tracking-wider transition-all ${
                   isOverBudget || selections.length === 0 || isSubmitting
                     ? 'bg-white/20 text-white/40 cursor-not-allowed'
-                    : 'bg-[#B8963E] text-[#1a3329] hover:bg-[#d4aa55] hover:-translate-y-px'
+                    : 'bg-gold text-[var(--color-dark-green)] hover:bg-[#d4aa55] hover:-translate-y-px'
                 }`}
               >
                 {isSubmitting
@@ -1082,17 +1082,17 @@ export default function AfgivBets({
           {/* Left — match cards */}
           <div className="py-3.5 px-5 pb-24 border-r border-black/10">
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[9px] font-bold tracking-widest text-[#7a7060] uppercase">
+              <span className="text-[9px] font-bold tracking-widest text-[var(--color-warm-taupe)] uppercase">
                 Vælg udfald
               </span>
               <div className="flex items-center gap-2">
                 <div className="w-[80px] h-0.5 bg-[#E8E0D4] rounded overflow-hidden">
                   <div
-                    className="h-full bg-[#2C4A3E] rounded transition-all duration-300"
+                    className="h-full bg-[var(--color-card-green)] rounded transition-all duration-300"
                     style={{ width: `${totalMatches > 0 ? (selections.length / totalMatches) * 100 : 0}%` }}
                   />
                 </div>
-                <span className="font-condensed text-xs font-bold text-[#1a3329]">
+                <span className="font-condensed text-xs font-bold text-[var(--color-dark-green)]">
                   {selections.length} / {totalMatches}
                 </span>
               </div>
@@ -1104,23 +1104,23 @@ export default function AfgivBets({
           <div className="sticky top-[52px] h-[calc(100vh-52px)] flex flex-col bg-white overflow-hidden">
             {/* Sidebar header */}
             <div className="flex items-center justify-between px-3.5 py-3 border-b border-black/10 shrink-0">
-              <span className="font-condensed text-sm font-bold text-[#1a3329] tracking-widest uppercase">
+              <span className="font-condensed text-sm font-bold text-[var(--color-dark-green)] tracking-widest uppercase">
                 Dine valg
               </span>
-              <span className="font-condensed text-[22px] font-extrabold text-[#B8963E] leading-none">
+              <span className="font-condensed text-[22px] font-extrabold text-gold leading-none">
                 {selections.length}
               </span>
             </div>
 
             {/* Credits bar */}
             {!isReadOnly && (
-              <div className="px-3 py-2.5 border-b border-black/10 bg-[#F2EDE4] shrink-0">
+              <div className="px-3 py-2.5 border-b border-black/10 bg-[var(--color-cream)] shrink-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-[8px] font-bold tracking-widest text-[#7a7060] uppercase">
+                  <span className="text-[8px] font-bold tracking-widest text-[var(--color-warm-taupe)] uppercase">
                     Dine credits
                   </span>
                   <span className={`font-condensed text-[18px] font-extrabold leading-none ${
-                    isOverBudget ? 'text-[#c0392b]' : 'text-[#1a3329]'
+                    isOverBudget ? 'text-[var(--color-red-dark)]' : 'text-[var(--color-dark-green)]'
                   }`}>
                     {displayCredits} pt
                   </span>
@@ -1131,7 +1131,7 @@ export default function AfgivBets({
             {/* Selections list with stake input */}
             <div className="flex-1 overflow-y-auto py-1.5 min-h-0">
               {selections.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full min-h-[120px] gap-2 text-[#7a7060] text-center px-5">
+                <div className="flex flex-col items-center justify-center h-full min-h-[120px] gap-2 text-[var(--color-warm-taupe)] text-center px-5">
                   <span className="text-3xl opacity-30">🎯</span>
                   <p className="text-xs leading-relaxed">
                     Vælg et udfald til venstre
@@ -1152,14 +1152,14 @@ export default function AfgivBets({
                         <span className="text-[11px] font-semibold flex-1 truncate">
                           {entry.match.home_team} vs {entry.match.away_team}
                         </span>
-                        <span className="font-condensed text-[13px] font-bold text-[#2C4A3E] bg-[#2C4A3E]/10 rounded px-1.5">
+                        <span className="font-condensed text-[13px] font-bold text-[#2C4A3E] bg-[var(--color-card-green)]/10 rounded px-1.5">
                           {entry.outcome}
                         </span>
                         {!isReadOnly && (
                           <button
                             type="button"
                             onClick={() => removeSelection(entry.matchId)}
-                            className="text-[11px] text-[#7a7060] opacity-50 hover:opacity-100 hover:text-red-600"
+                            className="text-[11px] text-[var(--color-warm-taupe)] opacity-50 hover:opacity-100 hover:text-red-600"
                           >
                             ✕
                           </button>
@@ -1171,7 +1171,7 @@ export default function AfgivBets({
                           <button
                             type="button"
                             onClick={() => adjustStake(entry.matchId, -50)}
-                            className="w-6 h-6 border border-black/10 rounded bg-[#F2EDE4] text-[#1a3329] font-bold text-sm flex items-center justify-center"
+                            className="w-6 h-6 border border-black/10 rounded bg-[var(--color-cream)] text-[var(--color-dark-green)] font-bold text-sm flex items-center justify-center"
                           >
                             −
                           </button>
@@ -1182,19 +1182,19 @@ export default function AfgivBets({
                             onChange={(e) =>
                               setStake(entry.matchId, Math.max(10, parseInt(e.target.value) || 10))
                             }
-                            className="flex-1 text-center font-condensed text-[15px] font-bold text-[#1a3329] border border-black/10 rounded bg-[#F2EDE4] h-6"
+                            className="flex-1 text-center font-condensed text-[15px] font-bold text-[var(--color-dark-green)] border border-black/10 rounded bg-[var(--color-cream)] h-6"
                           />
-                          <span className="text-[10px] text-[#7a7060] font-semibold">pt</span>
+                          <span className="text-[10px] text-[var(--color-warm-taupe)] font-semibold">pt</span>
                           <button
                             type="button"
                             onClick={() => adjustStake(entry.matchId, 50)}
-                            className="w-6 h-6 border border-black/10 rounded bg-[#F2EDE4] text-[#1a3329] font-bold text-sm flex items-center justify-center"
+                            className="w-6 h-6 border border-black/10 rounded bg-[var(--color-cream)] text-[var(--color-dark-green)] font-bold text-sm flex items-center justify-center"
                           >
                             +
                           </button>
                         </div>
                       ) : (
-                        <span className="font-condensed text-[15px] font-bold text-[#1a3329]">
+                        <span className="font-condensed text-[15px] font-bold text-[var(--color-dark-green)]">
                           {entry.points} pt
                         </span>
                       )}
@@ -1207,19 +1207,19 @@ export default function AfgivBets({
                             key={eb.type}
                             className={`flex items-center gap-2 px-2.5 py-1.5 ${
                               i > 0 ? 'border-t border-black/[0.07]' : ''
-                            } bg-[#F2EDE4]/60`}
+                            } bg-[var(--color-cream)]/60`}
                           >
-                            <span className="text-[9px] font-semibold text-[#7a7060] w-[70px] shrink-0 leading-tight">
+                            <span className="text-[9px] font-semibold text-[var(--color-warm-taupe)] w-[70px] shrink-0 leading-tight">
                               {BET_TYPE_LABELS[eb.type] ?? eb.type}
                             </span>
-                            <span className="font-condensed text-[12px] font-bold text-[#2C4A3E] bg-[#2C4A3E]/10 rounded px-1.5 shrink-0">
+                            <span className="font-condensed text-[12px] font-bold text-[#2C4A3E] bg-[var(--color-card-green)]/10 rounded px-1.5 shrink-0">
                               {getExtraBetLabel(eb.type, eb.prediction)}
                             </span>
                             <div className="flex items-center gap-1 ml-auto">
                               <button
                                 type="button"
                                 onClick={() => adjustExtraStake(entry.matchId, eb.type as ExtraBetType, -50)}
-                                className="w-5 h-5 border border-black/10 rounded bg-[#F2EDE4] text-[#1a3329] font-bold text-xs flex items-center justify-center"
+                                className="w-5 h-5 border border-black/10 rounded bg-[var(--color-cream)] text-[var(--color-dark-green)] font-bold text-xs flex items-center justify-center"
                               >
                                 −
                               </button>
@@ -1228,13 +1228,13 @@ export default function AfgivBets({
                                 min={10}
                                 value={eb.points}
                                 onChange={(e) => setExtraStake(entry.matchId, eb.type as ExtraBetType, parseInt(e.target.value) || 10)}
-                                className="w-12 text-center font-condensed text-[12px] font-bold text-[#1a3329] border border-black/10 rounded bg-[#F2EDE4] h-5"
+                                className="w-12 text-center font-condensed text-[12px] font-bold text-[var(--color-dark-green)] border border-black/10 rounded bg-[var(--color-cream)] h-5"
                               />
-                              <span className="text-[9px] text-[#7a7060] font-semibold">pt</span>
+                              <span className="text-[9px] text-[var(--color-warm-taupe)] font-semibold">pt</span>
                               <button
                                 type="button"
                                 onClick={() => adjustExtraStake(entry.matchId, eb.type as ExtraBetType, 50)}
-                                className="w-5 h-5 border border-black/10 rounded bg-[#F2EDE4] text-[#1a3329] font-bold text-xs flex items-center justify-center"
+                                className="w-5 h-5 border border-black/10 rounded bg-[var(--color-cream)] text-[var(--color-dark-green)] font-bold text-xs flex items-center justify-center"
                               >
                                 +
                               </button>
@@ -1251,14 +1251,14 @@ export default function AfgivBets({
             {/* Sidebar footer */}
             <div className="border-t-2 border-black/10 px-3 py-2.5 bg-white shrink-0">
               <div className="flex justify-between mb-1">
-                <span className="text-[10px] text-[#7a7060] font-semibold">Antal valg</span>
-                <span className="font-condensed text-base font-bold text-[#1a3329]">
+                <span className="text-[10px] text-[var(--color-warm-taupe)] font-semibold">Antal valg</span>
+                <span className="font-condensed text-base font-bold text-[var(--color-dark-green)]">
                   {selections.length}
                 </span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-[10px] text-[#7a7060] font-semibold">Samlet point</span>
-                <span className="font-condensed text-base font-bold text-[#B8963E]">
+                <span className="text-[10px] text-[var(--color-warm-taupe)] font-semibold">Samlet point</span>
+                <span className="font-condensed text-base font-bold text-gold">
                   {totalPoints} pt
                 </span>
               </div>
@@ -1274,17 +1274,17 @@ export default function AfgivBets({
                 type="button"
                 onClick={handleSubmit}
                 disabled={selections.length === 0 || isSubmitting || isReadOnly || isOverBudget}
-                className={`w-full h-[42px] rounded-lg font-condensed text-[15px] font-bold tracking-widest transition-all ${
+                className={`w-full h-[42px] rounded-sm font-condensed text-[15px] font-bold tracking-widest transition-all ${
                   isOverBudget
                     ? 'bg-[#c0392b] text-white cursor-not-allowed'
-                    : 'bg-[#B8963E] text-[#1a3329] disabled:bg-[#E8E0D4] disabled:text-[#7a7060] hover:bg-[#d4aa55] hover:-translate-y-px disabled:cursor-not-allowed disabled:transform-none'
+                    : 'bg-gold text-[var(--color-dark-green)] disabled:bg-[#E8E0D4] disabled:text-[var(--color-warm-taupe)] hover:bg-[#d4aa55] hover:-translate-y-px disabled:cursor-not-allowed disabled:transform-none'
                 }`}
               >
                 {isSubmitting ? 'Gemmer...' : 'LÅS DINE VALG'}
               </button>
               {selections.length > 0 && selections.length < totalMatches && (
-                <div className="flex items-center gap-1.5 mt-2 px-2 py-1.5 rounded border border-dashed border-[#B8963E]/40 bg-[#B8963E]/[0.07]">
-                  <span className="text-[9px] text-[#B8963E] font-semibold">
+                <div className="flex items-center gap-1.5 mt-2 px-2 py-1.5 rounded border border-dashed border-gold/40 bg-gold/[0.07]">
+                  <span className="text-[9px] text-gold font-semibold">
                     ⭐ Vælg alle {totalMatches} kampe og få +25 pt bonus!
                   </span>
                 </div>

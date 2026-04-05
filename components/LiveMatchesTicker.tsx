@@ -14,10 +14,10 @@ function StatusBadge({ status, kickoff }: { status: LiveMatch['status']; kickoff
     <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wide">HT</span>
   )
   if (status === 'finished') return (
-    <span className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wide">Slut</span>
+    <span className="text-[10px] font-bold text-[var(--color-warm-taupe)] uppercase tracking-wide">Slut</span>
   )
   if (status === 'scheduled') return (
-    <span style={{ fontFamily: "'Barlow Condensed'", fontSize: 12, fontWeight: 700, color: '#9ca3af' }}>
+    <span className="font-condensed text-[12px] font-bold text-gray-400">
       {kickoff
         ? new Date(kickoff).toLocaleTimeString('da-DK', { timeZone: 'Europe/Copenhagen', hour: '2-digit', minute: '2-digit' })
         : '—'}
@@ -41,8 +41,8 @@ function BetBadge({ match }: { match: LiveMatch }) {
   const betResult = getBetResult(match)
   if (betResult === 'none') return null
 
-  const bg = betResult === 'correct' ? '#27ae60'
-    : betResult === 'incorrect' ? '#c0392b'
+  const bg = betResult === 'correct' ? 'var(--color-green-dark)'
+    : betResult === 'incorrect' ? 'var(--color-red-dark)'
     : '#6b7280'
 
   return (
@@ -64,47 +64,46 @@ function MatchRow({ match }: { match: LiveMatch }) {
 
   const rowBg = isLive ? 'bg-red-500/15'
     : isHalftime ? 'bg-amber-500/15'
-    : isRivalry ? 'bg-[#2C4A3E]/25'
+    : isRivalry ? 'bg-[var(--color-card-green)]/25'
     : isScheduled ? 'bg-white/[0.03]'
     : 'bg-white/5'
 
   const betResult = getBetResult(match)
   const borderColor =
-    betResult === 'correct' ? '#27ae60'
-    : betResult === 'incorrect' ? '#c0392b'
+    betResult === 'correct' ? 'var(--color-green-dark)'
+    : betResult === 'incorrect' ? 'var(--color-red-dark)'
     : 'transparent'
 
-  const scoreColor = isLive ? 'text-red-500' : isHalftime ? 'text-amber-500' : 'text-[#F2EDE4]'
-  const teamColor = isFinished ? 'text-[#7a7060]' : 'text-[#F2EDE4]'
+  const scoreColor = isLive ? 'text-red-500' : isHalftime ? 'text-amber-500' : 'text-[var(--color-cream)]'
+  const teamColor = isFinished ? 'text-[var(--color-warm-taupe)]' : 'text-[var(--color-cream)]'
 
   const showDistribution = match.bet_open === false && match.distribution && match.distribution.total > 0
 
   return (
-    <div className={`rounded-lg ${rowBg}`} style={{ borderLeft: `3px solid ${borderColor}` }}>
+    <div className={`rounded-sm ${rowBg}`} style={{ borderLeft: `3px solid ${borderColor}` }}>
       {isRivalry && match.rivalryName && (
         <div className="flex items-center gap-1 px-2 pt-1.5 pb-0.5">
-          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700, color: '#C8B89A', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+          <span className="font-condensed text-[9px] font-bold text-[var(--color-gold-muted)] tracking-[0.1em] uppercase">
             🔥 {match.rivalryName}
           </span>
         </div>
       )}
-      <div className="flex items-center gap-2 pr-3 py-1.5" style={{ paddingLeft: 8 }}>
+      <div className="flex items-center gap-2 pr-3 py-1.5 pl-2">
         {/* Tournament logo */}
         {match.tournamentLogo && (
           <img
             src={match.tournamentLogo}
             alt=""
-            className="shrink-0"
-            style={{ width: 16, height: 16, objectFit: 'contain' }}
+            className="shrink-0 w-4 h-4 object-contain"
           />
         )}
 
         {/* Hjemmehold */}
-        <div className="flex items-center gap-1 min-w-0" style={{ width: '35%' }}>
+        <div className="flex items-center gap-1 min-w-0 w-[35%]">
           {match.home_team_logo && (
-            <img src={match.home_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
+            <img src={match.home_team_logo} alt="" className="shrink-0 w-3.5 h-3.5 object-contain" />
           )}
-          <span className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold ${teamColor}`}>
+          <span className={`text-[11px] truncate font-condensed font-semibold ${teamColor}`}>
             {match.home_team}
           </span>
         </div>
@@ -112,20 +111,20 @@ function MatchRow({ match }: { match: LiveMatch }) {
         {/* Score */}
         <div className="shrink-0 w-10 text-center">
           {!isScheduled ? (
-            <span className={`font-['Barlow_Condensed'] text-[13px] font-black tabular-nums ${scoreColor}`}>
+            <span className={`font-condensed text-[13px] font-black tabular-nums ${scoreColor}`}>
               {match.home_score ?? 0}–{match.away_score ?? 0}
             </span>
           ) : (
-            <span className="text-[11px] text-[#7a7060]">vs</span>
+            <span className="text-[11px] text-[var(--color-warm-taupe)]">vs</span>
           )}
         </div>
 
         {/* Udehold */}
-        <div className="flex items-center gap-1 min-w-0" style={{ width: '35%' }}>
+        <div className="flex items-center gap-1 min-w-0 w-[35%]">
           {match.away_team_logo && (
-            <img src={match.away_team_logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} className="shrink-0" />
+            <img src={match.away_team_logo} alt="" className="shrink-0 w-3.5 h-3.5 object-contain" />
           )}
-          <span className={`text-[11px] truncate font-['Barlow_Condensed'] font-semibold ${teamColor}`}>
+          <span className={`text-[11px] truncate font-condensed font-semibold ${teamColor}`}>
             {match.away_team}
           </span>
         </div>
@@ -151,15 +150,15 @@ function MatchRow({ match }: { match: LiveMatch }) {
             const odds = match.distribution!.odds?.[opt] ?? null
             return (
               <div key={opt} className="flex-1 text-center">
-                <div className="font-condensed text-[10px] text-[#F2EDE4]/40 font-bold uppercase">
+                <div className="font-condensed text-[10px] text-[var(--color-cream)]/40 font-bold uppercase">
                   {opt}
                 </div>
                 {odds !== null && (
-                  <div className="font-condensed text-[11px] text-[#F2EDE4]/40">
+                  <div className="font-condensed text-[11px] text-[var(--color-cream)]/40">
                     {odds.toFixed(2)}
                   </div>
                 )}
-                <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-[#B8963E]' : 'text-[#F2EDE4]/50'}`}>
+                <div className={`font-condensed text-[13px] font-bold ${isHighest && pct > 0 ? 'text-gold' : 'text-[var(--color-cream)]/50'}`}>
                   {pct}%
                 </div>
               </div>
@@ -180,32 +179,31 @@ function MatchRow({ match }: { match: LiveMatch }) {
             if (!userPick) return null
             const teamName = userPick === '1' ? match.home_team : match.away_team
             const resultIcon = match.status !== 'finished' ? '—' : null
-            // For finished: determine win/loss from scores
             let finishedIcon: string | null = null
-            let finishedColor = 'text-[#F2EDE4]/40'
+            let finishedColor = 'text-[var(--color-cream)]/40'
             if (match.status === 'finished' && match.home_score != null && match.away_score != null) {
               const correct = isBetCorrect(row.key, userPick, match.home_score, match.away_score)
               finishedIcon = correct ? '✓' : '✗'
-              finishedColor = correct ? 'text-[#4CAF50]' : 'text-[#E53935]'
+              finishedColor = correct ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
             }
             const dist = match.extraBetDist?.[row.key]
             const odds = dist ? (userPick === '1' ? dist.odds_1 : dist.odds_2) : null
             const betCount = dist ? (userPick === '1' ? dist.count_1 : dist.count_2) : null
             return (
               <div key={row.key} className="flex items-center gap-2 py-1">
-                <span className="text-[9px] font-bold tracking-wider uppercase text-[#C8B89A] w-[72px] shrink-0">
+                <span className="text-[9px] font-bold tracking-wider uppercase text-[var(--color-gold-muted)] w-[72px] shrink-0">
                   {row.label}
                 </span>
-                <span className="text-[10px] font-medium text-[#F2EDE4] truncate flex-1">
+                <span className="text-[10px] font-medium text-[var(--color-cream)] truncate flex-1">
                   {teamName} ({userPick})
                 </span>
                 {odds != null && (
-                  <span className="text-[9px] font-bold text-[#9E9486] shrink-0">{odds.toFixed(2)}</span>
+                  <span className="text-[9px] font-bold text-[var(--color-muted)] shrink-0">{odds.toFixed(2)}</span>
                 )}
                 {betCount != null && (
-                  <span className="text-[9px] text-[#9E9486] shrink-0">{betCount} {betCount === 1 ? 'bet' : 'bets'}</span>
+                  <span className="text-[9px] text-[var(--color-muted)] shrink-0">{betCount} {betCount === 1 ? 'bet' : 'bets'}</span>
                 )}
-                <span className={`text-[13px] font-bold shrink-0 w-5 text-center ${finishedIcon ? finishedColor : 'text-[#F2EDE4]/30'}`}>
+                <span className={`text-[13px] font-bold shrink-0 w-5 text-center ${finishedIcon ? finishedColor : 'text-[var(--color-cream)]/30'}`}>
                   {finishedIcon ?? resultIcon}
                 </span>
               </div>
@@ -228,7 +226,7 @@ function DateSeparator({ date }: { date: string }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5">
       <div className="flex-1 h-px bg-white/10" />
-      <span className="text-[10px] font-bold text-[#7a7060] uppercase tracking-wider capitalize">
+      <span className="text-[10px] font-bold text-[var(--color-warm-taupe)] uppercase tracking-wider capitalize">
         {label}
       </span>
       <div className="flex-1 h-px bg-white/10" />
@@ -280,7 +278,7 @@ export function LiveMatchesTicker({
     : summary.roundName ?? 'Ingen kommende kampe'
 
   const defaultRight = lastUpdate ? (
-    <span className="text-[9px] text-[#7a7060]">
+    <span className="text-[9px] text-[var(--color-warm-taupe)]">
       Opdateret {lastUpdate.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
     </span>
   ) : null
@@ -296,7 +294,7 @@ export function LiveMatchesTicker({
         <div className="flex items-center gap-2">
           {hasLive && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
           {headerTitle ?? (
-            <span className="text-[11px] font-bold text-[#F2EDE4] uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-[var(--color-cream)] uppercase tracking-wider">
               {defaultTitle}
             </span>
           )}
@@ -320,7 +318,7 @@ export function LiveMatchesTicker({
           </div>
         ))}
         {maxMatches && matches.length > maxMatches && (
-          <div className="px-3 py-2 text-center text-xs text-[#7a7060] font-body">
+          <div className="px-3 py-2 text-center text-xs text-[var(--color-warm-taupe)] font-body">
             +{matches.length - maxMatches} flere kampe
           </div>
         )}

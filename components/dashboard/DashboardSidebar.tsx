@@ -88,7 +88,7 @@ export default function DashboardSidebar({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="bg-white rounded-2xl border border-black/8 overflow-hidden">
+      <div className="bg-white rounded-sm border border-black/8 overflow-hidden">
         {/* Tab header */}
         <div className="flex border-b border-black/[0.07]">
           {[

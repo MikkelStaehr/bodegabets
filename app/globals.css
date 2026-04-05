@@ -49,6 +49,16 @@
   --accent-gold:   #C9A84C;
   --border:        #D4CFC4;
   --border-dark:   #2E5040;
+  --color-cream:      #F2EDE4;
+  --color-dark-green: #1C3829;
+  --color-card-green: #2C4A3E;
+  --color-gold-muted: #C8B89A;
+  --color-muted:      #9E9486;
+  --color-success:    #4CAF50;
+  --color-error:      #E53935;
+  --color-warm-taupe: #7a7060;
+  --color-green-dark: #27ae60;
+  --color-red-dark:   #c0392b;
 }
 
 /* ── Navbar transparency ─────────────────────────────────── */

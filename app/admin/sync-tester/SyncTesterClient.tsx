@@ -64,7 +64,7 @@ export default function SyncTesterClient({ leagues }: Props) {
       </Link>
 
       {/* 1. Test enkelt kamp */}
-      <section className="bg-white border border-[#C8BEA8] rounded-lg p-5">
+      <section className="bg-white border border-[#C8BEA8] rounded-sm p-5">
         <h2 className="font-condensed font-bold text-[#1a3329] text-lg mb-3">1. Test enkelt kamp</h2>
         <p className="text-sm text-[#7a7060] mb-4">
           Hent raw JSON fra Bold API for en specifik kamp (match_ids).
@@ -93,7 +93,7 @@ export default function SyncTesterClient({ leagues }: Props) {
       </section>
 
       {/* 2. Test aktiv runde */}
-      <section className="bg-white border border-[#C8BEA8] rounded-lg p-5">
+      <section className="bg-white border border-[#C8BEA8] rounded-sm p-5">
         <h2 className="font-condensed font-bold text-[#1a3329] text-lg mb-3">2. Test aktiv runde</h2>
         <p className="text-sm text-[#7a7060] mb-4">
           Sync scores for kampe der er kicket off indenfor de seneste 3 timer. Valgfrit: kun én kamp via bold_match_id.
@@ -131,7 +131,7 @@ export default function SyncTesterClient({ leagues }: Props) {
       </section>
 
       {/* 3. Dry-run sync */}
-      <section className="bg-white border border-[#C8BEA8] rounded-lg p-5">
+      <section className="bg-white border border-[#C8BEA8] rounded-sm p-5">
         <h2 className="font-condensed font-bold text-[#1a3329] text-lg mb-3">3. Dry-run sync (fixtures)</h2>
         <p className="text-sm text-[#7a7060] mb-4">
           Hent fixtures fra Bold API for en liga. Uden dry-run skrives til league_matches.
@@ -173,7 +173,7 @@ export default function SyncTesterClient({ leagues }: Props) {
       </section>
 
       {/* 4. Sæson info (phase_id) */}
-      <section className="bg-white border border-[#C8BEA8] rounded-lg p-5">
+      <section className="bg-white border border-[#C8BEA8] rounded-sm p-5">
         <h2 className="font-condensed font-bold text-[#1a3329] text-lg mb-3">4. Sæson info (phase_id)</h2>
         <p className="text-sm text-[#7a7060] mb-4">
           Hent oversigt over sæsonen fra Bold API: første/sidste kampdata, antal kampe, runder med datoer.
@@ -220,7 +220,7 @@ export default function SyncTesterClient({ leagues }: Props) {
 
       {/* Resultat */}
       {result && (
-        <section className="bg-white border border-[#C8BEA8] rounded-lg p-5">
+        <section className="bg-white border border-[#C8BEA8] rounded-sm p-5">
           <h2 className="font-condensed font-bold text-[#1a3329] text-lg mb-3">Resultat</h2>
           {elapsed != null && (
             <p className="text-sm text-[#7a7060] mb-3 font-body">
@@ -229,7 +229,7 @@ export default function SyncTesterClient({ leagues }: Props) {
           )}
 
           {hasPhaseInfo && (
-            <div className="mb-4 p-4 bg-[#2C4A3E]/10 border-2 border-[#2C4A3E]/30 rounded-lg">
+            <div className="mb-4 p-4 bg-[#2C4A3E]/10 border-2 border-[#2C4A3E]/30 rounded-sm">
               <p className="font-condensed font-bold text-[#1a3329] text-sm mb-3 uppercase tracking-wide">
                 Sæson info
               </p>
@@ -290,7 +290,7 @@ export default function SyncTesterClient({ leagues }: Props) {
           )}
 
           {hasPreview && (
-            <div className="mb-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
+            <div className="mb-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-sm">
               <p className="font-condensed font-bold text-amber-800 text-sm mb-2 uppercase tracking-wide">
                 ⚠️ VILLE blive skrevet til DB (dry-run preview)
               </p>

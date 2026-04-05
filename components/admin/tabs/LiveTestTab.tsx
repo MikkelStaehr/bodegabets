@@ -150,7 +150,7 @@ export function LiveTestTab() {
       </div>
 
       {/* Match table */}
-      <div className="border border-black/10 rounded-lg overflow-hidden bg-white">
+      <div className="border border-black/10 rounded-sm overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -207,7 +207,7 @@ export function LiveTestTab() {
 
       {/* Info boxes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="border border-black/10 rounded-lg bg-white p-4">
+        <div className="border border-black/10 rounded-sm bg-white p-4">
           <h3 className="font-semibold text-[#1a3329] mb-3">Bold Teams Coverage</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -239,7 +239,7 @@ export function LiveTestTab() {
           </div>
         </div>
 
-        <div className="border border-black/10 rounded-lg bg-white p-4">
+        <div className="border border-black/10 rounded-sm bg-white p-4">
           <h3 className="font-semibold text-[#1a3329] mb-3">Test live scores API</h3>
           <p className="text-xs text-[#7a7060] mb-3">
             Kalder GET /api/live-scores?round_id=X
@@ -271,7 +271,7 @@ export function LiveTestTab() {
           )}
         </div>
 
-        <div className="border border-black/10 rounded-lg bg-white p-4">
+        <div className="border border-black/10 rounded-sm bg-white p-4">
           <h3 className="font-semibold text-[#1a3329] mb-3">Seneste Bold sync</h3>
           <p className="text-xs text-[#7a7060] mb-3">Sidste time, max 5 kampe</p>
           <div className="space-y-2">

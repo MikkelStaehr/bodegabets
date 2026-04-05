@@ -9,7 +9,7 @@ export default function GameRoomLoading() {
           bodega bets
         </span>
         <span
-          className="font-['Barlow_Condensed'] text-[13px] font-bold tracking-widest uppercase text-[#B8963E]"
+          className="font-condensed text-[13px] font-bold tracking-widest uppercase text-[#B8963E]"
         >
           Indlæser spilrum...
         </span>

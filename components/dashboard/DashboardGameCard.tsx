@@ -54,7 +54,7 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, ac
 
   return (
     <div
-      className={`bg-white rounded-2xl border overflow-hidden hover:shadow-md transition-shadow ${
+      className={`bg-white rounded-sm border overflow-hidden hover:shadow-md transition-shadow ${
         isFinished ? 'border-black/6' : 'border-black/8'
       }`}
     >
@@ -74,7 +74,7 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, ac
         ) : null}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-['Barlow_Condensed'] text-lg font-bold text-white uppercase tracking-wide">
+            <h3 className="font-condensed text-lg font-bold text-white uppercase tracking-wide">
               {game.name}
             </h3>
             {activeRound && (
@@ -83,7 +83,7 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, ac
               </p>
             )}
             {activeBlock && (
-              <p className="font-['Barlow_Condensed'] text-[11px] mt-0.5" style={{ color: '#9E9486' }}>
+              <p className="font-condensed text-[11px] mt-0.5" style={{ color: '#9E9486' }}>
                 {activeBlock.name} · {activeBlock.rounds_remaining} runde{activeBlock.rounds_remaining !== 1 ? 'r' : ''} tilbage
               </p>
             )}
@@ -118,7 +118,7 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, ac
           <div key={label} className="px-4 py-3 text-center" style={{ minHeight: '44px' }}>
             <p className="text-[9px] font-semibold text-[#7a7060] uppercase tracking-wider mb-0.5">{label}</p>
             <p
-              className="font-['Barlow_Condensed'] text-[15px] font-bold transition-colors duration-300"
+              className="font-condensed text-[15px] font-bold transition-colors duration-300"
               style={{ color: isRank1 ? 'var(--accent)' : '#1a3329' }}
             >
               {value}

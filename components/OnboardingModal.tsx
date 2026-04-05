@@ -57,7 +57,7 @@ export default function OnboardingModal({ onComplete }: Props) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="bg-[#F2EDE4] rounded-2xl w-full max-w-[440px] overflow-hidden shadow-2xl">
+      <div className="bg-[#F2EDE4] rounded-sm w-full max-w-[440px] overflow-hidden shadow-2xl">
 
         {/* Progress bar */}
         <div className="h-1 bg-[#e5e0d8] w-full">
@@ -101,7 +101,7 @@ export default function OnboardingModal({ onComplete }: Props) {
               <button
                 type="button"
                 onClick={() => setStep(s => s - 1)}
-                className="h-10 px-4 rounded-lg border border-black/10 font-condensed text-[13px] font-bold text-[#7a7060] hover:text-[#1a3329] transition-colors"
+                className="h-10 px-4 rounded-sm border border-black/10 font-condensed text-[13px] font-bold text-[#7a7060] hover:text-[#1a3329] transition-colors"
               >
                 Tilbage
               </button>
@@ -110,7 +110,7 @@ export default function OnboardingModal({ onComplete }: Props) {
               type="button"
               onClick={isLast ? handleComplete : () => setStep(s => s + 1)}
               disabled={isCompleting}
-              className="h-10 px-5 rounded-lg bg-[#1a3329] font-condensed text-[13px] font-bold text-[#F2EDE4] hover:bg-[#2C4A3E] transition-colors disabled:opacity-50"
+              className="h-10 px-5 rounded-sm bg-[#1a3329] font-condensed text-[13px] font-bold text-[#F2EDE4] hover:bg-[#2C4A3E] transition-colors disabled:opacity-50"
             >
               {isLast ? (isCompleting ? 'Starter...' : 'Kom i gang →') : 'Næste →'}
             </button>

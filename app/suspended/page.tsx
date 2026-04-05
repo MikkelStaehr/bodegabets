@@ -1,7 +1,7 @@
 export default function SuspendedPage() {
   return (
     <div className="min-h-screen bg-[#F2EDE4] flex flex-col items-center justify-center p-8">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-black/8 p-8 text-center shadow-sm">
+      <div className="max-w-md w-full bg-white rounded-sm border border-black/8 p-8 text-center shadow-sm">
         <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-6">
           <span className="text-3xl">⚠️</span>
         </div>
