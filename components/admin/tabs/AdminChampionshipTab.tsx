@@ -404,8 +404,9 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
             <div className="border border-warm-border rounded-sm overflow-hidden max-h-[calc(100vh-220px)] overflow-y-auto">
               <div className="divide-y divide-warm-border">
                 {champRounds.map((round) => {
-                  const isActive = activeChampRoundId === round.id
-                  const isCurrent = currentChampRound?.id === round.id
+                  const isPast = round.betting_closes_at != null && round.betting_closes_at < now
+                  const isActive = !isPast && activeChampRoundId === round.id
+                  const isCurrent = !isPast && currentChampRound?.id === round.id
                   const isConfirming = deleteConfirm === round.id
                   const isDeleting = deleteLoading.has(round.id)
                   const weekRange = formatWeekRange(round.betting_closes_at)
@@ -413,15 +414,21 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
                   return (
                     <div
                       key={round.id}
-                      className={`px-3 py-2.5 cursor-pointer transition-colors ${
-                        isActive ? 'bg-forest/10 border-l-2 border-l-forest' : isCurrent ? 'bg-gold/5' : 'bg-cream hover:bg-cream-dark/40'
+                      className={`px-3 py-2.5 transition-colors ${
+                        isPast ? 'opacity-60' :
+                        isActive ? 'bg-forest/10 border-l-2 border-l-forest cursor-pointer' :
+                        isCurrent ? 'bg-gold/5 cursor-pointer' :
+                        'bg-cream hover:bg-cream-dark/40 cursor-pointer'
                       }`}
-                      onClick={() => setActiveChampRoundId(isActive ? null : round.id)}
+                      onClick={() => !isPast && setActiveChampRoundId(isActive ? null : round.id)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className={`font-condensed text-xs font-bold uppercase ${isActive ? 'text-forest' : 'text-ink'}`}>
+                            <span className={`font-condensed text-xs font-bold uppercase ${
+                              isPast ? 'text-[var(--color-muted)] line-through' :
+                              isActive ? 'text-forest' : 'text-ink'
+                            }`}>
                               {round.name}
                             </span>
                             {isCurrent && (
@@ -431,13 +438,16 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="font-body text-[10px] text-warm-gray">{weekRange}</span>
-                            <span className={`font-condensed text-[10px] font-bold ${round.matches.length > 0 ? 'text-forest' : 'text-warm-gray'}`}>
+                            <span className={`font-body text-[10px] ${isPast ? 'text-[var(--color-muted)]' : 'text-warm-gray'}`}>{weekRange}</span>
+                            <span className={`font-condensed text-[10px] font-bold ${
+                              isPast ? 'text-[var(--color-muted)]' :
+                              round.matches.length > 0 ? 'text-forest' : 'text-warm-gray'
+                            }`}>
                               {round.matches.length}/9
                             </span>
                           </div>
                         </div>
-                        {isActive && (
+                        {isActive && !isPast && (
                           <div onClick={(e) => e.stopPropagation()}>
                             {isConfirming ? (
                               <span className="inline-flex items-center gap-1">
