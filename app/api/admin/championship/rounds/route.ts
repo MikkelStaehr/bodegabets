@@ -6,10 +6,16 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { data: rounds, error } = await supabaseAdmin
+  const season = new URL(req.url).searchParams.get('season') ?? '2025/26'
+
+  let query = supabaseAdmin
     .from('championship_rounds')
-    .select('id, name, status, betting_closes_at')
-    .order('created_at', { ascending: false })
+    .select('id, name, status, betting_closes_at, season')
+    .order('betting_closes_at', { ascending: true })
+
+  if (season) query = query.eq('season', season)
+
+  const { data: rounds, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
