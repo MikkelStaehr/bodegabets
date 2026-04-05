@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatKickoff, formatDateTime } from '@/lib/dateUtils'
+import { formatKickoff } from '@/lib/dateUtils'
 
 type MatchOption = {
   id: number
@@ -46,13 +46,15 @@ type ChampionshipRound = {
 
 type Props = { adminSecret: string }
 
-function formatDateRange(first: string | null, last: string | null): string {
-  if (!first) return ''
-  const f = new Date(first)
-  const l = last ? new Date(last) : f
-  const fStr = f.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
-  const lStr = l.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
-  return fStr === lStr ? fStr : `${fStr} – ${lStr}`
+function formatWeekRange(bettingCloses: string | null): string {
+  if (!bettingCloses) return ''
+  // Runden slutter mandag 23:59 → startede tirsdag (6 dage før)
+  const end = new Date(bettingCloses)
+  const start = new Date(end)
+  start.setUTCDate(end.getUTCDate() - 6)
+  const fStr = start.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+  const lStr = end.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+  return `${fStr} – ${lStr}`
 }
 
 export function AdminChampionshipTab({ adminSecret }: Props) {
@@ -61,34 +63,56 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
 
   // State — kamp-browser
   const [roundOptions, setRoundOptions] = useState<RoundOverview[]>([])
-  const [selectedRoundId, setSelectedRoundId] = useState<string>('')
+  const [selectedLeagueRoundId, setSelectedLeagueRoundId] = useState<string>('')
   const [availableMatches, setAvailableMatches] = useState<MatchOption[]>([])
   const [loadingRoundOptions, setLoadingRoundOptions] = useState(true)
   const [loadingMatches, setLoadingMatches] = useState(false)
 
-  // State — runde builder
-  const [roundName, setRoundName] = useState('')
+  // State — championship rounds
+  const [champRounds, setChampRounds] = useState<ChampionshipRound[]>([])
+  const [loadingChampRounds, setLoadingChampRounds] = useState(true)
+  const [activeChampRoundId, setActiveChampRoundId] = useState<number | null>(null)
   const [selectedMatches, setSelectedMatches] = useState<MatchOption[]>([])
-  const [bettingCloses, setBettingCloses] = useState('')
   const [saving, setSaving] = useState(false)
-
-  // State — eksisterende runder
-  const [rounds, setRounds] = useState<ChampionshipRound[]>([])
-  const [loadingRounds, setLoadingRounds] = useState(true)
+  const [generating, setGenerating] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<Set<number>>(new Set())
 
-  // Hent runde-oversigt for dropdown
+  // Hent data on mount
   useEffect(() => {
     fetchRoundOptions()
-    fetchRounds()
+    fetchChampRounds()
   }, [])
 
-  // Hent kampe når runde vælges
+  // Hent kampe når liga-runde vælges
   useEffect(() => {
-    if (selectedRoundId) fetchMatchesForRound(selectedRoundId)
+    if (selectedLeagueRoundId) fetchMatchesForRound(selectedLeagueRoundId)
     else setAvailableMatches([])
-  }, [selectedRoundId])
+  }, [selectedLeagueRoundId])
+
+  // Når championship-runde vælges, load dens eksisterende kampe
+  useEffect(() => {
+    if (activeChampRoundId) {
+      const round = champRounds.find((r) => r.id === activeChampRoundId)
+      if (round) {
+        // Pre-populate selectedMatches from existing round matches
+        setSelectedMatches(round.matches.map((m) => ({
+          id: m.id,
+          kickoff: m.kickoff,
+          status: m.status,
+          home_team: m.home_team,
+          away_team: m.away_team,
+          tournament_name: null,
+          tournament_logo: null,
+          tournament_id: null,
+          is_rivalry: false,
+          rivalry_name: null,
+        })))
+      }
+    } else {
+      setSelectedMatches([])
+    }
+  }, [activeChampRoundId])
 
   async function fetchRoundOptions() {
     setLoadingRoundOptions(true)
@@ -109,7 +133,6 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
     }
     setLoadingMatches(true)
     try {
-      // Expand range by 1 day each side to catch edge cases
       const from = new Date(new Date(round.first_kickoff).getTime() - 24 * 60 * 60 * 1000).toISOString()
       const to = new Date(new Date(round.last_kickoff).getTime() + 24 * 60 * 60 * 1000).toISOString()
       const params = new URLSearchParams({ from, to })
@@ -122,14 +145,36 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
     }
   }
 
-  async function fetchRounds() {
-    setLoadingRounds(true)
+  async function fetchChampRounds() {
+    setLoadingChampRounds(true)
     try {
       const res = await fetch('/api/admin/championship/rounds', { headers: authHeader })
       const data = await res.json()
-      if (data.rounds) setRounds(data.rounds)
+      if (data.rounds) setChampRounds(data.rounds)
     } catch { /* silent */ } finally {
-      setLoadingRounds(false)
+      setLoadingChampRounds(false)
+    }
+  }
+
+  async function handleGenerate() {
+    if (!confirm('Generer alle mesterskabsrunder for sæson 2025/2026?\n\nDette opretter ~43 runder.')) return
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/admin/championship/generate', {
+        method: 'POST',
+        headers: authHeader,
+      })
+      const data = await res.json()
+      if (data.ok) {
+        fetchChampRounds()
+        router.refresh()
+      } else {
+        alert(data.error ?? 'Fejl ved generering')
+      }
+    } catch {
+      alert('Netværksfejl')
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -143,28 +188,41 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
     setSelectedMatches((prev) => prev.filter((m) => m.id !== matchId))
   }
 
-  async function saveRound() {
-    if (!roundName.trim() || selectedMatches.length === 0) return
+  async function saveMatchesToRound() {
+    if (!activeChampRoundId || selectedMatches.length === 0) return
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/championship/rounds', {
+      // Slet eksisterende tilknytninger og genopret
+      const res = await fetch(`/api/admin/championship/rounds/${activeChampRoundId}`, {
+        method: 'DELETE',
+        headers: authHeader,
+      })
+      const delData = await res.json()
+      if (!delData.ok) {
+        alert(delData.error ?? 'Fejl ved opdatering')
+        setSaving(false)
+        return
+      }
+
+      // Find aktiv championship round data
+      const champRound = champRounds.find((r) => r.id === activeChampRoundId)
+
+      // Genopret runden med nye kampe
+      const createRes = await fetch('/api/admin/championship/rounds', {
         method: 'POST',
         headers: { ...authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: roundName.trim(),
-          betting_closes_at: bettingCloses || null,
+          name: champRound?.name ?? `Runde ${activeChampRoundId}`,
+          betting_closes_at: champRound?.betting_closes_at ?? null,
           match_ids: selectedMatches.map((m) => m.id),
         }),
       })
-      const data = await res.json()
-      if (data.ok) {
-        setRoundName('')
-        setSelectedMatches([])
-        setBettingCloses('')
-        fetchRounds()
+      const createData = await createRes.json()
+      if (createData.ok) {
+        fetchChampRounds()
         router.refresh()
       } else {
-        alert(data.error ?? 'Fejl ved oprettelse')
+        alert(createData.error ?? 'Fejl ved oprettelse')
       }
     } catch {
       alert('Netværksfejl')
@@ -182,7 +240,8 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
       })
       const data = await res.json()
       if (data.ok) {
-        setRounds((prev) => prev.filter((r) => r.id !== roundId))
+        setChampRounds((prev) => prev.filter((r) => r.id !== roundId))
+        if (activeChampRoundId === roundId) setActiveChampRoundId(null)
         setDeleteConfirm(null)
         router.refresh()
       } else {
@@ -197,36 +256,83 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
 
   const selectedIds = new Set(selectedMatches.map((m) => m.id))
 
+  // Find "aktiv" runde baseret på nu-tidspunkt
+  const now = new Date().toISOString()
+  const currentChampRound = useMemo(() =>
+    champRounds.find((r) => r.status === 'open') ??
+    champRounds.find((r) => r.status === 'upcoming' && r.betting_closes_at && r.betting_closes_at > now) ??
+    null,
+    [champRounds, now]
+  )
+
   return (
     <div>
       <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Administration</p>
       <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-6">Mesterskabet</h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
 
         {/* ── Venstre: Kamp-browser ──────────────────────────── */}
         <div>
           <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide mb-3">Kampe</h3>
 
-          {/* Runde-dropdown */}
+          {/* Liga-runde dropdown */}
           <select
-            value={selectedRoundId}
-            onChange={(e) => setSelectedRoundId(e.target.value)}
+            value={selectedLeagueRoundId}
+            onChange={(e) => setSelectedLeagueRoundId(e.target.value)}
             disabled={loadingRoundOptions}
             className="w-full font-body text-sm text-ink border border-warm-border bg-cream px-3 py-2 rounded-sm mb-4 cursor-pointer"
           >
-            <option value="">Vælg en runde...</option>
-            {roundOptions.map((r) => (
-              <option key={r.id} value={String(r.id)}>
-                {r.tournament_name ?? 'Ukendt'} — {r.name} ({formatDateRange(r.first_kickoff, r.last_kickoff)})
-              </option>
-            ))}
+            <option value="">Vælg en liga-runde...</option>
+            {roundOptions.map((r) => {
+              const dateRange = r.first_kickoff && r.last_kickoff
+                ? (() => {
+                    const f = new Date(r.first_kickoff).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+                    const l = new Date(r.last_kickoff).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+                    return f === l ? f : `${f} – ${l}`
+                  })()
+                : ''
+              return (
+                <option key={r.id} value={String(r.id)}>
+                  {r.tournament_name ?? 'Ukendt'} — {r.name} ({dateRange})
+                </option>
+              )
+            })}
           </select>
 
+          {/* Valgte kampe for aktiv championship-runde */}
+          {activeChampRoundId && selectedMatches.length > 0 && (
+            <div className="mb-4 border border-forest/30 rounded-sm bg-forest/5 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-condensed text-xs font-bold text-forest uppercase tracking-wide">
+                  Valgte kampe ({selectedMatches.length}/9)
+                </span>
+                <button
+                  onClick={saveMatchesToRound}
+                  disabled={saving}
+                  className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 bg-forest text-cream rounded-sm hover:opacity-85 disabled:opacity-40 transition-opacity cursor-pointer"
+                >
+                  {saving ? 'Gemmer...' : 'Gem kampe'}
+                </button>
+              </div>
+              <div className="space-y-1">
+                {selectedMatches.map((match, i) => (
+                  <div key={match.id} className="flex items-center justify-between gap-2 px-2 py-1 bg-white rounded-sm">
+                    <span className="font-body text-xs text-ink truncate">
+                      <span className="font-condensed font-bold">{i + 1}.</span> {match.home_team} – {match.away_team}
+                      {match.is_rivalry && <span className="ml-1">🔥</span>}
+                    </span>
+                    <button onClick={() => removeMatch(match.id)} className="text-[10px] text-vintage-red cursor-pointer shrink-0">✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Kampliste */}
-          {!selectedRoundId ? (
+          {!selectedLeagueRoundId ? (
             <div className="border border-warm-border bg-cream-dark p-8 text-center rounded-sm">
-              <p className="font-body text-warm-gray text-sm">Vælg en runde ovenfor for at se kampe</p>
+              <p className="font-body text-warm-gray text-sm">Vælg en liga-runde ovenfor for at se kampe</p>
             </div>
           ) : loadingMatches ? (
             <div className="text-center py-8">
@@ -234,7 +340,7 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
             </div>
           ) : availableMatches.length === 0 ? (
             <div className="border border-warm-border bg-cream-dark p-8 text-center rounded-sm">
-              <p className="font-body text-warm-gray text-sm">Ingen kampe fundet for denne runde</p>
+              <p className="font-body text-warm-gray text-sm">Ingen kampe fundet</p>
             </div>
           ) : (
             <div className="border border-warm-border rounded-sm overflow-hidden">
@@ -252,28 +358,24 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
                             {match.home_team} – {match.away_team}
                           </span>
                           {match.is_rivalry && (
-                            <span className="font-condensed text-[9px] font-bold text-gold uppercase tracking-wide shrink-0">
-                              🔥
-                            </span>
+                            <span className="font-condensed text-[9px] font-bold text-gold uppercase tracking-wide shrink-0">🔥</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="font-body text-xs text-warm-gray">
-                            {formatKickoff(match.kickoff)}
-                          </span>
+                          <span className="font-body text-xs text-warm-gray">{formatKickoff(match.kickoff)}</span>
                           {match.tournament_name && (
-                            <span className="font-condensed text-[9px] font-bold text-warm-gray uppercase tracking-wide">
-                              {match.tournament_name}
-                            </span>
+                            <span className="font-condensed text-[9px] font-bold text-warm-gray uppercase tracking-wide">{match.tournament_name}</span>
                           )}
                         </div>
                       </div>
                       <button
                         onClick={() => isSelected ? removeMatch(match.id) : addMatch(match)}
-                        disabled={!isSelected && selectedMatches.length >= 9}
+                        disabled={!activeChampRoundId || (!isSelected && selectedMatches.length >= 9)}
                         className={`font-condensed text-xs uppercase tracking-wide px-3 py-1.5 rounded-sm transition-colors cursor-pointer shrink-0 ${
                           isSelected
                             ? 'bg-vintage-red text-cream hover:opacity-85'
+                            : !activeChampRoundId
+                            ? 'border border-warm-border text-warm-gray cursor-not-allowed opacity-50'
                             : 'border border-forest/40 text-forest hover:bg-forest hover:text-cream disabled:opacity-30 disabled:cursor-not-allowed'
                         }`}
                       >
@@ -287,166 +389,99 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
           )}
         </div>
 
-        {/* ── Højre: Runde builder ───────────────────────────── */}
+        {/* ── Højre: Championship runder ─────────────────────── */}
         <div>
-          <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide mb-3">Ny runde</h3>
-
-          <div className="border border-warm-border rounded-sm bg-cream p-4 space-y-4">
-            {/* Rundenavn */}
-            <div>
-              <label className="font-condensed font-semibold text-xs uppercase tracking-[0.08em] text-ink mb-1.5 block">
-                Rundenavn
-              </label>
-              <input
-                value={roundName}
-                onChange={(e) => setRoundName(e.target.value)}
-                placeholder="Fx Uge 16 · 2026"
-                className="w-full font-body text-sm text-ink border border-warm-border bg-white px-4 py-3 rounded-sm placeholder:text-warm-gray/50 focus:outline-none focus:border-forest"
-              />
-            </div>
-
-            {/* Betting deadline */}
-            <div>
-              <label className="font-condensed font-semibold text-xs uppercase tracking-[0.08em] text-ink mb-1.5 block">
-                Betting lukker
-              </label>
-              <input
-                type="datetime-local"
-                value={bettingCloses}
-                onChange={(e) => setBettingCloses(e.target.value)}
-                className="w-full font-body text-sm text-ink border border-warm-border bg-white px-4 py-3 rounded-sm focus:outline-none focus:border-forest"
-              />
-            </div>
-
-            {/* Valgte kampe */}
-            <div>
-              <label className="font-condensed font-semibold text-xs uppercase tracking-[0.08em] text-ink mb-1.5 block">
-                Valgte kampe ({selectedMatches.length}/9)
-              </label>
-              {selectedMatches.length === 0 ? (
-                <p className="font-body text-sm text-warm-gray py-4 text-center">
-                  Tilføj kampe fra listen til venstre
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {selectedMatches.map((match, i) => (
-                    <div
-                      key={match.id}
-                      className="flex items-center justify-between gap-2 px-3 py-2 bg-cream-dark rounded-sm"
-                    >
-                      <div className="min-w-0">
-                        <span className="font-condensed text-xs font-bold text-ink">
-                          {i + 1}.
-                        </span>
-                        <span className="font-body text-xs text-ink ml-1.5 truncate">
-                          {match.home_team} – {match.away_team}
-                        </span>
-                        {match.is_rivalry && (
-                          <span className="ml-1">🔥</span>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeMatch(match.id)}
-                        className="font-condensed text-[10px] text-vintage-red hover:text-vintage-red/70 transition-colors cursor-pointer shrink-0"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Gem */}
-            <button
-              onClick={saveRound}
-              disabled={saving || !roundName.trim() || selectedMatches.length === 0}
-              className="w-full font-condensed font-bold text-sm uppercase tracking-wide bg-forest text-cream px-6 py-3 rounded-sm hover:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer"
-            >
-              {saving ? 'Gemmer...' : 'Gem runde'}
-            </button>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide">Runder</h3>
+            {champRounds.length === 0 && (
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 bg-forest text-cream rounded-sm hover:opacity-85 disabled:opacity-40 transition-opacity cursor-pointer"
+              >
+                {generating ? 'Genererer...' : 'Generer runder'}
+              </button>
+            )}
           </div>
 
-          {/* ── Eksisterende runder ──────────────────────────── */}
-          <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide mt-8 mb-3">Eksisterende runder</h3>
-
-          {loadingRounds ? (
-            <div className="text-center py-4">
+          {loadingChampRounds ? (
+            <div className="text-center py-8">
               <span className="font-condensed text-sm text-warm-gray uppercase tracking-wide">Henter...</span>
             </div>
-          ) : rounds.length === 0 ? (
-            <div className="border border-warm-border bg-cream-dark p-6 text-center rounded-sm">
-              <p className="font-body text-warm-gray text-sm">Ingen mesterskabsrunder endnu</p>
+          ) : champRounds.length === 0 ? (
+            <div className="border border-warm-border bg-cream-dark p-8 text-center rounded-sm">
+              <p className="font-body text-warm-gray text-sm">Ingen runder. Klik "Generer runder" for at oprette sæsonen.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {rounds.map((round) => {
-                const isConfirming = deleteConfirm === round.id
-                const isDeleting = deleteLoading.has(round.id)
-                return (
-                  <div key={round.id} className="border border-warm-border rounded-sm bg-cream overflow-hidden">
-                    <div className="px-4 py-3 flex items-center justify-between">
-                      <div>
-                        <span className="font-condensed font-bold text-sm text-ink uppercase">{round.name}</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`font-condensed text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm ${
-                            round.status === 'upcoming' ? 'bg-gold/15 text-gold' :
-                            round.status === 'open' ? 'bg-forest/10 text-forest' :
-                            round.status === 'finished' ? 'bg-warm-border/40 text-warm-gray' :
-                            'bg-forest/10 text-forest'
-                          }`}>
-                            {round.status}
-                          </span>
-                          <span className="font-body text-xs text-warm-gray">
-                            {round.matches.length} kampe
-                          </span>
-                          {round.betting_closes_at && (
-                            <span className="font-body text-xs text-warm-gray">
-                              · lukker {formatDateTime(round.betting_closes_at)}
+            <div className="border border-warm-border rounded-sm overflow-hidden max-h-[calc(100vh-200px)] overflow-y-auto">
+              <div className="divide-y divide-warm-border">
+                {champRounds.map((round) => {
+                  const isActive = activeChampRoundId === round.id
+                  const isCurrent = currentChampRound?.id === round.id
+                  const isConfirming = deleteConfirm === round.id
+                  const isDeleting = deleteLoading.has(round.id)
+                  const weekRange = formatWeekRange(round.betting_closes_at)
+
+                  return (
+                    <div
+                      key={round.id}
+                      className={`px-3 py-2.5 cursor-pointer transition-colors ${
+                        isActive ? 'bg-forest/10 border-l-2 border-l-forest' : isCurrent ? 'bg-gold/5' : 'bg-cream hover:bg-cream-dark/40'
+                      }`}
+                      onClick={() => setActiveChampRoundId(isActive ? null : round.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-condensed text-xs font-bold uppercase ${isActive ? 'text-forest' : 'text-ink'}`}>
+                              {round.name}
                             </span>
-                          )}
+                            {isCurrent && (
+                              <span className="font-condensed text-[8px] font-bold text-gold uppercase tracking-wide px-1 py-0.5 bg-gold/15 rounded-sm">
+                                Aktiv
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="font-body text-[10px] text-warm-gray">{weekRange}</span>
+                            <span className={`font-condensed text-[10px] font-bold ${round.matches.length > 0 ? 'text-forest' : 'text-warm-gray'}`}>
+                              {round.matches.length}/9
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        {isConfirming ? (
-                          <span className="inline-flex items-center gap-2">
-                            <button
-                              onClick={() => deleteRound(round.id)}
-                              disabled={isDeleting}
-                              className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 bg-vintage-red text-cream rounded-sm hover:opacity-85 disabled:opacity-40 transition-opacity cursor-pointer"
-                            >
-                              {isDeleting ? 'Sletter...' : 'Ja, slet'}
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirm(null)}
-                              className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 border border-warm-border text-warm-gray rounded-sm hover:border-ink transition-colors cursor-pointer"
-                            >
-                              Annullér
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirm(round.id)}
-                            className="font-condensed text-xs uppercase tracking-wide px-3 py-1.5 border border-vintage-red/40 text-vintage-red rounded-sm hover:bg-vintage-red hover:text-cream transition-colors cursor-pointer"
-                          >
-                            Slet
-                          </button>
+                        {isActive && (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            {isConfirming ? (
+                              <span className="inline-flex items-center gap-1">
+                                <button
+                                  onClick={() => deleteRound(round.id)}
+                                  disabled={isDeleting}
+                                  className="font-condensed text-[10px] uppercase px-2 py-1 bg-vintage-red text-cream rounded-sm disabled:opacity-40 cursor-pointer"
+                                >
+                                  {isDeleting ? '...' : 'Ja'}
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirm(null)}
+                                  className="font-condensed text-[10px] uppercase px-2 py-1 border border-warm-border text-warm-gray rounded-sm cursor-pointer"
+                                >
+                                  Nej
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setDeleteConfirm(round.id)}
+                                className="font-condensed text-[10px] uppercase px-2 py-1 text-vintage-red hover:text-vintage-red/70 cursor-pointer"
+                              >
+                                Slet
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
-                    {round.matches.length > 0 && (
-                      <div className="border-t border-warm-border divide-y divide-warm-border">
-                        {round.matches.map((m) => (
-                          <div key={m.id} className="px-4 py-2 flex items-center justify-between text-xs">
-                            <span className="font-body text-ink">{m.home_team} – {m.away_team}</span>
-                            <span className="font-body text-warm-gray">{formatKickoff(m.kickoff)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
