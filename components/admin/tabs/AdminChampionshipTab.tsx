@@ -115,12 +115,13 @@ export function AdminChampionshipTab({ adminSecret }: Props) {
     if (!round.betting_closes_at) return
     setLoadingMatches(true)
     try {
-      // Rundens uge: mandag 23:59 → tir 00:01 er 6 dage før
-      const end = new Date(round.betting_closes_at)
+      // Rundens uge: tirsdag 00:01 → mandag 23:59
+      const end = new Date(round.betting_closes_at) // mandag 23:59
       const start = new Date(end)
-      start.setUTCDate(end.getUTCDate() - 7)
+      start.setUTCDate(end.getUTCDate() - 6)
+      start.setUTCHours(0, 1, 0, 0) // tirsdag 00:01
       const from = start.toISOString()
-      const to = new Date(end.getTime() + 24 * 60 * 60 * 1000).toISOString()
+      const to = end.toISOString()
       const res = await fetch(`/api/admin/championship/matches?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers: authHeader })
       const data = await res.json()
       if (data.matches) setAvailableMatches(data.matches)
