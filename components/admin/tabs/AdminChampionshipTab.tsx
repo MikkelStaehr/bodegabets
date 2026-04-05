@@ -40,11 +40,12 @@ type Props = { adminSecret: string }
 
 function formatWeekRange(bettingCloses: string | null): string {
   if (!bettingCloses) return ''
+  // betting_closes_at = mandag 23:59 UTC → start = tirsdag (6 dage før)
   const end = new Date(bettingCloses)
   const start = new Date(end)
   start.setUTCDate(end.getUTCDate() - 6)
-  const fStr = start.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
-  const lStr = end.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+  const fStr = start.toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
+  const lStr = end.toLocaleDateString('da-DK', { timeZone: 'UTC', day: 'numeric', month: 'short' })
   return `${fStr} – ${lStr}`
 }
 
