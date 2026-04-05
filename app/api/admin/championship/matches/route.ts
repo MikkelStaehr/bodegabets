@@ -15,6 +15,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'from og to parametre er påkrævet' }, { status: 400 })
   }
 
+  console.log('[championship/matches] from:', from, 'to:', to)
+
   // Hent kampe i tidsvindue
   let query = supabaseAdmin
     .from('matches')
@@ -73,6 +75,9 @@ export async function GET(req: NextRequest) {
   const result = (matches ?? []).map((m) => {
     const ht = m.home_team as unknown as { id: number; name: string } | null
     const at = m.away_team as unknown as { id: number; name: string } | null
+    if ((ht?.name?.includes('Atlético') || ht?.name?.includes('Atletico')) && (at?.name?.includes('Barcelona') || at?.name?.includes('Barça'))) {
+      console.log('[championship/matches] Atletico-Barcelona kickoff:', m.kickoff, 'id:', m.id)
+    }
     const season = m.season as unknown as { tournament: { id: number; name: string; logo_url: string | null } | null } | null
     const rivalryKey = ht && at ? [ht.id, at.id].sort().join(':') : null
     const isRivalry = rivalryKey ? rivalrySet.has(rivalryKey) : false
