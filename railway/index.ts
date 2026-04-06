@@ -520,8 +520,9 @@ app.get('/send-reminders', async (_req, res) => {
 
 app.get('/admin/test-fetch', async (_req, res) => {
   try {
-    const response = await fetch(
-      'https://www.uci.org/discipline/road/6TBjsDD8902tud440iv1Cu?tab=results&discipline=ROA',
+    // Step 1: Fetch UCI discipline page to extract JWT bearer token
+    const pageRes = await fetch(
+      'https://www.uci.org/discipline/road/6TBjsDD8902tud440iv1Cu?tab=calendar',
       {
         headers: {
           'User-Agent':
@@ -533,7 +534,7 @@ app.get('/admin/test-fetch', async (_req, res) => {
         redirect: 'follow',
       },
     )
-    const html = await response.text()
+    const html = await pageRes.text()
 
     // Extract data-props from DisciplineModule
     const match = html.match(
@@ -542,7 +543,8 @@ app.get('/admin/test-fetch', async (_req, res) => {
     if (!match) {
       res.json({
         ok: false,
-        status: response.status,
+        step: 'parse-html',
+        pageStatus: pageRes.status,
         error: 'DisciplineModule not found in HTML',
         bodyPreview: html.slice(0, 500),
       })
@@ -557,15 +559,53 @@ app.get('/admin/test-fetch', async (_req, res) => {
       .replace(/&gt;/g, '>')
       .replace(/&#39;/g, "'")
     const props = JSON.parse(decoded)
+    const bearerToken = props.bearerToken as string | undefined
 
-    // Strip bearerToken from response (it's large and sensitive)
-    const { bearerToken, ...safeProps } = props
+    if (!bearerToken) {
+      res.json({
+        ok: false,
+        step: 'extract-token',
+        error: 'bearerToken not found in DisciplineModule props',
+      })
+      return
+    }
+
+    // Step 2: Call DataRide Competitions API with the token
+    const apiRes = await fetch(
+      'https://dataride.uci.org/iframe/Competitions/',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${bearerToken}`,
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Referer:
+            'https://dataride.uci.org/iframe/CompetitionResults/10/2026',
+        },
+        body: JSON.stringify({
+          disciplineId: 10,
+          Take: 100,
+          Skip: 0,
+          CategoryId: 1,
+        }),
+      },
+    )
+
+    const apiBody = await apiRes.text()
+    let apiData: unknown
+    try {
+      apiData = JSON.parse(apiBody)
+    } catch {
+      apiData = null
+    }
 
     res.json({
       ok: true,
-      status: response.status,
-      hasBearerToken: !!bearerToken,
-      props: safeProps,
+      pageStatus: pageRes.status,
+      apiStatus: apiRes.status,
+      tokenLength: bearerToken.length,
+      apiData: apiData ?? apiBody.slice(0, 2000),
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
