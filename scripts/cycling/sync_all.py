@@ -214,46 +214,16 @@ def scrape_teams(client: httpx.Client) -> list[dict]:
 
 
 def scrape_team_logo(soup: BeautifulSoup) -> str | None:
-    """Extract team logo URL from PCS team page.
+    """Extract team jersey/shirt image URL from PCS team page.
 
-    PCS places the team logo/jersey in an <img> inside the team info
-    section, typically with src like 'images/shirts/...' or inside a
-    div with class containing 'logo' or 'shirt'.
+    The shirt image is an <img> with src containing 'images/shirts/'
+    inside a <div class="value">.
     """
-    # Strategy 1: look for img in the team info/header area
-    for div in soup.find_all("div", class_=re.compile(r"(logo|shirt|ktt)", re.I)):
-        img = div.find("img")
+    for div in soup.find_all("div", class_="value"):
+        img = div.find("img", src=re.compile(r"images/shirts/"))
         if img and img.get("src"):
             src = img["src"]
-            if src.startswith("//"):
-                return f"https:{src}"
-            if src.startswith("/"):
-                return f"{PCS_BASE}{src}"
-            if src.startswith("http"):
-                return src
-
-    # Strategy 2: find any <img> whose src contains 'shirt' or 'logo'
-    for img in soup.find_all("img", src=re.compile(r"(shirt|logo)", re.I)):
-        src = img["src"]
-        if src.startswith("//"):
-            return f"https:{src}"
-        if src.startswith("/"):
-            return f"{PCS_BASE}{src}"
-        if src.startswith("http"):
-            return src
-
-    # Strategy 3: look for the team jersey image (common pattern: img inside .entry section)
-    info_div = soup.find("div", class_="entry")
-    if info_div:
-        img = info_div.find("img")
-        if img and img.get("src"):
-            src = img["src"]
-            if src.startswith("//"):
-                return f"https:{src}"
-            if src.startswith("/"):
-                return f"{PCS_BASE}{src}"
-            if src.startswith("http"):
-                return src
+            return f"{PCS_BASE}/{src}" if not src.startswith("http") else src
 
     return None
 
@@ -275,6 +245,18 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> tuple[list[dict], st
     if not roster_ul:
         _warn(f"No <ul class='teamlist'> for {team['team_name']}, falling back to full page")
         roster_ul = soup
+
+    # Build rider photo lookup: find all <img> with src containing 'images/riders/'
+    rider_photos: dict[str, str] = {}
+    for img in soup.find_all("img", src=re.compile(r"images/riders/")):
+        src = img.get("src", "")
+        # Find the closest <a href="rider/slug"> parent or sibling
+        parent_a = img.find_parent("a", href=re.compile(r"^rider/([\w-]+)$"))
+        if parent_a:
+            slug_match = re.match(r"^rider/([\w-]+)$", parent_a["href"])
+            if slug_match:
+                photo_url = f"{PCS_BASE}/{src}" if not src.startswith("http") else src
+                rider_photos[slug_match.group(1)] = photo_url
 
     rider_re = re.compile(r"^rider/([\w-]+)$")
     riders: list[dict] = []
@@ -308,6 +290,7 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> tuple[list[dict], st
             "last_name": last_name,
             "team_name": team["team_name"],
             "team_logo_url": logo_url,
+            "photo_url": rider_photos.get(pcs_slug),
         })
 
     return riders, logo_url
