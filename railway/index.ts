@@ -519,10 +519,10 @@ app.get('/send-reminders', async (_req, res) => {
 // ─── GET /admin/test-fetch (temporary) ─────────────────────────────────────
 
 app.get('/admin/test-fetch', async (_req, res) => {
-  const debug: Record<string, unknown> = { version: '2026-04-06-v4' }
+  const debug: Record<string, unknown> = { version: '2026-04-06-v5' }
   try {
     const pageRes = await fetch(
-      'https://www.uci.org/competition-hub/2025-uci-worldtour/jxcBRgu0WBnnEnJNGgtMA',
+      'https://www.uci.org/competition-details/2025/ROA/74207',
       {
         headers: {
           'User-Agent':
@@ -539,7 +539,6 @@ app.get('/admin/test-fetch', async (_req, res) => {
     debug.pageUrl = pageRes.url
     debug.htmlLength = html.length
 
-    // Find any data-component with data-props
     const allComponents = [...html.matchAll(/data-component="([^"]+)"\s+data-props="([^"]*)"/g)]
     debug.components = allComponents.map((m) => m[1])
 
@@ -556,21 +555,36 @@ app.get('/admin/test-fetch', async (_req, res) => {
         .replace(/&gt;/g, '>')
         .replace(/&#39;/g, "'")
 
-    // Find HubsModule and return its full props
-    const hubsMatch = allComponents.find((m) => m[1] === 'HubsModule')
-    let hubsProps: unknown = null
-    if (hubsMatch) {
+    // Parse all components — strip heavy filter/country arrays, keep structure
+    const componentData: Record<string, unknown> = {}
+    for (const m of allComponents) {
+      const name = m[1]
       try {
-        hubsProps = JSON.parse(decode(hubsMatch[2]))
+        const props = JSON.parse(decode(m[2]))
+        // Recursively strip large arrays (filters, countries) but keep scalars and small arrays
+        const slim = (obj: unknown, depth: number): unknown => {
+          if (depth > 4 || obj === null || obj === undefined) return obj
+          if (typeof obj !== 'object') return obj
+          if (Array.isArray(obj)) {
+            if (obj.length > 15) return `[Array: ${obj.length} items]`
+            return obj.map((v) => slim(v, depth + 1))
+          }
+          const out: Record<string, unknown> = {}
+          for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+            out[k] = slim(v, depth + 1)
+          }
+          return out
+        }
+        componentData[name] = slim(props, 0)
       } catch {
-        hubsProps = 'parse-error'
+        componentData[name] = 'parse-error'
       }
     }
 
     res.json({
       ok: true,
       debug,
-      hubsProps,
+      componentData,
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
