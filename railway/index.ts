@@ -519,10 +519,10 @@ app.get('/send-reminders', async (_req, res) => {
 // ─── GET /admin/test-fetch (temporary) ─────────────────────────────────────
 
 app.get('/admin/test-fetch', async (_req, res) => {
-  const debug: Record<string, unknown> = { version: '2026-04-06-v3' }
+  const debug: Record<string, unknown> = { version: '2026-04-06-v4' }
   try {
     const pageRes = await fetch(
-      'https://www.uci.org/discipline/road/6TBjsDD8902tud440iv1Cu?tab=calendar&year=2026',
+      'https://www.uci.org/competition-hub/2025-uci-worldtour/jxcBRgu0WBnnEnJNGgtMA',
       {
         headers: {
           'User-Agent':
@@ -539,37 +539,66 @@ app.get('/admin/test-fetch', async (_req, res) => {
     debug.pageUrl = pageRes.url
     debug.htmlLength = html.length
 
-    const match = html.match(
-      /data-component="DisciplineModule"\s+data-props="([^"]*)"/,
-    )
-    if (!match) {
-      res.json({ ok: false, step: 'parse-html', debug, bodyPreview: html.slice(0, 1000) })
+    // Find any data-component with data-props
+    const allComponents = [...html.matchAll(/data-component="([^"]+)"\s+data-props="([^"]*)"/g)]
+    debug.components = allComponents.map((m) => m[1])
+
+    if (allComponents.length === 0) {
+      res.json({ ok: false, step: 'parse-html', debug, bodyPreview: html.slice(0, 2000) })
       return
     }
 
-    const decoded = match[1]
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&#39;/g, "'")
-    const props = JSON.parse(decoded)
-    debug.propsKeys = Object.keys(props)
+    // Decode and parse each component's props
+    const decode = (s: string) =>
+      s
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
 
-    // Return carousel (upcoming/latest/live competitions) and calendar preview
-    const calendar = props.calendar as Record<string, unknown> | undefined
-    let calendarPreview: unknown = null
-    if (calendar) {
-      const { filters, ...rest } = calendar as Record<string, unknown>
-      calendarPreview = rest
+    // Look for races/competitions in all components
+    type Race = { name: string; dates: string; detailsLink: string }
+    const races: Race[] = []
+    const allProps: Record<string, unknown> = {}
+
+    for (const m of allComponents) {
+      const componentName = m[1]
+      try {
+        const props = JSON.parse(decode(m[2]))
+        allProps[componentName] = Object.keys(props)
+
+        // Search for race entries recursively
+        const search = (obj: unknown, depth = 0): void => {
+          if (depth > 5 || !obj || typeof obj !== 'object') return
+          if (Array.isArray(obj)) {
+            for (const item of obj) search(item, depth + 1)
+            return
+          }
+          const rec = obj as Record<string, unknown>
+          // Check if this object has a detailsLink with competition-details URL
+          const detailsLink = rec.detailsLink as Record<string, string> | undefined
+          if (detailsLink?.url?.includes('/competition-details/')) {
+            races.push({
+              name: (rec.name as string) ?? (detailsLink.title as string) ?? '?',
+              dates: (rec.dates as string) ?? '',
+              detailsLink: detailsLink.url,
+            })
+          }
+          for (const v of Object.values(rec)) search(v, depth + 1)
+        }
+        search(props)
+      } catch {
+        allProps[componentName] = 'parse-error'
+      }
     }
 
     res.json({
       ok: true,
       debug,
-      carousel: props.carousel ?? null,
-      calendarPreview,
-      featuredCompetitions: props.featuredCompetitions ?? null,
+      componentProps: allProps,
+      racesFound: races.length,
+      races: races.slice(0, 20),
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
