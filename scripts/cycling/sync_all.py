@@ -213,11 +213,63 @@ def scrape_teams(client: httpx.Client) -> list[dict]:
     return teams
 
 
-def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
+def scrape_team_logo(soup: BeautifulSoup) -> str | None:
+    """Extract team logo URL from PCS team page.
+
+    PCS places the team logo/jersey in an <img> inside the team info
+    section, typically with src like 'images/shirts/...' or inside a
+    div with class containing 'logo' or 'shirt'.
+    """
+    # Strategy 1: look for img in the team info/header area
+    for div in soup.find_all("div", class_=re.compile(r"(logo|shirt|ktt)", re.I)):
+        img = div.find("img")
+        if img and img.get("src"):
+            src = img["src"]
+            if src.startswith("//"):
+                return f"https:{src}"
+            if src.startswith("/"):
+                return f"{PCS_BASE}{src}"
+            if src.startswith("http"):
+                return src
+
+    # Strategy 2: find any <img> whose src contains 'shirt' or 'logo'
+    for img in soup.find_all("img", src=re.compile(r"(shirt|logo)", re.I)):
+        src = img["src"]
+        if src.startswith("//"):
+            return f"https:{src}"
+        if src.startswith("/"):
+            return f"{PCS_BASE}{src}"
+        if src.startswith("http"):
+            return src
+
+    # Strategy 3: look for the team jersey image (common pattern: img inside .entry section)
+    info_div = soup.find("div", class_="entry")
+    if info_div:
+        img = info_div.find("img")
+        if img and img.get("src"):
+            src = img["src"]
+            if src.startswith("//"):
+                return f"https:{src}"
+            if src.startswith("/"):
+                return f"{PCS_BASE}{src}"
+            if src.startswith("http"):
+                return src
+
+    return None
+
+
+def scrape_team_riders(team: dict, client: httpx.Client) -> tuple[list[dict], str | None]:
     url = team["team_url"]
     _log(f"    Fetching: {url}")
     soup = pcs_get(url, client)
     time.sleep(REQUEST_DELAY)
+
+    # Extract team logo
+    logo_url = scrape_team_logo(soup)
+    if logo_url:
+        _log(f"    Logo: {logo_url[:80]}")
+    else:
+        _warn(f"    No logo found for {team['team_name']}")
 
     roster_ul = soup.find("ul", class_="teamlist")
     if not roster_ul:
@@ -255,9 +307,10 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
             "first_name": first_name,
             "last_name": last_name,
             "team_name": team["team_name"],
+            "team_logo_url": logo_url,
         })
 
-    return riders
+    return riders, logo_url
 
 
 def scrape_rankings_index(client: httpx.Client, target_slugs: set[str]) -> dict[str, int]:
@@ -316,7 +369,7 @@ def scrape_all_riders(client: httpx.Client) -> list[dict]:
     all_riders: list[dict] = []
     for i, team in enumerate(teams, 1):
         _log(f"  [{i}/{len(teams)}] {team['team_name']}")
-        team_riders = scrape_team_riders(team, client)
+        team_riders, _logo = scrape_team_riders(team, client)
         _log(f"    → {len(team_riders)} riders")
         all_riders.extend(team_riders)
 
