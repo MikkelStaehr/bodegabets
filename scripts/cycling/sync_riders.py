@@ -207,13 +207,17 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
             continue
 
         pcs_slug = m.group(1)
+
+        # Skip links without text (e.g. image-only links in rider photo grid).
+        # Don't add to seen — a later <a> for the same rider will have text.
+        name_parts = list(a.stripped_strings)
+        if not name_parts:
+            continue
+
         if pcs_slug in seen:
             continue
         seen.add(pcs_slug)
 
-        name_parts = list(a.stripped_strings)
-        if not name_parts:
-            continue
         full_name = " ".join(name_parts)
 
         # Split into last/first: the uppercase span contains the last name
@@ -407,6 +411,13 @@ def main() -> None:
         action="store_true",
         help="Fetch the teams page and print the first 2000 chars of raw HTML, then exit",
     )
+    parser.add_argument(
+        "--debug-team",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Fetch a team page (e.g. ineos-grenadiers-2026) and dump table structure, then exit",
+    )
     args = parser.parse_args()
 
     load_dotenv_local()
@@ -422,6 +433,43 @@ def main() -> None:
             _log(f"Content-Length: {len(resp.text)}")
             _log("--- Raw HTML (first 2000 chars) ---")
             print(resp.text[:2000])
+        return
+
+    # --- Debug mode: dump team page structure ---
+    if args.debug_team:
+        url = f"{PCS_BASE}/team/{args.debug_team}"
+        with httpx.Client(headers=PCS_HEADERS) as client:
+            _log(f"Fetching: {url}")
+            resp = client.get(url, timeout=30, follow_redirects=True)
+            _log(f"Status: {resp.status_code}")
+            _log(f"Final URL: {resp.url}")
+            _log(f"Content-Length: {len(resp.text)}")
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Count tables and rows
+            tables = soup.find_all("table")
+            _log(f"\nTables found: {len(tables)}")
+            for i, table in enumerate(tables):
+                rows = table.find_all("tr")
+                _log(f"  Table {i}: {len(rows)} <tr> rows")
+
+            # Count all rider links
+            rider_links = soup.find_all("a", href=re.compile(r"^rider/"))
+            seen_slugs: set[str] = set()
+            for a in rider_links:
+                m = re.match(r"^rider/([\w-]+)$", a["href"])
+                if m:
+                    seen_slugs.add(m.group(1))
+            _log(f"\nUnique rider links (rider/slug): {len(seen_slugs)}")
+
+            # Count all <li> with rider links (PCS sometimes uses lists)
+            rider_lis = soup.find_all("li")
+            li_with_rider = [li for li in rider_lis if li.find("a", href=re.compile(r"^rider/"))]
+            _log(f"<li> elements containing rider links: {len(li_with_rider)}")
+
+            _log("\n--- Raw HTML (first 3000 chars) ---")
+            print(resp.text[:3000])
         return
 
     # --- Step 1: Scrape ---
