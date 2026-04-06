@@ -15,23 +15,26 @@ Kræver `.env.local` i projekt-roden med:
 
 ## Scripts
 
-### 1. `sync_races.py` — Kør først
+### `sync_all.py` — Sæsonstart & vedligeholdelse
 
-Definerer de 29 løb vi tracker (Grand Tours, monumenter, klassikere, mesterskaber).
-Ingen scraping — data er hardcodet.
+Kører automatisk begge steps uden flags. Brug ved sæsonstart og når hold/ryttere ændrer sig.
 
 ```bash
-python scripts/cycling/sync_races.py                # generér JSON + upload til Supabase
-python scripts/cycling/sync_races.py --generate-only # kun skriv data/races.json
-python scripts/cycling/sync_races.py --upload-only   # kun læs JSON og upsert
+python scripts/cycling/sync_all.py
 ```
 
-Upserter til `cycling_races` på `pcs_slug`.
+**Step 1 — Scrape & generér data:**
+- **Ryttere**: Henter alle WorldTour holdlister fra PCS + UCI rankings → `data/riders.json`
+- **Løb**: 29 hardcodede løb (Grand Tours, monumenter, klassikere) → `data/races.json`
+- **Etaper**: For hvert etapeløb scrapes etapeliste fra PCS → `data/stages.json`
 
-### 2. `sync_riders.py` — Kør efter races
+**Step 2 — Upload til Supabase:**
+- `cycling_riders` på `pcs_slug`
+- `cycling_races` på `pcs_slug`
+- `cycling_stages` på `(race_id, stage_number)`
+- Logger til `cycling_sync_log` med `sync_type=full_sync`
 
-Scraper PCS individuelle rankings (alle sider). Parser rytternavn, team, ranking.
-Tildeler kategori baseret på ranking:
+Kategori-tildeling baseret på UCI ranking:
 
 | Ranking | Kategori |
 |---------|----------|
@@ -41,21 +44,39 @@ Tildeler kategori baseret på ranking:
 | 100–199 | 4        |
 | 200+    | 5        |
 
+### `sync_results.py` — Efter hvert løb/etape
+
+Kører automatisk begge steps uden flags. Brug manuelt efter et løb er færdigt.
+
 ```bash
-python scripts/cycling/sync_riders.py                # scrape + upload
-python scripts/cycling/sync_riders.py --scrape-only  # kun skriv data/riders.json
-python scripts/cycling/sync_riders.py --upload-only  # kun læs JSON og upsert
+python scripts/cycling/sync_results.py
 ```
 
-Upserter til `cycling_riders` på `pcs_slug`. Respekterer 1.5s delay mellem requests.
+**Step 1 — Hent resultater:**
+- Henter løb med status `active` eller `finished` fra Supabase
+- Endagsløb: scraper top 25 fra PCS
+- Etapeløb: scraper top 25 per etape der mangler resultater
+- Parser placering, rytternavn, hold, tidsgab, DNF
+- Gemmer per-løb JSON i `data/results_{slug}_{stage}.json`
+
+**Step 2 — Match & upload:**
+- Matcher ryttere mod `cycling_riders` via `pcs_slug`
+- Upserter til `cycling_results`
+- Opdaterer `results_uploaded_at` på løb/etaper
+- Logger til `cycling_sync_log` med `sync_type=results_sync`
 
 ## Rækkefølge
 
 ```bash
-python scripts/cycling/sync_races.py    # 1. Races først (ingen afhængigheder)
-python scripts/cycling/sync_riders.py   # 2. Riders derefter
+# Sæsonstart (kør én gang):
+python scripts/cycling/sync_all.py
+
+# Efter hvert løb (kør manuelt):
+# 1. Sæt løb-status til "active" eller "finished" i admin panelet
+# 2. Kør results sync:
+python scripts/cycling/sync_results.py
 ```
 
 ## Data
 
-JSON-filer gemmes i `data/` mappen og kan inspiceres/redigeres manuelt mellem step 1 og 2.
+JSON-filer gemmes i `data/` og kan inspiceres manuelt. De gitignores automatisk.
