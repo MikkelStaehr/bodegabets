@@ -75,7 +75,7 @@ export default async function GamePage({ params }: Props) {
   // Hent game
   const { data: game } = await supabaseAdmin
     .from('games')
-    .select('id, name, host_id, invite_code, status, created_at')
+    .select('id, name, host_id, invite_code, status, created_at, sport')
     .eq('id', gameId)
     .single()
 
@@ -576,7 +576,7 @@ export default async function GamePage({ params }: Props) {
       <GameTicker items={tickerItems} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      <div style={{ background: '#2C4A3E', color: '#F2EDE4', padding: '24px 20px 28px' }}>
+      <div style={{ background: typedGame.sport === 'cycling' ? '#1E3A5F' : '#2C4A3E', color: '#F2EDE4', padding: '24px 20px 28px' }}>
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
 
           {/* Top: navn + invite-kode */}

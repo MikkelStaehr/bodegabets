@@ -16,15 +16,6 @@ type ActiveRoundResult = {
   matches_count: number
 }
 
-// Infer sport from league name
-function inferSport(leagueName: string | null): SportType {
-  if (!leagueName) return 'football'
-  const lower = leagueName.toLowerCase()
-  if (lower.includes('tour de france') || lower.includes('giro') || lower.includes('vuelta') || lower.includes('cykling') || lower.includes('cycling')) {
-    return 'cycling'
-  }
-  return 'football'
-}
 
 async function getActiveRoundForGame(
   gameId: number,
@@ -129,7 +120,7 @@ export default async function DashboardPage() {
   const [gamesResult, gameSeasonsResult] = await Promise.all([
     supabaseAdmin
       .from('games')
-      .select('id, name, status, invite_code, created_at, member_count:game_members(count)')
+      .select('id, name, status, invite_code, created_at, sport, member_count:game_members(count)')
       .in('id', gameIds),
     supabaseAdmin
       .from('game_seasons')
@@ -140,8 +131,8 @@ export default async function DashboardPage() {
   const gamesData = gamesResult.data
   const gameSeasonRows = gameSeasonsResult.data
 
-  const gamesById = new Map<number, { id: number; name: string; status: string; invite_code: string; created_at: string; member_count: { count: number }[] }>()
-  for (const g of (gamesData ?? []) as { id: number; name: string; status: string; invite_code: string; created_at: string; member_count: { count: number }[] }[]) {
+  const gamesById = new Map<number, { id: number; name: string; status: string; invite_code: string; created_at: string; sport: string; member_count: { count: number }[] }>()
+  for (const g of (gamesData ?? []) as { id: number; name: string; status: string; invite_code: string; created_at: string; sport: string; member_count: { count: number }[] }[]) {
     gamesById.set(g.id, g)
   }
 
@@ -348,7 +339,7 @@ export default async function DashboardPage() {
         invite_code: g.invite_code,
         member_count: memberCount,
         league_name: leagueName,
-        sport_type: inferSport(leagueName),
+        sport_type: (g.sport === 'cycling' ? 'cycling' : 'football') as SportType,
       },
       activeRound: activeRound
         ? {
