@@ -1,8 +1,9 @@
 /**
  * scrapeUCIRankings.ts
  *
- * Scraper for UCI World Rankings fra ProCyclingStats via Puppeteer.
- * Henter top 500 ryttere og upsert til cycling_riders i Supabase.
+ * Scraper for UCI World Rankings fra ProCyclingStats.
+ * Henter top 500 ryttere via direkte HTTP requests og upsert til
+ * cycling_riders i Supabase.
  *
  * PCS ranking-side: https://www.procyclingstats.com/rankings/me/individual
  *
@@ -12,8 +13,6 @@
  *   1–24 → 1, 25–49 → 2, 50–99 → 3, 100–199 → 4, 200+ → 5
  */
 
-import puppeteer from 'puppeteer-core'
-import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -23,6 +22,14 @@ const supabaseAdmin = createClient(
 )
 
 const PCS_RANKING_URL = 'https://www.procyclingstats.com/rankings/me/individual'
+
+const PCS_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+} as const
+
+const REQUEST_DELAY_MS = 1500
 
 type ParsedRider = {
   pcs_slug: string
@@ -77,111 +84,148 @@ function parsePCSName(raw: string): { first_name: string; last_name: string } {
 }
 
 /**
- * Scraper én side fra PCS via Puppeteer og returnerer parsed ryttere.
+ * Parser HTML fra PCS ranking-side og returnerer liste af ryttere.
  */
-type Page = Awaited<ReturnType<Awaited<ReturnType<typeof puppeteer.launch>>['newPage']>>
+function parseRankingHTML(html: string): ParsedRider[] {
+  const riders: ParsedRider[] = []
 
-async function scrapePage(page: Page, url: string): Promise<ParsedRider[]> {
-  console.log(`[scrapeUCIRankings] Navigerer til ${url}`)
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 30_000 })
-
-  // Vent på at ranking-tabellen loader
-  try {
-    await page.waitForSelector('table.basic tbody tr', { timeout: 15_000 })
-  } catch {
-    console.warn(`[scrapeUCIRankings] Ingen tabel fundet på ${url}`)
-    return []
+  // Find tbody content
+  const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i)
+  if (!tbodyMatch) {
+    console.error('[scrapeUCIRankings] Kunne ikke finde <tbody> i HTML')
+    return riders
   }
 
-  // Ekstraher data fra DOM
-  const riders = await page.evaluate(() => {
-    const rows = document.querySelectorAll('table.basic tbody tr')
-    const results: Array<{
-      ranking: number
-      pcs_slug: string
-      name: string
-      team_name: string
-    }> = []
+  const tbody = tbodyMatch[1]
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+  let rowMatch: RegExpExecArray | null
 
-    rows.forEach((row) => {
-      const cells = row.querySelectorAll('td')
-      if (cells.length < 4) return
+  while ((rowMatch = rowRegex.exec(tbody)) !== null) {
+    const row = rowMatch[1]
 
-      // Ranking — første celle
-      const rankingText = cells[0]?.textContent?.trim() ?? ''
-      const ranking = parseInt(rankingText)
-      if (isNaN(ranking) || ranking <= 0) return
+    // Hent alle <td> celler
+    const cells: string[] = []
+    const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi
+    let cellMatch: RegExpExecArray | null
+    while ((cellMatch = cellRegex.exec(row)) !== null) {
+      cells.push(cellMatch[1].trim())
+    }
 
-      // Rider link og navn
-      const riderLink = row.querySelector('a[href*="rider/"]')
-      if (!riderLink) return
+    if (cells.length < 4) continue
 
-      const href = riderLink.getAttribute('href') ?? ''
-      const slugMatch = href.match(/rider\/(.+?)(?:$|\/)/)
-      if (!slugMatch) return
+    // Ranking (første celle med tal)
+    const rankingStr = cells[0].replace(/<[^>]+>/g, '').trim()
+    const ranking = parseInt(rankingStr)
+    if (isNaN(ranking) || ranking <= 0) continue
 
-      const pcs_slug = slugMatch[1]
-      const name = riderLink.textContent?.trim() ?? ''
+    // Rider link og navn (celle med rider/ link)
+    const riderCell = cells.find((c) => c.includes('rider/'))
+    if (!riderCell) continue
 
-      // Team
-      const teamLink = row.querySelector('a[href*="team/"]')
-      const team_name = teamLink?.textContent?.trim() ?? ''
+    const slugMatch = riderCell.match(/href="(?:.*?)?rider\/([^"]+)"/)
+    const nameMatch = riderCell.match(/>([^<]+)</)
+    if (!slugMatch || !nameMatch) continue
 
-      results.push({ ranking, pcs_slug, name, team_name })
-    })
+    const pcs_slug = slugMatch[1]
+    const rawName = nameMatch[1].trim()
+    const { first_name, last_name } = parsePCSName(rawName)
 
-    return results
-  })
+    // Team (celle med team/ link)
+    const teamCell = cells.find((c) => c.includes('team/'))
+    const teamNameMatch = teamCell?.match(/>([^<]+)</)
+    const team_name = teamNameMatch?.[1]?.trim() ?? ''
 
-  return riders.map((r) => {
-    const { first_name, last_name } = parsePCSName(r.name)
-    return {
-      pcs_slug: r.pcs_slug,
+    riders.push({
+      pcs_slug,
       first_name,
       last_name,
-      team_name: r.team_name,
-      uci_ranking: r.ranking,
-      category: rankingToCategory(r.ranking),
-    }
-  })
+      team_name,
+      uci_ranking: ranking,
+      category: rankingToCategory(ranking),
+    })
+  }
+
+  return riders
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /**
- * Scraper PCS UCI ranking via Puppeteer og upsert til cycling_riders.
- * Henter op til 5 sider (500 ryttere).
+ * Fetcher én side fra PCS med retry-logik.
+ */
+async function fetchPage(url: string, retries = 2): Promise<string | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: PCS_HEADERS,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(30_000),
+      })
+
+      if (res.status >= 500 && attempt < retries) {
+        console.warn(`[scrapeUCIRankings] HTTP ${res.status} for ${url} — retry ${attempt + 1}`)
+        await sleep(3000)
+        continue
+      }
+
+      if (!res.ok) return null
+
+      const html = await res.text()
+
+      // Tjek for Cloudflare challenge
+      if (html.includes('Just a moment...') || html.includes('challenge-platform')) {
+        console.warn(`[scrapeUCIRankings] Cloudflare challenge på ${url}`)
+        return null
+      }
+
+      return html
+    } catch (err) {
+      if (attempt < retries) {
+        console.warn(`[scrapeUCIRankings] Fetch fejl for ${url} — retry ${attempt + 1}: ${err}`)
+        await sleep(3000)
+        continue
+      }
+      throw err
+    }
+  }
+  return null
+}
+
+/**
+ * Scraper PCS UCI ranking og upsert til cycling_riders.
+ * Henter op til 5 sider (100 per side, 500 ryttere total).
  */
 export async function scrapeUCIRankings(): Promise<{ upserted: number; errors: string[] }> {
   const errors: string[] = []
   const allRiders: ParsedRider[] = []
 
-  const browser = await puppeteer.launch({
-    executablePath: await chromium.executablePath(),
-    headless: true,
-    args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  })
+  const offsets = [0, 100, 200, 300, 400]
 
-  try {
-    const page = await browser.newPage()
-    await page.setViewport({ width: 1280, height: 800 })
+  for (const offset of offsets) {
+    const url = offset === 0 ? PCS_RANKING_URL : `${PCS_RANKING_URL}/offset/${offset}`
+    console.log(`[scrapeUCIRankings] Fetcher ${url}`)
 
-    // Hent op til 5 sider (100 ryttere per side)
-    const offsets = [0, 100, 200, 300, 400]
+    try {
+      const html = await fetchPage(url)
 
-    for (const offset of offsets) {
-      const url = offset === 0 ? PCS_RANKING_URL : `${PCS_RANKING_URL}/offset/${offset}`
-
-      try {
-        const riders = await scrapePage(page, url)
-        console.log(`[scrapeUCIRankings] Parsed ${riders.length} ryttere fra offset ${offset}`)
-
-        if (riders.length === 0) break
-        allRiders.push(...riders)
-      } catch (err) {
-        errors.push(`Scrape fejl for offset ${offset}: ${err instanceof Error ? err.message : String(err)}`)
+      if (!html) {
+        errors.push(`Ingen HTML for offset ${offset}`)
+        break
       }
+
+      const parsed = parseRankingHTML(html)
+      console.log(`[scrapeUCIRankings] Parsed ${parsed.length} ryttere fra offset ${offset}`)
+
+      if (parsed.length === 0) break
+      allRiders.push(...parsed)
+
+      // Delay mellem requests
+      if (offset < 400) await sleep(REQUEST_DELAY_MS)
+    } catch (err) {
+      errors.push(`Fetch fejl for offset ${offset}: ${err instanceof Error ? err.message : String(err)}`)
     }
-  } finally {
-    await browser.close()
   }
 
   if (allRiders.length === 0) {
