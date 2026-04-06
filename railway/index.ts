@@ -516,27 +516,6 @@ app.get('/send-reminders', async (_req, res) => {
   }
 })
 
-// ─── GET /admin/test-fetch (temporary) ─────────────────────────────────────
-
-app.get('/admin/test-fetch', async (_req, res) => {
-  try {
-    const response = await fetch('https://firstcycling.com/rider.php?l=1', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      },
-    })
-    const body = await response.text()
-    res.json({
-      ok: true,
-      status: response.status,
-      bodyPreview: body.slice(0, 500),
-    })
-  } catch (err) {
-    console.error('[admin/test-fetch]', err)
-    res.status(500).json({ error: String(err) })
-  }
-})
-
 // ─── Start server ───────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
