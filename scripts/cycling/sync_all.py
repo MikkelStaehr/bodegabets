@@ -75,7 +75,7 @@ RACES = [
     {"name": "Volta a Catalunya", "pcs_slug": "volta-a-catalunya", "race_type": "stage_race", "profile": "mountain", "year": YEAR, "start_date": "2026-03-23"},
     {"name": "Tour de Romandie", "pcs_slug": "tour-de-romandie", "race_type": "stage_race", "profile": "mountain", "year": YEAR, "start_date": "2026-04-28"},
     {"name": "Tour de Suisse", "pcs_slug": "tour-de-suisse", "race_type": "stage_race", "profile": "mountain", "year": YEAR, "start_date": "2026-06-14"},
-    {"name": "Critérium du Dauphiné", "pcs_slug": "criterium-du-dauphine", "race_type": "stage_race", "profile": "mountain", "year": YEAR, "start_date": "2026-06-07"},
+    {"name": "Critérium du Dauphiné", "pcs_slug": "dauphine", "race_type": "stage_race", "profile": "mountain", "year": YEAR, "start_date": "2026-06-07"},
     {"name": "Itzulia Basque Country", "pcs_slug": "itzulia-basque-country", "race_type": "stage_race", "profile": "hilly", "year": YEAR, "start_date": "2026-04-06"},
     # Monuments
     {"name": "Milano-Sanremo", "pcs_slug": "milano-sanremo", "race_type": "one_day", "profile": "flat", "year": YEAR, "start_date": "2026-03-21"},
