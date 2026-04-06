@@ -23,6 +23,7 @@ type Race = {
   year: number
   status: string | null
   results_uploaded_at: string | null
+  startlist_count: number
 }
 
 type Stage = {
@@ -300,6 +301,7 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
                   <th className="text-left px-3 py-2">Profil</th>
                   <th className="text-left px-3 py-2">Dato</th>
                   <th className="text-center px-3 py-2">Status</th>
+                  <th className="text-left px-3 py-2">Startliste</th>
                   <th className="text-left px-3 py-2">Resultater</th>
                 </tr>
               </thead>
@@ -352,6 +354,16 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
                             <option value="finished">Finished</option>
                           </select>
                         </td>
+                        <td className="px-3 py-2.5 text-[12px]">
+                          {race.startlist_count > 0 ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-forest shrink-0" />
+                              <span className="text-ink">{race.startlist_count} bekræftede</span>
+                            </span>
+                          ) : (
+                            <span className="text-warm-gray">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2.5 text-warm-gray text-[12px]">
                           {race.results_uploaded_at
                             ? formatDateTime(race.results_uploaded_at)
@@ -360,7 +372,7 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
                       </tr>
                       {isStageRace && isExpanded && (
                         <tr>
-                          <td colSpan={6} className="p-0">
+                          <td colSpan={7} className="p-0">
                             <div className="bg-cream-dark border-b border-warm-border">
                               {isLoadingStages ? (
                                 <p className="px-8 py-3 font-condensed text-[11px] text-warm-gray uppercase tracking-wide">
