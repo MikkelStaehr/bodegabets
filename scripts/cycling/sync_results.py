@@ -652,21 +652,39 @@ def main() -> None:
     rider_index = build_rider_index(supabase)
     _log(f"  {len(rider_index)} riders in index")
 
-    # Fetch stages for stage races
+    # Fetch stages for stage races and find which ones lack results
     stage_races_ids = [r["id"] for r in races if r["race_type"] == "stage_race"]
-    stages_by_race: dict[int, list[dict]] = {}
+    stages_by_race: dict[str, list[dict]] = {}
     if stage_races_ids:
         try:
+            # Get all stages for these races
             resp = (
                 supabase.table("cycling_stages")
-                .select("id, race_id, stage_number, results_uploaded_at")
+                .select("id, race_id, stage_number")
                 .in_("race_id", stage_races_ids)
-                .is_("results_uploaded_at", "null")
                 .order("stage_number", desc=False)
                 .execute()
             )
-            for s in resp.data or []:
-                stages_by_race.setdefault(s["race_id"], []).append(s)
+            all_stages = resp.data or []
+
+            # Get existing results to find which stages already have them
+            resp2 = (
+                supabase.table("cycling_results")
+                .select("race_id, stage_number")
+                .in_("race_id", stage_races_ids)
+                .execute()
+            )
+            has_results: set[tuple[str, int]] = set()
+            for r in resp2.data or []:
+                has_results.add((r["race_id"], r["stage_number"]))
+
+            # Only keep stages without results
+            for s in all_stages:
+                if (s["race_id"], s["stage_number"]) not in has_results:
+                    stages_by_race.setdefault(s["race_id"], []).append(s)
+
+            total_stages = sum(len(v) for v in stages_by_race.values())
+            _log(f"  {len(all_stages)} total stages, {total_stages} pending (no results)")
         except APIError as e:
             _warn(f"Failed to fetch stages: {e}")
 
