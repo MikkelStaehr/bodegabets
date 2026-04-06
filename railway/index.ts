@@ -519,11 +519,10 @@ app.get('/send-reminders', async (_req, res) => {
 // ─── GET /admin/test-fetch (temporary) ─────────────────────────────────────
 
 app.get('/admin/test-fetch', async (_req, res) => {
-  const debug: Record<string, unknown> = { version: '2026-04-06-v2' }
+  const debug: Record<string, unknown> = { version: '2026-04-06-v3' }
   try {
-    // Step 1: Fetch UCI discipline page to extract JWT bearer token
     const pageRes = await fetch(
-      'https://www.uci.org/discipline/road/6TBjsDD8902tud440iv1Cu?tab=calendar',
+      'https://www.uci.org/discipline/road/6TBjsDD8902tud440iv1Cu?tab=calendar&year=2026',
       {
         headers: {
           'User-Agent':
@@ -540,7 +539,6 @@ app.get('/admin/test-fetch', async (_req, res) => {
     debug.pageUrl = pageRes.url
     debug.htmlLength = html.length
 
-    // Extract data-props from DisciplineModule
     const match = html.match(
       /data-component="DisciplineModule"\s+data-props="([^"]*)"/,
     )
@@ -556,59 +554,22 @@ app.get('/admin/test-fetch', async (_req, res) => {
       .replace(/&gt;/g, '>')
       .replace(/&#39;/g, "'")
     const props = JSON.parse(decoded)
-    const bearerToken = props.bearerToken as string | undefined
-    debug.tokenLength = bearerToken?.length ?? 0
-    debug.tokenPrefix = bearerToken?.slice(0, 20) ?? null
     debug.propsKeys = Object.keys(props)
 
-    if (!bearerToken) {
-      res.json({ ok: false, step: 'extract-token', debug })
-      return
-    }
-
-    // Step 2: Call DataRide Competitions API
-    const requestBody = JSON.stringify({
-      disciplineId: 10,
-      Take: 100,
-      Skip: 0,
-      CategoryId: 1,
-    })
-    debug.requestBody = requestBody
-
-    const apiRes = await fetch(
-      'https://dataride.uci.ch/iframe/Competitions/',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          Accept: 'application/json, text/javascript, */*; q=0.01',
-          Authorization: `Bearer ${bearerToken}`,
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          Referer: 'https://dataride.uci.ch/iframe/',
-          Origin: 'https://dataride.uci.ch',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: requestBody,
-      },
-    )
-
-    const apiBody = await apiRes.text()
-    debug.apiStatus = apiRes.status
-    debug.apiContentType = apiRes.headers.get('content-type')
-    debug.apiBodyLength = apiBody.length
-
-    let apiData: unknown
-    try {
-      apiData = JSON.parse(apiBody)
-    } catch {
-      apiData = null
+    // Return carousel (upcoming/latest/live competitions) and calendar preview
+    const calendar = props.calendar as Record<string, unknown> | undefined
+    let calendarPreview: unknown = null
+    if (calendar) {
+      const { filters, ...rest } = calendar as Record<string, unknown>
+      calendarPreview = rest
     }
 
     res.json({
-      ok: apiRes.status === 200,
+      ok: true,
       debug,
-      apiData: apiData ?? { rawBody: apiBody.slice(0, 3000) },
+      carousel: props.carousel ?? null,
+      calendarPreview,
+      featuredCompetitions: props.featuredCompetitions ?? null,
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
