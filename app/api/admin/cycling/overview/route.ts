@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       .select('category, last_synced_at', { count: 'exact' }),
     supabaseAdmin
       .from('cycling_races')
-      .select('id, name, pcs_slug, race_type, profile, start_date, year, status, results_uploaded_at')
+      .select('id, name, pcs_slug, race_type, profile, start_date, year, status, results_uploaded_at, startlist_total')
       .order('start_date', { ascending: true }),
     supabaseAdmin
       .from('cycling_sync_log')

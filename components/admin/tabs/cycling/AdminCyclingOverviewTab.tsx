@@ -24,6 +24,15 @@ type Race = {
   status: string | null
   results_uploaded_at: string | null
   startlist_count: number
+  startlist_total: number | null
+}
+
+type StartlistRider = {
+  bib_number: number | null
+  first_name: string
+  last_name: string
+  team_name: string
+  category: number
 }
 
 type Stage = {
@@ -85,6 +94,9 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
   const [expandedRace, setExpandedRace] = useState<string | null>(null)
   const [stagesCache, setStagesCache] = useState<Record<string, Stage[]>>({})
   const [stagesLoading, setStagesLoading] = useState<Set<string>>(new Set())
+  const [startlistModal, setStartlistModal] = useState<{ raceId: string; raceName: string } | null>(null)
+  const [startlistRiders, setStartlistRiders] = useState<StartlistRider[]>([])
+  const [startlistLoading, setStartlistLoading] = useState(false)
 
   const authHeader = {
     'Content-Type': 'application/json',
@@ -172,6 +184,23 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
         n.delete(raceId)
         return n
       })
+    }
+  }
+
+  async function openStartlistModal(raceId: string, raceName: string) {
+    setStartlistModal({ raceId, raceName })
+    setStartlistRiders([])
+    setStartlistLoading(true)
+    try {
+      const res = await fetch(`/api/admin/cycling/races/${raceId}/startlist`, {
+        headers: authHeader,
+      })
+      const data = await res.json()
+      setStartlistRiders(data.riders ?? [])
+    } catch {
+      setStartlistRiders([])
+    } finally {
+      setStartlistLoading(false)
     }
   }
 
@@ -356,10 +385,16 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
                         </td>
                         <td className="px-3 py-2.5 text-[12px]">
                           {race.startlist_count > 0 ? (
-                            <span className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => openStartlistModal(race.id, race.name)}
+                              className="inline-flex items-center gap-1.5 hover:underline"
+                            >
                               <span className="w-1.5 h-1.5 rounded-full bg-forest shrink-0" />
-                              <span className="text-ink">{race.startlist_count} bekræftede</span>
-                            </span>
+                              <span className="text-ink">
+                                {race.startlist_count}
+                                {race.startlist_total ? ` / ${race.startlist_total}` : ''} bekræftede
+                              </span>
+                            </button>
                           ) : (
                             <span className="text-warm-gray">—</span>
                           )}
@@ -489,6 +524,86 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── Startlist modal ──────────────────────────────────────── */}
+      {startlistModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setStartlistModal(null)}
+        >
+          <div
+            className="bg-cream border border-warm-border w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            style={{ borderRadius: '2px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-warm-border flex items-center justify-between">
+              <div>
+                <p
+                  className="font-condensed uppercase text-warm-gray"
+                  style={{ fontSize: '11px', letterSpacing: '0.1em' }}
+                >
+                  Startliste
+                </p>
+                <h3 className="font-condensed font-bold text-ink text-base uppercase tracking-wide">
+                  {startlistModal.raceName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setStartlistModal(null)}
+                className="font-condensed text-[12px] text-warm-gray hover:text-ink px-3 py-1 border border-warm-border hover:bg-cream-dark"
+                style={{ borderRadius: '2px' }}
+              >
+                Luk
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {startlistLoading ? (
+                <p className="px-5 py-8 text-center font-condensed text-[13px] text-warm-gray uppercase tracking-wide">
+                  Henter startliste...
+                </p>
+              ) : startlistRiders.length === 0 ? (
+                <p className="px-5 py-8 text-center font-body text-[13px] text-warm-gray">
+                  Ingen ryttere fundet.
+                </p>
+              ) : (
+                <table className="w-full font-body text-[13px]">
+                  <thead>
+                    <tr className="font-condensed text-[10px] font-bold text-warm-gray uppercase tracking-wider border-b border-warm-border sticky top-0 bg-cream">
+                      <th className="text-left px-5 py-2">Nr</th>
+                      <th className="text-left px-3 py-2">Navn</th>
+                      <th className="text-left px-3 py-2">Hold</th>
+                      <th className="text-center px-3 py-2">Kat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {startlistRiders.map((rider, i) => (
+                      <tr key={i} className="border-b border-warm-border">
+                        <td className="px-5 py-2 text-warm-gray">
+                          {rider.bib_number ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-ink font-medium">
+                          {rider.last_name} {rider.first_name}
+                        </td>
+                        <td className="px-3 py-2 text-warm-gray">
+                          {rider.team_name}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span
+                            className="font-condensed text-[10px] font-bold uppercase border px-1.5 py-0.5 text-warm-gray border-warm-border"
+                            style={{ borderRadius: '2px' }}
+                          >
+                            {rider.category}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
