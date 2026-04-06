@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { formatDateTime } from '@/lib/dateUtils'
 
 type Props = {
@@ -22,6 +22,15 @@ type Race = {
   start_date: string | null
   year: number
   status: string | null
+  results_uploaded_at: string | null
+}
+
+type Stage = {
+  id: number
+  stage_number: number
+  name: string | null
+  profile: string | null
+  start_date: string | null
   results_uploaded_at: string | null
 }
 
@@ -72,6 +81,9 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
   } | null>(null)
   const [syncLoading, setSyncLoading] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState<Set<number>>(new Set())
+  const [expandedRace, setExpandedRace] = useState<number | null>(null)
+  const [stagesCache, setStagesCache] = useState<Record<number, Stage[]>>({})
+  const [stagesLoading, setStagesLoading] = useState<Set<number>>(new Set())
 
   const authHeader = {
     'Content-Type': 'application/json',
@@ -129,6 +141,32 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
       /* ignore */
     } finally {
       setStatusUpdating((s) => {
+        const n = new Set(s)
+        n.delete(raceId)
+        return n
+      })
+    }
+  }
+
+  async function toggleStages(raceId: number) {
+    if (expandedRace === raceId) {
+      setExpandedRace(null)
+      return
+    }
+    setExpandedRace(raceId)
+    if (stagesCache[raceId]) return
+
+    setStagesLoading((s) => new Set(s).add(raceId))
+    try {
+      const res = await fetch(`/api/admin/cycling/races/${raceId}/stages`, {
+        headers: authHeader,
+      })
+      const data = await res.json()
+      setStagesCache((prev) => ({ ...prev, [raceId]: data.stages ?? [] }))
+    } catch {
+      setStagesCache((prev) => ({ ...prev, [raceId]: [] }))
+    } finally {
+      setStagesLoading((s) => {
         const n = new Set(s)
         n.delete(raceId)
         return n
@@ -266,44 +304,120 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {races.map((race) => (
-                  <tr key={race.id} className="border-b border-warm-border">
-                    <td className="px-3 py-2.5 font-medium text-ink">
-                      {race.name}
-                    </td>
-                    <td className="px-3 py-2.5 text-warm-gray">
-                      {race.race_type === 'stage_race'
-                        ? 'Etapeløb'
-                        : 'Endagsløb'}
-                    </td>
-                    <td className="px-3 py-2.5 text-warm-gray capitalize">
-                      {race.profile}
-                    </td>
-                    <td className="px-3 py-2.5 text-warm-gray">
-                      {race.start_date ?? '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <select
-                        value={race.status ?? 'upcoming'}
-                        onChange={(e) =>
-                          updateRaceStatus(race.id, e.target.value)
-                        }
-                        disabled={statusUpdating.has(race.id)}
-                        className="font-condensed text-[11px] uppercase tracking-wide bg-cream border border-warm-border px-2 py-1 text-ink disabled:opacity-50"
-                        style={{ borderRadius: '2px' }}
-                      >
-                        <option value="upcoming">Upcoming</option>
-                        <option value="active">Active</option>
-                        <option value="finished">Finished</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2.5 text-warm-gray text-[12px]">
-                      {race.results_uploaded_at
-                        ? formatDateTime(race.results_uploaded_at)
-                        : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {races.map((race) => {
+                  const isStageRace = race.race_type === 'stage_race'
+                  const isExpanded = expandedRace === race.id
+                  const stages = stagesCache[race.id]
+                  const isLoadingStages = stagesLoading.has(race.id)
+
+                  return (
+                    <React.Fragment key={race.id}>
+                      <tr className="border-b border-warm-border">
+                        <td className="px-3 py-2.5 font-medium text-ink">
+                          <div className="flex items-center gap-2">
+                            {isStageRace ? (
+                              <button
+                                onClick={() => toggleStages(race.id)}
+                                className="text-warm-gray hover:text-ink transition-colors shrink-0 w-4 text-center"
+                              >
+                                {isExpanded ? '▼' : '▶'}
+                              </button>
+                            ) : (
+                              <span className="w-4" />
+                            )}
+                            {race.name}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-warm-gray">
+                          {isStageRace ? 'Etapeløb' : 'Endagsløb'}
+                        </td>
+                        <td className="px-3 py-2.5 text-warm-gray capitalize">
+                          {race.profile}
+                        </td>
+                        <td className="px-3 py-2.5 text-warm-gray">
+                          {race.start_date ?? '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <select
+                            value={race.status ?? 'upcoming'}
+                            onChange={(e) =>
+                              updateRaceStatus(race.id, e.target.value)
+                            }
+                            disabled={statusUpdating.has(race.id)}
+                            className="font-condensed text-[11px] uppercase tracking-wide bg-cream border border-warm-border px-2 py-1 text-ink disabled:opacity-50"
+                            style={{ borderRadius: '2px' }}
+                          >
+                            <option value="upcoming">Upcoming</option>
+                            <option value="active">Active</option>
+                            <option value="finished">Finished</option>
+                          </select>
+                        </td>
+                        <td className="px-3 py-2.5 text-warm-gray text-[12px]">
+                          {race.results_uploaded_at
+                            ? formatDateTime(race.results_uploaded_at)
+                            : '—'}
+                        </td>
+                      </tr>
+                      {isStageRace && isExpanded && (
+                        <tr>
+                          <td colSpan={6} className="p-0">
+                            <div className="bg-cream-dark border-b border-warm-border">
+                              {isLoadingStages ? (
+                                <p className="px-8 py-3 font-condensed text-[11px] text-warm-gray uppercase tracking-wide">
+                                  Henter etaper...
+                                </p>
+                              ) : !stages || stages.length === 0 ? (
+                                <p className="px-8 py-3 font-body text-[12px] text-warm-gray">
+                                  Ingen etaper registreret.
+                                </p>
+                              ) : (
+                                <table className="w-full font-body text-[12px]">
+                                  <thead>
+                                    <tr className="font-condensed text-[9px] font-bold text-warm-gray uppercase tracking-wider border-b border-warm-border">
+                                      <th className="text-left px-8 py-1.5">Etape</th>
+                                      <th className="text-left px-3 py-1.5">Navn</th>
+                                      <th className="text-left px-3 py-1.5">Profil</th>
+                                      <th className="text-left px-3 py-1.5">Dato</th>
+                                      <th className="text-left px-3 py-1.5">Resultater</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {stages.map((stage) => (
+                                      <tr
+                                        key={stage.id}
+                                        className="border-b border-warm-border/50"
+                                      >
+                                        <td className="px-8 py-1.5 text-ink font-medium">
+                                          {stage.stage_number === 0
+                                            ? 'Prolog'
+                                            : `Etape ${stage.stage_number}`}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-warm-gray">
+                                          {stage.name ?? '—'}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-warm-gray capitalize">
+                                          {stage.profile ?? '—'}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-warm-gray">
+                                          {stage.start_date ?? '—'}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-warm-gray">
+                                          {stage.results_uploaded_at
+                                            ? formatDateTime(stage.results_uploaded_at)
+                                            : '—'}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
