@@ -471,29 +471,60 @@ def _parse_stages(soup: BeautifulSoup, race_slug: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Step 1d: Scrape startlists for upcoming races
+# Step 1d: Scrape startlists for races that need them
 # ---------------------------------------------------------------------------
 
 
-def fetch_upcoming_races(supabase: Client) -> list[dict]:
-    """Fetch races with status=upcoming and start_date within the next 7 days."""
+def fetch_races_needing_startlist(supabase: Client) -> list[dict]:
+    """
+    Fetch races that need a startlist:
+    1. Upcoming races with start_date within the next 7 days
+    2. Active/finished races that have 0 entries in cycling_startlists
+    """
     today = datetime.utcnow().strftime("%Y-%m-%d")
     cutoff = (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d")
 
     try:
+        # All upcoming within 7 days + all active/finished
         resp = (
             supabase.table("cycling_races")
-            .select("id, name, pcs_slug, race_type, year")
-            .eq("status", "upcoming")
-            .gte("start_date", today)
-            .lte("start_date", cutoff)
+            .select("id, name, pcs_slug, race_type, year, status")
+            .in_("status", ["upcoming", "active", "finished"])
             .order("start_date", desc=False)
             .execute()
         )
-        return resp.data or []
+        all_races = resp.data or []
     except APIError as e:
-        _warn(f"Failed to fetch upcoming races: {e}")
+        _warn(f"Failed to fetch races: {e}")
         return []
+
+    if not all_races:
+        return []
+
+    # Get existing startlist counts per race
+    try:
+        resp = supabase.table("cycling_startlists").select("race_id").execute()
+        startlist_race_ids: set[str] = set()
+        for row in resp.data or []:
+            startlist_race_ids.add(row["race_id"])
+    except APIError as e:
+        _warn(f"Failed to fetch startlist counts: {e}")
+        startlist_race_ids = set()
+
+    result: list[dict] = []
+    for race in all_races:
+        has_startlist = race["id"] in startlist_race_ids
+
+        if race["status"] == "upcoming":
+            # Only upcoming within 7 days
+            sd = race.get("start_date") or ""
+            if today <= sd <= cutoff:
+                result.append(race)
+        elif not has_startlist:
+            # Active/finished without any startlist entries
+            result.append(race)
+
+    return result
 
 
 def scrape_startlist(race: dict, client: httpx.Client) -> list[dict]:
@@ -549,13 +580,13 @@ def scrape_startlist(race: dict, client: httpx.Client) -> list[dict]:
 
 
 def scrape_startlists(client: httpx.Client, supabase: Client) -> list[dict]:
-    """Scrape startlists for upcoming races within 7 days."""
-    upcoming = fetch_upcoming_races(supabase)
+    """Scrape startlists for races that need them."""
+    upcoming = fetch_races_needing_startlist(supabase)
     if not upcoming:
-        _log("  No upcoming races within 7 days")
+        _log("  No races need startlist updates")
         return []
 
-    _log(f"  Found {len(upcoming)} upcoming races within 7 days")
+    _log(f"  Found {len(upcoming)} races needing startlists")
     all_startlists: list[dict] = []
 
     for race in upcoming:
