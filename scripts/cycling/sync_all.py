@@ -366,89 +366,105 @@ def scrape_stages(client: httpx.Client) -> list[dict]:
 
     for race in stage_races:
         slug = race["pcs_slug"]
-        url = f"{PCS_BASE}/race/{slug}/{YEAR}/stages"
+        url = f"{PCS_BASE}/race/{slug}/{YEAR}"
         _log(f"  Fetching stages: {slug}")
         soup = pcs_get(url, client)
         time.sleep(REQUEST_DELAY)
 
-        stages = _parse_stages_page(soup, slug)
+        stages = _parse_stages(soup, slug)
         _log(f"    → {len(stages)} stages")
         all_stages.extend(stages)
 
     return all_stages
 
 
-def _parse_stages_page(soup: BeautifulSoup, race_slug: str) -> list[dict]:
+def _parse_stages(soup: BeautifulSoup, race_slug: str) -> list[dict]:
     """
-    Parse PCS stages page. Structure:
-      <tr>
-        <td>Stage 1</td> or <td>Prologue</td>
-        <td>2026-07-04</td>
-        <td><a href="...">Stage name / route</a></td>
-        <td>Profile icon or text</td>
-        <td>Distance</td>
-      </tr>
+    Parse stages from PCS race page using two sources:
+
+    1. Stage links: href="race/{slug}/{year}/stage-{N}" with text like
+       "Stage 1 (TTT) | Barcelona - Barcelona"
+
+    2. Stages table (first <table>): rows with format
+       Date | Day | Stage Name | KM
+       "04/07 | Saturday | Stage 1 (TTT) | Barcelona - Barcelona | 19"
     """
+    # Strategy 1: Parse stage links (reliable for stage number + name)
+    stage_link_re = re.compile(
+        rf"^race/{re.escape(race_slug)}/{YEAR}/(stage-(\d+)|prologue)$"
+    )
+
     stages: list[dict] = []
-    stage_num = 0
+    seen_nums: set[int] = set()
 
-    for tr in soup.find_all("tr"):
-        cells = tr.find_all("td")
-        if len(cells) < 3:
+    for a in soup.find_all("a", href=stage_link_re):
+        m = stage_link_re.match(a["href"])
+        if not m:
             continue
 
-        cell0_text = cells[0].get_text(strip=True).lower()
-
-        # Detect stage rows: "Stage 1", "Prologue", "Stage 21", etc.
-        stage_match = re.search(r"stage\s*(\d+)", cell0_text)
-        is_prologue = "prologue" in cell0_text
-
-        if not stage_match and not is_prologue:
-            continue
-
-        if is_prologue:
+        if m.group(1) == "prologue":
             stage_num = 0
-        elif stage_match:
-            stage_num = int(stage_match.group(1))
+        else:
+            stage_num = int(m.group(2))
 
-        # Date from second cell
-        date_text = cells[1].get_text(strip=True) if len(cells) > 1 else ""
-        stage_date = None
-        date_match = re.search(r"(\d{4}-\d{2}-\d{2})", date_text)
-        if date_match:
-            stage_date = date_match.group(1)
-        elif re.match(r"\d{1,2}/\d{1,2}", date_text):
-            # PCS sometimes uses "04/07" format
-            stage_date = None  # Can't reliably parse without year context
+        if stage_num in seen_nums:
+            continue
+        seen_nums.add(stage_num)
 
-        # Stage name from link or third cell
-        name_cell = cells[2] if len(cells) > 2 else cells[1]
-        link = name_cell.find("a")
-        stage_name = link.get_text(strip=True) if link else name_cell.get_text(strip=True)
-
-        # Profile from profile icon class or text
-        profile = "mixed"
-        for cell in cells:
-            profile_span = cell.find("span", class_=re.compile(r"icon profile"))
-            if profile_span:
-                cls = " ".join(profile_span.get("class", []))
-                if "p5" in cls or "p4" in cls:
-                    profile = "mountain"
-                elif "p3" in cls:
-                    profile = "hilly"
-                elif "p2" in cls:
-                    profile = "mixed"
-                elif "p1" in cls:
-                    profile = "flat"
-                break
+        # Text format: "Stage 1 (TTT) | Barcelona - Barcelona"
+        text = a.get_text(strip=True)
+        # Split on " | " to get stage name/route
+        parts = text.split(" | ", 1)
+        stage_name = parts[1] if len(parts) > 1 else text
 
         stages.append({
             "race_pcs_slug": race_slug,
             "stage_number": stage_num,
-            "date": stage_date,
+            "date": None,
             "name": stage_name,
-            "profile": profile,
+            "profile": "mixed",
         })
+
+    stages.sort(key=lambda s: s["stage_number"])
+
+    # Strategy 2: Enrich with dates from stages table
+    # Table rows: Date | Day | Stage description | KM
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if len(rows) < 2:
+            continue
+
+        # Check if first row header contains "Date" or "KM"
+        header = rows[0].get_text(strip=True).lower()
+        if "date" not in header and "km" not in header:
+            continue
+
+        stage_idx = 0
+        for tr in rows[1:]:
+            cells = tr.find_all("td")
+            if len(cells) < 3:
+                continue
+
+            # First cell is date (DD/MM format)
+            date_text = cells[0].get_text(strip=True)
+            date_match = re.match(r"(\d{1,2})/(\d{1,2})", date_text)
+
+            # Find which stage this row belongs to by looking for stage link
+            stage_link = tr.find("a", href=stage_link_re)
+            if stage_link:
+                m2 = stage_link_re.match(stage_link["href"])
+                if m2:
+                    sn = 0 if m2.group(1) == "prologue" else int(m2.group(2))
+                    # Find matching stage and set date
+                    if date_match:
+                        day = int(date_match.group(1))
+                        month = int(date_match.group(2))
+                        for s in stages:
+                            if s["stage_number"] == sn and s["date"] is None:
+                                s["date"] = f"{YEAR}-{month:02d}-{day:02d}"
+                                break
+
+        break  # Only process first matching table
 
     return stages
 
@@ -569,8 +585,76 @@ def log_sync(supabase: Client, results: dict) -> None:
 
 
 def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description="Full cycling data sync.")
+    parser.add_argument(
+        "--debug-stages",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Fetch a race page (e.g. tour-de-france) and dump stage-related links + raw HTML, then exit",
+    )
+    args = parser.parse_args()
+
     load_dotenv_local()
     os.makedirs(DATA_DIR, exist_ok=True)
+
+    if args.debug_stages:
+        slug = args.debug_stages
+        with httpx.Client(headers=PCS_HEADERS) as client:
+            # Try main race page
+            url = f"{PCS_BASE}/race/{slug}/{YEAR}"
+            _log(f"Fetching: {url}")
+            resp = client.get(url, timeout=30, follow_redirects=True)
+            _log(f"Status: {resp.status_code}")
+            _log(f"Final URL: {resp.url}")
+            _log(f"Content-Length: {len(resp.text)}")
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # All links containing "stage" in href
+            stage_links = soup.find_all("a", href=re.compile(r"stage", re.I))
+            _log(f"\nLinks with 'stage' in href: {len(stage_links)}")
+            seen_hrefs: set[str] = set()
+            for a in stage_links:
+                href = a.get("href", "")
+                if href in seen_hrefs:
+                    continue
+                seen_hrefs.add(href)
+                text = a.get_text(strip=True)[:60]
+                _log(f"  href={href}  text={text}")
+
+            # Also check /stages subpage
+            stages_url = f"{PCS_BASE}/race/{slug}/{YEAR}/stages"
+            _log(f"\nFetching stages subpage: {stages_url}")
+            resp2 = client.get(stages_url, timeout=30, follow_redirects=True)
+            _log(f"Status: {resp2.status_code}")
+            _log(f"Final URL: {resp2.url}")
+
+            soup2 = BeautifulSoup(resp2.text, "html.parser")
+            stage_links2 = soup2.find_all("a", href=re.compile(r"stage", re.I))
+            seen2: set[str] = set()
+            _log(f"Links with 'stage' in href: {len(stage_links2)}")
+            for a in stage_links2:
+                href = a.get("href", "")
+                if href in seen2:
+                    continue
+                seen2.add(href)
+                text = a.get_text(strip=True)[:60]
+                _log(f"  href={href}  text={text}")
+
+            # Table rows
+            tables = soup2.find_all("table")
+            _log(f"\nTables on stages page: {len(tables)}")
+            for i, table in enumerate(tables):
+                rows = table.find_all("tr")
+                _log(f"  Table {i}: {len(rows)} rows")
+                for tr in rows[:3]:
+                    _log(f"    {tr.get_text(' | ', strip=True)[:120]}")
+
+            _log("\n--- Raw HTML main page (first 2000 chars) ---")
+            print(resp.text[:2000])
+        return
 
     _log("=" * 60)
     _log("  CYCLING FULL SYNC")
