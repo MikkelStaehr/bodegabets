@@ -1,49 +1,63 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import NewGameForm from '@/components/NewGameForm'
-import type { Tournament, Season } from '@/types'
+import Link from 'next/link'
 
-export default async function NewGamePage() {
+export default async function ChooseSportPage() {
   const supabase = await createServerSupabaseClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: tournaments }, { data: seasons }] = await Promise.all([
-    supabase
-      .from('tournaments')
-      .select('id, name, logo_url, bold_id, bold_slug, is_cup')
-      .order('name', { ascending: true }),
-    supabase
-      .from('seasons')
-      .select('id, tournament_id, name, bold_phase_id')
-      .order('id', { ascending: false }),
-  ])
-
-  // Build map: tournament_id → latest season (first match since ordered desc)
-  const seasonMap: Record<number, Season> = {}
-  for (const s of seasons ?? []) {
-    const tid = s.tournament_id as number
-    if (!seasonMap[tid]) {
-      seasonMap[tid] = s as Season
-    }
-  }
-
-  // Only include tournaments that have at least one season
-  const tournamentsWithSeason = (tournaments ?? []).filter(
-    (t) => seasonMap[t.id as number]
-  ) as Tournament[]
-
   return (
     <div className="min-h-screen bg-cream">
       <div className="max-w-2xl mx-auto px-4 py-12 pb-24">
-        <p className="font-condensed text-xs uppercase tracking-[0.14em] text-text-warm mb-2">Nyt spilrum</p>
-        <h1 className="font-display text-forest text-5xl font-bold leading-none mb-2">Opret spilrum</h1>
-        <p className="font-body text-text-warm text-base font-light mb-12">
-          Du får en invitationskode du kan dele med vennerne.
+        <p className="font-condensed text-xs uppercase tracking-[0.14em] text-warm-gray mb-2">
+          Nyt spilrum
+        </p>
+        <h1 className="font-display text-forest text-5xl font-bold leading-none mb-2">
+          Vælg sport
+        </h1>
+        <p className="font-body text-warm-gray text-base font-light mb-12">
+          Hvilken sport vil du spille med vennerne?
         </p>
 
-        <NewGameForm tournaments={tournamentsWithSeason} seasonMap={seasonMap} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Fodbold */}
+          <Link
+            href="/games/fodbold/new"
+            className="group border border-warm-border bg-cream hover:bg-cream-dark transition-colors p-6 flex flex-col items-center text-center"
+            style={{ borderRadius: '2px' }}
+          >
+            <span className="text-4xl mb-4">&#9917;</span>
+            <h2 className="font-condensed font-bold text-forest text-lg uppercase tracking-wide mb-2">
+              Fodbold
+            </h2>
+            <p className="font-body text-[13px] text-warm-gray leading-relaxed">
+              Bet på kampe fra Premier League, La Liga, Serie A og meget mere.
+            </p>
+          </Link>
+
+          {/* Cykling */}
+          <Link
+            href="/games/cykling/new"
+            className="group relative border border-warm-border bg-cream hover:bg-cream-dark transition-colors p-6 flex flex-col items-center text-center"
+            style={{ borderRadius: '2px' }}
+          >
+            <span
+              className="absolute top-3 right-3 font-condensed text-[10px] font-bold uppercase tracking-widest text-cream bg-forest px-2 py-0.5"
+              style={{ borderRadius: '2px' }}
+            >
+              Ny
+            </span>
+            <span className="text-4xl mb-4">&#128692;</span>
+            <h2 className="font-condensed font-bold text-forest text-lg uppercase tracking-wide mb-2">
+              Cykling
+            </h2>
+            <p className="font-body text-[13px] text-warm-gray leading-relaxed">
+              Byg dit hold og følg Tour de France, klassikerne og monumenterne.
+            </p>
+          </Link>
+        </div>
       </div>
     </div>
   )
