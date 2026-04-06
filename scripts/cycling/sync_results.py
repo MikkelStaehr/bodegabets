@@ -456,6 +456,15 @@ def sync_startlists(
         if unmatched:
             _log(f"    {unmatched} riders not found in cycling_riders")
 
+        # Update startlist_total on the race
+        try:
+            supabase.table("cycling_races").update(
+                {"startlist_total": len(entries)}
+            ).eq("id", race["id"]).execute()
+            _log(f"    startlist_total={len(entries)}")
+        except APIError as e:
+            _warn(f"    Failed to update startlist_total: {e}")
+
     return total_upserted
 
 
