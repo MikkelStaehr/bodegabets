@@ -210,6 +210,10 @@ export async function scrapeUCIRankings(): Promise<{ upserted: number; errors: s
         break
       }
 
+      if (offset === 0) {
+        console.log(`[scrapeUCIRankings] Response HTML (first 500 chars):\n${html.slice(0, 500)}`)
+      }
+
       const parsed = parseRankingPage(html)
       console.log(`[scrapeUCIRankings] Parsed ${parsed.length} ryttere fra offset ${offset}`)
 
