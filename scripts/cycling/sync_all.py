@@ -647,10 +647,37 @@ def main() -> None:
         metavar="SLUG",
         help="Fetch a race page (e.g. tour-de-france) and dump stage-related links + raw HTML, then exit",
     )
+    parser.add_argument(
+        "--debug-logo",
+        action="store_true",
+        help="Fetch INEOS Grenadiers team page and dump all <img> tags, then exit",
+    )
     args = parser.parse_args()
 
     load_dotenv_local()
     os.makedirs(DATA_DIR, exist_ok=True)
+
+    if args.debug_logo:
+        url = f"{PCS_BASE}/team/ineos-grenadiers-2026"
+        _log(f"Fetching: {url}")
+        with httpx.Client(headers=PCS_HEADERS) as client:
+            resp = client.get(url, timeout=30, follow_redirects=True)
+            _log(f"Status: {resp.status_code}")
+            _log(f"Final URL: {resp.url}")
+            soup = BeautifulSoup(resp.text, "html.parser")
+            imgs = soup.find_all("img")
+            _log(f"\nAll <img> tags: {len(imgs)}\n")
+            for i, img in enumerate(imgs):
+                src = img.get("src", "")
+                alt = img.get("alt", "")
+                cls = " ".join(img.get("class", []))
+                parent_cls = " ".join(img.parent.get("class", [])) if img.parent else ""
+                _log(f"  [{i}] src={src}")
+                _log(f"       alt={alt}")
+                _log(f"       class={cls}")
+                _log(f"       parent_tag={img.parent.name if img.parent else ''} parent_class={parent_cls}")
+                _log("")
+        return
 
     if args.debug_stages:
         slug = args.debug_stages
