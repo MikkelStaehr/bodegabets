@@ -379,7 +379,7 @@ def scrape_startlist(slug: str, year: int, client: httpx.Client) -> list[dict]:
         # or in a <span> before the <a>
         bib = None
         prev = a.previous_sibling
-        if prev and hasattr(prev, 'strip'):
+        if prev and isinstance(prev, str):
             bib_text = prev.strip()
             if bib_text.isdigit():
                 bib = int(bib_text)
