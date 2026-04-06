@@ -576,16 +576,17 @@ app.get('/admin/test-fetch', async (_req, res) => {
     debug.requestBody = requestBody
 
     const apiRes = await fetch(
-      'https://dataride.uci.org/iframe/Competitions/',
+      'https://dataride.uci.ch/iframe/Competitions/',
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json; charset=UTF-8',
+          Accept: 'application/json, text/javascript, */*; q=0.01',
           Authorization: `Bearer ${bearerToken}`,
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          Referer: 'https://dataride.uci.org/iframe/CompetitionResults/10/2026',
-          Origin: 'https://dataride.uci.org',
+          Referer: 'https://dataride.uci.ch/iframe/',
+          Origin: 'https://dataride.uci.ch',
           'X-Requested-With': 'XMLHttpRequest',
         },
         body: requestBody,
