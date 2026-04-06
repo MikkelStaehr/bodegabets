@@ -157,6 +157,44 @@ def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> lis
     return _parse_results_table(soup)
 
 
+def parse_time_to_seconds(text: str) -> int | None:
+    """
+    Parse PCS time gap strings to seconds. Examples:
+      "4:32:10" → 16330
+      "0:03:54" → 234
+      "+0:03:54" → 234
+      "4h 32' 10\"" → 16330
+      ",," or empty → None
+    """
+    if not text:
+        return None
+    text = text.strip().lstrip("+").strip()
+    if not text or text in (",,", "-"):
+        return None
+
+    # Format: H:MM:SS or M:SS
+    m = re.match(r"^(\d+):(\d{1,2}):(\d{2})$", text)
+    if m:
+        return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+
+    # Format: M:SS (no hours)
+    m = re.match(r"^(\d+):(\d{2})$", text)
+    if m:
+        return int(m.group(1)) * 60 + int(m.group(2))
+
+    # Format: Xh YY' ZZ"
+    m = re.match(r"^(\d+)h\s*(\d+)['\u2019]\s*(\d+)", text)
+    if m:
+        return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+
+    # Just seconds
+    m = re.match(r"^(\d+)[\"s]?$", text)
+    if m:
+        return int(m.group(1))
+
+    return None
+
+
 def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
     """
     Parse PCS results page. Structure:
@@ -190,7 +228,7 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
         row = a.find_parent("tr")
         position = len(results) + 1
         team = ""
-        time_gap = ""
+        time_gap_seconds: int | None = None
         dnf = False
 
         if row:
@@ -210,18 +248,25 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
             if team_link:
                 team = team_link.get_text(strip=True)
 
-            # Time gap — usually last meaningful td
+            # Time gap — find last td with time-like content.
+            # Use .string or direct text to avoid doubled text from nested elements.
             if len(cells) >= 4:
-                time_text = cells[-1].get_text(strip=True)
-                if re.search(r"[\d:'+]", time_text):
-                    time_gap = time_text
+                last_td = cells[-1]
+                # Prefer .string (leaf text) to avoid concatenation of child texts
+                raw = last_td.string
+                if raw is None:
+                    # Fallback: join direct text nodes only (skip nested tags' text)
+                    raw = "".join(last_td.find_all(string=True, recursive=False)).strip()
+                else:
+                    raw = raw.strip()
+                time_gap_seconds = parse_time_to_seconds(raw)
 
         results.append({
             "pcs_slug": pcs_slug,
             "name": name,
             "team": team,
             "position": position,
-            "time_gap": time_gap,
+            "time_gap_seconds": time_gap_seconds,
             "dnf": dnf,
         })
 
@@ -432,11 +477,12 @@ def build_rider_index(supabase: Client) -> dict[str, int]:
 def upload_results(
     results: list[dict],
     race_id: int,
-    stage_number: int | None,
+    stage_number: int,
     rider_index: dict[str, int],
     supabase: Client,
 ) -> tuple[int, int]:
-    """Match and upsert results. Returns (upserted, unmatched)."""
+    """Match and upsert results. Returns (upserted, unmatched).
+    stage_number=0 for one-day races and GC classification."""
     rows: list[dict] = []
     unmatched = 0
 
@@ -447,24 +493,22 @@ def upload_results(
             _warn(f"    Unmatched: {r['name']} ({r['pcs_slug']})")
             continue
 
-        row: dict = {
+        rows.append({
             "race_id": race_id,
             "rider_id": rider_id,
+            "stage_number": stage_number,
             "position": r["position"],
-            "time_gap_seconds": r["time_gap"] or None,
+            "time_gap_seconds": r["time_gap_seconds"],
             "dnf": r["dnf"],
-        }
-        if stage_number is not None:
-            row["stage_number"] = stage_number
-
-        rows.append(row)
+        })
 
     if not rows:
         return 0, unmatched
 
     try:
-        conflict = "race_id,rider_id,stage_number" if stage_number is not None else "race_id,rider_id"
-        supabase.table("cycling_results").upsert(rows, on_conflict=conflict).execute()
+        supabase.table("cycling_results").upsert(
+            rows, on_conflict="race_id,rider_id,stage_number"
+        ).execute()
     except APIError as e:
         _warn(f"    Upsert failed: {e}")
         return 0, unmatched
@@ -590,7 +634,7 @@ def main() -> None:
                 _log(f"  Parsed {len(results)} results")
 
                 upserted, unmatched = upload_results(
-                    results, race["id"], None, rider_index, supabase,
+                    results, race["id"], 0, rider_index, supabase,
                 )
                 total_upserted += upserted
                 total_unmatched += unmatched
