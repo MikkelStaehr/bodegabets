@@ -85,11 +85,11 @@ RACES = [
     {"name": "Il Lombardia", "pcs_slug": "il-lombardia", "race_type": "one_day", "profile": "hilly", "year": YEAR, "start_date": "2026-10-10", "end_date": "2026-10-10"},
     # Championships
     {"name": "World Championships", "pcs_slug": "world-championship", "race_type": "one_day", "profile": "mixed", "year": YEAR, "start_date": "2026-09-20", "end_date": "2026-09-20"},
-    {"name": "European Championships", "pcs_slug": "european-championship", "race_type": "one_day", "profile": "mixed", "year": YEAR, "start_date": "2026-09-13", "end_date": "2026-09-13"},
+    {"name": "European Championships", "pcs_slug": "uec-road-european-championships", "race_type": "one_day", "profile": "mixed", "year": YEAR, "start_date": "2026-09-13", "end_date": "2026-09-13"},
     # Classics — cobbled
     {"name": "Omloop Het Nieuwsblad", "pcs_slug": "omloop-het-nieuwsblad", "race_type": "one_day", "profile": "cobbled", "year": YEAR, "start_date": "2026-02-28", "end_date": "2026-02-28"},
     {"name": "Strade Bianche", "pcs_slug": "strade-bianche", "race_type": "one_day", "profile": "mixed", "year": YEAR, "start_date": "2026-03-07", "end_date": "2026-03-07"},
-    {"name": "E3 Classic", "pcs_slug": "e3-saxo-bank-classic", "race_type": "one_day", "profile": "cobbled", "year": YEAR, "start_date": "2026-03-27", "end_date": "2026-03-27"},
+    {"name": "E3 Classic", "pcs_slug": "e3-harelbeke", "race_type": "one_day", "profile": "cobbled", "year": YEAR, "start_date": "2026-03-27", "end_date": "2026-03-27"},
     {"name": "Gent-Wevelgem", "pcs_slug": "gent-wevelgem", "race_type": "one_day", "profile": "cobbled", "year": YEAR, "start_date": "2026-03-29", "end_date": "2026-03-29"},
     {"name": "Dwars door Vlaanderen", "pcs_slug": "dwars-door-vlaanderen", "race_type": "one_day", "profile": "cobbled", "year": YEAR, "start_date": "2026-04-01", "end_date": "2026-04-01"},
     # Classics — hilly/other
