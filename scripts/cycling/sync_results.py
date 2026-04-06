@@ -232,6 +232,132 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Startlist scraping
+# ---------------------------------------------------------------------------
+
+
+def scrape_startlist(slug: str, year: int, client: httpx.Client) -> list[dict]:
+    """
+    Scrape startlist from PCS for a single race.
+
+    PCS startlist URL: /race/{slug}/{year}/startlist
+    Structure: table rows with
+      <td>bib number</td>
+      <td><a href="rider/{slug}">LASTNAME Firstname</a></td>
+    """
+    url = f"{PCS_BASE}/race/{slug}/{year}/startlist"
+    _log(f"    Fetching startlist: {url}")
+    soup = pcs_get(url, client)
+    time.sleep(REQUEST_DELAY)
+
+    rider_re = re.compile(r"^rider/([\w-]+)$")
+    entries: list[dict] = []
+    seen: set[str] = set()
+
+    for a in soup.find_all("a", href=rider_re):
+        m = rider_re.match(a["href"])
+        if not m:
+            continue
+
+        pcs_slug = m.group(1)
+        name_parts = list(a.stripped_strings)
+        if not name_parts:
+            continue
+        if pcs_slug in seen:
+            continue
+        seen.add(pcs_slug)
+
+        # Get bib number from parent row
+        bib = None
+        row = a.find_parent("tr")
+        if row:
+            first_td = row.find("td")
+            if first_td:
+                bib_text = first_td.get_text(strip=True)
+                if bib_text.isdigit():
+                    bib = int(bib_text)
+
+        entries.append({
+            "pcs_slug": pcs_slug,
+            "name": " ".join(name_parts),
+            "bib_number": bib,
+        })
+
+    return entries
+
+
+def sync_startlists(
+    races: list[dict],
+    rider_index: dict[str, int],
+    client: httpx.Client,
+    supabase: Client,
+) -> int:
+    """
+    For each race, check if cycling_startlists has entries.
+    If not, scrape and upsert. Returns total entries upserted.
+    """
+    # Get race IDs that already have startlist entries
+    try:
+        resp = supabase.table("cycling_startlists").select("race_id").execute()
+        has_startlist: set[str] = set()
+        for row in resp.data or []:
+            has_startlist.add(row["race_id"])
+    except APIError as e:
+        _warn(f"Failed to fetch existing startlists: {e}")
+        has_startlist = set()
+
+    total_upserted = 0
+
+    for race in races:
+        if race["id"] in has_startlist:
+            continue
+
+        _log(f"  Scraping startlist for {race['name']}...")
+        entries = scrape_startlist(race["pcs_slug"], YEAR, client)
+
+        if not entries:
+            _log(f"    No startlist available")
+            continue
+
+        save_json(
+            os.path.join(DATA_DIR, f"startlist_{race['pcs_slug']}.json"),
+            entries,
+        )
+
+        # Match and build upsert rows
+        now = datetime.utcnow().isoformat()
+        rows: list[dict] = []
+        unmatched = 0
+        for entry in entries:
+            rider_id = rider_index.get(entry["pcs_slug"])
+            if not rider_id:
+                unmatched += 1
+                continue
+            rows.append({
+                "race_id": race["id"],
+                "rider_id": rider_id,
+                "bib_number": entry["bib_number"],
+                "confirmed": True,
+                "updated_at": now,
+            })
+
+        if rows:
+            try:
+                supabase.table("cycling_startlists").upsert(
+                    rows, on_conflict="race_id,rider_id"
+                ).execute()
+                total_upserted += len(rows)
+                _log(f"    → {len(rows)} entries upserted")
+            except APIError as e:
+                _warn(f"    Startlist upsert failed: {e}")
+
+        if unmatched:
+            _log(f"    {unmatched} riders not found in cycling_riders")
+
+    return total_upserted
+
+
+# ---------------------------------------------------------------------------
 # Step 2: Match & upload
 # ---------------------------------------------------------------------------
 
@@ -297,16 +423,16 @@ def update_results_timestamp(supabase: Client, table: str, record_id: int) -> No
         pass
 
 
-def log_sync(supabase: Client, total_upserted: int, total_unmatched: int, errors: list[str]) -> None:
+def log_sync(supabase: Client, total_upserted: int, total_unmatched: int, total_startlists: int, errors: list[str]) -> None:
     status = "success" if not errors else "error"
-    message = f"upserted={total_upserted}, unmatched={total_unmatched}"
+    message = f"startlists={total_startlists}, results={total_upserted}, unmatched={total_unmatched}"
     if errors:
         message += f" | {len(errors)} error(s)"
 
     try:
         supabase.table("cycling_sync_log").insert({
             "sync_type": "results_sync",
-            "records_affected": total_upserted,
+            "records_affected": total_upserted + total_startlists,
             "status": status,
             "message": message,
         }).execute()
@@ -374,7 +500,14 @@ def main() -> None:
         except APIError as e:
             _warn(f"Failed to fetch stages: {e}")
 
-    # Step 1 + 2: Scrape and upload per race
+    # ── Startlists: scrape for races missing them ──────────────
+    _log("\n→ Syncing startlists for races without entries...")
+    with httpx.Client(headers=PCS_HEADERS) as client:
+        total_startlists = sync_startlists(races, rider_index, client, supabase)
+    _log(f"  Startlist entries upserted: {total_startlists}")
+
+    # ── Results: scrape and upload per race ───────────────────
+    _log("\n→ Syncing results...")
     total_upserted = 0
     total_unmatched = 0
     errors: list[str] = []
@@ -436,18 +569,20 @@ def main() -> None:
                     update_results_timestamp(supabase, "cycling_stages", stage["id"])
 
     # Log
-    log_sync(supabase, total_upserted, total_unmatched, errors)
+    log_sync(supabase, total_upserted, total_unmatched, total_startlists, errors)
 
     # Summary
     _log("\n" + "=" * 60)
     _log("  RESULTS SYNC COMPLETE")
     _log("=" * 60)
-    _log(f"  Total upserted: {total_upserted}")
-    _log(f"  Total unmatched: {total_unmatched}")
+    _log(f"  Startlists:     {total_startlists}")
+    _log(f"  Results:        {total_upserted}")
+    _log(f"  Unmatched:      {total_unmatched}")
 
     result = {
         "ok": True,
-        "total_upserted": total_upserted,
+        "startlists_upserted": total_startlists,
+        "results_upserted": total_upserted,
         "total_unmatched": total_unmatched,
     }
     print(json.dumps(result, ensure_ascii=False))

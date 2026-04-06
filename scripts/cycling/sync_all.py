@@ -10,7 +10,6 @@ Step 1 — Scrape & generate data:
     a) WorldTour team rosters + UCI rankings → data/riders.json
     b) Hardcoded 29 races → data/races.json
     c) For each stage_race: scrape stage list from PCS → data/stages.json
-    d) For upcoming races (within 7 days): scrape startlists → data/startlist_{slug}.json
 
 Step 2 — Upload to Supabase:
     a) cycling_riders on pcs_slug
@@ -28,7 +27,7 @@ import re
 import json
 import time
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import httpx
 from bs4 import BeautifulSoup
@@ -471,143 +470,6 @@ def _parse_stages(soup: BeautifulSoup, race_slug: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Step 1d: Scrape startlists for races that need them
-# ---------------------------------------------------------------------------
-
-
-def fetch_races_needing_startlist(supabase: Client) -> list[dict]:
-    """
-    Fetch races that need a startlist:
-    1. Upcoming races with start_date within the next 7 days
-    2. Active/finished races that have 0 entries in cycling_startlists
-    """
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    cutoff = (datetime.utcnow() + timedelta(days=7)).strftime("%Y-%m-%d")
-
-    try:
-        # All upcoming within 7 days + all active/finished
-        resp = (
-            supabase.table("cycling_races")
-            .select("id, name, pcs_slug, race_type, year, status")
-            .in_("status", ["upcoming", "active", "finished"])
-            .order("start_date", desc=False)
-            .execute()
-        )
-        all_races = resp.data or []
-    except APIError as e:
-        _warn(f"Failed to fetch races: {e}")
-        return []
-
-    if not all_races:
-        return []
-
-    # Get existing startlist counts per race
-    try:
-        resp = supabase.table("cycling_startlists").select("race_id").execute()
-        startlist_race_ids: set[str] = set()
-        for row in resp.data or []:
-            startlist_race_ids.add(row["race_id"])
-    except APIError as e:
-        _warn(f"Failed to fetch startlist counts: {e}")
-        startlist_race_ids = set()
-
-    result: list[dict] = []
-    for race in all_races:
-        has_startlist = race["id"] in startlist_race_ids
-
-        if race["status"] == "upcoming":
-            # Only upcoming within 7 days
-            sd = race.get("start_date") or ""
-            if today <= sd <= cutoff:
-                result.append(race)
-        elif not has_startlist:
-            # Active/finished without any startlist entries
-            result.append(race)
-
-    return result
-
-
-def scrape_startlist(race: dict, client: httpx.Client) -> list[dict]:
-    """
-    Scrape startlist from PCS for a single race.
-
-    PCS startlist URL: /race/{slug}/{year}/startlist
-    Structure: table rows with
-      <td>bib number</td>
-      <td><a href="rider/{slug}">LASTNAME Firstname</a></td>
-    """
-    slug = race["pcs_slug"]
-    year = race.get("year", YEAR)
-    url = f"{PCS_BASE}/race/{slug}/{year}/startlist"
-    _log(f"    Fetching: {url}")
-    soup = pcs_get(url, client)
-    time.sleep(REQUEST_DELAY)
-
-    rider_re = re.compile(r"^rider/([\w-]+)$")
-    entries: list[dict] = []
-    seen: set[str] = set()
-
-    for a in soup.find_all("a", href=rider_re):
-        m = rider_re.match(a["href"])
-        if not m:
-            continue
-
-        pcs_slug = m.group(1)
-        name_parts = list(a.stripped_strings)
-        if not name_parts:
-            continue
-        if pcs_slug in seen:
-            continue
-        seen.add(pcs_slug)
-
-        # Get bib number from parent row
-        bib = None
-        row = a.find_parent("tr")
-        if row:
-            first_td = row.find("td")
-            if first_td:
-                bib_text = first_td.get_text(strip=True)
-                if bib_text.isdigit():
-                    bib = int(bib_text)
-
-        entries.append({
-            "pcs_slug": pcs_slug,
-            "name": " ".join(name_parts),
-            "bib_number": bib,
-        })
-
-    return entries
-
-
-def scrape_startlists(client: httpx.Client, supabase: Client) -> list[dict]:
-    """Scrape startlists for races that need them."""
-    upcoming = fetch_races_needing_startlist(supabase)
-    if not upcoming:
-        _log("  No races need startlist updates")
-        return []
-
-    _log(f"  Found {len(upcoming)} races needing startlists")
-    all_startlists: list[dict] = []
-
-    for race in upcoming:
-        _log(f"  [{race['name']}]")
-        entries = scrape_startlist(race, client)
-        _log(f"    → {len(entries)} riders")
-
-        if entries:
-            filename = f"startlist_{race['pcs_slug']}.json"
-            save_json(os.path.join(DATA_DIR, filename), entries)
-
-        for entry in entries:
-            entry["race_id"] = race["id"]
-            entry["race_pcs_slug"] = race["pcs_slug"]
-
-        all_startlists.extend(entries)
-
-    return all_startlists
-
-
-# ---------------------------------------------------------------------------
 # Step 2: Upload to Supabase
 # ---------------------------------------------------------------------------
 
@@ -632,7 +494,6 @@ def upload_all(
     riders: list[dict],
     races: list[dict],
     stages: list[dict],
-    startlists: list[dict],
     supabase: Client,
 ) -> dict:
     results: dict = {"errors": []}
@@ -680,40 +541,6 @@ def upload_all(
     else:
         results["stages_upserted"] = 0
 
-    # Startlists — need rider_id from DB
-    if startlists:
-        _log("  Resolving rider IDs for startlists...")
-        rider_slug_to_id = _resolve_rider_ids(supabase)
-        now = datetime.utcnow().isoformat()
-
-        startlist_rows = []
-        unmatched = 0
-        for entry in startlists:
-            rider_id = rider_slug_to_id.get(entry["pcs_slug"])
-            if not rider_id:
-                unmatched += 1
-                continue
-            startlist_rows.append({
-                "race_id": entry["race_id"],
-                "rider_id": rider_id,
-                "bib_number": entry["bib_number"],
-                "confirmed": True,
-                "updated_at": now,
-            })
-
-        if unmatched:
-            _log(f"  {unmatched} startlist riders not found in cycling_riders")
-
-        _log(f"  Upserting {len(startlist_rows)} startlist entries...")
-        count, errs = upsert_batch(
-            supabase, "cycling_startlists", startlist_rows, "race_id,rider_id"
-        )
-        results["startlists_upserted"] = count
-        results["errors"].extend(errs)
-        _log(f"  → {count} startlist entries")
-    else:
-        results["startlists_upserted"] = 0
-
     return results
 
 
@@ -726,28 +553,17 @@ def _resolve_race_ids(supabase: Client) -> dict[str, str]:
         return {}
 
 
-def _resolve_rider_ids(supabase: Client) -> dict[str, str]:
-    try:
-        resp = supabase.table("cycling_riders").select("id, pcs_slug").execute()
-        return {r["pcs_slug"]: r["id"] for r in (resp.data or [])}
-    except APIError as e:
-        _warn(f"Failed to resolve rider IDs: {e}")
-        return {}
-
-
 def log_sync(supabase: Client, results: dict) -> None:
     total = (
         results.get("riders_upserted", 0)
         + results.get("races_upserted", 0)
         + results.get("stages_upserted", 0)
-        + results.get("startlists_upserted", 0)
     )
     status = "success" if not results["errors"] else "error"
     message = (
         f"riders={results.get('riders_upserted', 0)}, "
         f"races={results.get('races_upserted', 0)}, "
-        f"stages={results.get('stages_upserted', 0)}, "
-        f"startlists={results.get('startlists_upserted', 0)}"
+        f"stages={results.get('stages_upserted', 0)}"
     )
     if results["errors"]:
         message += f" | {len(results['errors'])} error(s)"
@@ -872,13 +688,7 @@ def main() -> None:
     service_key = require_env("SUPABASE_SERVICE_ROLE_KEY")
     supabase = create_client(supabase_url, service_key)
 
-    # 1d. Startlists (needs Supabase to find upcoming races, so runs after connection)
-    _log("\n─ 1d. Startlists ─")
-    with httpx.Client(headers=PCS_HEADERS) as client:
-        startlists = scrape_startlists(client, supabase)
-    _log(f"  Total startlist entries: {len(startlists)}")
-
-    results = upload_all(riders, races, stages, startlists, supabase)
+    results = upload_all(riders, races, stages, supabase)
 
     # Log
     log_sync(supabase, results)
@@ -887,10 +697,9 @@ def main() -> None:
     _log("\n" + "=" * 60)
     _log("  SYNC COMPLETE")
     _log("=" * 60)
-    _log(f"  Riders:     {results['riders_upserted']}")
-    _log(f"  Races:      {results['races_upserted']}")
-    _log(f"  Stages:     {results['stages_upserted']}")
-    _log(f"  Startlists: {results['startlists_upserted']}")
+    _log(f"  Riders: {results['riders_upserted']}")
+    _log(f"  Races:  {results['races_upserted']}")
+    _log(f"  Stages: {results['stages_upserted']}")
 
     if results["errors"]:
         _warn(f"\n  {len(results['errors'])} error(s):")
