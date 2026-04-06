@@ -548,7 +548,6 @@ app.get('/admin/test-fetch', async (_req, res) => {
       return
     }
 
-    // Decode and parse each component's props
     const decode = (s: string) =>
       s
         .replace(/&quot;/g, '"')
@@ -557,48 +556,21 @@ app.get('/admin/test-fetch', async (_req, res) => {
         .replace(/&gt;/g, '>')
         .replace(/&#39;/g, "'")
 
-    // Look for races/competitions in all components
-    type Race = { name: string; dates: string; detailsLink: string }
-    const races: Race[] = []
-    const allProps: Record<string, unknown> = {}
-
-    for (const m of allComponents) {
-      const componentName = m[1]
+    // Find HubsModule and return its full props
+    const hubsMatch = allComponents.find((m) => m[1] === 'HubsModule')
+    let hubsProps: unknown = null
+    if (hubsMatch) {
       try {
-        const props = JSON.parse(decode(m[2]))
-        allProps[componentName] = Object.keys(props)
-
-        // Search for race entries recursively
-        const search = (obj: unknown, depth = 0): void => {
-          if (depth > 5 || !obj || typeof obj !== 'object') return
-          if (Array.isArray(obj)) {
-            for (const item of obj) search(item, depth + 1)
-            return
-          }
-          const rec = obj as Record<string, unknown>
-          // Check if this object has a detailsLink with competition-details URL
-          const detailsLink = rec.detailsLink as Record<string, string> | undefined
-          if (detailsLink?.url?.includes('/competition-details/')) {
-            races.push({
-              name: (rec.name as string) ?? (detailsLink.title as string) ?? '?',
-              dates: (rec.dates as string) ?? '',
-              detailsLink: detailsLink.url,
-            })
-          }
-          for (const v of Object.values(rec)) search(v, depth + 1)
-        }
-        search(props)
+        hubsProps = JSON.parse(decode(hubsMatch[2]))
       } catch {
-        allProps[componentName] = 'parse-error'
+        hubsProps = 'parse-error'
       }
     }
 
     res.json({
       ok: true,
       debug,
-      componentProps: allProps,
-      racesFound: races.length,
-      races: races.slice(0, 20),
+      hubsProps,
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
