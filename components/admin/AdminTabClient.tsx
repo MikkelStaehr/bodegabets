@@ -10,6 +10,7 @@ import { AdminUsersTab } from './tabs/AdminUsersTab'
 import { AdminLogsTab } from './tabs/AdminLogsTab'
 import { LiveTestTab } from './tabs/LiveTestTab'
 import { AdminChampionshipTab } from './tabs/AdminChampionshipTab'
+import { AdminCyclingOverviewTab } from './tabs/cycling/AdminCyclingOverviewTab'
 
 const SPORTS = [
   { id: 'football', label: 'Fodbold', icon: '⚽' },
@@ -126,11 +127,7 @@ export default function AdminTabClient({
       {validSport === 'cycling' && (
         <>
           {validTab === 'cycling-overview' && (
-            <div className="rounded-sm border border-warm-border bg-cream-dark p-8 text-center">
-              <p className="font-condensed text-[13px] font-semibold uppercase tracking-[0.08em] text-warm-gray">
-                Cykling overblik kommer snart
-              </p>
-            </div>
+            <AdminCyclingOverviewTab adminSecret={adminSecret} />
           )}
         </>
       )}
