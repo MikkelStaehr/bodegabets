@@ -30,8 +30,10 @@ import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
+import { scrapeUCIRankings } from './scrapeUCIRankings'
 
 const app = express()
+app.use(express.json())
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
 
 // ─── Supabase admin client ──────────────────────────────────────────────────
@@ -511,6 +513,33 @@ app.get('/send-reminders', async (_req, res) => {
     res.json({ ok: true, sent: totalSent, failed: totalFailed })
   } catch (err) {
     console.error('[send-reminders]', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
+// ─── POST /admin/sync-cycling-riders ────────────────────────────────────────
+
+app.post('/admin/sync-cycling-riders', async (_req, res) => {
+  try {
+    const result = await scrapeUCIRankings()
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cron_sync',
+      status: result.errors.length === 0 ? 'success' : 'warning',
+      message: `sync-cycling-riders: ${result.upserted} upserted`,
+      metadata: result,
+    })
+
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[sync-cycling-riders]', err)
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cron_sync',
+      status: 'error',
+      message: `sync-cycling-riders: ${String(err)}`,
+    })
+
     res.status(500).json({ error: String(err) })
   }
 })
