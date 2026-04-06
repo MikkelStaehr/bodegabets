@@ -286,12 +286,9 @@ def scrape_rankings_index(client: httpx.Client) -> dict[str, int]:
                 index[pcs_slug] = int(pos_text)
                 page_count += 1
 
+        _log(f"    Indexed {page_count} new riders (total: {len(index)})")
+
         if page_count == 0:
-            break
-
-        _log(f"    Indexed {page_count} riders (total: {len(index)})")
-
-        if page_count < 100:
             break
 
         offset += 100
@@ -325,6 +322,17 @@ def scrape_all_riders() -> list[dict]:
             all_riders.extend(team_riders)
 
         _log(f"  Total riders from team pages: {len(all_riders)}")
+
+        # 1b-dedup. Deduplicate on pcs_slug — keep last occurrence (most recent team)
+        seen: dict[str, int] = {}
+        for i, rider in enumerate(all_riders):
+            seen[rider["pcs_slug"]] = i
+        unique_indices = sorted(seen.values())
+        dupes = len(all_riders) - len(unique_indices)
+        if dupes > 0:
+            _log(f"  Removed {dupes} duplicate riders (kept last team occurrence)")
+        all_riders = [all_riders[i] for i in unique_indices]
+        _log(f"  Unique riders: {len(all_riders)}")
 
         # 1c. Scrape rankings index
         _log("  Building UCI rankings index...")
