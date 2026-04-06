@@ -35,6 +35,7 @@ interface CalendarSliderProps {
   betsCount: number
   activeRoundId: number | null
   activeBlockId?: number | null
+  sportColor?: string
 }
 
 const DAY_NAMES_DA = ['søn', 'man', 'tir', 'ons', 'tor', 'fre', 'lør']
@@ -59,6 +60,7 @@ export default function CalendarSlider({
   betsCount,
   activeRoundId,
   activeBlockId,
+  sportColor = '#2C4A3E',
 }: CalendarSliderProps) {
   const matchesByDate = useMemo(() => {
     const map = new Map<string, CalendarMatch[]>()
@@ -200,7 +202,7 @@ export default function CalendarSlider({
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 15,
               fontWeight: 600,
-              color: '#2C4A3E',
+              color: sportColor,
             }}
           >
             {MONTH_NAMES_DA[viewMonth.month]} {viewMonth.year}
@@ -219,7 +221,7 @@ export default function CalendarSlider({
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 14,
-                color: '#2C4A3E',
+                color: sportColor,
               }}
             >
               ‹
@@ -237,7 +239,7 @@ export default function CalendarSlider({
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 14,
-                color: '#2C4A3E',
+                color: sportColor,
               }}
             >
               ›
@@ -259,7 +261,7 @@ export default function CalendarSlider({
                 ? '#e53935'
                 : day.isPast
                   ? '#C0B8B0'
-                  : '#2C4A3E'
+                  : sportColor
 
             const elements = []
 
@@ -314,7 +316,7 @@ export default function CalendarSlider({
                   border: 'none',
                   borderTop: isActiveBlock && !isSelected ? '2px solid #C8B89A' : '2px solid transparent',
                   cursor: 'pointer',
-                  background: isSelected ? '#2C4A3E' : 'transparent',
+                  background: isSelected ? sportColor : 'transparent',
                   transition: 'background 0.15s',
                   flexShrink: 0,
                 }}

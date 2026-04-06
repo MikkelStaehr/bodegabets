@@ -13,6 +13,14 @@ import type { Game, Round, RoundScore } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
+// Sport-specific color theme
+function getSportTheme(sport: string) {
+  if (sport === 'cycling') {
+    return { primary: '#1E3A5F', primaryLight: '#2B4F7A', accent: '#4A6FA5' }
+  }
+  return { primary: '#2C4A3E', primaryLight: '#3D6B5A', accent: '#2C4A3E' }
+}
+
 type Props = {
   params: Promise<{ id: string }>
 }
@@ -248,6 +256,7 @@ export default async function GamePage({ params }: Props) {
   }
 
   const typedGame = game as Game
+  const theme = getSportTheme(typedGame.sport)
   const members = (rawMembers ?? []) as unknown as MemberRow[]
   const typedRounds = (rounds ?? []) as Round[]
 
@@ -576,7 +585,7 @@ export default async function GamePage({ params }: Props) {
       <GameTicker items={tickerItems} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      <div style={{ background: typedGame.sport === 'cycling' ? '#1E3A5F' : '#2C4A3E', color: '#F2EDE4', padding: '24px 20px 28px' }}>
+      <div style={{ background: theme.primary, color: '#F2EDE4', padding: '24px 20px 28px' }}>
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
 
           {/* Top: navn + invite-kode */}
@@ -632,6 +641,7 @@ export default async function GamePage({ params }: Props) {
             betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
             activeRoundId={activeRound?.id ?? null}
             activeBlockId={activeBlock?.id ?? null}
+            sportColor={theme.primary}
           />
           <ActiveRoundLiveTicker />
         </section>
@@ -662,14 +672,14 @@ export default async function GamePage({ params }: Props) {
                       borderBottom: idx < Math.min(blockLeaderboardRows.length, 5) - 1 ? '1px solid #E8E0D3' : 'none',
                       gap: 8,
                       alignItems: 'center',
-                      background: isMe ? 'rgba(44,74,62,0.05)' : undefined,
+                      background: isMe ? `${theme.primary}0D` : undefined,
                     }}
                   >
                     <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 700, textAlign: 'center', color: entry.rank <= 3 ? '#B8963E' : '#6b6b6b' }}>
                       {entry.rank}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: isMe ? '#3D6B5A' : '#2C4A3E', color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: isMe ? theme.primaryLight : theme.primary, color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {entry.username.slice(0, 2).toUpperCase()}
                       </div>
                       <span style={{ fontSize: 13, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -731,8 +741,8 @@ export default async function GamePage({ params }: Props) {
                     borderBottom: idx < leaderboardRows.length - 1 ? '1px solid #E8E0D3' : 'none',
                     gap: 8,
                     alignItems: 'center',
-                    background: isMe ? 'rgba(44,74,62,0.05)' : undefined,
-                    borderLeft: (isTop3 && leaderboardRows.length > 3) ? '3px solid #2C4A3E' : (isLast && leaderboardRows.length > 1) ? '3px solid #8B2E2E' : '3px solid transparent',
+                    background: isMe ? `${theme.primary}0D` : undefined,
+                    borderLeft: (isTop3 && leaderboardRows.length > 3) ? `3px solid ${theme.primary}` : (isLast && leaderboardRows.length > 1) ? '3px solid #8B2E2E' : '3px solid transparent',
                   }}
                 >
                   {/* Rank */}
@@ -742,7 +752,7 @@ export default async function GamePage({ params }: Props) {
 
                   {/* Spiller */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: isMe ? '#3D6B5A' : '#2C4A3E', color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: isMe ? theme.primaryLight : theme.primary, color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {entry.username.slice(0, 2).toUpperCase()}
                     </div>
                     <div style={{ minWidth: 0 }}>
@@ -775,7 +785,7 @@ export default async function GamePage({ params }: Props) {
                           width: 14,
                           height: 14,
                           borderRadius: 2,
-                          background: f === 'W' ? '#2C4A3E' : f === 'L' ? '#8B2E2E' : '#E8E0D3',
+                          background: f === 'W' ? theme.primary : f === 'L' ? '#8B2E2E' : '#E8E0D3',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -796,7 +806,7 @@ export default async function GamePage({ params }: Props) {
                       {entry.earnings.toLocaleString('da-DK')}
                     </div>
                     {entry.lastRoundPoints !== null && (
-                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600, color: entry.lastRoundPoints > 0 ? '#2C4A3E' : '#8B2E2E', lineHeight: 1, marginTop: 2 }}>
+                      <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600, color: entry.lastRoundPoints > 0 ? theme.primary : '#8B2E2E', lineHeight: 1, marginTop: 2 }}>
                         {entry.lastRoundPoints > 0 ? `+${entry.lastRoundPoints}` : `${entry.lastRoundPoints}`}
                       </div>
                     )}
@@ -819,7 +829,7 @@ export default async function GamePage({ params }: Props) {
             ))}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#6b6b6b', fontWeight: 300 }}>
               <div style={{ display: 'flex', gap: 3 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 2, background: '#2C4A3E' }} />
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: theme.primary }} />
                 <div style={{ width: 10, height: 10, borderRadius: 2, background: '#8B2E2E' }} />
                 <div style={{ width: 10, height: 10, borderRadius: 2, background: '#E8E0D3' }} />
               </div>
