@@ -340,23 +340,28 @@ def auto_update_race_statuses(supabase: Client) -> int:
 
 def scrape_startlist(slug: str, year: int, client: httpx.Client) -> list[dict]:
     """
-    Scrape startlist from PCS for a single race.
+    Scrape startlist from PCS for a single race (men elite only).
 
     PCS startlist URL: /race/{slug}/{year}/startlist
-    Structure: table rows with
-      <td>bib number</td>
-      <td><a href="rider/{slug}">LASTNAME Firstname</a></td>
+    The men's roster is inside <ul class="startlist_v4">.
+    Each <li> is a team with rider links and bib numbers embedded in text.
     """
     url = f"{PCS_BASE}/race/{slug}/{year}/startlist"
     _log(f"    Fetching startlist: {url}")
     soup = pcs_get(url, client)
     time.sleep(REQUEST_DELAY)
 
+    # Only parse riders from startlist_v4 (men elite roster)
+    startlist_ul = soup.find("ul", class_="startlist_v4")
+    if not startlist_ul:
+        _warn(f"    No <ul class='startlist_v4'> found, falling back to full page")
+        startlist_ul = soup
+
     rider_re = re.compile(r"^rider/([\w-]+)$")
     entries: list[dict] = []
     seen: set[str] = set()
 
-    for a in soup.find_all("a", href=rider_re):
+    for a in startlist_ul.find_all("a", href=rider_re):
         m = rider_re.match(a["href"])
         if not m:
             continue
@@ -369,15 +374,15 @@ def scrape_startlist(slug: str, year: int, client: httpx.Client) -> list[dict]:
             continue
         seen.add(pcs_slug)
 
-        # Get bib number from parent row
+        # Bib number: the text node immediately before the rider name link
+        # PCS format inside <li>: "1POGAČAR Tadej" where "1" is a text node
+        # or in a <span> before the <a>
         bib = None
-        row = a.find_parent("tr")
-        if row:
-            first_td = row.find("td")
-            if first_td:
-                bib_text = first_td.get_text(strip=True)
-                if bib_text.isdigit():
-                    bib = int(bib_text)
+        prev = a.previous_sibling
+        if prev and hasattr(prev, 'strip'):
+            bib_text = prev.strip()
+            if bib_text.isdigit():
+                bib = int(bib_text)
 
         entries.append({
             "pcs_slug": pcs_slug,
@@ -556,8 +561,58 @@ def log_sync(supabase: Client, total_upserted: int, total_unmatched: int, total_
 
 
 def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description="Cycling results sync.")
+    parser.add_argument(
+        "--debug-startlist",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Fetch a startlist page and dump HTML structure, then exit",
+    )
+    args = parser.parse_args()
+
     load_dotenv_local()
     os.makedirs(DATA_DIR, exist_ok=True)
+
+    if args.debug_startlist:
+        slug = args.debug_startlist
+        url = f"{PCS_BASE}/race/{slug}/{YEAR}/startlist"
+        with httpx.Client(headers=PCS_HEADERS) as client:
+            _log(f"Fetching: {url}")
+            resp = client.get(url, timeout=30, follow_redirects=True)
+            _log(f"Status: {resp.status_code}")
+            _log(f"Content-Length: {len(resp.text)}")
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Find all headings and section markers
+            for tag in soup.find_all(["h1", "h2", "h3", "h4", "div", "span"], class_=True):
+                text = tag.get_text(strip=True)
+                cls = " ".join(tag.get("class", []))
+                if text and len(text) < 80 and any(kw in text.lower() for kw in ["men", "women", "elite", "u23", "junior", "startlist"]):
+                    _log(f"  <{tag.name} class=\"{cls}\"> {text}")
+
+            # Count rider links per section
+            rider_re = re.compile(r"^rider/([\w-]+)$")
+            all_riders = soup.find_all("a", href=rider_re)
+            seen = set()
+            for a in all_riders:
+                m = rider_re.match(a["href"])
+                if m and a.get_text(strip=True):
+                    seen.add(m.group(1))
+            _log(f"\nTotal unique rider links with text: {len(seen)}")
+
+            # Look for ul.startlist_v4 or similar list containers
+            for ul in soup.find_all("ul", class_=True):
+                cls = " ".join(ul.get("class", []))
+                rider_count = len(ul.find_all("a", href=rider_re))
+                if rider_count > 5:
+                    _log(f"  <ul class=\"{cls}\">: {rider_count} rider links")
+
+            _log("\n--- Raw HTML (first 3000 chars) ---")
+            print(resp.text[:3000])
+        return
 
     _log("=" * 60)
     _log("  CYCLING RESULTS SYNC")
