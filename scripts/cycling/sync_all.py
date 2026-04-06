@@ -526,7 +526,7 @@ def upload_all(
             stage_rows.append({
                 "race_id": race_id,
                 "stage_number": s["stage_number"],
-                "date": s["date"],
+                "start_date": s["date"],
                 "name": s["name"],
                 "profile": s["profile"],
             })
