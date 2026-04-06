@@ -451,7 +451,7 @@ def upload_results(
             "race_id": race_id,
             "rider_id": rider_id,
             "position": r["position"],
-            "time_gap": r["time_gap"] or None,
+            "time_gap_seconds": r["time_gap"] or None,
             "dnf": r["dnf"],
         }
         if stage_number is not None:
