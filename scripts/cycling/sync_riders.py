@@ -1,5 +1,5 @@
 """
-sync_riders.py — Scrape UCI road rankings from PCS and store in cycling_riders.
+sync_riders.py — Scrape UCI WorldTour team rosters from PCS and store in cycling_riders.
 
 Usage:
     python scripts/cycling/sync_riders.py                # scrape + upload
@@ -7,8 +7,11 @@ Usage:
     python scripts/cycling/sync_riders.py --upload-only  # only read JSON and upsert
 
 Flow:
-    Step 1: Scrape https://www.procyclingstats.com/rankings/me/individual
-            Parse rider name, team, ranking. Assign category by ranking bracket.
+    Step 1: Scrape WorldTour teams from
+            https://www.procyclingstats.com/teams.php?year=2026&circuit=1
+            For each team, fetch the team page and parse all riders (name, pcs_slug).
+            Then scrape the individual rankings page to look up UCI ranking for each rider.
+            Assign category based on ranking: 1-24→1, 25-49→2, 50-99→3, 100-199→4, 200+→5.
             Save to data/riders.json.
     Step 2: Read data/riders.json and upsert to cycling_riders in Supabase on pcs_slug.
 
@@ -33,6 +36,7 @@ from postgrest.exceptions import APIError
 # ---------------------------------------------------------------------------
 
 PCS_BASE = "https://www.procyclingstats.com"
+TEAMS_URL = f"{PCS_BASE}/teams.php?year=2026&circuit=1"
 RANKINGS_URL = f"{PCS_BASE}/rankings/me/individual"
 
 PCS_HEADERS = {
@@ -93,6 +97,31 @@ def _log(msg: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# PCS fetch helper
+# ---------------------------------------------------------------------------
+
+
+def pcs_get(url: str, client: httpx.Client, retries: int = 2) -> BeautifulSoup:
+    """Fetch a PCS URL and return a BeautifulSoup object, with retry on 5xx."""
+    for attempt in range(retries + 1):
+        try:
+            resp = client.get(url, timeout=30, follow_redirects=True)
+            if resp.status_code == 404:
+                return BeautifulSoup("", "html.parser")
+            resp.raise_for_status()
+            return BeautifulSoup(resp.text, "html.parser")
+        except httpx.HTTPStatusError as e:
+            if attempt < retries and e.response.status_code >= 500:
+                _warn(f"HTTP {e.response.status_code} for {url} — retrying in 3s")
+                time.sleep(3)
+                continue
+            _die(f"PCS returned HTTP {e.response.status_code} for {url}")
+        except httpx.HTTPError as e:
+            _die(f"HTTP error for {url}: {e}")
+    return BeautifulSoup("", "html.parser")
+
+
+# ---------------------------------------------------------------------------
 # Category assignment
 # ---------------------------------------------------------------------------
 
@@ -111,73 +140,64 @@ def ranking_to_category(ranking: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Step 1: Scrape PCS rankings
+# Step 1a: Scrape WorldTour team rosters
 # ---------------------------------------------------------------------------
 
 
-def scrape_rankings() -> list[dict]:
+def scrape_teams(client: httpx.Client) -> list[dict]:
     """
-    Scrape PCS individual rankings. Paginates through offset=0, 100, 200, ...
-    until no more riders are found.
+    Fetch the WT teams page and return a list of
+    {"team_slug": str, "team_name": str, "team_url": str}.
 
-    PCS rankings table structure:
-      <tr>
-        <td>1</td>                          ← ranking position
-        <td>...</td>                        ← prev position
-        <td class="ridername">
-          <a href="rider/{slug}">
-            <span class="uppercase">LASTNAME</span> Firstname
-          </a>
-        </td>
-        ...
-        <td><a href="team/{slug}/{year}">Team Name</a></td>
-        <td>12345</td>                      ← points
-      </tr>
+    PCS teams page structure:
+      <div class="teams"> or <ul class="list">
+        <a href="team/{slug}/{year}">Team Name</a>
     """
-    riders: list[dict] = []
-    offset = 0
+    _log(f"  Fetching teams: {TEAMS_URL}")
+    soup = pcs_get(TEAMS_URL, client)
+    time.sleep(REQUEST_DELAY)
+
+    team_re = re.compile(r"^team/([\w-]+)/(\d{4})$")
+    teams: list[dict] = []
+    seen: set[str] = set()
+
+    for a in soup.find_all("a", href=team_re):
+        href: str = a["href"]
+        m = team_re.match(href)
+        if not m:
+            continue
+
+        slug = m.group(1)
+        if slug in seen:
+            continue
+        seen.add(slug)
+
+        teams.append({
+            "team_slug": slug,
+            "team_name": a.get_text(strip=True),
+            "team_url": f"{PCS_BASE}/{href}",
+        })
+
+    return teams
+
+
+def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
+    """
+    Fetch a team page and parse all riders.
+
+    PCS team page rider structure:
+      <a href="rider/{slug}">
+        <span class="uppercase">LASTNAME</span> Firstname
+      </a>
+    """
+    url = team["team_url"]
+    _log(f"    Fetching: {url}")
+    soup = pcs_get(url, client)
+    time.sleep(REQUEST_DELAY)
+
     rider_re = re.compile(r"^rider/([\w-]+)$")
-
-    with httpx.Client(headers=PCS_HEADERS) as client:
-        while True:
-            url = f"{RANKINGS_URL}?offset={offset}" if offset > 0 else RANKINGS_URL
-            _log(f"  Fetching: {url}")
-
-            try:
-                resp = client.get(url, timeout=30, follow_redirects=True)
-                resp.raise_for_status()
-            except httpx.HTTPStatusError as e:
-                _die(f"PCS returned HTTP {e.response.status_code} for {url}")
-            except httpx.HTTPError as e:
-                _die(f"HTTP error fetching rankings: {e}")
-
-            soup = BeautifulSoup(resp.text, "html.parser")
-            page_riders = _parse_rankings_page(soup, rider_re)
-
-            if not page_riders:
-                break
-
-            riders.extend(page_riders)
-            _log(f"    Parsed {len(page_riders)} riders (total: {len(riders)})")
-
-            # PCS shows 100 riders per page
-            if len(page_riders) < 100:
-                break
-
-            offset += 100
-            time.sleep(REQUEST_DELAY)
-
-    # Assign categories
-    for rider in riders:
-        rider["category"] = ranking_to_category(rider["uci_ranking"])
-
-    return riders
-
-
-def _parse_rankings_page(soup: BeautifulSoup, rider_re: re.Pattern) -> list[dict]:
-    """Parse a single page of PCS rankings."""
     riders: list[dict] = []
-    seen_slugs: set[str] = set()
+    seen: set[str] = set()
 
     for a in soup.find_all("a", href=rider_re):
         href: str = a["href"]
@@ -186,11 +206,10 @@ def _parse_rankings_page(soup: BeautifulSoup, rider_re: re.Pattern) -> list[dict
             continue
 
         pcs_slug = m.group(1)
-        if pcs_slug in seen_slugs:
+        if pcs_slug in seen:
             continue
-        seen_slugs.add(pcs_slug)
+        seen.add(pcs_slug)
 
-        # Parse name: <span class="uppercase">LASTNAME</span> Firstname
         name_parts = list(a.stripped_strings)
         if not name_parts:
             continue
@@ -202,7 +221,6 @@ def _parse_rankings_page(soup: BeautifulSoup, rider_re: re.Pattern) -> list[dict
             last_name = uppercase_span.get_text(strip=True)
             first_name = full_name.replace(last_name, "").strip()
         else:
-            # Fallback: assume "LASTNAME Firstname" format
             parts = full_name.split()
             upper_parts = [p for p in parts if p.isupper()]
             if upper_parts:
@@ -212,32 +230,121 @@ def _parse_rankings_page(soup: BeautifulSoup, rider_re: re.Pattern) -> list[dict
                 last_name = parts[-1] if parts else ""
                 first_name = " ".join(parts[:-1]) if len(parts) > 1 else ""
 
-        # Get ranking from first <td> in parent row
-        row = a.find_parent("tr")
-        ranking = len(riders) + 1  # fallback
-        team_name = ""
-
-        if row:
-            cells = row.find_all("td")
-            if cells:
-                pos_text = re.sub(r"[^\d]", "", cells[0].get_text(strip=True))
-                if pos_text.isdigit():
-                    ranking = int(pos_text)
-
-            # Team is in a link with href starting with "team/"
-            team_link = row.find("a", href=re.compile(r"^team/"))
-            if team_link:
-                team_name = team_link.get_text(strip=True)
-
         riders.append({
             "pcs_slug": pcs_slug,
             "first_name": first_name,
             "last_name": last_name,
-            "team_name": team_name,
-            "uci_ranking": ranking,
+            "team_name": team["team_name"],
         })
 
     return riders
+
+
+# ---------------------------------------------------------------------------
+# Step 1b: Scrape rankings to look up UCI ranking per rider
+# ---------------------------------------------------------------------------
+
+
+def scrape_rankings_index(client: httpx.Client) -> dict[str, int]:
+    """
+    Scrape PCS individual rankings and build a slug → ranking lookup.
+    Paginates through all pages to cover riders outside the top 100.
+    """
+    index: dict[str, int] = {}
+    offset = 0
+    rider_re = re.compile(r"^rider/([\w-]+)$")
+
+    while True:
+        url = f"{RANKINGS_URL}?offset={offset}" if offset > 0 else RANKINGS_URL
+        _log(f"  Fetching rankings: {url}")
+
+        soup = pcs_get(url, client)
+        time.sleep(REQUEST_DELAY)
+
+        page_count = 0
+        for a in soup.find_all("a", href=rider_re):
+            href: str = a["href"]
+            m = rider_re.match(href)
+            if not m:
+                continue
+
+            pcs_slug = m.group(1)
+            if pcs_slug in index:
+                continue
+
+            row = a.find_parent("tr")
+            if not row:
+                continue
+
+            cells = row.find_all("td")
+            if not cells:
+                continue
+
+            pos_text = re.sub(r"[^\d]", "", cells[0].get_text(strip=True))
+            if pos_text.isdigit():
+                index[pcs_slug] = int(pos_text)
+                page_count += 1
+
+        if page_count == 0:
+            break
+
+        _log(f"    Indexed {page_count} riders (total: {len(index)})")
+
+        if page_count < 100:
+            break
+
+        offset += 100
+
+    return index
+
+
+# ---------------------------------------------------------------------------
+# Step 1: Combined scrape
+# ---------------------------------------------------------------------------
+
+
+def scrape_all_riders() -> list[dict]:
+    """Scrape WT team rosters, then enrich with UCI rankings."""
+    all_riders: list[dict] = []
+
+    with httpx.Client(headers=PCS_HEADERS) as client:
+        # 1a. Get team list
+        _log("  Fetching WorldTour teams...")
+        teams = scrape_teams(client)
+        _log(f"  Found {len(teams)} teams")
+
+        if not teams:
+            _die("No WorldTour teams found. PCS page structure may have changed.")
+
+        # 1b. Get riders from each team
+        for i, team in enumerate(teams, 1):
+            _log(f"  [{i}/{len(teams)}] {team['team_name']}")
+            team_riders = scrape_team_riders(team, client)
+            _log(f"    → {len(team_riders)} riders")
+            all_riders.extend(team_riders)
+
+        _log(f"  Total riders from team pages: {len(all_riders)}")
+
+        # 1c. Scrape rankings index
+        _log("  Building UCI rankings index...")
+        rankings = scrape_rankings_index(client)
+        _log(f"  Rankings index: {len(rankings)} riders")
+
+    # 1d. Enrich riders with ranking + category
+    ranked = 0
+    for rider in all_riders:
+        ranking = rankings.get(rider["pcs_slug"])
+        if ranking is not None:
+            rider["uci_ranking"] = ranking
+            rider["category"] = ranking_to_category(ranking)
+            ranked += 1
+        else:
+            rider["uci_ranking"] = None
+            rider["category"] = 5  # unranked riders get lowest category
+
+    _log(f"  Matched rankings for {ranked}/{len(all_riders)} riders")
+
+    return all_riders
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +381,7 @@ def upload_riders(riders: list[dict], supabase: Client) -> tuple[int, list[str]]
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Scrape PCS rider rankings and store in cycling_riders."
+        description="Scrape PCS WorldTour team rosters and store in cycling_riders."
     )
     parser.add_argument(
         "--scrape-only",
@@ -293,8 +400,8 @@ def main() -> None:
 
     # --- Step 1: Scrape ---
     if not args.upload_only:
-        _log("→ Step 1: Scraping PCS rankings...")
-        riders = scrape_rankings()
+        _log("→ Step 1: Scraping WorldTour team rosters + rankings...")
+        riders = scrape_all_riders()
         _log(f"✓ Scraped {len(riders)} riders")
 
         with open(RIDERS_JSON, "w") as f:
@@ -332,12 +439,20 @@ def main() -> None:
         by_cat[c] = by_cat.get(c, 0) + 1
     _log(f"  Categories: {dict(sorted(by_cat.items()))}")
 
+    # Team breakdown
+    by_team: dict[str, int] = {}
+    for r in riders:
+        t = r.get("team_name", "?")
+        by_team[t] = by_team.get(t, 0) + 1
+    _log(f"  Teams: {len(by_team)} ({', '.join(f'{t}: {n}' for t, n in sorted(by_team.items()))})")
+
     result = {
         "ok": len(errors) == 0,
         "riders_scraped": len(riders),
         "upserted": upserted,
         "errors": errors,
         "by_category": dict(sorted(by_cat.items())),
+        "teams": len(by_team),
     }
     print(json.dumps(result, ensure_ascii=False))
 
