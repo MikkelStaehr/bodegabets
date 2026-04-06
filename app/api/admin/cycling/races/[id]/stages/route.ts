@@ -9,9 +9,8 @@ export async function GET(
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { id } = await params
-  const raceId = parseInt(id, 10)
-  if (isNaN(raceId)) {
+  const { id: raceId } = await params
+  if (!raceId) {
     return NextResponse.json({ error: 'Invalid race id' }, { status: 400 })
   }
 

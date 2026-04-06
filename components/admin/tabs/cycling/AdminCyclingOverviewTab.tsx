@@ -14,7 +14,7 @@ type RiderStats = {
 }
 
 type Race = {
-  id: number
+  id: string
   name: string
   pcs_slug: string
   race_type: string
@@ -26,7 +26,7 @@ type Race = {
 }
 
 type Stage = {
-  id: number
+  id: string
   stage_number: number
   name: string | null
   profile: string | null
@@ -35,7 +35,7 @@ type Stage = {
 }
 
 type SyncLog = {
-  id: number
+  id: string
   created_at: string
   sync_type: string
   records_affected: number | null
@@ -80,10 +80,10 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
     text: string
   } | null>(null)
   const [syncLoading, setSyncLoading] = useState(false)
-  const [statusUpdating, setStatusUpdating] = useState<Set<number>>(new Set())
-  const [expandedRace, setExpandedRace] = useState<number | null>(null)
-  const [stagesCache, setStagesCache] = useState<Record<number, Stage[]>>({})
-  const [stagesLoading, setStagesLoading] = useState<Set<number>>(new Set())
+  const [statusUpdating, setStatusUpdating] = useState<Set<string>>(new Set())
+  const [expandedRace, setExpandedRace] = useState<string | null>(null)
+  const [stagesCache, setStagesCache] = useState<Record<string, Stage[]>>({})
+  const [stagesLoading, setStagesLoading] = useState<Set<string>>(new Set())
 
   const authHeader = {
     'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
     }
   }
 
-  async function updateRaceStatus(raceId: number, newStatus: string) {
+  async function updateRaceStatus(raceId: string, newStatus: string) {
     setStatusUpdating((s) => new Set(s).add(raceId))
     try {
       const res = await fetch('/api/admin/cycling/races', {
@@ -148,7 +148,7 @@ export function AdminCyclingOverviewTab({ adminSecret }: Props) {
     }
   }
 
-  async function toggleStages(raceId: number) {
+  async function toggleStages(raceId: string) {
     if (expandedRace === raceId) {
       setExpandedRace(null)
       return
