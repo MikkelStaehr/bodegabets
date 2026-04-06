@@ -37,7 +37,8 @@ from postgrest.exceptions import APIError
 
 PCS_BASE = "https://www.procyclingstats.com"
 TEAMS_URL = f"{PCS_BASE}/teams.php?year=2026&circuit=1"
-RANKINGS_URL = f"{PCS_BASE}/rankings/me/individual"
+# Rankings URL needs full query params for pagination to work on PCS
+RANKINGS_BASE = f"{PCS_BASE}/rankings.php?p=me&s=individual&filter=Filter"
 
 PCS_HEADERS = {
     "User-Agent": (
@@ -184,23 +185,28 @@ def scrape_teams(client: httpx.Client) -> list[dict]:
 
 def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
     """
-    Fetch a team page and parse all riders.
+    Fetch a team page and parse active roster riders only.
 
-    PCS team page rider structure:
-      <a href="rider/{slug}">
-        <span class="uppercase">LASTNAME</span> Firstname
-      </a>
+    PCS shows the active roster in <ul class="teamlist list lineh18">.
+    Other sections (top results, statistics, etc.) contain historical riders
+    that we must skip.
     """
     url = team["team_url"]
     _log(f"    Fetching: {url}")
     soup = pcs_get(url, client)
     time.sleep(REQUEST_DELAY)
 
+    # Find the active roster list: <ul class="teamlist list lineh18">
+    roster_ul = soup.find("ul", class_="teamlist")
+    if not roster_ul:
+        _warn(f"No <ul class='teamlist'> found for {team['team_name']}, falling back to full page")
+        roster_ul = soup
+
     rider_re = re.compile(r"^rider/([\w-]+)$")
     riders: list[dict] = []
     seen: set[str] = set()
 
-    for a in soup.find_all("a", href=rider_re):
+    for a in roster_ul.find_all("a", href=rider_re):
         href: str = a["href"]
         m = rider_re.match(href)
         if not m:
@@ -208,8 +214,7 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
 
         pcs_slug = m.group(1)
 
-        # Skip links without text (e.g. image-only links in rider photo grid).
-        # Don't add to seen — a later <a> for the same rider will have text.
+        # Skip links without text (e.g. image-only links).
         name_parts = list(a.stripped_strings)
         if not name_parts:
             continue
@@ -220,20 +225,15 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
 
         full_name = " ".join(name_parts)
 
-        # Split into last/first: the uppercase span contains the last name
-        uppercase_span = a.find("span", class_="uppercase")
-        if uppercase_span:
-            last_name = uppercase_span.get_text(strip=True)
-            first_name = full_name.replace(last_name, "").strip()
+        # Split into last/first: PCS format is "LASTNAME Firstname"
+        parts = full_name.split()
+        upper_parts = [p for p in parts if p.isupper() and len(p) > 1]
+        if upper_parts:
+            last_name = " ".join(upper_parts)
+            first_name = " ".join(p for p in parts if p not in upper_parts)
         else:
-            parts = full_name.split()
-            upper_parts = [p for p in parts if p.isupper()]
-            if upper_parts:
-                last_name = " ".join(upper_parts)
-                first_name = " ".join(p for p in parts if not p.isupper())
-            else:
-                last_name = parts[-1] if parts else ""
-                first_name = " ".join(parts[:-1]) if len(parts) > 1 else ""
+            last_name = parts[-1] if parts else ""
+            first_name = " ".join(parts[:-1]) if len(parts) > 1 else ""
 
         riders.append({
             "pcs_slug": pcs_slug,
@@ -250,26 +250,32 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def scrape_rankings_index(client: httpx.Client) -> dict[str, int]:
+def scrape_rankings_index(client: httpx.Client, target_slugs: set[str]) -> dict[str, int]:
     """
     Scrape PCS individual rankings and build a slug → ranking lookup.
-    Paginates through all pages to cover riders outside the top 100.
+    Paginates through all pages until all target riders are found or pages run out.
+    Uses rankings.php with full query params — PCS ignores offset on the
+    /rankings/me/individual pretty-URL.
     """
     index: dict[str, int] = {}
     offset = 0
     rider_re = re.compile(r"^rider/([\w-]+)$")
 
     while True:
-        url = f"{RANKINGS_URL}?offset={offset}" if offset > 0 else RANKINGS_URL
-        _log(f"  Fetching rankings: {url}")
+        url = f"{RANKINGS_BASE}&offset={offset}"
+        _log(f"  Fetching rankings: offset={offset}")
 
         soup = pcs_get(url, client)
         time.sleep(REQUEST_DELAY)
 
+        # Parse only riders inside table rows (skip sidebar/nav rider links)
         page_count = 0
-        for a in soup.find_all("a", href=rider_re):
-            href: str = a["href"]
-            m = rider_re.match(href)
+        for tr in soup.find_all("tr"):
+            a = tr.find("a", href=rider_re)
+            if not a:
+                continue
+
+            m = rider_re.match(a["href"])
             if not m:
                 continue
 
@@ -277,11 +283,7 @@ def scrape_rankings_index(client: httpx.Client) -> dict[str, int]:
             if pcs_slug in index:
                 continue
 
-            row = a.find_parent("tr")
-            if not row:
-                continue
-
-            cells = row.find_all("td")
+            cells = tr.find_all("td")
             if not cells:
                 continue
 
@@ -293,6 +295,12 @@ def scrape_rankings_index(client: httpx.Client) -> dict[str, int]:
         _log(f"    Indexed {page_count} new riders (total: {len(index)})")
 
         if page_count == 0:
+            break
+
+        # Check if we've found all target riders
+        remaining = target_slugs - set(index.keys())
+        if not remaining:
+            _log(f"  All {len(target_slugs)} target riders found in rankings")
             break
 
         offset += 100
@@ -338,9 +346,10 @@ def scrape_all_riders() -> list[dict]:
         all_riders = [all_riders[i] for i in unique_indices]
         _log(f"  Unique riders: {len(all_riders)}")
 
-        # 1c. Scrape rankings index
-        _log("  Building UCI rankings index...")
-        rankings = scrape_rankings_index(client)
+        # 1c. Scrape rankings index (only for our WT riders)
+        target_slugs = {r["pcs_slug"] for r in all_riders}
+        _log(f"  Building UCI rankings index for {len(target_slugs)} riders...")
+        rankings = scrape_rankings_index(client, target_slugs)
         _log(f"  Rankings index: {len(rankings)} riders")
 
     # 1d. Enrich riders with ranking + category
