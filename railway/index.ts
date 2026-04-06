@@ -519,6 +519,7 @@ app.get('/send-reminders', async (_req, res) => {
 // ─── GET /admin/test-fetch (temporary) ─────────────────────────────────────
 
 app.get('/admin/test-fetch', async (_req, res) => {
+  const debug: Record<string, unknown> = { version: '2026-04-06-v2' }
   try {
     // Step 1: Fetch UCI discipline page to extract JWT bearer token
     const pageRes = await fetch(
@@ -535,23 +536,19 @@ app.get('/admin/test-fetch', async (_req, res) => {
       },
     )
     const html = await pageRes.text()
+    debug.pageStatus = pageRes.status
+    debug.pageUrl = pageRes.url
+    debug.htmlLength = html.length
 
     // Extract data-props from DisciplineModule
     const match = html.match(
       /data-component="DisciplineModule"\s+data-props="([^"]*)"/,
     )
     if (!match) {
-      res.json({
-        ok: false,
-        step: 'parse-html',
-        pageStatus: pageRes.status,
-        error: 'DisciplineModule not found in HTML',
-        bodyPreview: html.slice(0, 500),
-      })
+      res.json({ ok: false, step: 'parse-html', debug, bodyPreview: html.slice(0, 1000) })
       return
     }
 
-    // Decode HTML entities and parse JSON
     const decoded = match[1]
       .replace(/&quot;/g, '"')
       .replace(/&amp;/g, '&')
@@ -560,17 +557,24 @@ app.get('/admin/test-fetch', async (_req, res) => {
       .replace(/&#39;/g, "'")
     const props = JSON.parse(decoded)
     const bearerToken = props.bearerToken as string | undefined
+    debug.tokenLength = bearerToken?.length ?? 0
+    debug.tokenPrefix = bearerToken?.slice(0, 20) ?? null
+    debug.propsKeys = Object.keys(props)
 
     if (!bearerToken) {
-      res.json({
-        ok: false,
-        step: 'extract-token',
-        error: 'bearerToken not found in DisciplineModule props',
-      })
+      res.json({ ok: false, step: 'extract-token', debug })
       return
     }
 
-    // Step 2: Call DataRide Competitions API with the token
+    // Step 2: Call DataRide Competitions API
+    const requestBody = JSON.stringify({
+      disciplineId: 10,
+      Take: 100,
+      Skip: 0,
+      CategoryId: 1,
+    })
+    debug.requestBody = requestBody
+
     const apiRes = await fetch(
       'https://dataride.uci.org/iframe/Competitions/',
       {
@@ -580,19 +584,19 @@ app.get('/admin/test-fetch', async (_req, res) => {
           Authorization: `Bearer ${bearerToken}`,
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          Referer:
-            'https://dataride.uci.org/iframe/CompetitionResults/10/2026',
+          Referer: 'https://dataride.uci.org/iframe/CompetitionResults/10/2026',
+          Origin: 'https://dataride.uci.org',
+          'X-Requested-With': 'XMLHttpRequest',
         },
-        body: JSON.stringify({
-          disciplineId: 10,
-          Take: 100,
-          Skip: 0,
-          CategoryId: 1,
-        }),
+        body: requestBody,
       },
     )
 
     const apiBody = await apiRes.text()
+    debug.apiStatus = apiRes.status
+    debug.apiContentType = apiRes.headers.get('content-type')
+    debug.apiBodyLength = apiBody.length
+
     let apiData: unknown
     try {
       apiData = JSON.parse(apiBody)
@@ -601,15 +605,13 @@ app.get('/admin/test-fetch', async (_req, res) => {
     }
 
     res.json({
-      ok: true,
-      pageStatus: pageRes.status,
-      apiStatus: apiRes.status,
-      tokenLength: bearerToken.length,
-      apiData: apiData ?? apiBody.slice(0, 2000),
+      ok: apiRes.status === 200,
+      debug,
+      apiData: apiData ?? { rawBody: apiBody.slice(0, 3000) },
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
-    res.status(500).json({ error: String(err) })
+    res.status(500).json({ ok: false, debug, error: String(err) })
   }
 })
 
