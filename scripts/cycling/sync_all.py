@@ -296,27 +296,19 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> tuple[list[dict], st
     return riders, logo_url
 
 
-def scrape_race_logo(pcs_slug: str, year: int, client: httpx.Client) -> str | None:
-    """Extract race logo from PCS race page.
+def scrape_race_profile_image(pcs_slug: str, year: int, client: httpx.Client) -> str | None:
+    """Extract route profile image from PCS race page.
 
-    Looks for an <img> inside <div class="value"> whose src contains
-    'images/' but is not a rider photo or icon.
+    Looks for an <img> whose src contains 'images/profiles/' or 'profile'.
     """
     url = f"{PCS_BASE}/race/{pcs_slug}/{year}"
     soup = pcs_get(url, client)
     time.sleep(REQUEST_DELAY)
 
-    # Strategy 1: div.value > img with images/ in src (skip riders/icons)
-    skip_re = re.compile(r"(images/riders/|images/icons/|images/flags/)")
-    for div in soup.find_all("div", class_="value"):
-        img = div.find("img", src=re.compile(r"images/"))
-        if img and img.get("src") and not skip_re.search(img["src"]):
-            src = img["src"]
-            return f"{PCS_BASE}/{src}" if not src.startswith("http") else src
-
-    # Strategy 2: any img with src containing images/logos/
-    for img in soup.find_all("img", src=re.compile(r"images/logos/")):
-        src = img["src"]
+    for img in soup.find_all("img", src=re.compile(r"images/profiles/|profile")):
+        src = img.get("src", "")
+        if not src:
+            continue
         return f"{PCS_BASE}/{src}" if not src.startswith("http") else src
 
     return None
@@ -785,18 +777,18 @@ def main() -> None:
         riders = scrape_all_riders(client)
         save_json(RIDERS_JSON, riders)
 
-        # 1b. Races + logos
+        # 1b. Races + profile images
         _log("\n─ 1b. Races ─")
         races = [dict(r) for r in RACES]
         _log(f"  Defined {len(races)} races")
-        _log("  Scraping race logos...")
+        _log("  Scraping race profile images...")
         for race in races:
-            logo = scrape_race_logo(race["pcs_slug"], race["year"], client)
-            race["logo_url"] = logo
-            if logo:
-                _log(f"    {race['pcs_slug']}: {logo[:70]}")
+            img_url = scrape_race_profile_image(race["pcs_slug"], race["year"], client)
+            race["profile_image_url"] = img_url
+            if img_url:
+                _log(f"    {race['pcs_slug']}: {img_url[:70]}")
             else:
-                _warn(f"    {race['pcs_slug']}: no logo found")
+                _warn(f"    {race['pcs_slug']}: no profile image found")
         save_json(RACES_JSON, races)
 
         # 1c. Stages
