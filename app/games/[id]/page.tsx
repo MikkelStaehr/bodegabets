@@ -6,6 +6,8 @@ import ActiveRoundLiveTicker from '@/components/ActiveRoundLiveTicker'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
 import CalendarSlider from '@/components/games/CalendarSlider'
 import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
+import CyclingCalendarSlider from '@/components/games/CyclingCalendarSlider'
+import type { CyclingEvent } from '@/components/games/CyclingCalendarSlider'
 import ActiveRounds from '@/components/games/ActiveRounds'
 import { formatDateTime } from '@/lib/dateUtils'
 import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
@@ -257,6 +259,72 @@ export default async function GamePage({ params }: Props) {
 
   const typedGame = game as Game
   const theme = getSportTheme(typedGame.sport)
+
+  // Fetch cycling schedule for cycling games
+  let cyclingEvents: CyclingEvent[] = []
+  if (typedGame.sport === 'cycling') {
+    const { data: gameRaces } = await supabaseAdmin
+      .from('cycling_game_races')
+      .select('race_id, block_number')
+      .eq('game_id', gameId)
+
+    if (gameRaces?.length) {
+      const raceIds = gameRaces.map((gr) => gr.race_id)
+      const blockByRace = new Map(gameRaces.map((gr) => [gr.race_id, gr.block_number]))
+
+      const [{ data: cRaces }, { data: cStages }] = await Promise.all([
+        supabaseAdmin
+          .from('cycling_races')
+          .select('id, name, pcs_slug, race_type, profile, start_date, status')
+          .in('id', raceIds),
+        supabaseAdmin
+          .from('cycling_stages')
+          .select('id, race_id, stage_number, name, profile, start_date')
+          .in('race_id', raceIds.filter((id) => {
+            // We'll filter stage_race ids after we have races, but fetch all stages for now
+            return true
+          }))
+          .order('stage_number', { ascending: true }),
+      ])
+
+      const raceById = new Map((cRaces ?? []).map((r) => [r.id, r]))
+
+      for (const race of cRaces ?? []) {
+        if (race.race_type === 'one_day') {
+          cyclingEvents.push({
+            date: race.start_date,
+            race_name: race.name,
+            race_slug: race.pcs_slug,
+            race_type: race.race_type,
+            stage_number: null,
+            stage_name: null,
+            profile: race.profile,
+            status: race.status,
+            block_number: blockByRace.get(race.id) ?? 0,
+          })
+        }
+      }
+
+      for (const stage of cStages ?? []) {
+        const race = raceById.get(stage.race_id)
+        if (!race || race.race_type !== 'stage_race') continue
+        cyclingEvents.push({
+          date: stage.start_date,
+          race_name: race.name,
+          race_slug: race.pcs_slug,
+          race_type: race.race_type,
+          stage_number: stage.stage_number,
+          stage_name: stage.name,
+          profile: stage.profile || race.profile,
+          status: race.status,
+          block_number: blockByRace.get(race.id) ?? 0,
+        })
+      }
+
+      cyclingEvents.sort((a, b) => a.date.localeCompare(b.date))
+    }
+  }
+
   const members = (rawMembers ?? []) as unknown as MemberRow[]
   const typedRounds = (rounds ?? []) as Round[]
 
@@ -623,27 +691,33 @@ export default async function GamePage({ params }: Props) {
 
         {/* Kalender-slider */}
         <section className="border-t border-b border-[#d4cec4] py-0">
-          <CalendarSlider
-            matches={allMatches}
-            rounds={roundsWithBlock.map((r) => ({
-              id: r.id,
-              name: r.name,
-              season_id: r.season_id ?? 0,
-              computedStatus: r.computedStatus,
-              betting_closes_at: r.betting_closes_at,
-              leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
-              leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
-              logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
-              block_id: r.block_id ?? null,
-              block_number: r.block_id != null ? (blockById.get(r.block_id)?.block_number ?? null) : null,
-            })) as CalendarRound[]}
-            gameId={gameId}
-            betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
-            activeRoundId={activeRound?.id ?? null}
-            activeBlockId={activeBlock?.id ?? null}
-            sportColor={theme.primary}
-          />
-          <ActiveRoundLiveTicker />
+          {typedGame.sport === 'cycling' ? (
+            <CyclingCalendarSlider events={cyclingEvents} sportColor={theme.primary} />
+          ) : (
+            <>
+              <CalendarSlider
+                matches={allMatches}
+                rounds={roundsWithBlock.map((r) => ({
+                  id: r.id,
+                  name: r.name,
+                  season_id: r.season_id ?? 0,
+                  computedStatus: r.computedStatus,
+                  betting_closes_at: r.betting_closes_at,
+                  leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
+                  leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
+                  logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
+                  block_id: r.block_id ?? null,
+                  block_number: r.block_id != null ? (blockById.get(r.block_id)?.block_number ?? null) : null,
+                })) as CalendarRound[]}
+                gameId={gameId}
+                betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
+                activeRoundId={activeRound?.id ?? null}
+                activeBlockId={activeBlock?.id ?? null}
+                sportColor={theme.primary}
+              />
+              <ActiveRoundLiveTicker />
+            </>
+          )}
         </section>
 
         {/* Block leaderboard — kun hvis aktiv block */}
