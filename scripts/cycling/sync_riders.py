@@ -157,7 +157,8 @@ def scrape_teams(client: httpx.Client) -> list[dict]:
     soup = pcs_get(TEAMS_URL, client)
     time.sleep(REQUEST_DELAY)
 
-    team_re = re.compile(r"^team/([\w-]+)/(\d{4})$")
+    # PCS team hrefs are "team/{slug-with-year}" e.g. "team/uae-team-emirates-xrg-2026"
+    team_re = re.compile(r"^team/([\w-]+-\d{4})$")
     teams: list[dict] = []
     seen: set[str] = set()
 
@@ -393,10 +394,27 @@ def main() -> None:
         action="store_true",
         help="Only read data/riders.json and upload to Supabase",
     )
+    parser.add_argument(
+        "--debug-html",
+        action="store_true",
+        help="Fetch the teams page and print the first 2000 chars of raw HTML, then exit",
+    )
     args = parser.parse_args()
 
     load_dotenv_local()
     os.makedirs(DATA_DIR, exist_ok=True)
+
+    # --- Debug mode: dump raw HTML ---
+    if args.debug_html:
+        with httpx.Client(headers=PCS_HEADERS) as client:
+            _log(f"Fetching: {TEAMS_URL}")
+            resp = client.get(TEAMS_URL, timeout=30, follow_redirects=True)
+            _log(f"Status: {resp.status_code}")
+            _log(f"Final URL: {resp.url}")
+            _log(f"Content-Length: {len(resp.text)}")
+            _log("--- Raw HTML (first 2000 chars) ---")
+            print(resp.text[:2000])
+        return
 
     # --- Step 1: Scrape ---
     if not args.upload_only:
