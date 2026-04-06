@@ -10,7 +10,6 @@ export async function GET(req: NextRequest) {
     { data: riders, count: riderCount },
     { data: races },
     { data: syncLogs },
-    { data: startlistCounts },
   ] = await Promise.all([
     supabaseAdmin
       .from('cycling_riders')
@@ -24,10 +23,6 @@ export async function GET(req: NextRequest) {
       .select('id, created_at, sync_type, records_affected, status, message')
       .order('created_at', { ascending: false })
       .limit(10),
-    supabaseAdmin
-      .from('cycling_startlists')
-      .select('race_id')
-      .limit(10000),
   ])
 
   // Build rider stats
@@ -41,10 +36,19 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Build startlist count per race
+  // Count startlist entries per race using exact count with head:true.
+  // Individual queries per race avoid row limits and implicit FK join issues.
   const startlistByRace: Record<string, number> = {}
-  for (const row of startlistCounts ?? []) {
-    startlistByRace[row.race_id] = (startlistByRace[row.race_id] ?? 0) + 1
+  const countPromises = (races ?? []).map(async (race) => {
+    const { count } = await supabaseAdmin
+      .from('cycling_startlists')
+      .select('*', { count: 'exact', head: true })
+      .eq('race_id', race.id)
+    return { id: race.id, count: count ?? 0 }
+  })
+  const counts = await Promise.all(countPromises)
+  for (const { id, count } of counts) {
+    startlistByRace[id] = count
   }
 
   // Attach startlist_count to each race
