@@ -232,6 +232,63 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Auto status update
+# ---------------------------------------------------------------------------
+
+
+def auto_update_race_statuses(supabase: Client) -> int:
+    """
+    Automatically update race statuses based on dates:
+    - One-day races with start_date < today and status=upcoming → finished
+    - Stage races with end_date < today and status in (upcoming, active) → finished
+    - Stage races with start_date <= today and end_date >= today and status=upcoming → active
+    Returns number of races updated.
+    """
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    updated = 0
+
+    try:
+        resp = (
+            supabase.table("cycling_races")
+            .select("id, name, race_type, status, start_date, end_date")
+            .in_("status", ["upcoming", "active"])
+            .execute()
+        )
+        races = resp.data or []
+    except APIError as e:
+        _warn(f"Failed to fetch races for status update: {e}")
+        return 0
+
+    for race in races:
+        start = race.get("start_date") or ""
+        end = race.get("end_date") or start  # one-day races: end = start
+        old_status = race["status"]
+        new_status = old_status
+
+        if race["race_type"] == "one_day":
+            if start and start < today and old_status == "upcoming":
+                new_status = "finished"
+        else:
+            # Stage race
+            if end and end < today and old_status in ("upcoming", "active"):
+                new_status = "finished"
+            elif start and start <= today and (not end or end >= today) and old_status == "upcoming":
+                new_status = "active"
+
+        if new_status != old_status:
+            try:
+                supabase.table("cycling_races").update(
+                    {"status": new_status}
+                ).eq("id", race["id"]).execute()
+                _log(f"  {race['name']}: {old_status} → {new_status}")
+                updated += 1
+            except APIError as e:
+                _warn(f"  Failed to update {race['name']}: {e}")
+
+    return updated
+
+
+# ---------------------------------------------------------------------------
 # Startlist scraping
 # ---------------------------------------------------------------------------
 
@@ -456,6 +513,11 @@ def main() -> None:
     supabase_url = require_env("NEXT_PUBLIC_SUPABASE_URL")
     service_key = require_env("SUPABASE_SERVICE_ROLE_KEY")
     supabase = create_client(supabase_url, service_key)
+
+    # ── Auto-update race statuses based on dates ─────────────
+    _log("\n→ Auto-updating race statuses...")
+    status_updates = auto_update_race_statuses(supabase)
+    _log(f"  Updated {status_updates} race(s)")
 
     # Fetch active/finished races
     _log("\n→ Fetching active/finished races from Supabase...")
