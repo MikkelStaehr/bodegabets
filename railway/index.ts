@@ -520,16 +520,52 @@ app.get('/send-reminders', async (_req, res) => {
 
 app.get('/admin/test-fetch', async (_req, res) => {
   try {
-    const response = await fetch('https://www.uci.org/road/results', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    const response = await fetch(
+      'https://www.uci.org/discipline/road/6TBjsDD8902tud440iv1Cu?tab=results&discipline=ROA',
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        redirect: 'follow',
       },
-    })
-    const body = await response.text()
+    )
+    const html = await response.text()
+
+    // Extract data-props from DisciplineModule
+    const match = html.match(
+      /data-component="DisciplineModule"\s+data-props="([^"]*)"/,
+    )
+    if (!match) {
+      res.json({
+        ok: false,
+        status: response.status,
+        error: 'DisciplineModule not found in HTML',
+        bodyPreview: html.slice(0, 500),
+      })
+      return
+    }
+
+    // Decode HTML entities and parse JSON
+    const decoded = match[1]
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#39;/g, "'")
+    const props = JSON.parse(decoded)
+
+    // Strip bearerToken from response (it's large and sensitive)
+    const { bearerToken, ...safeProps } = props
+
     res.json({
       ok: true,
       status: response.status,
-      bodyPreview: body.slice(0, 500),
+      hasBearerToken: !!bearerToken,
+      props: safeProps,
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
