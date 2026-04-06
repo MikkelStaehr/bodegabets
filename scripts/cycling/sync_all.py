@@ -296,6 +296,32 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> tuple[list[dict], st
     return riders, logo_url
 
 
+def scrape_race_logo(pcs_slug: str, year: int, client: httpx.Client) -> str | None:
+    """Extract race logo from PCS race page.
+
+    Looks for an <img> inside <div class="value"> whose src contains
+    'images/' but is not a rider photo or icon.
+    """
+    url = f"{PCS_BASE}/race/{pcs_slug}/{year}"
+    soup = pcs_get(url, client)
+    time.sleep(REQUEST_DELAY)
+
+    # Strategy 1: div.value > img with images/ in src (skip riders/icons)
+    skip_re = re.compile(r"(images/riders/|images/icons/|images/flags/)")
+    for div in soup.find_all("div", class_="value"):
+        img = div.find("img", src=re.compile(r"images/"))
+        if img and img.get("src") and not skip_re.search(img["src"]):
+            src = img["src"]
+            return f"{PCS_BASE}/{src}" if not src.startswith("http") else src
+
+    # Strategy 2: any img with src containing images/logos/
+    for img in soup.find_all("img", src=re.compile(r"images/logos/")):
+        src = img["src"]
+        return f"{PCS_BASE}/{src}" if not src.startswith("http") else src
+
+    return None
+
+
 def scrape_rankings_index(client: httpx.Client, target_slugs: set[str]) -> dict[str, int]:
     index: dict[str, int] = {}
     offset = 0
@@ -635,6 +661,11 @@ def main() -> None:
         action="store_true",
         help="Fetch INEOS Grenadiers team page and dump all <img> tags, then exit",
     )
+    parser.add_argument(
+        "--debug-race-logo",
+        action="store_true",
+        help="Fetch Paris-Roubaix race page and dump all <img> tags, then exit",
+    )
     args = parser.parse_args()
 
     load_dotenv_local()
@@ -642,6 +673,28 @@ def main() -> None:
 
     if args.debug_logo:
         url = f"{PCS_BASE}/team/ineos-grenadiers-2026"
+        _log(f"Fetching: {url}")
+        with httpx.Client(headers=PCS_HEADERS) as client:
+            resp = client.get(url, timeout=30, follow_redirects=True)
+            _log(f"Status: {resp.status_code}")
+            _log(f"Final URL: {resp.url}")
+            soup = BeautifulSoup(resp.text, "html.parser")
+            imgs = soup.find_all("img")
+            _log(f"\nAll <img> tags: {len(imgs)}\n")
+            for i, img in enumerate(imgs):
+                src = img.get("src", "")
+                alt = img.get("alt", "")
+                cls = " ".join(img.get("class", []))
+                parent_cls = " ".join(img.parent.get("class", [])) if img.parent else ""
+                _log(f"  [{i}] src={src}")
+                _log(f"       alt={alt}")
+                _log(f"       class={cls}")
+                _log(f"       parent_tag={img.parent.name if img.parent else ''} parent_class={parent_cls}")
+                _log("")
+        return
+
+    if args.debug_race_logo:
+        url = f"{PCS_BASE}/race/paris-roubaix/{YEAR}"
         _log(f"Fetching: {url}")
         with httpx.Client(headers=PCS_HEADERS) as client:
             resp = client.get(url, timeout=30, follow_redirects=True)
@@ -732,10 +785,18 @@ def main() -> None:
         riders = scrape_all_riders(client)
         save_json(RIDERS_JSON, riders)
 
-        # 1b. Races
+        # 1b. Races + logos
         _log("\n─ 1b. Races ─")
         races = [dict(r) for r in RACES]
         _log(f"  Defined {len(races)} races")
+        _log("  Scraping race logos...")
+        for race in races:
+            logo = scrape_race_logo(race["pcs_slug"], race["year"], client)
+            race["logo_url"] = logo
+            if logo:
+                _log(f"    {race['pcs_slug']}: {logo[:70]}")
+            else:
+                _warn(f"    {race['pcs_slug']}: no logo found")
         save_json(RACES_JSON, races)
 
         # 1c. Stages
