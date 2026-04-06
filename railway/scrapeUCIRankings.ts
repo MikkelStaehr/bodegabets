@@ -6,13 +6,13 @@
  * cycling_riders i Supabase.
  *
  * PCS ranking-side: https://www.procyclingstats.com/rankings/me/individual
- *
- * Navneformat: "EFTERNAVN Fornavn" → splittes til first_name/last_name.
+ * PCS navneformat: "EFTERNAVN Fornavn" → splittes til first_name/last_name.
  *
  * Category baseret på ranking:
  *   1–24 → 1, 25–49 → 2, 50–99 → 3, 100–199 → 4, 200+ → 5
  */
 
+import { parse as parseHTML } from 'node-html-parser'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -24,9 +24,9 @@ const supabaseAdmin = createClient(
 const PCS_RANKING_URL = 'https://www.procyclingstats.com/rankings/me/individual'
 
 const PCS_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Language': 'en-US,en;q=0.5',
 } as const
 
 const REQUEST_DELAY_MS = 1500
@@ -50,7 +50,6 @@ function rankingToCategory(ranking: number): number {
 
 /**
  * Splitter PCS navneformat "EFTERNAVN Fornavn" til { first_name, last_name }
- * Eksempler:
  *   "POGAČAR Tadej" → { first_name: "Tadej", last_name: "Pogačar" }
  *   "VAN DER POEL Mathieu" → { first_name: "Mathieu", last_name: "Van Der Poel" }
  */
@@ -83,57 +82,54 @@ function parsePCSName(raw: string): { first_name: string; last_name: string } {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /**
- * Parser HTML fra PCS ranking-side og returnerer liste af ryttere.
+ * Parser HTML fra én PCS ranking-side med node-html-parser.
  */
-function parseRankingHTML(html: string): ParsedRider[] {
+function parseRankingPage(html: string): ParsedRider[] {
+  const root = parseHTML(html)
   const riders: ParsedRider[] = []
 
-  // Find tbody content
-  const tbodyMatch = html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i)
-  if (!tbodyMatch) {
-    console.error('[scrapeUCIRankings] Kunne ikke finde <tbody> i HTML')
-    return riders
+  const rows = root.querySelectorAll('table.basic tbody tr')
+  if (rows.length === 0) {
+    // Fallback: prøv uden .basic
+    const fallbackRows = root.querySelectorAll('tbody tr')
+    if (fallbackRows.length === 0) {
+      console.warn('[scrapeUCIRankings] Ingen table rows fundet i HTML')
+      return riders
+    }
+    rows.push(...fallbackRows)
   }
 
-  const tbody = tbodyMatch[1]
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
-  let rowMatch: RegExpExecArray | null
-
-  while ((rowMatch = rowRegex.exec(tbody)) !== null) {
-    const row = rowMatch[1]
-
-    // Hent alle <td> celler
-    const cells: string[] = []
-    const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi
-    let cellMatch: RegExpExecArray | null
-    while ((cellMatch = cellRegex.exec(row)) !== null) {
-      cells.push(cellMatch[1].trim())
-    }
-
+  for (const row of rows) {
+    const cells = row.querySelectorAll('td')
     if (cells.length < 4) continue
 
-    // Ranking (første celle med tal)
-    const rankingStr = cells[0].replace(/<[^>]+>/g, '').trim()
+    // Ranking — første celle
+    const rankingStr = cells[0].text.trim()
     const ranking = parseInt(rankingStr)
     if (isNaN(ranking) || ranking <= 0) continue
 
-    // Rider link og navn (celle med rider/ link)
-    const riderCell = cells.find((c) => c.includes('rider/'))
-    if (!riderCell) continue
+    // Rider link og navn
+    const riderLink = row.querySelector('a[href*="rider/"]')
+    if (!riderLink) continue
 
-    const slugMatch = riderCell.match(/href="(?:.*?)?rider\/([^"]+)"/)
-    const nameMatch = riderCell.match(/>([^<]+)</)
-    if (!slugMatch || !nameMatch) continue
+    const href = riderLink.getAttribute('href') ?? ''
+    const slugMatch = href.match(/rider\/([^/]+)/)
+    if (!slugMatch) continue
 
     const pcs_slug = slugMatch[1]
-    const rawName = nameMatch[1].trim()
+    const rawName = riderLink.text.trim()
+    if (!rawName) continue
+
     const { first_name, last_name } = parsePCSName(rawName)
 
-    // Team (celle med team/ link)
-    const teamCell = cells.find((c) => c.includes('team/'))
-    const teamNameMatch = teamCell?.match(/>([^<]+)</)
-    const team_name = teamNameMatch?.[1]?.trim() ?? ''
+    // Team
+    const teamLink = row.querySelector('a[href*="team/"]')
+    const team_name = teamLink?.text.trim() ?? ''
 
     riders.push({
       pcs_slug,
@@ -146,10 +142,6 @@ function parseRankingHTML(html: string): ParsedRider[] {
   }
 
   return riders
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /**
@@ -170,7 +162,10 @@ async function fetchPage(url: string, retries = 2): Promise<string | null> {
         continue
       }
 
-      if (!res.ok) return null
+      if (!res.ok) {
+        console.warn(`[scrapeUCIRankings] HTTP ${res.status} for ${url}`)
+        return null
+      }
 
       const html = await res.text()
 
@@ -215,7 +210,7 @@ export async function scrapeUCIRankings(): Promise<{ upserted: number; errors: s
         break
       }
 
-      const parsed = parseRankingHTML(html)
+      const parsed = parseRankingPage(html)
       console.log(`[scrapeUCIRankings] Parsed ${parsed.length} ryttere fra offset ${offset}`)
 
       if (parsed.length === 0) break
@@ -233,7 +228,7 @@ export async function scrapeUCIRankings(): Promise<{ upserted: number; errors: s
     return { upserted: 0, errors }
   }
 
-  // Upsert til cycling_riders
+  // Upsert til cycling_riders i chunks af 100
   const now = new Date().toISOString()
   const rows = allRiders.map((r) => ({
     pcs_slug: r.pcs_slug,
