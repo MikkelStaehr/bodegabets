@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
       .limit(10),
     supabaseAdmin
       .from('cycling_startlists')
-      .select('race_id'),
+      .select('race_id')
+      .limit(10000),
   ])
 
   // Build rider stats
