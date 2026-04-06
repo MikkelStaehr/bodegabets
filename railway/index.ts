@@ -519,10 +519,11 @@ app.get('/send-reminders', async (_req, res) => {
 // ─── GET /admin/test-fetch (temporary) ─────────────────────────────────────
 
 app.get('/admin/test-fetch', async (_req, res) => {
-  const debug: Record<string, unknown> = { version: '2026-04-06-v5' }
+  const debug: Record<string, unknown> = { version: '2026-04-06-v6' }
   try {
+    // Step 1: Fetch UCI discipline page to get bearer token
     const pageRes = await fetch(
-      'https://www.uci.org/competition-details/2025/ROA/74207',
+      'https://www.uci.org/discipline/road/6TBjsDD8902tud440iv1Cu?tab=results&discipline=ROA',
       {
         headers: {
           'User-Agent':
@@ -536,55 +537,82 @@ app.get('/admin/test-fetch', async (_req, res) => {
     )
     const html = await pageRes.text()
     debug.pageStatus = pageRes.status
-    debug.pageUrl = pageRes.url
     debug.htmlLength = html.length
 
-    const allComponents = [...html.matchAll(/data-component="([^"]+)"\s+data-props="([^"]*)"/g)]
-    debug.components = allComponents.map((m) => m[1])
-
-    if (allComponents.length === 0) {
-      res.json({ ok: false, step: 'parse-html', debug, bodyPreview: html.slice(0, 2000) })
+    const match = html.match(
+      /data-component="DisciplineModule"\s+data-props="([^"]*)"/,
+    )
+    if (!match) {
+      res.json({ ok: false, step: 'parse-html', debug, bodyPreview: html.slice(0, 1000) })
       return
     }
 
-    const decode = (s: string) =>
-      s
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&#39;/g, "'")
+    const decoded = match[1]
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#39;/g, "'")
+    const props = JSON.parse(decoded)
+    const bearerToken = props.bearerToken as string | undefined
+    debug.tokenLength = bearerToken?.length ?? 0
 
-    // Parse all components — strip heavy filter/country arrays, keep structure
-    const componentData: Record<string, unknown> = {}
-    for (const m of allComponents) {
-      const name = m[1]
-      try {
-        const props = JSON.parse(decode(m[2]))
-        // Recursively strip large arrays (filters, countries) but keep scalars and small arrays
-        const slim = (obj: unknown, depth: number): unknown => {
-          if (depth > 4 || obj === null || obj === undefined) return obj
-          if (typeof obj !== 'object') return obj
-          if (Array.isArray(obj)) {
-            if (obj.length > 15) return `[Array: ${obj.length} items]`
-            return obj.map((v) => slim(v, depth + 1))
-          }
-          const out: Record<string, unknown> = {}
-          for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-            out[k] = slim(v, depth + 1)
-          }
-          return out
-        }
-        componentData[name] = slim(props, 0)
-      } catch {
-        componentData[name] = 'parse-error'
-      }
+    if (!bearerToken) {
+      res.json({ ok: false, step: 'extract-token', debug })
+      return
     }
+
+    // Step 2: Call DataRide Results endpoint with eventCode
+    const apiRes = await fetch(
+      'https://dataride.uci.ch/iframe/Results/?eventCode=D2EV349896',
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          Authorization: `Bearer ${bearerToken}`,
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Referer: 'https://dataride.uci.ch/iframe/',
+          Origin: 'https://dataride.uci.ch',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      },
+    )
+
+    const apiBody = await apiRes.text()
+    debug.apiStatus = apiRes.status
+    debug.apiContentType = apiRes.headers.get('content-type')
+    debug.apiBodyLength = apiBody.length
+
+    // Also try POST variant
+    const apiRes2 = await fetch(
+      'https://dataride.uci.ch/iframe/Results/',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          Authorization: `Bearer ${bearerToken}`,
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Referer: 'https://dataride.uci.ch/iframe/',
+          Origin: 'https://dataride.uci.ch',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ eventCode: 'D2EV349896' }),
+      },
+    )
+
+    const apiBody2 = await apiRes2.text()
+    debug.apiPostStatus = apiRes2.status
+    debug.apiPostContentType = apiRes2.headers.get('content-type')
+    debug.apiPostBodyLength = apiBody2.length
 
     res.json({
       ok: true,
       debug,
-      componentData,
+      getResponse: apiBody.slice(0, 500),
+      postResponse: apiBody2.slice(0, 500),
     })
   } catch (err) {
     console.error('[admin/test-fetch]', err)
