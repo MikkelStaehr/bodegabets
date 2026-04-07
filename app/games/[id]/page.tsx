@@ -955,9 +955,14 @@ export default async function GamePage({ params }: Props) {
               <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
                 Sæt din trup{cyclingActiveBlock ? ` — ${cyclingActiveBlock.name}` : ''}
               </span>
-              <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: '#9E9486', marginTop: 2, lineHeight: 1.3 }}>
-                {userSquad ? 'Vælg 25 ryttere til din brutto trup' : `Udtag 25 ryttere${cyclingActiveBlock ? ` til ${cyclingActiveBlock.name}` : ''}`}
+              <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: theme.primary, marginTop: 2, lineHeight: 1.3 }}>
+                {cyclingActiveBlock?.name ?? 'Vælg din blok'}
               </p>
+              {!userSquad && (
+                <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: '#9E9486', marginTop: 2, lineHeight: 1.3 }}>
+                  Udtag 25 ryttere til din brutto trup
+                </p>
+              )}
             </div>
             <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: theme.primary, fontWeight: 700 }}>›</span>
           </Link>
@@ -1028,15 +1033,16 @@ export default async function GamePage({ params }: Props) {
           </div>
         )}
 
-        {/* Aktive betting runder */}
+        {/* Aktive betting runder — kun fodbold */}
         {typedGame.sport !== 'cycling' && (
-          <ActiveRounds rounds={activeRoundRows} gameId={gameId} />
-        )}
-
-        {typedGame.sport !== 'cycling' && sortedRounds.length === 0 && (
-          <div style={{ border: '1px dashed #C8BEA8', borderRadius: 2, padding: '48px 16px', textAlign: 'center', color: '#6b6b6b', fontFamily: "'Barlow', sans-serif", fontSize: 14 }}>
-            Ingen runder oprettet endnu
-          </div>
+          <>
+            <ActiveRounds rounds={activeRoundRows} gameId={gameId} />
+            {sortedRounds.length === 0 && (
+              <div style={{ border: '1px dashed #C8BEA8', borderRadius: 2, padding: '48px 16px', textAlign: 'center', color: '#6b6b6b', fontFamily: "'Barlow', sans-serif", fontSize: 14 }}>
+                Ingen runder oprettet endnu
+              </div>
+            )}
+          </>
         )}
 
         {/* Leaderboard */}
