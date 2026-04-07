@@ -480,10 +480,12 @@ export default function NewCyclingGameForm({ races }: Props) {
   // Build the race_selections for the API: { race_id, block_number }[]
   function buildRaceSelections(): { race_id: string; block_number: number }[] {
     const selections: { race_id: string; block_number: number }[] = []
+    const seen = new Set<string>()
     for (const block of BLOCKS) {
       for (const slug of block.slugs) {
         const race = raceBySlug[slug]
-        if (race && selectedRaceIds.has(race.id)) {
+        if (race && selectedRaceIds.has(race.id) && !seen.has(race.id)) {
+          seen.add(race.id)
           selections.push({ race_id: race.id, block_number: block.blockNumber })
         }
       }
