@@ -331,6 +331,7 @@ export default async function GamePage({ params }: Props) {
   let userSquad: { id: string } | null = null
   let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
+  let cyclingActiveBlock: { id: string; name: string; block_order: number } | null = null
 
   if (typedGame.sport === 'cycling') {
     const { data: sq } = await supabaseAdmin
@@ -347,7 +348,6 @@ export default async function GamePage({ params }: Props) {
     // Find brugerens aktive blok via cycling_block_id
     const cyclingBlockId = (sq as { cycling_block_id?: string | null } | null)?.cycling_block_id ?? null
     let activeBlockIds: string[] = []
-    let cyclingActiveBlock: { id: string; name: string; block_order: number } | null = null
 
     if (cyclingBlockId) {
       const { data: fetchedBlock } = await supabaseAdmin
