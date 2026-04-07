@@ -225,7 +225,7 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
             {tournaments.length === 0 ? (
               <p className="font-body text-sm text-text-warm">Ingen turneringer fundet — opret via admin-panelet.</p>
             ) : (
-              <>
+              <div style={{ opacity: bodegaRounds ? 0.4 : 1, pointerEvents: bodegaRounds ? 'none' : 'auto', transition: 'opacity 0.15s' }}>
                 {topTournaments.length > 0 && (
                   <>
                     <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-2 flex items-center gap-2">
@@ -245,7 +245,7 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
                     <TournamentGrid items={otherTournaments} onSelect={(id) => { setSelectedTournamentId(id); setBodegaRounds(false) }} isSelected={(id) => selectedTournamentId === id} />
                   </>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -254,7 +254,7 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
         {cupTournaments.length > 0 && (
           <>
             <Connector />
-            <div className="flex gap-5">
+            <div className="flex gap-5" style={{ opacity: bodegaRounds ? 0.4 : 1, pointerEvents: bodegaRounds ? 'none' : 'auto', transition: 'opacity 0.15s' }}>
               <StepNumber n={2} active={step2Active} />
               <div className="flex-1 pb-2">
                 <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-1">Trin 2b · Valgfrit</p>
