@@ -403,20 +403,11 @@ def sync_startlists(
     For each race, check if cycling_startlists has entries.
     If not, scrape and upsert. Returns total entries upserted.
     """
-    # Get race IDs that already have startlist entries
-    try:
-        resp = supabase.table("cycling_startlists").select("race_id").execute()
-        has_startlist: set[str] = set()
-        for row in resp.data or []:
-            has_startlist.add(row["race_id"])
-    except APIError as e:
-        _warn(f"Failed to fetch existing startlists: {e}")
-        has_startlist = set()
-
     total_upserted = 0
 
     for race in races:
-        if race["id"] in has_startlist:
+        # Skip finished races — startlists don't change after a race is done
+        if race.get("status") == "finished":
             continue
 
         _log(f"  Scraping startlist for {race['name']}...")
@@ -688,10 +679,24 @@ def main() -> None:
         except APIError as e:
             _warn(f"Failed to fetch stages: {e}")
 
-    # ── Startlists: scrape for races missing them ──────────────
-    _log("\n→ Syncing startlists for races without entries...")
+    # ── Startlists: scrape for upcoming + active races ──────────
+    _log("\n→ Fetching upcoming/active races for startlist sync...")
+    try:
+        sl_resp = (
+            supabase.table("cycling_races")
+            .select("id, name, pcs_slug, race_type, status")
+            .in_("status", ["upcoming", "active"])
+            .order("start_date", desc=False)
+            .execute()
+        )
+        startlist_races = sl_resp.data or []
+    except APIError as e:
+        _warn(f"Failed to fetch upcoming/active races: {e}")
+        startlist_races = []
+
+    _log(f"  Found {len(startlist_races)} upcoming/active races")
     with httpx.Client(headers=PCS_HEADERS) as client:
-        total_startlists = sync_startlists(races, rider_index, client, supabase)
+        total_startlists = sync_startlists(startlist_races, rider_index, client, supabase)
     _log(f"  Startlist entries upserted: {total_startlists}")
 
     # ── Results: scrape and upload per race ───────────────────
