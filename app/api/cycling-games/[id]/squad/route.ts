@@ -118,11 +118,22 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
+  // Find aktiv blok (lavest block_order med fremtidig deadline, ingen parent)
+  const { data: activeBlock } = await supabaseAdmin
+    .from('cycling_blocks')
+    .select('id')
+    .eq('game_id', Number(gameId))
+    .is('parent_block_id', null)
+    .gt('lock_deadline', new Date().toISOString())
+    .order('block_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
   // Upsert squad
   const { data: squad, error: squadErr } = await supabaseAdmin
     .from('cycling_squads')
     .upsert(
-      { game_id: Number(gameId), user_id: user.id },
+      { game_id: Number(gameId), user_id: user.id, cycling_block_id: activeBlock?.id ?? null },
       { onConflict: 'game_id,user_id' }
     )
     .select('id')
