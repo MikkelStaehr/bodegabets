@@ -403,6 +403,7 @@ export default async function GamePage({ params }: Props) {
           )
         )
       `)
+      .eq('season', '2025/26')
       .order('betting_closes_at', { ascending: true })
 
     championshipRounds = (cRounds ?? []) as unknown as ChampionshipRound[]

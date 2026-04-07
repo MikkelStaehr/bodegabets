@@ -224,16 +224,41 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ betting_closes_at: deadline }).eq('id', r.id)
     }
 
-    console.log(`[update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}`)
+    // 4) Markér championship_rounds som finished
+    const { data: champRounds } = await supabaseAdmin
+      .from('championship_rounds')
+      .select(`
+        id,
+        championship_round_matches(
+          matches(id, status)
+        )
+      `)
+      .eq('status', 'upcoming')
+
+    let champFinished = 0
+    for (const cr of champRounds ?? []) {
+      const allChampMatches = (cr.championship_round_matches as { matches: { id: number; status: string } }[])
+        .map((crm) => crm.matches)
+      if (allChampMatches.length > 0 && allChampMatches.every((m) => m.status === 'finished')) {
+        await supabaseAdmin
+          .from('championship_rounds')
+          .update({ status: 'finished' })
+          .eq('id', cr.id)
+        champFinished++
+      }
+    }
+
+    console.log(`[update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}, champ finished: ${champFinished}`)
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'cron_sync',
       status: finishedIds.length > 0 || openIds.length > 0 ? 'success' : 'info',
-      message: `update-rounds: ${finishedIds.length} finished, ${openIds.length} opened, ${toSetDeadline.length} deadlines sat`,
+      message: `update-rounds: ${finishedIds.length} finished, ${openIds.length} opened, ${toSetDeadline.length} deadlines sat, ${champFinished} champ finished`,
       metadata: {
         rounds_marked_finished: finishedIds,
         rounds_marked_open: openIds,
         deadlines_set: toSetDeadline.map((r) => r.id),
+        championship_rounds_finished: champFinished,
       },
     })
 
@@ -243,6 +268,7 @@ app.get('/update-rounds', async (_req, res) => {
       rounds_marked_finished: finishedIds.length,
       rounds_marked_open: openIds.length,
       deadlines_set: toSetDeadline.length,
+      championship_rounds_finished: champFinished,
     })
   } catch (err) {
     console.error('[update-rounds]', err)
