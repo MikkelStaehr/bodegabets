@@ -22,7 +22,7 @@ type SquadRider = {
   photo_url: string | null
 }
 
-type RoleKey = 'captain' | 'solo_attack' | 'sprint_assist' | 'domestique' | 'helper_0' | 'helper_1' | 'helper_2' | 'luxury_helper'
+type RoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' | 'equipier_0' | 'equipier_1' | 'joker'
 
 type LineupState = Record<string, Record<RoleKey, string | null>>
 
@@ -35,15 +35,15 @@ type Props = {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const ROLES: { key: RoleKey; label: string; emoji: string; catRule: number[] | null }[] = [
-  { key: 'captain',        label: 'Kaptajn',            emoji: '🏆', catRule: null },
-  { key: 'solo_attack',    label: 'Solo angreb',        emoji: '⚔️',  catRule: null },
-  { key: 'sprint_assist',  label: 'Sprint assist',      emoji: '💨', catRule: null },
-  { key: 'domestique',     label: 'Domestik',           emoji: '🐴', catRule: [4] },
-  { key: 'helper_0',       label: 'Hjælperytter',       emoji: '🤝', catRule: null },
-  { key: 'helper_1',       label: 'Hjælperytter',       emoji: '🤝', catRule: null },
-  { key: 'helper_2',       label: 'Hjælperytter',       emoji: '🤝', catRule: null },
-  { key: 'luxury_helper',  label: 'Luksus hjælperytter', emoji: '🛡️', catRule: null },
+const ROLES: { key: RoleKey; label: string; catRule: number[] | null }[] = [
+  { key: 'leader',      label: 'Leader',     catRule: null },
+  { key: 'lieutenant',  label: 'Lieutenant', catRule: [2, 3] },
+  { key: 'grimpeur',    label: 'Grimpeur',   catRule: [3, 4, 5] },
+  { key: 'sprinter',    label: 'Sprinter',   catRule: [1, 2, 3] },
+  { key: 'domestique',  label: 'Domestique', catRule: [4] },
+  { key: 'equipier_0',  label: 'Équipier',   catRule: null },
+  { key: 'equipier_1',  label: 'Équipier',   catRule: null },
+  { key: 'joker',       label: 'Joker',      catRule: null },
 ]
 
 const CAT_LABELS: Record<number, string> = { 1: 'Kat 1', 2: 'Kat 2', 3: 'Kat 3', 4: 'Kat 4', 5: 'Kat 5' }
@@ -146,14 +146,14 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
         const locked = new Set<string>()
         for (const lineup of data.lineups) {
           const raceSlots: Record<RoleKey, string | null> = {
-            captain: null, solo_attack: null, sprint_assist: null, domestique: null,
-            helper_0: null, helper_1: null, helper_2: null, luxury_helper: null,
+            leader: null, lieutenant: null, grimpeur: null, sprinter: null,
+            domestique: null, equipier_0: null, equipier_1: null, joker: null,
           }
           if (lineup.is_locked) locked.add(lineup.race_id)
           for (const rider of lineup.riders) {
             let roleKey: RoleKey = rider.role as RoleKey
-            if (rider.role === 'helper') {
-              roleKey = `helper_${rider.slot_index}` as RoleKey
+            if (rider.role === 'equipier') {
+              roleKey = `equipier_${rider.slot_index}` as RoleKey
             }
             if (roleKey in raceSlots) {
               raceSlots[roleKey] = rider.rider_id
@@ -213,8 +213,8 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
     for (const role of ROLES) {
       const riderId = slots[role.key]
       if (!riderId) continue
-      const baseRole = role.key.startsWith('helper_') ? 'helper' : role.key
-      const slotIndex = role.key.startsWith('helper_') ? parseInt(role.key.split('_')[1]) : 0
+      const baseRole = role.key.startsWith('equipier_') ? 'equipier' : role.key
+      const slotIndex = role.key.startsWith('equipier_') ? parseInt(role.key.split('_')[1]) : 0
       riders.push({ rider_id: riderId, role: baseRole, slot_index: slotIndex })
     }
 
@@ -403,14 +403,12 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
                     {/* Role label */}
                     <div
                       style={{
-                        width: 100,
+                        width: 90,
                         flexShrink: 0,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 6,
                       }}
                     >
-                      <span style={{ fontSize: 14, lineHeight: 1 }}>{role.emoji}</span>
                       <span
                         style={{
                           fontFamily: "'Barlow Condensed', sans-serif",
@@ -587,7 +585,6 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>{role.emoji}</span>
                   <span
                     style={{
                       fontFamily: "'Barlow Condensed', sans-serif",

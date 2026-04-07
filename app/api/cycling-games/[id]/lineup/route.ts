@@ -19,12 +19,20 @@ import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 type Props = { params: Promise<{ id: string }> }
 
 const ROLE_LIMITS: Record<string, number> = {
-  captain: 1,
-  solo_attack: 1,
-  sprint_assist: 1,
+  leader: 1,
+  lieutenant: 1,
+  grimpeur: 1,
+  sprinter: 1,
   domestique: 1,
-  helper: 3,
-  luxury_helper: 1,
+  equipier: 2,
+  joker: 1,
+}
+
+const CAT_RULES: Record<string, number[]> = {
+  lieutenant: [2, 3],
+  grimpeur: [3, 4, 5],
+  sprinter: [1, 2, 3],
+  domestique: [4],
 }
 
 // ── GET: hent brugerens lineups ────────────────────────────────────────────
@@ -135,7 +143,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Valider antal per rolle
   const roleCounts: Record<string, number> = {}
   for (const r of riders) {
-    const baseRole = r.role.startsWith('helper_') ? 'helper' : r.role
+    const baseRole = r.role.startsWith('equipier_') ? 'equipier' : r.role
     roleCounts[baseRole] = (roleCounts[baseRole] ?? 0) + 1
   }
   for (const [role, limit] of Object.entries(ROLE_LIMITS)) {
@@ -169,17 +177,29 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Valider kategori-regler: domestique kun kat 4
-  if (riders.some((r) => r.role === 'domestique')) {
-    const domestiqueRiderIds = riders.filter((r) => r.role === 'domestique').map((r) => r.rider_id)
-    const { data: domestiqueRiders } = await supabaseAdmin
+  // Valider kategori-regler per rolle
+  const catRuleRiders = riders.filter((r) => {
+    const baseRole = r.role.startsWith('equipier_') ? 'equipier' : r.role
+    return baseRole in CAT_RULES
+  })
+
+  if (catRuleRiders.length > 0) {
+    const { data: riderDetails } = await supabaseAdmin
       .from('cycling_riders')
       .select('id, category')
-      .in('id', domestiqueRiderIds)
+      .in('id', catRuleRiders.map((r) => r.rider_id))
 
-    for (const dr of domestiqueRiders ?? []) {
-      if (dr.category !== 4) {
-        return NextResponse.json({ error: 'Domestik-rollen kræver en Kat 4 rytter' }, { status: 400 })
+    const catById = new Map((riderDetails ?? []).map((r) => [r.id, r.category]))
+
+    for (const r of catRuleRiders) {
+      const baseRole = r.role.startsWith('equipier_') ? 'equipier' : r.role
+      const allowed = CAT_RULES[baseRole]
+      if (!allowed) continue
+      const cat = catById.get(r.rider_id)
+      if (cat != null && !allowed.includes(cat)) {
+        return NextResponse.json({
+          error: `${baseRole} kræver kat ${allowed.join('/')} — rytteren er kat ${cat}`,
+        }, { status: 400 })
       }
     }
   }
