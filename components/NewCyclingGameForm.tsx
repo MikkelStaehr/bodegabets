@@ -19,9 +19,14 @@ type Props = {
 
 // ── Block definitions ────────────────────────────────────────────────────────
 
+const MONUMENT_SLUGS = [
+  'milano-sanremo', 'ronde-van-vlaanderen', 'paris-roubaix',
+  'liege-bastogne-liege', 'il-lombardia',
+]
+
 const FLANDERN_SLUGS = [
   'omloop-het-nieuwsblad', 'strade-bianche', 'milano-sanremo',
-  'e3-saxo-bank-classic', 'gent-wevelgem', 'dwars-door-vlaanderen',
+  'e3-harelbeke', 'gent-wevelgem', 'dwars-door-vlaanderen',
   'ronde-van-vlaanderen',
 ]
 
@@ -34,16 +39,19 @@ const GRAND_TOUR_SLUGS = ['giro-d-italia', 'tour-de-france', 'vuelta-a-espana']
 
 const MAJOR_TOUR_SLUGS = [
   'paris-nice', 'tirreno-adriatico', 'volta-a-catalunya',
-  'tour-de-romandie', 'criterium-du-dauphine',
-  'tour-de-suisse', 'tour-de-pologne',
+  'itzulia-basque-country', 'tour-de-romandie', 'dauphine',
+  'tour-de-suisse',
 ]
 
-const CHAMPIONSHIP_SLUGS = ['uci-road-world-championships', 'uci-european-championships']
+const CHAMPIONSHIP_SLUGS = ['world-championship', 'uec-road-european-championships']
 
 const OTHER_SLUGS = [
-  'il-lombardia', 'paris-tours', 'gp-montreal',
-  'gp-quebec', 'clasica-san-sebastian',
+  'il-lombardia', 'eschborn-frankfurt', 'san-sebastian',
+  'bretagne-classic', 'gp-quebec', 'gp-montreal',
 ]
+
+// Blokke der ekskluderer hinanden (monumenter ↔ flandern/ardennerne/øvrige)
+const MONUMENT_CONFLICTS = ['flandern', 'ardennerne', 'other']
 
 type BlockDef = {
   key: string
@@ -51,18 +59,27 @@ type BlockDef = {
   desc: string
   icon: string
   slugs: string[]
-  isBundle: boolean   // true = all-or-nothing, false = pick individual races
+  isBundle: boolean
   blockNumber: number
 }
 
 const BLOCKS: BlockDef[] = [
+  {
+    key: 'monuments',
+    label: 'De 5 Monumenter',
+    desc: 'Milano-Sanremo, Ronde, Roubaix, Liège og Lombardiet',
+    icon: '🏛️',
+    slugs: MONUMENT_SLUGS,
+    isBundle: true,
+    blockNumber: 0,
+  },
   {
     key: 'flandern',
     label: 'Flandern-klassikerne',
     desc: '7 forårsklassikere fra Omloop til Ronde',
     icon: '🧱',
     slugs: FLANDERN_SLUGS,
-    isBundle: true,
+    isBundle: false,
     blockNumber: 1,
   },
   {
@@ -71,7 +88,7 @@ const BLOCKS: BlockDef[] = [
     desc: 'Paris-Roubaix, Amstel, Flèche og Liège',
     icon: '⛰️',
     slugs: ARDENNERNE_SLUGS,
-    isBundle: true,
+    isBundle: false,
     blockNumber: 2,
   },
   {
@@ -104,7 +121,7 @@ const BLOCKS: BlockDef[] = [
   {
     key: 'other',
     label: 'Øvrige klassikere',
-    desc: 'Lombardiet og efterårsløb',
+    desc: 'Lombardiet, Eschborn-Frankfurt og efterårsløb',
     icon: '🍂',
     slugs: OTHER_SLUGS,
     isBundle: false,
@@ -168,26 +185,59 @@ export default function NewCyclingGameForm({ races }: Props) {
       if (allSelected) {
         for (const id of blockRaceIds) next.delete(id)
       } else {
+        // Monument-konflikter: deselect overlappende blokke
+        if (block.key === 'monuments') {
+          for (const conflictKey of MONUMENT_CONFLICTS) {
+            const conflictBlock = BLOCKS.find((b) => b.key === conflictKey)
+            if (conflictBlock) {
+              for (const slug of conflictBlock.slugs) {
+                const race = raceBySlug[slug]
+                if (race) next.delete(race.id)
+              }
+            }
+          }
+        } else if (MONUMENT_CONFLICTS.includes(block.key)) {
+          // Deselect monumenter når flandern/ardennerne/øvrige vælges
+          const monumentBlock = BLOCKS.find((b) => b.key === 'monuments')
+          if (monumentBlock) {
+            for (const slug of monumentBlock.slugs) {
+              const race = raceBySlug[slug]
+              if (race) next.delete(race.id)
+            }
+          }
+        }
         for (const id of blockRaceIds) next.add(id)
       }
       return next
     })
   }
 
-  function toggleRace(raceId: string) {
+  function toggleRace(raceId: string, blockKey: string) {
     setSelectedRaceIds((prev) => {
       const next = new Set(prev)
-      if (next.has(raceId)) next.delete(raceId)
-      else next.add(raceId)
+      if (next.has(raceId)) {
+        next.delete(raceId)
+      } else {
+        // Deselect monumenter hvis man vælger individuelle løb fra konflikt-blokke
+        if (MONUMENT_CONFLICTS.includes(blockKey)) {
+          const monumentBlock = BLOCKS.find((b) => b.key === 'monuments')
+          if (monumentBlock) {
+            for (const slug of monumentBlock.slugs) {
+              const race = raceBySlug[slug]
+              if (race) next.delete(race.id)
+            }
+          }
+        }
+        next.add(raceId)
+      }
       return next
     })
   }
 
   function isBlockFullySelected(block: BlockDef): boolean {
-    return block.slugs.every((s) => {
-      const race = raceBySlug[s]
-      return race && selectedRaceIds.has(race.id)
-    })
+    const blockRaces = block.slugs.map((s) => raceBySlug[s]).filter(Boolean)
+    if (blockRaces.length === 0) return false
+    return blockRaces.every((race) => selectedRaceIds.has(race.id))
   }
 
   function isBlockPartiallySelected(block: BlockDef): boolean {
@@ -340,7 +390,7 @@ export default function NewCyclingGameForm({ races }: Props) {
                             <button
                               key={race.id}
                               type="button"
-                              onClick={() => toggleRace(race.id)}
+                              onClick={() => toggleRace(race.id, block.key)}
                               className="w-full flex items-center gap-3 py-1.5 text-left hover:bg-cream-dark/50 px-1 transition-colors"
                               style={{ borderRadius: '2px' }}
                             >

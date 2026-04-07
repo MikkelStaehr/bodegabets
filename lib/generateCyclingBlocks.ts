@@ -6,7 +6,7 @@ const FLANDERN_SLUGS = [
   'omloop-het-nieuwsblad',
   'strade-bianche',
   'milano-sanremo',
-  'e3-saxo-bank-classic',
+  'e3-harelbeke',
   'gent-wevelgem',
   'dwars-door-vlaanderen',
   'ronde-van-vlaanderen',
