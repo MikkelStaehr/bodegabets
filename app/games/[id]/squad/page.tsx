@@ -37,7 +37,26 @@ export default async function SquadPage({ params }: Props) {
 
   if (!membership) redirect(`/games/${gameId}`)
 
-  // Find races in this game
+  // Fetch ALL riders
+  const { data: allRidersRaw } = await supabaseAdmin
+    .from('cycling_riders')
+    .select('id, first_name, last_name, team_name, category, team_logo_url, photo_url')
+    .order('category', { ascending: true })
+    .order('last_name', { ascending: true })
+
+  const allRiders: Rider[] = (allRidersRaw ?? []).map((r) => ({
+    id: r.id,
+    first_name: r.first_name,
+    last_name: r.last_name,
+    team_name: r.team_name,
+    category: r.category,
+    team_logo_url: r.team_logo_url,
+    photo_url: r.photo_url,
+  }))
+
+  // Find confirmed rider IDs from next active/upcoming race startlist
+  const confirmedRiderIds: string[] = []
+
   const { data: gameRaces } = await supabaseAdmin
     .from('cycling_game_races')
     .select('race_id')
@@ -45,53 +64,28 @@ export default async function SquadPage({ params }: Props) {
 
   const raceIds = (gameRaces ?? []).map((gr) => gr.race_id)
 
-  // Find the next active/upcoming race with a startlist
-  let availableRiders: Rider[] = []
-
   if (raceIds.length > 0) {
-    // Get races sorted by date, prefer active then upcoming
     const { data: races } = await supabaseAdmin
       .from('cycling_races')
-      .select('id, name, status, start_date')
+      .select('id, status, start_date')
       .in('id', raceIds)
       .in('status', ['active', 'upcoming'])
       .order('start_date', { ascending: true })
 
-    // Pick first active, or first upcoming
     const targetRace =
       (races ?? []).find((r) => r.status === 'active') ??
       (races ?? []).find((r) => r.status === 'upcoming') ??
       null
 
     if (targetRace) {
-      // Fetch startlist riders joined with cycling_riders
       const { data: startlist } = await supabaseAdmin
         .from('cycling_startlists')
-        .select(`
-          rider:cycling_riders!inner(
-            id, first_name, last_name, team_name, category, team_logo_url, photo_url
-          )
-        `)
+        .select('rider_id')
         .eq('race_id', targetRace.id)
 
-      availableRiders = (startlist ?? []).map((row) => {
-        const r = row.rider as unknown as Rider
-        return {
-          id: r.id,
-          first_name: r.first_name,
-          last_name: r.last_name,
-          team_name: r.team_name,
-          category: r.category,
-          team_logo_url: r.team_logo_url,
-          photo_url: r.photo_url,
-        }
-      })
-
-      // Sort by category then last name
-      availableRiders.sort((a, b) => {
-        if (a.category !== b.category) return a.category - b.category
-        return a.last_name.localeCompare(b.last_name)
-      })
+      for (const row of startlist ?? []) {
+        confirmedRiderIds.push(row.rider_id)
+      }
     }
   }
 
@@ -174,27 +168,12 @@ export default async function SquadPage({ params }: Props) {
 
       {/* Content */}
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 80px' }}>
-        {availableRiders.length === 0 ? (
-          <div
-            style={{
-              padding: '48px 16px',
-              textAlign: 'center',
-              border: '1px dashed #C8BEA8',
-              borderRadius: 2,
-              color: '#6b6b6b',
-              fontFamily: "'Barlow', sans-serif",
-              fontSize: 14,
-            }}
-          >
-            Ingen startliste tilgængelig endnu. Startlister offentliggøres tæt på løbsdagen.
-          </div>
-        ) : (
-          <SquadBuilder
-            gameId={gameId}
-            availableRiders={availableRiders}
-            initialSquad={initialSquad}
-          />
-        )}
+        <SquadBuilder
+          gameId={gameId}
+          availableRiders={allRiders}
+          confirmedRiderIds={confirmedRiderIds}
+          initialSquad={initialSquad}
+        />
       </div>
     </div>
   )

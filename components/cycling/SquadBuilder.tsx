@@ -18,6 +18,7 @@ export type Rider = {
 type Props = {
   gameId: number
   availableRiders: Rider[]
+  confirmedRiderIds: string[]
   initialSquad: Rider[]
 }
 
@@ -108,15 +109,17 @@ function Spinner() {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SquadBuilder({ gameId, availableRiders, initialSquad }: Props) {
+export default function SquadBuilder({ gameId, availableRiders, confirmedRiderIds, initialSquad }: Props) {
   const router = useRouter()
   const [squad, setSquad] = useState<Rider[]>(initialSquad)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<number | null>(null)
+  const [confirmedOnly, setConfirmedOnly] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
+  const confirmedSet = useMemo(() => new Set(confirmedRiderIds), [confirmedRiderIds])
   const squadIds = useMemo(() => new Set(squad.map((r) => r.id)), [squad])
 
   // Category counts
@@ -136,6 +139,7 @@ export default function SquadBuilder({ gameId, availableRiders, initialSquad }: 
   // Filtered available riders
   const filtered = useMemo(() => {
     let list = availableRiders.filter((r) => !squadIds.has(r.id))
+    if (confirmedOnly) list = list.filter((r) => confirmedSet.has(r.id))
     if (catFilter !== null) list = list.filter((r) => r.category === catFilter)
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -147,7 +151,7 @@ export default function SquadBuilder({ gameId, availableRiders, initialSquad }: 
       )
     }
     return list
-  }, [availableRiders, squadIds, catFilter, search])
+  }, [availableRiders, squadIds, catFilter, search, confirmedOnly, confirmedSet])
 
   function canAdd(rider: Rider): { ok: boolean; reason?: string } {
     if (squad.length >= MAX_TOTAL) return { ok: false, reason: `Max ${MAX_TOTAL} ryttere` }
@@ -405,7 +409,7 @@ export default function SquadBuilder({ gameId, availableRiders, initialSquad }: 
             />
           </div>
 
-          {/* Category filter pills */}
+          {/* Category filter pills + confirmed toggle */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -444,6 +448,26 @@ export default function SquadBuilder({ gameId, availableRiders, initialSquad }: 
                 {CAT_LABELS[cat]}
               </button>
             ))}
+            {confirmedRiderIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmedOnly(!confirmedOnly)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 999,
+                  border: `1px solid ${confirmedOnly ? '#4CAF50' : '#D4CFC4'}`,
+                  background: confirmedOnly ? 'rgba(76,175,80,0.1)' : 'transparent',
+                  color: confirmedOnly ? '#4CAF50' : '#6b6b6b',
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                }}
+              >
+                Bekræftede
+              </button>
+            )}
           </div>
 
           {/* Rider list */}
@@ -527,6 +551,23 @@ export default function SquadBuilder({ gameId, availableRiders, initialSquad }: 
                         {rider.team_name}
                       </div>
                     </div>
+                    {confirmedSet.has(rider.id) && (
+                      <span
+                        style={{
+                          padding: '1px 5px',
+                          borderRadius: 2,
+                          background: 'rgba(76,175,80,0.1)',
+                          color: '#4CAF50',
+                          fontFamily: "'Barlow Condensed', sans-serif",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                          flexShrink: 0,
+                        }}
+                      >
+                        Bekræftet
+                      </span>
+                    )}
                     <CatBadge cat={rider.category} />
                     <span
                       style={{
