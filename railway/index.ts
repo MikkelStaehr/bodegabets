@@ -237,8 +237,8 @@ app.get('/update-rounds', async (_req, res) => {
 
     let champFinished = 0
     for (const cr of champRounds ?? []) {
-      const allChampMatches = (cr.championship_round_matches as { matches: { id: number; status: string } }[])
-        .map((crm) => crm.matches)
+      const allChampMatches = (cr.championship_round_matches as { matches: { id: number; status: string }[] }[])
+        .flatMap((crm) => crm.matches ?? [])
       if (allChampMatches.length > 0 && allChampMatches.every((m) => m.status === 'finished')) {
         await supabaseAdmin
           .from('championship_rounds')
