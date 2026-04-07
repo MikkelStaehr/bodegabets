@@ -675,7 +675,7 @@ export default async function GamePage({ params }: Props) {
           leagueType: 'cup' as const,
           logo_url: null,
           hasRivalry: true,
-          href: `/games/${gameId}`,
+          href: `/games/${gameId}/championship/${cr.id}`,
         }
       })
 

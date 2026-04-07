@@ -85,6 +85,7 @@ type Props = {
   totalMatchesInRound?: number
   betDistribution?: BetDistribution
   blockInfo?: { block_number: number; block_name: string; is_last_in_block: boolean } | null
+  submitApiPath?: string
 }
 
 function initSelections(_matches: MatchWithOptions[], _existing: Bet[]): BetEntry[] {
@@ -647,6 +648,7 @@ export default function AfgivBets({
   totalMatchesInRound,
   betDistribution,
   blockInfo,
+  submitApiPath,
 }: Props) {
   const router = useRouter()
   const { toast } = useToast()
@@ -865,7 +867,7 @@ export default function AfgivBets({
     }
 
     setIsSubmitting(true)
-    const res = await fetch(`/api/rounds/${roundId}/submit-bets`, {
+    const res = await fetch(submitApiPath ?? `/api/rounds/${roundId}/submit-bets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
