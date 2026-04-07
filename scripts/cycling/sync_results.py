@@ -145,8 +145,8 @@ def save_json(path: str, data: object) -> None:
 
 
 def scrape_race_results(slug: str, client: httpx.Client) -> list[dict]:
-    """Scrape ALL results from a one-day race or GC."""
-    url = f"{PCS_BASE}/race/{slug}/{YEAR}"
+    """Scrape ALL results from a one-day race using /result endpoint."""
+    url = f"{PCS_BASE}/race/{slug}/{YEAR}/result"
     _log(f"    Fetching: {url}")
     soup = pcs_get(url, client)
     time.sleep(REQUEST_DELAY)
@@ -155,21 +155,36 @@ def scrape_race_results(slug: str, client: httpx.Client) -> list[dict]:
 
 def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tuple[list[dict], dict[str, list[str]], str | None]:
     """Scrape ALL results from a specific stage.
+    Uses /stage-{N} page for jerseys and profile, then fetches
+    /stage-{N}/result for the full results table.
     Returns (results, jersey_holders, stage_profile).
-    jersey_holders: { rider_pcs_slug: [jersey_type, ...] }
-    stage_profile: 'flat', 'hilly', 'mountain', 'cobbled', 'itt', 'mixed' or None
     """
     if stage_num == 0:
-        url = f"{PCS_BASE}/race/{slug}/{YEAR}/prologue"
+        base = f"{PCS_BASE}/race/{slug}/{YEAR}/prologue"
     else:
-        url = f"{PCS_BASE}/race/{slug}/{YEAR}/stage-{stage_num}"
-    _log(f"    Fetching: {url}")
-    soup = pcs_get(url, client)
+        base = f"{PCS_BASE}/race/{slug}/{YEAR}/stage-{stage_num}"
+
+    # Fetch stage page for jerseys + profile
+    _log(f"    Fetching: {base}")
+    soup = pcs_get(base, client)
     time.sleep(REQUEST_DELAY)
 
-    results = _parse_results_table(soup)
     jerseys = _parse_jerseys(soup)
     profile = _parse_stage_profile(soup)
+
+    # Fetch full results from /result sub-page
+    result_url = f"{base}/result"
+    _log(f"    Fetching full results: {result_url}")
+    result_soup = pcs_get(result_url, client)
+    time.sleep(REQUEST_DELAY)
+
+    results = _parse_results_table(result_soup)
+
+    # Fallback: if /result returned fewer than the stage page, use stage page
+    stage_results = _parse_results_table(soup)
+    if len(stage_results) > len(results):
+        _log(f"    Fallback: stage page had {len(stage_results)} vs /result {len(results)}")
+        results = stage_results
 
     return results, jerseys, profile
 
@@ -693,10 +708,53 @@ def main() -> None:
         metavar="SLUG",
         help="Fetch a startlist page and dump HTML structure, then exit",
     )
+    parser.add_argument(
+        "--debug-results",
+        type=str,
+        default=None,
+        metavar="SLUG",
+        help="Fetch result pages for a race and compare rider counts, then exit",
+    )
     args = parser.parse_args()
 
     load_dotenv_local()
     os.makedirs(DATA_DIR, exist_ok=True)
+
+    if args.debug_results:
+        slug = args.debug_results
+        with httpx.Client(headers=PCS_HEADERS) as client:
+            rider_re = re.compile(r"^rider/([\w-]+)$")
+
+            # Test different URL patterns
+            urls = [
+                f"{PCS_BASE}/race/{slug}/{YEAR}",
+                f"{PCS_BASE}/race/{slug}/{YEAR}/result",
+                f"{PCS_BASE}/race/{slug}/{YEAR}/result/result",
+                f"{PCS_BASE}/race/{slug}/{YEAR}?offset=0",
+            ]
+            for url in urls:
+                _log(f"\nFetching: {url}")
+                resp = client.get(url, timeout=30, follow_redirects=True)
+                _log(f"  Status: {resp.status_code}, Final URL: {resp.url}")
+                if resp.status_code != 200:
+                    continue
+                soup = BeautifulSoup(resp.text, "html.parser")
+                riders = set()
+                for a in soup.find_all("a", href=rider_re):
+                    m = rider_re.match(a["href"])
+                    if m and a.find_parent("tr"):
+                        riders.add(m.group(1))
+                _log(f"  Unique riders in <tr>: {len(riders)}")
+
+                # Check for pagination or "show all" links
+                for a in soup.find_all("a", href=True):
+                    href = a.get("href", "")
+                    text = a.get_text(strip=True).lower()
+                    if any(kw in text for kw in ["all", "alle", "more", "full", "next"]):
+                        _log(f"  Pagination link: href={href} text={text}")
+                    if "offset" in href or "limit" in href or "page" in href:
+                        _log(f"  Pagination link: href={href} text={text}")
+        return
 
     if args.debug_startlist:
         slug = args.debug_startlist
