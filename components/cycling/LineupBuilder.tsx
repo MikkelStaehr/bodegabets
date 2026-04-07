@@ -1,0 +1,765 @@
+'use client'
+
+import { useState, useEffect, useMemo, useCallback } from 'react'
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+type Race = {
+  id: string
+  name: string
+  start_date: string
+  status: string
+  race_type: string
+}
+
+type SquadRider = {
+  id: string
+  first_name: string
+  last_name: string
+  team_name: string
+  category: number
+  team_logo_url: string | null
+  photo_url: string | null
+}
+
+type RoleKey = 'captain' | 'solo_attack' | 'sprint_assist' | 'domestique' | 'helper_0' | 'helper_1' | 'helper_2' | 'luxury_helper'
+
+type LineupState = Record<string, Record<RoleKey, string | null>>
+
+type Props = {
+  gameId: number
+  squadId: string | null
+  races: Race[]
+  squadRiders: SquadRider[]
+}
+
+// ── Constants ───────────────────────────────────────────────────────────────
+
+const ROLES: { key: RoleKey; label: string; emoji: string; catRule: number[] | null }[] = [
+  { key: 'captain',        label: 'Kaptajn',            emoji: '🏆', catRule: null },
+  { key: 'solo_attack',    label: 'Solo angreb',        emoji: '⚔️',  catRule: null },
+  { key: 'sprint_assist',  label: 'Sprint assist',      emoji: '💨', catRule: null },
+  { key: 'domestique',     label: 'Domestik',           emoji: '🐴', catRule: [4] },
+  { key: 'helper_0',       label: 'Hjælperytter',       emoji: '🤝', catRule: null },
+  { key: 'helper_1',       label: 'Hjælperytter',       emoji: '🤝', catRule: null },
+  { key: 'helper_2',       label: 'Hjælperytter',       emoji: '🤝', catRule: null },
+  { key: 'luxury_helper',  label: 'Luksus hjælperytter', emoji: '🛡️', catRule: null },
+]
+
+const CAT_LABELS: Record<number, string> = { 1: 'Kat 1', 2: 'Kat 2', 3: 'Kat 3', 4: 'Kat 4', 5: 'Kat 5' }
+const CAT_COLORS: Record<number, string> = {
+  1: '#B8963E',
+  2: '#6B8F71',
+  3: '#4A6FA5',
+  4: '#8B6F47',
+  5: '#7A7060',
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function CatBadge({ cat }: { cat: number }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1px 6px',
+        borderRadius: 2,
+        background: `${CAT_COLORS[cat] ?? '#7A7060'}18`,
+        color: CAT_COLORS[cat] ?? '#7A7060',
+        fontFamily: "'Barlow Condensed', sans-serif",
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        lineHeight: 1.4,
+      }}
+    >
+      {CAT_LABELS[cat] ?? `K${cat}`}
+    </span>
+  )
+}
+
+function TeamLogo({ url, team }: { url: string | null; team: string }) {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={team}
+        style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
+      />
+    )
+  }
+  return (
+    <div
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: 2,
+        background: '#2B4F7A',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 8,
+        fontWeight: 700,
+        color: '#8FABC4',
+        flexShrink: 0,
+      }}
+    >
+      {team.slice(0, 2).toUpperCase()}
+    </div>
+  )
+}
+
+function formatDanishDate(dateStr: string): string {
+  const months = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+  const d = new Date(dateStr)
+  return `${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}`
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
+
+export default function LineupBuilder({ gameId, squadId, races, squadRiders }: Props) {
+  const [lineups, setLineups] = useState<LineupState>({})
+  const [lockedRaces, setLockedRaces] = useState<Set<string>>(new Set())
+  const [savingRace, setSavingRace] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState<{ raceId: string; roleKey: RoleKey } | null>(null)
+  const [modalSearch, setModalSearch] = useState('')
+  const [initialLineups, setInitialLineups] = useState<LineupState>({})
+
+  const riderMap = useMemo(() => {
+    const map = new Map<string, SquadRider>()
+    for (const r of squadRiders) map.set(r.id, r)
+    return map
+  }, [squadRiders])
+
+  // Fetch existing lineups on mount
+  useEffect(() => {
+    if (!squadId) return
+    fetch(`/api/cycling-games/${gameId}/lineup`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.lineups?.length) return
+        const state: LineupState = {}
+        const locked = new Set<string>()
+        for (const lineup of data.lineups) {
+          const raceSlots: Record<RoleKey, string | null> = {
+            captain: null, solo_attack: null, sprint_assist: null, domestique: null,
+            helper_0: null, helper_1: null, helper_2: null, luxury_helper: null,
+          }
+          if (lineup.is_locked) locked.add(lineup.race_id)
+          for (const rider of lineup.riders) {
+            let roleKey: RoleKey = rider.role as RoleKey
+            if (rider.role === 'helper') {
+              roleKey = `helper_${rider.slot_index}` as RoleKey
+            }
+            if (roleKey in raceSlots) {
+              raceSlots[roleKey] = rider.rider_id
+            }
+          }
+          state[lineup.race_id] = raceSlots
+        }
+        setLineups(state)
+        setInitialLineups(JSON.parse(JSON.stringify(state)))
+        setLockedRaces(locked)
+      })
+      .catch(() => {})
+  }, [gameId, squadId])
+
+  const setSlot = useCallback((raceId: string, roleKey: RoleKey, riderId: string | null) => {
+    setLineups((prev) => ({
+      ...prev,
+      [raceId]: {
+        ...(prev[raceId] ?? {
+          captain: null, solo_attack: null, sprint_assist: null, domestique: null,
+          helper_0: null, helper_1: null, helper_2: null, luxury_helper: null,
+        }),
+        [roleKey]: riderId,
+      },
+    }))
+    setError(null)
+    setSuccess(null)
+  }, [])
+
+  const getUsedRiderIds = useCallback((raceId: string): Set<string> => {
+    const slots = lineups[raceId]
+    if (!slots) return new Set()
+    const ids = new Set<string>()
+    for (const v of Object.values(slots)) {
+      if (v) ids.add(v)
+    }
+    return ids
+  }, [lineups])
+
+  const hasChanges = useCallback((raceId: string): boolean => {
+    const current = lineups[raceId]
+    const initial = initialLineups[raceId]
+    if (!current && !initial) return false
+    if (!current || !initial) return true
+    return JSON.stringify(current) !== JSON.stringify(initial)
+  }, [lineups, initialLineups])
+
+  async function handleSave(raceId: string) {
+    setError(null)
+    setSuccess(null)
+    setSavingRace(raceId)
+
+    const slots = lineups[raceId]
+    if (!slots) { setSavingRace(null); return }
+
+    const riders: { rider_id: string; role: string; slot_index: number }[] = []
+    for (const role of ROLES) {
+      const riderId = slots[role.key]
+      if (!riderId) continue
+      const baseRole = role.key.startsWith('helper_') ? 'helper' : role.key
+      const slotIndex = role.key.startsWith('helper_') ? parseInt(role.key.split('_')[1]) : 0
+      riders.push({ rider_id: riderId, role: baseRole, slot_index: slotIndex })
+    }
+
+    try {
+      const res = await fetch(`/api/cycling-games/${gameId}/lineup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ race_id: raceId, riders }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Noget gik galt')
+      } else {
+        setSuccess(raceId)
+        setInitialLineups((prev) => ({
+          ...prev,
+          [raceId]: JSON.parse(JSON.stringify(lineups[raceId])),
+        }))
+      }
+    } catch {
+      setError('Noget gik galt')
+    }
+    setSavingRace(null)
+  }
+
+  // No squad
+  if (!squadId || squadRiders.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '20px 16px',
+          background: '#1E3A5F',
+          border: '1px solid #2B4F7A',
+          borderRadius: 2,
+          textAlign: 'center',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#8FABC4',
+          }}
+        >
+          Udtag din brutto trup først
+        </span>
+      </div>
+    )
+  }
+
+  if (races.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '20px 16px',
+          background: '#1E3A5F',
+          border: '1px solid #2B4F7A',
+          borderRadius: 2,
+          textAlign: 'center',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#8FABC4',
+          }}
+        >
+          Ingen kommende løb
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Section header */}
+      <div style={{ marginBottom: 0 }}>
+        <span
+          style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 11,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: '#8FABC4',
+          }}
+        >
+          Aktiv lineup
+        </span>
+      </div>
+
+      {races.map((race) => {
+        const isLocked = lockedRaces.has(race.id)
+        const slots = lineups[race.id] ?? {
+          captain: null, solo_attack: null, sprint_assist: null, domestique: null,
+          helper_0: null, helper_1: null, helper_2: null, luxury_helper: null,
+        }
+        const changed = hasChanges(race.id)
+        const isSaving = savingRace === race.id
+        const isSuccess = success === race.id
+
+        return (
+          <div
+            key={race.id}
+            style={{
+              background: '#1E3A5F',
+              border: '1px solid #2B4F7A',
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 14px',
+                borderBottom: '1px solid #2B4F7A',
+                background: '#162E4A',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: '#F2EDE4',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {isLocked && '🔒 '}{race.name}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontSize: 11,
+                    color: '#8FABC4',
+                    marginTop: 2,
+                  }}
+                >
+                  {formatDanishDate(race.start_date)} · {race.race_type === 'stage_race' ? 'Etapeløb' : 'Endagsløb'}
+                </div>
+              </div>
+            </div>
+
+            {/* Slot rows */}
+            <div>
+              {ROLES.map((role, idx) => {
+                const riderId = slots[role.key]
+                const rider = riderId ? riderMap.get(riderId) : null
+
+                return (
+                  <button
+                    key={role.key}
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => {
+                      if (isLocked) return
+                      setModalOpen({ raceId: race.id, roleKey: role.key })
+                      setModalSearch('')
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderBottom: idx < ROLES.length - 1 ? '1px solid #2B4F7A' : 'none',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottomStyle: idx < ROLES.length - 1 ? 'solid' : 'none',
+                      borderBottomWidth: idx < ROLES.length - 1 ? 1 : 0,
+                      borderBottomColor: '#2B4F7A',
+                      cursor: isLocked ? 'not-allowed' : 'pointer',
+                      opacity: isLocked ? 0.6 : 1,
+                      textAlign: 'left',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => { if (!isLocked) e.currentTarget.style.background = '#2B4F7A' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    {/* Role label */}
+                    <div
+                      style={{
+                        width: 100,
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>{role.emoji}</span>
+                      <span
+                        style={{
+                          fontFamily: "'Barlow Condensed', sans-serif",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#8FABC4',
+                          letterSpacing: '0.02em',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {role.label}
+                      </span>
+                    </div>
+
+                    {/* Rider info or placeholder */}
+                    {rider ? (
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <TeamLogo url={rider.team_logo_url} team={rider.team_name} />
+                        <span
+                          style={{
+                            fontFamily: "'Barlow Condensed', sans-serif",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: '#F2EDE4',
+                            lineHeight: 1.2,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {rider.first_name} {rider.last_name}
+                        </span>
+                        <CatBadge cat={rider.category} />
+                      </div>
+                    ) : (
+                      <div style={{ flex: 1 }}>
+                        <span
+                          style={{
+                            fontFamily: "'Barlow', sans-serif",
+                            fontSize: 12,
+                            color: '#64748B',
+                            fontStyle: 'italic',
+                          }}
+                        >
+                          Vælg rytter
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Save button + status */}
+            <div
+              style={{
+                padding: '10px 14px',
+                borderTop: '1px solid #2B4F7A',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => handleSave(race.id)}
+                disabled={!changed || isLocked || isSaving}
+                style={{
+                  padding: '8px 20px',
+                  border: 'none',
+                  borderRadius: 2,
+                  background: '#4A6FA5',
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: '#F2EDE4',
+                  cursor: !changed || isLocked || isSaving ? 'not-allowed' : 'pointer',
+                  opacity: !changed || isLocked || isSaving ? 0.4 : 1,
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {isSaving ? 'Gemmer...' : 'Gem lineup'}
+              </button>
+              {isSuccess && !changed && (
+                <span
+                  style={{
+                    fontFamily: "'Barlow', sans-serif",
+                    fontSize: 11,
+                    color: '#6B8F71',
+                  }}
+                >
+                  Gemt ✓
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Error */}
+      {error && (
+        <div
+          style={{
+            padding: '10px 14px',
+            background: 'rgba(200,57,43,0.12)',
+            border: '1px solid rgba(200,57,43,0.3)',
+            borderRadius: 2,
+            fontFamily: "'Barlow', sans-serif",
+            fontSize: 13,
+            color: '#E86B5F',
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* ── Modal ────────────────────────────────────────────────────── */}
+      {modalOpen && (() => {
+        const { raceId, roleKey } = modalOpen
+        const role = ROLES.find((r) => r.key === roleKey)!
+        const usedIds = getUsedRiderIds(raceId)
+
+        const filteredRiders = squadRiders.filter((r) => {
+          if (role.catRule && !role.catRule.includes(r.category)) return false
+          if (modalSearch.trim()) {
+            const q = modalSearch.toLowerCase()
+            if (
+              !r.first_name.toLowerCase().includes(q) &&
+              !r.last_name.toLowerCase().includes(q) &&
+              !r.team_name.toLowerCase().includes(q)
+            ) return false
+          }
+          return true
+        })
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.6)',
+            }}
+            onClick={() => setModalOpen(null)}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 480,
+                maxHeight: '70vh',
+                background: '#0F2137',
+                border: '1px solid #2B4F7A',
+                borderRadius: '8px 8px 0 0',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderBottom: '1px solid #2B4F7A',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>{role.emoji}</span>
+                  <span
+                    style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: '#F2EDE4',
+                    }}
+                  >
+                    {role.label}
+                  </span>
+                  {role.catRule && (
+                    <span
+                      style={{
+                        fontFamily: "'Barlow Condensed', sans-serif",
+                        fontSize: 10,
+                        color: '#8FABC4',
+                      }}
+                    >
+                      (kun Kat {role.catRule.join(', ')})
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#8FABC4',
+                    fontSize: 20,
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Search */}
+              <div style={{ padding: '10px 16px' }}>
+                <input
+                  type="text"
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  placeholder="Søg rytter eller hold..."
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #2B4F7A',
+                    borderRadius: 2,
+                    fontFamily: "'Barlow', sans-serif",
+                    fontSize: 13,
+                    outline: 'none',
+                    background: '#1E3A5F',
+                    color: '#F2EDE4',
+                  }}
+                />
+              </div>
+
+              {/* Rider list */}
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {filteredRiders.length === 0 ? (
+                  <div
+                    style={{
+                      padding: '32px 16px',
+                      textAlign: 'center',
+                      color: '#64748B',
+                      fontFamily: "'Barlow', sans-serif",
+                      fontSize: 13,
+                    }}
+                  >
+                    Ingen ryttere fundet
+                  </div>
+                ) : (
+                  filteredRiders.map((rider, idx) => {
+                    const alreadyUsed = usedIds.has(rider.id) && lineups[raceId]?.[roleKey] !== rider.id
+                    return (
+                      <button
+                        key={rider.id}
+                        type="button"
+                        disabled={alreadyUsed}
+                        title={alreadyUsed ? 'Allerede valgt i en anden rolle' : undefined}
+                        onClick={() => {
+                          setSlot(raceId, roleKey, rider.id)
+                          setModalOpen(null)
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          padding: '10px 16px',
+                          borderBottom: idx < filteredRiders.length - 1 ? '1px solid #1E3A5F' : 'none',
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottomStyle: idx < filteredRiders.length - 1 ? 'solid' : 'none',
+                          borderBottomWidth: idx < filteredRiders.length - 1 ? 1 : 0,
+                          borderBottomColor: '#1E3A5F',
+                          cursor: alreadyUsed ? 'not-allowed' : 'pointer',
+                          opacity: alreadyUsed ? 0.35 : 1,
+                          textAlign: 'left',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={(e) => { if (!alreadyUsed) e.currentTarget.style.background = '#1E3A5F' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <TeamLogo url={rider.team_logo_url} team={rider.team_name} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontFamily: "'Barlow Condensed', sans-serif",
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: '#F2EDE4',
+                              lineHeight: 1.2,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {rider.last_name}
+                            <span style={{ fontWeight: 400, color: '#8FABC4' }}> {rider.first_name}</span>
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: "'Barlow Condensed', sans-serif",
+                              fontSize: 10,
+                              color: '#64748B',
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {rider.team_name}
+                          </div>
+                        </div>
+                        <CatBadge cat={rider.category} />
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Clear slot option */}
+              {lineups[modalOpen.raceId]?.[modalOpen.roleKey] && (
+                <div style={{ borderTop: '1px solid #2B4F7A', padding: '8px 16px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSlot(modalOpen.raceId, modalOpen.roleKey, null)
+                      setModalOpen(null)
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 0',
+                      background: 'none',
+                      border: 'none',
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#E86B5F',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Fjern rytter fra slot
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+}

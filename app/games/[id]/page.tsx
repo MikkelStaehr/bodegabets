@@ -13,6 +13,7 @@ import ActiveRounds from '@/components/games/ActiveRounds'
 import { formatDateTime } from '@/lib/dateUtils'
 import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
+import LineupBuilder from '@/components/cycling/LineupBuilder'
 
 export const dynamic = 'force-dynamic'
 
@@ -323,6 +324,45 @@ export default async function GamePage({ params }: Props) {
       }
 
       cyclingEvents.sort((a, b) => a.date.localeCompare(b.date))
+    }
+  }
+
+  // Lineup builder data — brugerens squad + løb med status upcoming/active
+  let userSquad: { id: string } | null = null
+  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string }[] = []
+  let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
+
+  if (typedGame.sport === 'cycling') {
+    const { data: sq } = await supabaseAdmin
+      .from('cycling_squads')
+      .select('id')
+      .eq('game_id', gameId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    userSquad = sq
+
+    const { data: gameRacesFull } = await supabaseAdmin
+      .from('cycling_game_races')
+      .select('race_id, cycling_races!inner(id, name, start_date, status, race_type)')
+      .eq('game_id', gameId)
+
+    lineupRaces = (gameRacesFull ?? [])
+      .map((gr) => gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string })
+      .filter((r) => r.status === 'upcoming' || r.status === 'active')
+
+    if (userSquad) {
+      const { data: srData } = await supabaseAdmin
+        .from('cycling_squad_riders')
+        .select('rider_id, cycling_riders!inner(id, first_name, last_name, team_name, category, team_logo_url, photo_url)')
+        .eq('squad_id', userSquad.id)
+
+      lineupSquadRiders = (srData ?? []).map((r) => r.cycling_riders as unknown as {
+        id: string; first_name: string; last_name: string; team_name: string
+        category: number; team_logo_url: string | null; photo_url: string | null
+      })
     }
   }
 
@@ -747,6 +787,16 @@ export default async function GamePage({ params }: Props) {
             </div>
             <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: theme.primary, fontWeight: 700 }}>›</span>
           </Link>
+        )}
+
+        {/* Lineup builder — kun cykling */}
+        {typedGame.sport === 'cycling' && (
+          <LineupBuilder
+            gameId={gameId}
+            squadId={userSquad?.id ?? null}
+            races={lineupRaces}
+            squadRiders={lineupSquadRiders}
+          />
         )}
 
         {/* Block leaderboard — kun hvis aktiv block */}

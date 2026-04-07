@@ -1,0 +1,225 @@
+/*
+  SQL — kør manuelt i Supabase før deploy:
+
+  ALTER TABLE cycling_lineups
+  ADD CONSTRAINT cycling_lineups_squad_race_unique
+  UNIQUE (squad_id, race_id);
+
+  ALTER TABLE cycling_lineup_riders
+  ADD COLUMN IF NOT EXISTS slot_index integer NOT NULL DEFAULT 0;
+
+  -- Hvis updated_at ikke findes:
+  ALTER TABLE cycling_lineups
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+*/
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+
+type Props = { params: Promise<{ id: string }> }
+
+const ROLE_LIMITS: Record<string, number> = {
+  captain: 1,
+  solo_attack: 1,
+  sprint_assist: 1,
+  domestique: 1,
+  helper: 3,
+  luxury_helper: 1,
+}
+
+// ── GET: hent brugerens lineups ────────────────────────────────────────────
+
+export async function GET(req: NextRequest, { params }: Props) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
+
+  const { id: gameId } = await params
+
+  const { data: squad } = await supabaseAdmin
+    .from('cycling_squads')
+    .select('id')
+    .eq('game_id', Number(gameId))
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!squad) return NextResponse.json({ lineups: [] })
+
+  const { data: lineups } = await supabaseAdmin
+    .from('cycling_lineups')
+    .select('id, race_id, is_locked')
+    .eq('squad_id', squad.id)
+
+  if (!lineups?.length) return NextResponse.json({ lineups: [] })
+
+  const lineupIds = lineups.map((l) => l.id)
+
+  const { data: lineupRiders } = await supabaseAdmin
+    .from('cycling_lineup_riders')
+    .select(`
+      lineup_id,
+      rider_id,
+      role,
+      slot_index,
+      rider:cycling_riders!inner(
+        id, first_name, last_name, team_name, category
+      )
+    `)
+    .in('lineup_id', lineupIds)
+
+  const ridersByLineup = new Map<string, typeof lineupRiders>()
+  for (const lr of lineupRiders ?? []) {
+    const key = String(lr.lineup_id)
+    if (!ridersByLineup.has(key)) ridersByLineup.set(key, [])
+    ridersByLineup.get(key)!.push(lr)
+  }
+
+  const result = lineups.map((lineup) => {
+    const riders = (ridersByLineup.get(String(lineup.id)) ?? []).map((lr) => {
+      const r = lr.rider as unknown as {
+        id: string; first_name: string; last_name: string
+        team_name: string; category: number
+      }
+      return {
+        rider_id: r.id,
+        role: lr.role,
+        slot_index: lr.slot_index,
+        first_name: r.first_name,
+        last_name: r.last_name,
+        team_name: r.team_name,
+        category: r.category,
+      }
+    })
+    return {
+      race_id: lineup.race_id,
+      is_locked: lineup.is_locked,
+      riders,
+    }
+  })
+
+  return NextResponse.json({ lineups: result })
+}
+
+// ── POST: gem lineup for ét løb ────────────────────────────────────────────
+
+export async function POST(req: NextRequest, { params }: Props) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
+
+  const { id: gameId } = await params
+  const body = await req.json()
+  const { race_id, riders } = body as {
+    race_id: string
+    riders: { rider_id: string; role: string; slot_index: number }[]
+  }
+
+  if (!race_id || !Array.isArray(riders)) {
+    return NextResponse.json({ error: 'Ugyldigt input' }, { status: 400 })
+  }
+
+  // Find brugerens squad
+  const { data: squad } = await supabaseAdmin
+    .from('cycling_squads')
+    .select('id')
+    .eq('game_id', Number(gameId))
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!squad) return NextResponse.json({ error: 'Ingen brutto trup fundet' }, { status: 400 })
+
+  // Valider antal per rolle
+  const roleCounts: Record<string, number> = {}
+  for (const r of riders) {
+    const baseRole = r.role.startsWith('helper_') ? 'helper' : r.role
+    roleCounts[baseRole] = (roleCounts[baseRole] ?? 0) + 1
+  }
+  for (const [role, limit] of Object.entries(ROLE_LIMITS)) {
+    const count = roleCounts[role] ?? 0
+    if (count > limit) {
+      return NextResponse.json({ error: `Max ${limit} rytter(e) som ${role}` }, { status: 400 })
+    }
+  }
+
+  // Total max 8
+  if (riders.length > 8) {
+    return NextResponse.json({ error: 'Max 8 ryttere i aktiv lineup' }, { status: 400 })
+  }
+
+  // Tjek for dubletter
+  const riderIdSet = new Set(riders.map((r) => r.rider_id))
+  if (riderIdSet.size !== riders.length) {
+    return NextResponse.json({ error: 'Samme rytter kan ikke vælges to gange' }, { status: 400 })
+  }
+
+  // Valider at alle ryttere er i brutto truppen
+  const { data: squadRiders } = await supabaseAdmin
+    .from('cycling_squad_riders')
+    .select('rider_id')
+    .eq('squad_id', squad.id)
+
+  const squadRiderIds = new Set((squadRiders ?? []).map((sr) => sr.rider_id))
+  for (const r of riders) {
+    if (!squadRiderIds.has(r.rider_id)) {
+      return NextResponse.json({ error: 'Rytter er ikke i din brutto trup' }, { status: 400 })
+    }
+  }
+
+  // Valider kategori-regler: domestique kun kat 4
+  if (riders.some((r) => r.role === 'domestique')) {
+    const domestiqueRiderIds = riders.filter((r) => r.role === 'domestique').map((r) => r.rider_id)
+    const { data: domestiqueRiders } = await supabaseAdmin
+      .from('cycling_riders')
+      .select('id, category')
+      .in('id', domestiqueRiderIds)
+
+    for (const dr of domestiqueRiders ?? []) {
+      if (dr.category !== 4) {
+        return NextResponse.json({ error: 'Domestik-rollen kræver en Kat 4 rytter' }, { status: 400 })
+      }
+    }
+  }
+
+  // Upsert lineup
+  const { data: lineup, error: lineupErr } = await supabaseAdmin
+    .from('cycling_lineups')
+    .upsert(
+      { squad_id: squad.id, race_id, is_locked: false, updated_at: new Date().toISOString() },
+      { onConflict: 'squad_id,race_id' }
+    )
+    .select('id, is_locked')
+    .single()
+
+  if (lineupErr) return NextResponse.json({ error: lineupErr.message }, { status: 500 })
+
+  if (lineup.is_locked) {
+    return NextResponse.json({ error: 'Lineup er låst og kan ikke ændres' }, { status: 400 })
+  }
+
+  // Slet eksisterende lineup riders
+  await supabaseAdmin
+    .from('cycling_lineup_riders')
+    .delete()
+    .eq('lineup_id', lineup.id)
+
+  // Insert nye lineup riders
+  const rows = riders.map((r) => ({
+    lineup_id: lineup.id,
+    rider_id: r.rider_id,
+    role: r.role,
+    slot_index: r.slot_index,
+    is_active: true,
+  }))
+
+  const { error: insertErr } = await supabaseAdmin
+    .from('cycling_lineup_riders')
+    .insert(rows)
+
+  if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
+
+  return NextResponse.json({ success: true, lineup_id: lineup.id })
+}
