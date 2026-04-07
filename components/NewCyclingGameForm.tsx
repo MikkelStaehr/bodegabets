@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -152,6 +152,252 @@ function StepNumber({ n, active }: { n: number; active: boolean }) {
 
 function Connector() {
   return <div className="w-px h-6 bg-border ml-[13px]" />
+}
+
+// ── Season Calendar ─────────────────────────────────────────────────────────
+
+const CAT_COLORS: Record<string, { bg: string; color: string }> = {
+  flandern:    { bg: '#B5D4F4', color: '#0C447C' },
+  ardennerne:  { bg: '#9FE1CB', color: '#085041' },
+  grandTour:   { bg: '#FAC775', color: '#633806' },
+  majorTour:   { bg: '#F5C4B3', color: '#712B13' },
+  other:       { bg: '#C0DD97', color: '#27500A' },
+}
+
+function getRaceCategory(slug: string): { bg: string; color: string } {
+  if (FLANDERN_SLUGS.includes(slug)) return CAT_COLORS.flandern
+  if (ARDENNERNE_SLUGS.includes(slug)) return CAT_COLORS.ardennerne
+  if (GRAND_TOUR_SLUGS.includes(slug)) return CAT_COLORS.grandTour
+  if (MAJOR_TOUR_SLUGS.includes(slug)) return CAT_COLORS.majorTour
+  return CAT_COLORS.other
+}
+
+const MONTH_NAMES = ['Januar', 'Februar', 'Marts', 'April', 'Maj', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'December']
+const QUARTER_LABELS = [
+  'Q1 — Jan · Feb · Mar',
+  'Q2 — Apr · Maj · Jun',
+  'Q3 — Jul · Aug · Sep',
+  'Q4 — Okt · Nov · Dec',
+]
+
+function SeasonCalendar({ races, selectedRaceIds }: { races: Race[]; selectedRaceIds: Set<string> }) {
+  const [quarter, setQuarter] = useState(0)
+
+  const racesByMonth = useMemo(() => {
+    const map: Record<number, Race[]> = {}
+    for (let i = 0; i < 12; i++) map[i] = []
+    for (const r of races) {
+      if (!r.start_date) continue
+      const month = new Date(r.start_date).getMonth()
+      map[month].push(r)
+    }
+    // Sort each month by date
+    for (const key in map) {
+      map[key].sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
+    }
+    return map
+  }, [races])
+
+  const startMonth = quarter * 3
+  const months = [startMonth, startMonth + 1, startMonth + 2]
+
+  return (
+    <div style={{ marginTop: 16, marginBottom: 8 }}>
+      <div style={{ marginBottom: 12 }}>
+        <span
+          style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 11,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: '#6b6b6b',
+          }}
+        >
+          Sæsonoverblik 2026
+        </span>
+      </div>
+
+      <div
+        style={{
+          background: '#fff',
+          border: '1px solid #D4CFC4',
+          borderRadius: 2,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Quarter label */}
+        <div
+          style={{
+            padding: '10px 14px',
+            borderBottom: '1px solid #EDE8E0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "'Barlow Condensed', sans-serif",
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#1a1a1a',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {QUARTER_LABELS[quarter]}
+          </span>
+        </div>
+
+        {/* 3 months side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', minHeight: 160 }}>
+          {months.map((m) => {
+            const monthRaces = racesByMonth[m] ?? []
+            return (
+              <div
+                key={m}
+                style={{
+                  borderRight: m < startMonth + 2 ? '1px solid #EDE8E0' : 'none',
+                  padding: '8px 6px',
+                }}
+              >
+                {/* Month header */}
+                <div
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    color: '#9E9486',
+                    marginBottom: 6,
+                    textAlign: 'center',
+                  }}
+                >
+                  {MONTH_NAMES[m]}
+                </div>
+
+                {monthRaces.length === 0 ? (
+                  <div
+                    style={{
+                      fontFamily: "'Barlow', sans-serif",
+                      fontSize: 10,
+                      color: '#C0B8B0',
+                      textAlign: 'center',
+                      padding: '12px 0',
+                    }}
+                  >
+                    Ingen løb
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {monthRaces.map((race) => {
+                      const cat = getRaceCategory(race.pcs_slug)
+                      const isSelected = selectedRaceIds.has(race.id)
+                      const d = race.start_date ? new Date(race.start_date) : null
+                      const dayLabel = d
+                        ? `${d.getDate()}. ${MONTH_NAMES[d.getMonth()].slice(0, 3).toLowerCase()}`
+                        : ''
+
+                      return (
+                        <div
+                          key={race.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '3px 5px',
+                            borderRadius: 2,
+                            background: cat.bg,
+                            border: isSelected ? `2px solid ${cat.color}` : '2px solid transparent',
+                            opacity: isSelected ? 1 : 0.7,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: "'Barlow Condensed', sans-serif",
+                              fontSize: 9,
+                              fontWeight: 600,
+                              color: cat.color,
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {dayLabel}
+                          </span>
+                          <span
+                            style={{
+                              fontFamily: "'Barlow Condensed', sans-serif",
+                              fontSize: 9,
+                              fontWeight: isSelected ? 700 : 500,
+                              color: cat.color,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {race.name}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Dot navigation + slider */}
+        <div
+          style={{
+            padding: '10px 16px 12px',
+            borderTop: '1px solid #EDE8E0',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          {/* Dots */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[0, 1, 2, 3].map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => setQuarter(q)}
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: q === quarter ? '#2C4A3E' : '#D4CFC4',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'background 0.15s',
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Range slider */}
+          <input
+            type="range"
+            min={0}
+            max={3}
+            step={1}
+            value={quarter}
+            onChange={(e) => setQuarter(parseInt(e.target.value))}
+            style={{
+              width: '100%',
+              maxWidth: 200,
+              accentColor: '#2C4A3E',
+              cursor: 'pointer',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -426,6 +672,9 @@ export default function NewCyclingGameForm({ races }: Props) {
             )}
           </div>
         </div>
+
+        {/* ── Sæsonkalender ────────────────────────────────── */}
+        <SeasonCalendar races={races} selectedRaceIds={selectedRaceIds} />
 
         <Connector />
 
