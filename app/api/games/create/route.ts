@@ -18,16 +18,17 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, season_id, cup_season_ids } = body as {
+  const { name, season_id, cup_season_ids, bodega_rounds } = body as {
     name: string
-    season_id: number
+    season_id?: number
     cup_season_ids?: number[]
+    bodega_rounds?: boolean
   }
 
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Navn er påkrævet' }, { status: 400 })
   }
-  if (!season_id) {
+  if (!bodega_rounds && !season_id) {
     return NextResponse.json({ error: 'Turnering er påkrævet' }, { status: 400 })
   }
 
@@ -61,13 +62,16 @@ export async function POST(req: NextRequest) {
     attempts++
   }
 
+  const gameInsert: Record<string, unknown> = {
+    name: name.trim(),
+    host_id: user.id,
+    invite_code,
+    sport: 'football',
+  }
+
   const { data: game, error: gameError } = await supabaseAdmin
     .from('games')
-    .insert({
-      name: name.trim(),
-      host_id: user.id,
-      invite_code,
-    })
+    .insert(gameInsert)
     .select()
     .single()
 
@@ -75,12 +79,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: gameError.message }, { status: 500 })
   }
 
+  // Bodega Rounds — ingen season linking eller block-generering
+  if (bodega_rounds) {
+    // Tilmeld host som member
+    const { error: memberError } = await supabaseAdmin
+      .from('game_members')
+      .insert({ game_id: game.id, user_id: user.id })
+
+    if (memberError) {
+      return NextResponse.json({ error: memberError.message }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      game_id: game.id,
+      invite_code: game.invite_code,
+      seasons: [],
+      warning: null,
+    })
+  }
+
   // Link game to all selected seasons via junction table
-  const allSeasonIds = [season_id, ...(cup_season_ids ?? [])]
-  for (const season_id of allSeasonIds) {
+  const allSeasonIds = [season_id!, ...(cup_season_ids ?? [])]
+  for (const sid of allSeasonIds) {
     const { error: linkError } = await supabaseAdmin
       .from('game_seasons')
-      .insert({ game_id: game.id, season_id })
+      .insert({ game_id: game.id, season_id: sid })
 
     if (linkError) {
       return NextResponse.json({ error: linkError.message }, { status: 500 })
@@ -120,7 +144,7 @@ export async function POST(req: NextRequest) {
   const { count: roundCount } = await supabaseAdmin
     .from('rounds')
     .select('*', { count: 'exact', head: true })
-    .eq('season_id', season_id)
+    .eq('season_id', season_id!)
 
   return NextResponse.json({
     ok: true,

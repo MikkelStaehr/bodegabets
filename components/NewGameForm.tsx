@@ -16,13 +16,6 @@ const TOP_LEAGUE_NAMES = [
   'Premier League', 'Bundesliga', 'La Liga', 'Serie A', 'Ligue 1',
 ]
 
-const EXTRA_BETS = [
-  { icon: '⚽', name: 'Første målscorer', desc: 'Gæt hvem der scorer det første mål i kampen' },
-  { icon: '🟨', name: 'Antal kort',       desc: 'Over eller under antal gule kort i kampen' },
-  { icon: '⏱️', name: 'Overtid / tillægstid', desc: 'Kommer der mere end 4 minutters tillægstid?' },
-  { icon: '🧤', name: 'Clean sheet',      desc: 'Holder hjemmeholdet nullet i anden halvleg?' },
-]
-
 function Spinner() {
   return (
     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -52,16 +45,16 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
   const [description, setDescription] = useState('')
   const [selectedTournamentId, setSelectedTournamentId] = useState<string>('')
   const [cupTournamentIds, setCupTournamentIds]         = useState<string[]>([])
+  const [bodegaRounds, setBodegaRounds]                 = useState(false)
   const [error, setError]             = useState<string | null>(null)
   const [syncState, setSyncState]     = useState<SyncState>('idle')
   const [gameId, setGameId]           = useState<number | null>(null)
   const [pollAttempts, setPollAttempts] = useState(0)
 
   const loading    = syncState === 'creating' || syncState === 'syncing'
-  const canSubmit  = name.trim().length >= 2 && selectedTournamentId !== ''
+  const canSubmit  = name.trim().length >= 2 && (selectedTournamentId !== '' || bodegaRounds)
   const step2Active = name.trim().length >= 2
-  const step3Active = step2Active && selectedTournamentId !== ''
-  const step4Active = step3Active
+  const step3Active = step2Active && (selectedTournamentId !== '' || bodegaRounds)
 
   const cupTournaments   = tournaments.filter((t) => t.is_cup === true)
   const nonCupTournaments = tournaments.filter((t) => t.is_cup !== true)
@@ -93,21 +86,27 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
     e.preventDefault()
     setError(null)
     if (name.trim().length < 2) { setError('Spilnavn skal være mindst 2 tegn'); return }
-    if (!selectedTournamentId)   { setError('Vælg en turnering'); return }
-
-    const primarySeasonId = getSeasonId(selectedTournamentId)
-    if (!primarySeasonId) { setError('Ingen sæson fundet for den valgte turnering'); return }
-
-    const cupSeasonIds = cupTournamentIds
-      .map((tid) => getSeasonId(tid))
-      .filter((id): id is number => id !== null)
+    if (!bodegaRounds && !selectedTournamentId) { setError('Vælg en turnering'); return }
 
     setSyncState('creating')
+
+    let bodyPayload: Record<string, unknown>
+
+    if (bodegaRounds) {
+      bodyPayload = { name: name.trim(), bodega_rounds: true }
+    } else {
+      const primarySeasonId = getSeasonId(selectedTournamentId)
+      if (!primarySeasonId) { setError('Ingen sæson fundet for den valgte turnering'); setSyncState('idle'); return }
+      const cupSeasonIds = cupTournamentIds
+        .map((tid) => getSeasonId(tid))
+        .filter((id): id is number => id !== null)
+      bodyPayload = { name: name.trim(), season_id: primarySeasonId, cup_season_ids: cupSeasonIds }
+    }
 
     const res  = await fetch('/api/games/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), season_id: primarySeasonId, cup_season_ids: cupSeasonIds }),
+      body: JSON.stringify(bodyPayload),
     })
     const data = await res.json()
 
@@ -195,6 +194,34 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
             <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-1">Trin 2</p>
             <p className="font-condensed font-semibold text-lg text-primary mb-4">Vælg liga</p>
 
+            {/* Bodega Betting Rounds */}
+            <button
+              type="button"
+              onClick={() => {
+                setBodegaRounds(true)
+                setSelectedTournamentId('')
+                setCupTournamentIds([])
+              }}
+              className={`w-full text-left p-4 border-[1.5px] rounded-sm transition-all mb-4 ${
+                bodegaRounds
+                  ? 'border-forest bg-cream-dark'
+                  : 'border-border bg-white hover:border-forest/50 hover:bg-cream'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl leading-none">⭐</span>
+                  <span className="font-condensed font-bold text-[15px] text-primary">Bodega Betting Rounds</span>
+                </div>
+                {bodegaRounds && (
+                  <span className="text-forest font-bold text-xs">✓</span>
+                )}
+              </div>
+              <p className="font-body text-xs text-text-warm font-light leading-relaxed mt-1.5 ml-[34px]">
+                Håndplukkede kampe på tværs af Europa — rivalopgør, derbys og klassikere
+              </p>
+            </button>
+
             {tournaments.length === 0 ? (
               <p className="font-body text-sm text-text-warm">Ingen turneringer fundet — opret via admin-panelet.</p>
             ) : (
@@ -205,7 +232,7 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
                       Topligaer
                       <span className="flex-1 h-px bg-border" />
                     </p>
-                    <TournamentGrid items={topTournaments} onSelect={setSelectedTournamentId} isSelected={(id) => selectedTournamentId === id} />
+                    <TournamentGrid items={topTournaments} onSelect={(id) => { setSelectedTournamentId(id); setBodegaRounds(false) }} isSelected={(id) => selectedTournamentId === id} />
                   </>
                 )}
 
@@ -215,7 +242,7 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
                       Øvrige
                       <span className="flex-1 h-px bg-border" />
                     </p>
-                    <TournamentGrid items={otherTournaments} onSelect={setSelectedTournamentId} isSelected={(id) => selectedTournamentId === id} />
+                    <TournamentGrid items={otherTournaments} onSelect={(id) => { setSelectedTournamentId(id); setBodegaRounds(false) }} isSelected={(id) => selectedTournamentId === id} />
                   </>
                 )}
               </>
@@ -243,42 +270,11 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
 
         <Connector />
 
-        {/* ── Trin 3: Ekstra bets (placeholder) ───────────── */}
+        {/* ── Trin 3: Beskrivelse ───────────────────────────── */}
         <div className="flex gap-5">
           <StepNumber n={3} active={step3Active} />
           <div className="flex-1 pb-2">
             <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-1">Trin 3 · Valgfrit</p>
-            <p className="font-condensed font-semibold text-lg text-primary mb-1">Ekstra bets</p>
-            <p className="font-body text-xs text-text-warm font-light leading-relaxed mb-4">
-              Tilføj kampafgørende spørgsmål til hver runde — fx hvem scorer først, eller om der kommer overtid. Kommer snart.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {EXTRA_BETS.map((b) => (
-                <div
-                  key={b.name}
-                  className="bg-cream-dark border border-border rounded-sm p-3.5 opacity-50 cursor-not-allowed flex flex-col gap-1"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-lg leading-none">{b.icon}</span>
-                    <span className="font-condensed text-[10px] uppercase tracking-widest text-text-warm bg-cream-dark border border-border px-1.5 py-0.5 rounded-badge">
-                      Kommer snart
-                    </span>
-                  </div>
-                  <p className="font-condensed font-semibold text-sm text-primary">{b.name}</p>
-                  <p className="font-body text-xs text-text-warm font-light leading-snug">{b.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <Connector />
-
-        {/* ── Trin 4: Beskrivelse ───────────────────────────── */}
-        <div className="flex gap-5">
-          <StepNumber n={4} active={step4Active} />
-          <div className="flex-1 pb-2">
-            <p className="font-condensed text-[10px] uppercase tracking-[0.12em] text-text-warm mb-1">Trin 4 · Valgfrit</p>
             <p className="font-condensed font-semibold text-lg text-primary mb-4">Tilføj en beskrivelse</p>
             <div className="relative">
               <textarea
