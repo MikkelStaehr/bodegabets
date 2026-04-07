@@ -653,15 +653,22 @@ export default async function GamePage({ params }: Props) {
     const champBetMatchIds = new Set((champUserBets ?? []).map((b) => b.match_id))
 
     // Build ActiveRoundRows fra championship_rounds
-    // Vis kun runder med status active/open ELLER mindst én kamp
-    const champActiveRows: ActiveRoundRow[] = championshipRounds
-      .filter((cr) => {
-        if (cr.status === 'finished') return false
-        const hasMatches = cr.championship_round_matches.length > 0
-        if (!hasMatches) return false
-        const isActiveOrOpen = cr.status === 'active' || (cr.betting_closes_at && new Date(cr.betting_closes_at) > now2)
-        return isActiveOrOpen
-      })
+    const openChampRounds = championshipRounds
+      .filter((cr) => cr.championship_round_matches.length > 0)
+      .filter((cr) => cr.status !== 'finished')
+
+    // Vis altid første åbne runde
+    // Vis anden runde hvis første lukker inden for 24 timer
+    const visibleChampRounds = openChampRounds.slice(0, 1)
+    if (openChampRounds.length > 1 && openChampRounds[0].betting_closes_at) {
+      const firstCloses = new Date(openChampRounds[0].betting_closes_at)
+      const hoursUntilClose = (firstCloses.getTime() - now2.getTime()) / (1000 * 60 * 60)
+      if (hoursUntilClose < 24) {
+        visibleChampRounds.push(openChampRounds[1])
+      }
+    }
+
+    const champActiveRows: ActiveRoundRow[] = visibleChampRounds
       .map((cr) => {
         const matchIds = cr.championship_round_matches.map((crm) => crm.matches.id)
         return {
