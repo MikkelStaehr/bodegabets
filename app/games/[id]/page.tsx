@@ -87,7 +87,7 @@ export default async function GamePage({ params }: Props) {
   // Hent game
   const { data: game } = await supabaseAdmin
     .from('games')
-    .select('id, name, host_id, invite_code, status, created_at, sport')
+    .select('id, name, host_id, invite_code, status, created_at, sport, championship_mode')
     .eq('id', gameId)
     .single()
 
@@ -366,6 +366,48 @@ export default async function GamePage({ params }: Props) {
     }
   }
 
+  // ── Championship mode data ────────────────────────────────────────────────
+  type ChampionshipMatch = {
+    id: number
+    kickoff: string
+    status: string
+    bet_open: boolean
+    bet_lock_at: string | null
+    result: string | null
+    home_score: number | null
+    away_score: number | null
+    home_team: { id: number; name: string; logo_url: string | null }
+    away_team: { id: number; name: string; logo_url: string | null }
+  }
+  type ChampionshipRound = {
+    id: number
+    name: string
+    status: string
+    betting_closes_at: string | null
+    championship_round_matches: { match_id: number; matches: ChampionshipMatch }[]
+  }
+  let championshipRounds: ChampionshipRound[] = []
+
+  if (typedGame.championship_mode) {
+    const { data: cRounds } = await supabaseAdmin
+      .from('championship_rounds')
+      .select(`
+        id, name, status, betting_closes_at,
+        championship_round_matches(
+          match_id,
+          matches(
+            id, kickoff, status, bet_open, bet_lock_at, result,
+            home_score, away_score,
+            home_team:teams!home_team_id(id, name, logo_url),
+            away_team:teams!away_team_id(id, name, logo_url)
+          )
+        )
+      `)
+      .order('betting_closes_at', { ascending: true })
+
+    championshipRounds = (cRounds ?? []) as unknown as ChampionshipRound[]
+  }
+
   const members = (rawMembers ?? []) as unknown as MemberRow[]
   const typedRounds = (rounds ?? []) as Round[]
 
@@ -588,6 +630,74 @@ export default async function GamePage({ params }: Props) {
     hasRivalry: rivalryRoundIds.has(r.id),
   }))
 
+  // ── Championship mode: override rounds + matches ──────────────────────────
+  if (typedGame.championship_mode && championshipRounds.length > 0) {
+    const now2 = new Date()
+
+    // Hent brugerens bets for championship kampe
+    const champMatchIds = championshipRounds.flatMap((cr) =>
+      cr.championship_round_matches.map((crm) => crm.matches.id)
+    )
+    const { data: champUserBets } = champMatchIds.length > 0
+      ? await supabase
+          .from('bets')
+          .select('id, match_id')
+          .eq('game_id', gameId)
+          .eq('user_id', user.id)
+          .in('match_id', champMatchIds)
+      : { data: [] as { id: number; match_id: number }[] }
+
+    const champBetMatchIds = new Set((champUserBets ?? []).map((b) => b.match_id))
+
+    // Build ActiveRoundRows fra championship_rounds
+    const champActiveRows: ActiveRoundRow[] = championshipRounds
+      .filter((cr) => {
+        if (cr.status === 'finished') return false
+        if (!cr.betting_closes_at) return true
+        return new Date(cr.betting_closes_at) > now2 || cr.status === 'active'
+      })
+      .map((cr) => {
+        const matchIds = cr.championship_round_matches.map((crm) => crm.matches.id)
+        return {
+          id: cr.id,
+          name: cr.name,
+          status: cr.status,
+          betting_closes_at: cr.betting_closes_at,
+          totalMatches: cr.championship_round_matches.length,
+          userBets: matchIds.filter((mid) => champBetMatchIds.has(mid)).length,
+          leagueAbbr: 'BBR',
+          leagueType: 'cup' as const,
+          logo_url: null,
+          hasRivalry: true,
+        }
+      })
+
+    // Override activeRoundRows
+    activeRoundRows.length = 0
+    activeRoundRows.push(...champActiveRows)
+
+    // Build CalendarMatches fra championship kampe
+    allMatches.length = 0
+    for (const cr of championshipRounds) {
+      for (const crm of cr.championship_round_matches) {
+        const m = crm.matches
+        allMatches.push({
+          id: m.id,
+          kickoff_at: m.kickoff,
+          status: m.status,
+          round_name: cr.name,
+          season_id: 0,
+          home_team: m.home_team?.name ?? '',
+          away_team: m.away_team?.name ?? '',
+          home_score: m.home_score,
+          away_score: m.away_score,
+          isRivalry: true,
+        })
+      }
+    }
+
+  }
+
   const myEntry = ranked.find((r) => r.user_id === user.id)
 
   // ── Byg ticker-beskeder ──────────────────────────────────────────────────────
@@ -738,18 +848,39 @@ export default async function GamePage({ params }: Props) {
             <>
               <CalendarSlider
                 matches={allMatches}
-                rounds={roundsWithBlock.map((r) => ({
-                  id: r.id,
-                  name: r.name,
-                  season_id: r.season_id ?? 0,
-                  computedStatus: r.computedStatus,
-                  betting_closes_at: r.betting_closes_at,
-                  leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
-                  leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
-                  logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
-                  block_id: r.block_id ?? null,
-                  block_number: r.block_id != null ? (blockById.get(r.block_id)?.block_number ?? null) : null,
-                })) as CalendarRound[]}
+                rounds={(typedGame.championship_mode
+                  ? championshipRounds.map((cr) => {
+                      const now2 = new Date()
+                      const status = cr.status === 'finished' ? 'finished' as const
+                        : cr.betting_closes_at && new Date(cr.betting_closes_at) > now2 ? 'open' as const
+                        : cr.status === 'active' ? 'active' as const
+                        : 'upcoming' as const
+                      return {
+                        id: cr.id,
+                        name: cr.name,
+                        season_id: 0,
+                        computedStatus: status,
+                        betting_closes_at: cr.betting_closes_at,
+                        leagueAbbr: 'BBR',
+                        leagueType: 'cup' as const,
+                        logo_url: null,
+                        block_id: null,
+                        block_number: null,
+                      }
+                    })
+                  : roundsWithBlock.map((r) => ({
+                      id: r.id,
+                      name: r.name,
+                      season_id: r.season_id ?? 0,
+                      computedStatus: r.computedStatus,
+                      betting_closes_at: r.betting_closes_at,
+                      leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
+                      leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
+                      logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
+                      block_id: r.block_id ?? null,
+                      block_number: r.block_id != null ? (blockById.get(r.block_id)?.block_number ?? null) : null,
+                    }))
+                ) as CalendarRound[]}
                 gameId={gameId}
                 betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
                 activeRoundId={activeRound?.id ?? null}

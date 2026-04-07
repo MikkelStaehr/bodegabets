@@ -14,6 +14,7 @@ export type Game = {
   sport: string
   status: 'active' | 'finished'
   created_at: string
+  championship_mode?: boolean
 }
 
 export type League = {
