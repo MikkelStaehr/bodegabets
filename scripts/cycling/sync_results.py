@@ -111,9 +111,11 @@ def pcs_get(url: str, client: httpx.Client, retries: int = 2) -> BeautifulSoup:
                 _warn(f"HTTP {e.response.status_code} for {url} — retrying in 3s")
                 time.sleep(3)
                 continue
-            _die(f"PCS returned HTTP {e.response.status_code} for {url}")
+            _warn(f"PCS returned HTTP {e.response.status_code} for {url} — skipping")
+            return BeautifulSoup("", "html.parser")
         except httpx.HTTPError as e:
-            _die(f"HTTP error for {url}: {e}")
+            _warn(f"HTTP error for {url}: {e} — skipping")
+            return BeautifulSoup("", "html.parser")
     return BeautifulSoup("", "html.parser")
 
 
