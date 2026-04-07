@@ -710,6 +710,14 @@ export default async function GamePage({ params }: Props) {
       }
     }
 
+    console.log('DEBUG allMatches sample:',
+      allMatches.slice(0, 3).map(m => ({
+        id: m.id,
+        kickoff_at: m.kickoff_at,
+        home: m.home_team,
+        away: m.away_team,
+      }))
+    )
   }
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
