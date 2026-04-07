@@ -30,6 +30,7 @@ import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
+import { calculateCyclingPoints, runCyclingPointsForAllGames } from '@/lib/calculateCyclingPoints'
 
 const app = express()
 app.use(express.json())
@@ -538,6 +539,36 @@ app.get('/send-reminders', async (_req, res) => {
     res.json({ ok: true, sent: totalSent, failed: totalFailed })
   } catch (err) {
     console.error('[send-reminders]', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
+// ─── POST /api/cycling/calculate-points ─────────────────────────────────────
+
+app.post('/api/cycling/calculate-points', async (req, res) => {
+  try {
+    const { race_id, game_id } = req.body as { race_id?: string; game_id?: number }
+
+    if (!race_id) {
+      res.status(400).json({ error: 'race_id is required' })
+      return
+    }
+
+    if (game_id != null) {
+      await calculateCyclingPoints(race_id, game_id)
+    } else {
+      await runCyclingPointsForAllGames(race_id)
+    }
+
+    // Count scores created
+    const { count } = await supabaseAdmin
+      .from('cycling_scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('race_id', race_id)
+
+    res.json({ ok: true, scores_calculated: count ?? 0 })
+  } catch (err) {
+    console.error('[cycling/calculate-points]', err)
     res.status(500).json({ error: String(err) })
   }
 })
