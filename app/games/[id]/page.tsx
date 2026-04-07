@@ -406,13 +406,9 @@ export default async function GamePage({ params }: Props) {
       .eq('season', '2025/26')
       .order('betting_closes_at', { ascending: true })
 
-    championshipRounds = (cRounds ?? []) as unknown as ChampionshipRound[]
-    console.log('DEBUG championship:', {
-      championship_mode: typedGame.championship_mode,
-      rounds_count: championshipRounds?.length,
-      first_round: championshipRounds?.[0],
-      first_round_matches: championshipRounds?.[0]?.championship_round_matches?.length,
-    })
+    championshipRounds = (cRounds ?? []).filter(
+      (cr: { championship_round_matches: unknown[] }) => cr.championship_round_matches.length > 0
+    ) as unknown as ChampionshipRound[]
   }
 
   const members = (rawMembers ?? []) as unknown as MemberRow[]
