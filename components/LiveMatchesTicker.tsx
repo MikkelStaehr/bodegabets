@@ -95,6 +95,7 @@ function MatchRow({ match }: { match: LiveMatch }) {
             src={match.tournamentLogo}
             alt=""
             className="shrink-0 w-4 h-4 object-contain"
+            style={{ filter: 'brightness(0) invert(1)', opacity: 0.5 }}
           />
         )}
 
