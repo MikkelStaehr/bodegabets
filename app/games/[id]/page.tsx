@@ -409,20 +409,6 @@ export default async function GamePage({ params }: Props) {
     championshipRounds = (cRounds ?? []).filter(
       (cr: { championship_round_matches: unknown[] }) => cr.championship_round_matches.length > 0
     ) as unknown as ChampionshipRound[]
-    console.log('DEBUG championship post-filter:', {
-      total_rounds: championshipRounds.length,
-      first_round_name: championshipRounds[0]?.name,
-      first_round_matches_count: championshipRounds[0]?.championship_round_matches?.length,
-      first_match_kickoff: championshipRounds[0]?.championship_round_matches?.[0]?.matches?.kickoff,
-      first_match_home: championshipRounds[0]?.championship_round_matches?.[0]?.matches?.home_team,
-    })
-    console.log('DEBUG alle match ids i runde 36:',
-      championshipRounds[0]?.championship_round_matches
-        ?.map((crm) => ({
-          match_id: crm.match_id,
-          kickoff: crm.matches?.kickoff,
-        }))
-    )
   }
 
   const members = (rawMembers ?? []) as unknown as MemberRow[]
@@ -701,6 +687,7 @@ export default async function GamePage({ params }: Props) {
     allMatches.length = 0
     for (const cr of championshipRounds) {
       for (const crm of cr.championship_round_matches) {
+        if (!crm.matches) continue
         const m = crm.matches
         allMatches.push({
           id: m.id,
@@ -716,15 +703,6 @@ export default async function GamePage({ params }: Props) {
         })
       }
     }
-
-    console.log('DEBUG allMatches sample:',
-      allMatches.slice(0, 3).map(m => ({
-        id: m.id,
-        kickoff_at: m.kickoff_at,
-        home: m.home_team,
-        away: m.away_team,
-      }))
-    )
   }
 
   const myEntry = ranked.find((r) => r.user_id === user.id)
