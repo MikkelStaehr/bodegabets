@@ -416,6 +416,13 @@ export default async function GamePage({ params }: Props) {
       first_match_kickoff: championshipRounds[0]?.championship_round_matches?.[0]?.matches?.kickoff,
       first_match_home: championshipRounds[0]?.championship_round_matches?.[0]?.matches?.home_team,
     })
+    console.log('DEBUG alle match ids i runde 36:',
+      championshipRounds[0]?.championship_round_matches
+        ?.map((crm) => ({
+          match_id: crm.match_id,
+          kickoff: crm.matches?.kickoff,
+        }))
+    )
   }
 
   const members = (rawMembers ?? []) as unknown as MemberRow[]
