@@ -191,8 +191,7 @@ export default function SquadBuilder({ gameId, availableRiders, confirmedRiderId
         setSaving(false)
         return
       }
-      setSuccess(true)
-      setSaving(false)
+      router.push(`/games/${gameId}`)
     } catch {
       setError('Noget gik galt')
       setSaving(false)
