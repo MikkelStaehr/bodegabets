@@ -14,6 +14,7 @@ import { formatDateTime } from '@/lib/dateUtils'
 import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
 import LineupBuilder from '@/components/cycling/LineupBuilder'
+import CyclingGameroom from '@/components/cycling/CyclingGameroom'
 
 export const dynamic = 'force-dynamic'
 
@@ -331,7 +332,7 @@ export default async function GamePage({ params }: Props) {
   let userSquad: { id: string } | null = null
   let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
-  let cyclingActiveBlock: { id: string; name: string; block_order: number } | null = null
+  let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
 
   if (typedGame.sport === 'cycling') {
     const { data: sq } = await supabaseAdmin
@@ -935,47 +936,23 @@ export default async function GamePage({ params }: Props) {
           )}
         </section>
 
-        {/* Squad link — kun cykling */}
+        {/* Cykling sektion — trup + lineup overview + builder */}
         {typedGame.sport === 'cycling' && (
-          <Link
-            href={`/games/${gameId}/squad`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 16px',
-              background: '#FDFAF5',
-              border: '1px solid #E8E0D3',
-              borderRadius: 2,
-              textDecoration: 'none',
-              transition: 'border-color 0.15s',
-            }}
-          >
-            <div>
-              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
-                Sæt din trup{cyclingActiveBlock ? ` — ${cyclingActiveBlock.name}` : ''}
-              </span>
-              <p style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: theme.primary, marginTop: 2, lineHeight: 1.3 }}>
-                {cyclingActiveBlock?.name ?? 'Vælg din blok'}
-              </p>
-              {!userSquad && (
-                <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: '#9E9486', marginTop: 2, lineHeight: 1.3 }}>
-                  Udtag 25 ryttere til din brutto trup
-                </p>
-              )}
-            </div>
-            <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: theme.primary, fontWeight: 700 }}>›</span>
-          </Link>
-        )}
-
-        {/* Lineup builder — kun cykling */}
-        {typedGame.sport === 'cycling' && (
-          <LineupBuilder
-            gameId={gameId}
-            squadId={userSquad?.id ?? null}
-            races={lineupRaces}
-            squadRiders={lineupSquadRiders}
-          />
+          <>
+            <CyclingGameroom
+              gameId={gameId}
+              squadId={userSquad?.id ?? null}
+              activeBlock={cyclingActiveBlock}
+              races={lineupRaces}
+              squadRiders={lineupSquadRiders}
+            />
+            <LineupBuilder
+              gameId={gameId}
+              squadId={userSquad?.id ?? null}
+              races={lineupRaces}
+              squadRiders={lineupSquadRiders}
+            />
+          </>
         )}
 
         {/* Block leaderboard — kun hvis aktiv block */}
