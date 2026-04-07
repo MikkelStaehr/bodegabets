@@ -409,6 +409,13 @@ export default async function GamePage({ params }: Props) {
     championshipRounds = (cRounds ?? []).filter(
       (cr: { championship_round_matches: unknown[] }) => cr.championship_round_matches.length > 0
     ) as unknown as ChampionshipRound[]
+    console.log('DEBUG championship post-filter:', {
+      total_rounds: championshipRounds.length,
+      first_round_name: championshipRounds[0]?.name,
+      first_round_matches_count: championshipRounds[0]?.championship_round_matches?.length,
+      first_match_kickoff: championshipRounds[0]?.championship_round_matches?.[0]?.matches?.kickoff,
+      first_match_home: championshipRounds[0]?.championship_round_matches?.[0]?.matches?.home_team,
+    })
   }
 
   const members = (rawMembers ?? []) as unknown as MemberRow[]
