@@ -136,9 +136,11 @@ export async function POST(req: NextRequest, { params }: Props) {
     .delete()
     .eq('squad_id', squad.id)
 
+  const catByRider = new Map(riders.map((r) => [r.id, r.category]))
   const rows = riderIds.map((riderId) => ({
     squad_id: squad.id,
     rider_id: riderId,
+    category_slot: catByRider.get(riderId) ?? 5,
   }))
 
   const { error: insertErr } = await supabaseAdmin
