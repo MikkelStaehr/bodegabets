@@ -24,6 +24,116 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   if (!membership) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
+  // Tjek om spillet er championship_mode
+  const { data: gameInfo } = await supabaseAdmin
+    .from('games')
+    .select('championship_mode')
+    .eq('id', gameId)
+    .single()
+
+  if (gameInfo?.championship_mode) {
+    // Championship mode: hent kampe via championship_round_matches
+    const { data: champRounds } = await supabaseAdmin
+      .from('championship_rounds')
+      .select(`
+        id, name, status, betting_closes_at,
+        championship_round_matches(
+          match_id,
+          matches(
+            id, kickoff_at:kickoff, status, result, bet_open, second_half_started_at,
+            home_score, away_score, home_score_ht, away_score_ht,
+            home_team_id, away_team_id,
+            home_team_ref:teams!home_team_id(name, logo_url),
+            away_team_ref:teams!away_team_id(name, logo_url)
+          )
+        )
+      `)
+      .eq('season', '2025/26')
+      .neq('status', 'finished')
+      .order('betting_closes_at', { ascending: true })
+
+    // Flatten matches from all active championship rounds
+    const allChampMatches: Array<{ id: number; round_id: number; round_name: string; kickoff_at: string; status: string; home_score: number | null; away_score: number | null; home_score_ht: number | null; away_score_ht: number | null; home_team: string; away_team: string; home_team_logo: string | null; away_team_logo: string | null; second_half_started_at: string | null; bet_open: boolean; userPrediction: string | null; isRivalry: boolean; rivalryName: string | null; distribution: null; extraBetDist: null; userExtraPicks: null; tournamentLogo: null }> = []
+
+    for (const cr of champRounds ?? []) {
+      for (const crm of cr.championship_round_matches as unknown[]) {
+        const entry = crm as { match_id: number; matches: Record<string, unknown> | null }
+        if (!entry.matches) continue
+        const m = entry.matches
+        const homeRef = m.home_team_ref as { name: string; logo_url: string | null } | null
+        const awayRef = m.away_team_ref as { name: string; logo_url: string | null } | null
+        allChampMatches.push({
+          id: m.id as number,
+          round_id: cr.id,
+          round_name: cr.name,
+          kickoff_at: (m.kickoff_at as string) ?? '',
+          status: m.status as string,
+          home_score: m.home_score as number | null,
+          away_score: m.away_score as number | null,
+          home_score_ht: m.home_score_ht as number | null,
+          away_score_ht: m.away_score_ht as number | null,
+          home_team: homeRef?.name ?? '',
+          away_team: awayRef?.name ?? '',
+          home_team_logo: homeRef?.logo_url ?? null,
+          away_team_logo: awayRef?.logo_url ?? null,
+          second_half_started_at: (m.second_half_started_at as string | null) ?? null,
+          bet_open: (m.bet_open as boolean) ?? true,
+          userPrediction: null,
+          isRivalry: true,
+          rivalryName: null,
+          distribution: null,
+          extraBetDist: null,
+          userExtraPicks: null,
+          tournamentLogo: null,
+        })
+      }
+    }
+
+    // Hent brugerens bets
+    const champMatchIds = allChampMatches.map((m) => m.id)
+    if (champMatchIds.length > 0) {
+      const { data: champBets } = await supabaseAdmin
+        .from('bets')
+        .select('match_id, prediction')
+        .eq('user_id', user.id)
+        .eq('game_id', gameId)
+        .eq('bet_type', 'match_result')
+        .in('match_id', champMatchIds)
+      for (const b of champBets ?? []) {
+        const match = allChampMatches.find((m) => m.id === b.match_id)
+        if (match) match.userPrediction = b.prediction
+      }
+    }
+
+    // Find target runde
+    const liveMatches = allChampMatches.filter((m) => m.status === 'live' || m.status === 'halftime')
+    let targetRoundId: number | null = null
+    if (liveMatches.length > 0) {
+      targetRoundId = liveMatches[0].round_id
+    } else {
+      const earliest = allChampMatches
+        .filter((m) => m.status !== 'finished')
+        .sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))[0]
+      targetRoundId = earliest?.round_id ?? allChampMatches[0]?.round_id ?? null
+    }
+
+    const filteredList = [
+      ...liveMatches,
+      ...allChampMatches.filter((m) => m.round_id === targetRoundId && m.status !== 'live' && m.status !== 'halftime'),
+    ].sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at))
+
+    const roundName = (champRounds ?? []).find((r) => r.id === targetRoundId)?.name ?? null
+    const live = filteredList.filter((m) => m.status === 'live').length
+    const halftime = filteredList.filter((m) => m.status === 'halftime').length
+    const finished = filteredList.filter((m) => m.status === 'finished').length
+    const scheduled = filteredList.filter((m) => m.status === 'scheduled').length
+
+    return NextResponse.json({
+      matches: filteredList,
+      summary: { live, halftime, finished, scheduled, total: filteredList.length, roundName },
+    })
+  }
+
   // Hent alle season_ids for dette spil
   const { data: gameSeasons } = await supabaseAdmin
     .from('game_seasons')
