@@ -44,7 +44,10 @@ export async function GET(req: NextRequest, { params }: Props) {
             home_score, away_score, home_score_ht, away_score_ht,
             home_team_id, away_team_id,
             home_team_ref:teams!home_team_id(name, logo_url),
-            away_team_ref:teams!away_team_id(name, logo_url)
+            away_team_ref:teams!away_team_id(name, logo_url),
+            season:seasons!season_id(
+              tournament:tournaments!tournament_id(id, logo_url, name)
+            )
           )
         )
       `)
@@ -53,7 +56,7 @@ export async function GET(req: NextRequest, { params }: Props) {
       .order('betting_closes_at', { ascending: true })
 
     // Flatten matches from all active championship rounds
-    const allChampMatches: Array<{ id: number; round_id: number; round_name: string; kickoff_at: string; status: string; home_score: number | null; away_score: number | null; home_score_ht: number | null; away_score_ht: number | null; home_team: string; away_team: string; home_team_logo: string | null; away_team_logo: string | null; second_half_started_at: string | null; bet_open: boolean; userPrediction: string | null; isRivalry: boolean; rivalryName: string | null; distribution: null; extraBetDist: null; userExtraPicks: null; tournamentLogo: null }> = []
+    const allChampMatches: Array<{ id: number; round_id: number; round_name: string; kickoff_at: string; status: string; home_score: number | null; away_score: number | null; home_score_ht: number | null; away_score_ht: number | null; home_team: string; away_team: string; home_team_logo: string | null; away_team_logo: string | null; second_half_started_at: string | null; bet_open: boolean; userPrediction: string | null; isRivalry: boolean; rivalryName: string | null; distribution: null; extraBetDist: null; userExtraPicks: null; tournamentLogo: string | null }> = []
 
     for (const cr of champRounds ?? []) {
       for (const crm of cr.championship_round_matches as unknown[]) {
@@ -84,7 +87,7 @@ export async function GET(req: NextRequest, { params }: Props) {
           distribution: null,
           extraBetDist: null,
           userExtraPicks: null,
-          tournamentLogo: null,
+          tournamentLogo: ((m.season as { tournament?: { logo_url?: string | null } } | null)?.tournament?.logo_url) ?? null,
         })
       }
     }
