@@ -19,24 +19,30 @@ type Props = {
 
 // ── Block definitions ────────────────────────────────────────────────────────
 
-const CLASSICS_SLUGS = [
-  'omloop-het-nieuwsblad', 'strade-bianche', 'milano-sanremo', 'e3-harelbeke',
-  'gent-wevelgem', 'dwars-door-vlaanderen', 'ronde-van-vlaanderen',
+const FLANDERN_SLUGS = [
+  'omloop-het-nieuwsblad', 'strade-bianche', 'milano-sanremo',
+  'e3-saxo-bank-classic', 'gent-wevelgem', 'dwars-door-vlaanderen',
+  'ronde-van-vlaanderen',
+]
+
+const ARDENNERNE_SLUGS = [
   'paris-roubaix', 'amstel-gold-race', 'la-fleche-wallonne',
+  'liege-bastogne-liege',
 ]
 
 const GRAND_TOUR_SLUGS = ['giro-d-italia', 'tour-de-france', 'vuelta-a-espana']
 
 const MAJOR_TOUR_SLUGS = [
   'paris-nice', 'tirreno-adriatico', 'volta-a-catalunya',
-  'itzulia-basque-country', 'tour-de-romandie', 'dauphine', 'tour-de-suisse',
+  'tour-de-romandie', 'criterium-du-dauphine',
+  'tour-de-suisse', 'tour-de-pologne',
 ]
 
-const CHAMPIONSHIP_SLUGS = ['world-championship', 'uec-road-european-championships']
+const CHAMPIONSHIP_SLUGS = ['uci-road-world-championships', 'uci-european-championships']
 
 const OTHER_SLUGS = [
-  'liege-bastogne-liege', 'eschborn-frankfurt', 'san-sebastian',
-  'bretagne-classic', 'gp-quebec', 'gp-montreal', 'il-lombardia',
+  'il-lombardia', 'paris-tours', 'gp-montreal',
+  'gp-quebec', 'clasica-san-sebastian',
 ]
 
 type BlockDef = {
@@ -51,13 +57,22 @@ type BlockDef = {
 
 const BLOCKS: BlockDef[] = [
   {
-    key: 'classics',
-    label: 'Klassiker-sæson',
-    desc: '10 forårsklassikere fra Omloop til Flèche Wallonne',
+    key: 'flandern',
+    label: 'Flandern-klassikerne',
+    desc: '7 forårsklassikere fra Omloop til Ronde',
     icon: '🧱',
-    slugs: CLASSICS_SLUGS,
+    slugs: FLANDERN_SLUGS,
     isBundle: true,
     blockNumber: 1,
+  },
+  {
+    key: 'ardennerne',
+    label: 'Ardennerne-klassikerne',
+    desc: 'Paris-Roubaix, Amstel, Flèche og Liège',
+    icon: '⛰️',
+    slugs: ARDENNERNE_SLUGS,
+    isBundle: true,
+    blockNumber: 2,
   },
   {
     key: 'grand-tours',
@@ -66,7 +81,7 @@ const BLOCKS: BlockDef[] = [
     icon: '🏔️',
     slugs: GRAND_TOUR_SLUGS,
     isBundle: false,
-    blockNumber: 2,
+    blockNumber: 3,
   },
   {
     key: 'major-tours',
@@ -75,7 +90,7 @@ const BLOCKS: BlockDef[] = [
     icon: '🗺️',
     slugs: MAJOR_TOUR_SLUGS,
     isBundle: false,
-    blockNumber: 3,
+    blockNumber: 4,
   },
   {
     key: 'championships',
@@ -84,16 +99,16 @@ const BLOCKS: BlockDef[] = [
     icon: '🏅',
     slugs: CHAMPIONSHIP_SLUGS,
     isBundle: false,
-    blockNumber: 4,
+    blockNumber: 5,
   },
   {
     key: 'other',
     label: 'Øvrige klassikere',
-    desc: 'Ardenner-klassikere, Lombardiet og efterårsløb',
+    desc: 'Lombardiet og efterårsløb',
     icon: '🍂',
     slugs: OTHER_SLUGS,
     isBundle: false,
-    blockNumber: 5,
+    blockNumber: 6,
   },
 ]
 

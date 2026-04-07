@@ -335,7 +335,7 @@ export default async function GamePage({ params }: Props) {
   if (typedGame.sport === 'cycling') {
     const { data: sq } = await supabaseAdmin
       .from('cycling_squads')
-      .select('id')
+      .select('id, cycling_block_id')
       .eq('game_id', gameId)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -344,10 +344,39 @@ export default async function GamePage({ params }: Props) {
 
     userSquad = sq
 
-    const { data: gameRacesFull } = await supabaseAdmin
+    // Find brugerens aktive blok via cycling_block_id
+    const cyclingBlockId = (sq as { cycling_block_id?: string | null } | null)?.cycling_block_id ?? null
+    let activeBlockIds: string[] = []
+
+    if (cyclingBlockId) {
+      const { data: activeBlock } = await supabaseAdmin
+        .from('cycling_blocks')
+        .select('id, name, block_order, lock_deadline, parent_block_id')
+        .eq('id', cyclingBlockId)
+        .single()
+
+      if (activeBlock) {
+        if (activeBlock.parent_block_id) {
+          // Sub-blok: vis løb fra parent
+          activeBlockIds = [activeBlock.parent_block_id]
+        } else {
+          // Parent eller klassiker-blok: vis løb tilknyttet denne blok
+          activeBlockIds = [activeBlock.id]
+        }
+      }
+    }
+
+    // Hent løb tilknyttet aktive blok (eller alle hvis ingen blok)
+    const gameRacesQuery = supabaseAdmin
       .from('cycling_game_races')
-      .select('race_id, cycling_races!inner(id, name, start_date, status, race_type)')
+      .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type)')
       .eq('game_id', gameId)
+
+    if (activeBlockIds.length > 0) {
+      gameRacesQuery.in('cycling_block_id', activeBlockIds)
+    }
+
+    const { data: gameRacesFull } = await gameRacesQuery
 
     lineupRaces = (gameRacesFull ?? [])
       .map((gr) => gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string })

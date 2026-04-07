@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { generateCyclingBlocks } from '@/lib/generateCyclingBlocks'
 
 function generateInviteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -88,6 +89,9 @@ export async function POST(req: NextRequest) {
   if (racesError) {
     return NextResponse.json({ error: racesError.message }, { status: 500 })
   }
+
+  // Generer cycling blocks baseret på valgte løb
+  await generateCyclingBlocks(game.id, race_selections)
 
   // Tilmeld host som member
   const { error: memberError } = await supabaseAdmin
