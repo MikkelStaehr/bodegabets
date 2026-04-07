@@ -62,16 +62,15 @@ export async function POST(req: NextRequest) {
     attempts++
   }
 
-  const gameInsert: Record<string, unknown> = {
-    name: name.trim(),
-    host_id: user.id,
-    invite_code,
-    sport: 'football',
-  }
-
   const { data: game, error: gameError } = await supabaseAdmin
     .from('games')
-    .insert(gameInsert)
+    .insert({
+      name: name.trim(),
+      host_id: user.id,
+      invite_code,
+      sport: 'football',
+      ...(bodega_rounds ? { championship_mode: true } : {}),
+    })
     .select()
     .single()
 
