@@ -8,15 +8,22 @@ Runs both steps automatically — no flags needed.
 
 Step 1 — Find active/finished races and scrape results:
     - Fetches races with status=active or finished from Supabase
-    - For one_day races: scrape top 25 from /race/{slug}/{year}
-    - For stage_race: scrape top 25 per stage missing results
+    - For one_day races: scrape ALL riders from /race/{slug}/{year}
+    - For stage_race: scrape ALL riders per stage missing results
+    - Parses jersey holders (yellow/green/polka/white) per stage
+    - Parses abandon_type (DNF/DNS/DSQ) separately
     - Saves per-race JSON to data/results_{slug}_{stage}.json
 
 Step 2 — Match riders and upload:
     - Matches rider names against cycling_riders in Supabase
-    - Upserts to cycling_results
+    - Upserts to cycling_results (incl. jersey, abandon_type)
     - Updates results_uploaded_at on races/stages
+    - Updates cycling_stages.profile from PCS stage pages
     - Logs to cycling_sync_log with sync_type=results_sync
+
+SQL migration (run once):
+    ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS jersey text;
+    ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS abandon_type text;
 
 Environment variables (loaded from .env.local or shell):
     NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -53,7 +60,6 @@ PCS_HEADERS = {
 
 REQUEST_DELAY = 1.5
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-TOP_N = 25
 YEAR = 2026
 
 # ---------------------------------------------------------------------------
@@ -139,7 +145,7 @@ def save_json(path: str, data: object) -> None:
 
 
 def scrape_race_results(slug: str, client: httpx.Client) -> list[dict]:
-    """Scrape top N results from a one-day race or GC."""
+    """Scrape ALL results from a one-day race or GC."""
     url = f"{PCS_BASE}/race/{slug}/{YEAR}"
     _log(f"    Fetching: {url}")
     soup = pcs_get(url, client)
@@ -147,8 +153,12 @@ def scrape_race_results(slug: str, client: httpx.Client) -> list[dict]:
     return _parse_results_table(soup)
 
 
-def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> list[dict]:
-    """Scrape top N results from a specific stage."""
+def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tuple[list[dict], dict[str, list[str]], str | None]:
+    """Scrape ALL results from a specific stage.
+    Returns (results, jersey_holders, stage_profile).
+    jersey_holders: { rider_pcs_slug: [jersey_type, ...] }
+    stage_profile: 'flat', 'hilly', 'mountain', 'cobbled', 'itt', 'mixed' or None
+    """
     if stage_num == 0:
         url = f"{PCS_BASE}/race/{slug}/{YEAR}/prologue"
     else:
@@ -156,7 +166,12 @@ def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> lis
     _log(f"    Fetching: {url}")
     soup = pcs_get(url, client)
     time.sleep(REQUEST_DELAY)
-    return _parse_results_table(soup)
+
+    results = _parse_results_table(soup)
+    jerseys = _parse_jerseys(soup)
+    profile = _parse_stage_profile(soup)
+
+    return results, jerseys, profile
 
 
 def parse_time_to_seconds(text: str) -> int | None:
@@ -199,9 +214,10 @@ def parse_time_to_seconds(text: str) -> int | None:
 
 def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
     """
-    Parse PCS results page. Structure:
+    Parse PCS results page — ALL riders, no limit.
+    Structure:
       <tr>
-        <td>1</td>                    ← position
+        <td>1</td>                    ← position (or DNF/DNS/DSQ)
         <td class="ridername">
           <a href="rider/{slug}">LASTNAME Firstname</a>
         </td>
@@ -232,13 +248,17 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
         team = ""
         time_gap_seconds: int | None = None
         dnf = False
+        abandon_type: str | None = None
 
         if row:
             cells = row.find_all("td")
             if cells:
-                pos_text = cells[0].get_text(strip=True)
-                if pos_text.lower() in ("dnf", "dns", "otl", "dsq"):
+                pos_text = cells[0].get_text(strip=True).lower()
+                if pos_text in ("dnf", "dns", "otl", "dsq"):
                     dnf = True
+                    abandon_type = pos_text.upper()
+                    if pos_text == "otl":
+                        abandon_type = "OTL"  # outside time limit
                     position = None  # type: ignore[assignment]
                 else:
                     pos_num = re.sub(r"[^\d]", "", pos_text)
@@ -251,13 +271,10 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
                 team = team_link.get_text(strip=True)
 
             # Time gap — find last td with time-like content.
-            # Use .string or direct text to avoid doubled text from nested elements.
             if len(cells) >= 4:
                 last_td = cells[-1]
-                # Prefer .string (leaf text) to avoid concatenation of child texts
                 raw = last_td.string
                 if raw is None:
-                    # Fallback: join direct text nodes only (skip nested tags' text)
                     raw = "".join(last_td.find_all(string=True, recursive=False)).strip()
                 else:
                     raw = raw.strip()
@@ -270,12 +287,109 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
             "position": position,
             "time_gap_seconds": time_gap_seconds,
             "dnf": dnf,
+            "abandon_type": abandon_type,
         })
 
-        if len(results) >= TOP_N:
-            break
-
     return results
+
+
+def _parse_jerseys(soup: BeautifulSoup) -> dict[str, list[str]]:
+    """
+    Parse jersey holders from PCS stage page.
+    PCS shows jersey classifications in sections/tables after the stage result.
+    Look for known classification keywords and map to jersey types.
+    Returns { rider_pcs_slug: ['yellow', 'green', ...] }
+    """
+    rider_re = re.compile(r"^rider/([\w-]+)$")
+    jerseys: dict[str, list[str]] = {}
+
+    # Map PCS classification keywords to jersey types
+    classification_map = {
+        "general": "yellow",
+        "gc": "yellow",
+        "leader": "yellow",
+        "points": "green",
+        "sprint": "green",
+        "mountain": "polka",
+        "kom": "polka",
+        "climber": "polka",
+        "young": "white",
+        "youth": "white",
+        "u25": "white",
+    }
+
+    # Look for classification sections — PCS uses <h3> or <div> headers
+    # followed by result tables. The first rider in each classification is the leader.
+    for header in soup.find_all(["h3", "h4", "div"], class_=re.compile(r"(sub)?head")):
+        text = header.get_text(strip=True).lower()
+
+        jersey_type = None
+        for keyword, jtype in classification_map.items():
+            if keyword in text:
+                jersey_type = jtype
+                break
+
+        if not jersey_type:
+            continue
+
+        # Find the next table or list after this header
+        sibling = header.find_next("table")
+        if not sibling:
+            continue
+
+        # First rider link in the table is the jersey holder
+        first_rider = sibling.find("a", href=rider_re)
+        if first_rider:
+            rm = rider_re.match(first_rider["href"])
+            if rm:
+                slug = rm.group(1)
+                if slug not in jerseys:
+                    jerseys[slug] = []
+                if jersey_type not in jerseys[slug]:
+                    jerseys[slug].append(jersey_type)
+
+    return jerseys
+
+
+def _parse_stage_profile(soup: BeautifulSoup) -> str | None:
+    """
+    Parse stage profile from PCS stage page.
+    PCS uses profile icon classes or text indicators:
+    - 'p1' / 'flat' → flat
+    - 'p2' / 'hills' / 'hilly' → hilly
+    - 'p3' / 'mountain' → mountain
+    - 'p4' / 'cobbles' / 'cobbled' → cobbled
+    - 'p5' / 'itt' / 'time trial' → itt
+    """
+    # Strategy 1: look for profile icon spans with classes like 'icon profile p1'
+    for span in soup.find_all("span", class_=re.compile(r"profile")):
+        classes = " ".join(span.get("class", []))
+        if "p1" in classes:
+            return "flat"
+        if "p2" in classes:
+            return "hilly"
+        if "p3" in classes:
+            return "mountain"
+        if "p4" in classes:
+            return "cobbled"
+        if "p5" in classes:
+            return "itt"
+
+    # Strategy 2: look for text content with profile keywords
+    for tag in soup.find_all(["span", "div"], class_=re.compile(r"(stage|info)")):
+        text = tag.get_text(strip=True).lower()
+        if "time trial" in text or "itt" in text or "ttt" in text:
+            return "itt"
+        if "mountain" in text:
+            return "mountain"
+        if "hilly" in text or "hills" in text:
+            return "hilly"
+        if "flat" in text:
+            return "flat"
+        if "cobble" in text:
+            return "cobbled"
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -487,6 +601,7 @@ def upload_results(
     stage_number: int,
     rider_index: dict[str, int],
     supabase: Client,
+    jersey_holders: dict[str, list[str]] | None = None,
 ) -> tuple[int, int]:
     """Match and upsert results. Returns (upserted, unmatched).
     stage_number=0 for one-day races and GC classification."""
@@ -500,27 +615,42 @@ def upload_results(
             _warn(f"    Unmatched: {r['name']} ({r['pcs_slug']})")
             continue
 
-        rows.append({
+        # Jersey for this rider (comma-separated if multiple)
+        jersey = None
+        if jersey_holders and r["pcs_slug"] in jersey_holders:
+            jersey = ",".join(jersey_holders[r["pcs_slug"]])
+
+        row: dict = {
             "race_id": race_id,
             "rider_id": rider_id,
             "stage_number": stage_number,
             "position": r["position"],
             "time_gap_seconds": r["time_gap_seconds"],
             "dnf": r["dnf"],
-        })
+            "abandon_type": r.get("abandon_type"),
+        }
+        if jersey:
+            row["jersey"] = jersey
+
+        rows.append(row)
 
     if not rows:
         return 0, unmatched
 
-    try:
-        supabase.table("cycling_results").upsert(
-            rows, on_conflict="race_id,rider_id,stage_number"
-        ).execute()
-    except APIError as e:
-        _warn(f"    Upsert failed: {e}")
-        return 0, unmatched
+    # Batch upsert in chunks to avoid payload limits
+    batch_size = 200
+    total = 0
+    for i in range(0, len(rows), batch_size):
+        batch = rows[i:i + batch_size]
+        try:
+            supabase.table("cycling_results").upsert(
+                batch, on_conflict="race_id,rider_id,stage_number"
+            ).execute()
+            total += len(batch)
+        except APIError as e:
+            _warn(f"    Upsert failed (batch {i // batch_size + 1}): {e}")
 
-    return len(rows), unmatched
+    return total, unmatched
 
 
 def update_results_timestamp(supabase: Client, table: str, record_id: int) -> None:
@@ -743,7 +873,7 @@ def main() -> None:
                     stage_num = stage["stage_number"]
                     _log(f"  Stage {stage_num}:")
 
-                    results = scrape_stage_results(
+                    results, jerseys, stage_profile = scrape_stage_results(
                         race["pcs_slug"], stage_num, client,
                     )
                     if not results:
@@ -754,12 +884,26 @@ def main() -> None:
                     save_json(os.path.join(DATA_DIR, filename), results)
                     _log(f"    Parsed {len(results)} results")
 
+                    if jerseys:
+                        _log(f"    Jerseys: {jerseys}")
+
                     upserted, unmatched = upload_results(
                         results, race["id"], stage_num, rider_index, supabase,
+                        jersey_holders=jerseys,
                     )
                     total_upserted += upserted
                     total_unmatched += unmatched
                     _log(f"    Upserted {upserted}, unmatched {unmatched}")
+
+                    # Update stage profile if parsed
+                    if stage_profile:
+                        try:
+                            supabase.table("cycling_stages").update(
+                                {"profile": stage_profile}
+                            ).eq("id", stage["id"]).execute()
+                            _log(f"    Profile: {stage_profile}")
+                        except APIError as e:
+                            _warn(f"    Failed to update stage profile: {e}")
 
                     update_results_timestamp(supabase, "cycling_stages", stage["id"])
 
