@@ -407,6 +407,12 @@ export default async function GamePage({ params }: Props) {
       .order('betting_closes_at', { ascending: true })
 
     championshipRounds = (cRounds ?? []) as unknown as ChampionshipRound[]
+    console.log('DEBUG championship:', {
+      championship_mode: typedGame.championship_mode,
+      rounds_count: championshipRounds?.length,
+      first_round: championshipRounds?.[0],
+      first_round_matches: championshipRounds?.[0]?.championship_round_matches?.length,
+    })
   }
 
   const members = (rawMembers ?? []) as unknown as MemberRow[]
@@ -656,8 +662,9 @@ export default async function GamePage({ params }: Props) {
       .filter((cr) => {
         if (cr.status === 'finished') return false
         const hasMatches = cr.championship_round_matches.length > 0
+        if (!hasMatches) return false
         const isActiveOrOpen = cr.status === 'active' || (cr.betting_closes_at && new Date(cr.betting_closes_at) > now2)
-        return isActiveOrOpen || hasMatches
+        return isActiveOrOpen
       })
       .map((cr) => {
         const matchIds = cr.championship_round_matches.map((crm) => crm.matches.id)
