@@ -554,21 +554,22 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
               position: 'fixed',
               inset: 0,
               zIndex: 9999,
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'center',
               background: 'rgba(0,0,0,0.6)',
             }}
             onClick={() => setModalOpen(null)}
           >
             <div
               style={{
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
                 width: '100%',
                 maxWidth: 480,
                 maxHeight: '70vh',
                 background: '#0F2137',
                 border: '1px solid #2B4F7A',
-                borderRadius: '8px 8px 0 0',
+                borderRadius: 8,
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
