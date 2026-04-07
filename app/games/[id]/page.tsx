@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
+import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
 import GameTicker from '@/components/GameTicker'
@@ -719,6 +720,34 @@ export default async function GamePage({ params }: Props) {
             </>
           )}
         </section>
+
+        {/* Squad link — kun cykling */}
+        {typedGame.sport === 'cycling' && (
+          <Link
+            href={`/games/${gameId}/squad`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 16px',
+              background: '#FDFAF5',
+              border: '1px solid #E8E0D3',
+              borderRadius: 2,
+              textDecoration: 'none',
+              transition: 'border-color 0.15s',
+            }}
+          >
+            <div>
+              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
+                Sæt din trup
+              </span>
+              <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: '#9E9486', marginTop: 2, lineHeight: 1.3 }}>
+                Vælg 25 ryttere til din brutto trup
+              </p>
+            </div>
+            <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: theme.primary, fontWeight: 700 }}>›</span>
+          </Link>
+        )}
 
         {/* Block leaderboard — kun hvis aktiv block */}
         {activeBlock && blockLeaderboardRows.length > 0 && (
