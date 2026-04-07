@@ -185,7 +185,7 @@ export default function NewCyclingGameForm({ races }: Props) {
       if (allSelected) {
         for (const id of blockRaceIds) next.delete(id)
       } else {
-        // Monument-konflikter: deselect overlappende blokke
+        // Kun Monumenter deselekter overlappende blokke
         if (block.key === 'monuments') {
           for (const conflictKey of MONUMENT_CONFLICTS) {
             const conflictBlock = BLOCKS.find((b) => b.key === conflictKey)
@@ -196,15 +196,6 @@ export default function NewCyclingGameForm({ races }: Props) {
               }
             }
           }
-        } else if (MONUMENT_CONFLICTS.includes(block.key)) {
-          // Deselect monumenter når flandern/ardennerne/øvrige vælges
-          const monumentBlock = BLOCKS.find((b) => b.key === 'monuments')
-          if (monumentBlock) {
-            for (const slug of monumentBlock.slugs) {
-              const race = raceBySlug[slug]
-              if (race) next.delete(race.id)
-            }
-          }
         }
         for (const id of blockRaceIds) next.add(id)
       }
@@ -212,24 +203,11 @@ export default function NewCyclingGameForm({ races }: Props) {
     })
   }
 
-  function toggleRace(raceId: string, blockKey: string) {
+  function toggleRace(raceId: string) {
     setSelectedRaceIds((prev) => {
       const next = new Set(prev)
-      if (next.has(raceId)) {
-        next.delete(raceId)
-      } else {
-        // Deselect monumenter hvis man vælger individuelle løb fra konflikt-blokke
-        if (MONUMENT_CONFLICTS.includes(blockKey)) {
-          const monumentBlock = BLOCKS.find((b) => b.key === 'monuments')
-          if (monumentBlock) {
-            for (const slug of monumentBlock.slugs) {
-              const race = raceBySlug[slug]
-              if (race) next.delete(race.id)
-            }
-          }
-        }
-        next.add(raceId)
-      }
+      if (next.has(raceId)) next.delete(raceId)
+      else next.add(raceId)
       return next
     })
   }
@@ -246,6 +224,12 @@ export default function NewCyclingGameForm({ races }: Props) {
       return race && selectedRaceIds.has(race.id)
     })
   }
+
+  // Monumenter disabled når Flandern eller Ardennerne har valgte løb
+  const monumentsDisabled = MONUMENT_CONFLICTS.some((key) => {
+    const block = BLOCKS.find((b) => b.key === key)
+    return block && isBlockPartiallySelected(block)
+  })
 
   // Build the race_selections for the API: { race_id, block_number }[]
   function buildRaceSelections(): { race_id: string; block_number: number }[] {
@@ -347,7 +331,12 @@ export default function NewCyclingGameForm({ races }: Props) {
                           ? 'border-forest/40 bg-cream'
                           : 'border-border bg-white'
                     }`}
-                    style={{ borderRadius: '2px' }}
+                    style={{
+                      borderRadius: '2px',
+                      ...(block.key === 'monuments' && monumentsDisabled
+                        ? { opacity: 0.4, pointerEvents: 'none' as const }
+                        : {}),
+                    }}
                   >
                     {/* Block header */}
                     <button
@@ -390,7 +379,7 @@ export default function NewCyclingGameForm({ races }: Props) {
                             <button
                               key={race.id}
                               type="button"
-                              onClick={() => toggleRace(race.id, block.key)}
+                              onClick={() => toggleRace(race.id)}
                               className="w-full flex items-center gap-3 py-1.5 text-left hover:bg-cream-dark/50 px-1 transition-colors"
                               style={{ borderRadius: '2px' }}
                             >
