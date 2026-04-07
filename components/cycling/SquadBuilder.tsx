@@ -15,11 +15,54 @@ export type Rider = {
   photo_url: string | null
 }
 
+export type RaceStartlist = {
+  raceId: string
+  raceName: string
+  riderIds: string[]
+}
+
 type Props = {
   gameId: number
   availableRiders: Rider[]
-  confirmedRiderIds: string[]
+  raceStartlists: RaceStartlist[]
   initialSquad: Rider[]
+}
+
+// Short race name aliases
+const RACE_SHORT_NAMES: Record<string, string> = {
+  'Paris-Roubaix': 'Roubaix',
+  'Amstel Gold Race': 'Amstel',
+  'La Flèche Wallonne': 'Flèche',
+  'Liège-Bastogne-Liège': 'Liège',
+  'Ronde van Vlaanderen': 'Flandern',
+  'Milano-Sanremo': 'Sanremo',
+  'Tour de France': 'Tour',
+  "Giro d'Italia": 'Giro',
+  'Vuelta a España': 'Vuelta',
+  'Omloop Het Nieuwsblad': 'Omloop',
+  'Strade Bianche': 'Strade',
+  'E3 Classic': 'E3',
+  'Gent-Wevelgem': 'Wevelgem',
+  'Dwars door Vlaanderen': 'Dwars',
+  'Eschborn-Frankfurt': 'Frankfurt',
+  'San Sebastián': 'San Seb.',
+  'Bretagne Classic': 'Bretagne',
+  'GP Québec': 'Québec',
+  'GP Montréal': 'Montréal',
+  'Il Lombardia': 'Lombardia',
+  'World Championships': 'VM',
+  'European Championships': 'EM',
+  'Itzulia Basque Country': 'Itzulia',
+  'Critérium du Dauphiné': 'Dauphiné',
+  'Volta a Catalunya': 'Catalunya',
+  'Tour de Romandie': 'Romandie',
+  'Tour de Suisse': 'Suisse',
+  'Paris-Nice': 'Paris-Nice',
+  'Tirreno-Adriatico': 'Tirreno',
+}
+
+function shortRaceName(name: string): string {
+  return RACE_SHORT_NAMES[name] ?? (name.length > 10 ? name.slice(0, 8) + '...' : name)
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -109,7 +152,7 @@ function Spinner() {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SquadBuilder({ gameId, availableRiders, confirmedRiderIds, initialSquad }: Props) {
+export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad }: Props) {
   const router = useRouter()
   const [squad, setSquad] = useState<Rider[]>(initialSquad)
   const [search, setSearch] = useState('')
@@ -119,7 +162,21 @@ export default function SquadBuilder({ gameId, availableRiders, confirmedRiderId
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  const confirmedSet = useMemo(() => new Set(confirmedRiderIds), [confirmedRiderIds])
+  // Build per-rider race lookup: rider_id → list of short race names
+  const riderRaces = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const rs of raceStartlists) {
+      const short = shortRaceName(rs.raceName)
+      for (const rid of rs.riderIds) {
+        const arr = map.get(rid) ?? []
+        arr.push(short)
+        map.set(rid, arr)
+      }
+    }
+    return map
+  }, [raceStartlists])
+
+  const confirmedSet = useMemo(() => new Set(riderRaces.keys()), [riderRaces])
   const squadIds = useMemo(() => new Set(squad.map((r) => r.id)), [squad])
 
   // Category counts
@@ -447,7 +504,7 @@ export default function SquadBuilder({ gameId, availableRiders, confirmedRiderId
                 {CAT_LABELS[cat]}
               </button>
             ))}
-            {confirmedRiderIds.length > 0 && (
+            {raceStartlists.length > 0 && (
               <button
                 type="button"
                 onClick={() => setConfirmedOnly(!confirmedOnly)}
@@ -550,22 +607,27 @@ export default function SquadBuilder({ gameId, availableRiders, confirmedRiderId
                         {rider.team_name}
                       </div>
                     </div>
-                    {confirmedSet.has(rider.id) && (
-                      <span
-                        style={{
-                          padding: '1px 5px',
-                          borderRadius: 2,
-                          background: 'rgba(76,175,80,0.1)',
-                          color: '#4CAF50',
-                          fontFamily: "'Barlow Condensed', sans-serif",
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: '0.04em',
-                          flexShrink: 0,
-                        }}
-                      >
-                        Bekræftet
-                      </span>
+                    {riderRaces.has(rider.id) && (
+                      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', flexShrink: 0 }}>
+                        {riderRaces.get(rider.id)!.map((raceName) => (
+                          <span
+                            key={raceName}
+                            style={{
+                              padding: '1px 5px',
+                              borderRadius: 2,
+                              background: 'rgba(76,175,80,0.1)',
+                              color: '#4CAF50',
+                              fontFamily: "'Barlow Condensed', sans-serif",
+                              fontSize: 8,
+                              fontWeight: 700,
+                              letterSpacing: '0.02em',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {raceName} ✓
+                          </span>
+                        ))}
+                      </div>
                     )}
                     <CatBadge cat={rider.category} />
                     <span

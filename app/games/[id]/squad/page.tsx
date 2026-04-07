@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import SquadBuilder from '@/components/cycling/SquadBuilder'
-import type { Rider } from '@/components/cycling/SquadBuilder'
+import type { Rider, RaceStartlist } from '@/components/cycling/SquadBuilder'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,8 +54,8 @@ export default async function SquadPage({ params }: Props) {
     photo_url: r.photo_url,
   }))
 
-  // Find confirmed rider IDs from next active/upcoming race startlist
-  const confirmedRiderIds: string[] = []
+  // Find startlists for ALL upcoming/active races in this game
+  const raceStartlists: RaceStartlist[] = []
 
   const { data: gameRaces } = await supabaseAdmin
     .from('cycling_game_races')
@@ -67,24 +67,36 @@ export default async function SquadPage({ params }: Props) {
   if (raceIds.length > 0) {
     const { data: races } = await supabaseAdmin
       .from('cycling_races')
-      .select('id, status, start_date')
+      .select('id, name, status, start_date')
       .in('id', raceIds)
       .in('status', ['active', 'upcoming'])
       .order('start_date', { ascending: true })
 
-    const targetRace =
-      (races ?? []).find((r) => r.status === 'active') ??
-      (races ?? []).find((r) => r.status === 'upcoming') ??
-      null
-
-    if (targetRace) {
-      const { data: startlist } = await supabaseAdmin
+    if (races?.length) {
+      // Fetch all startlists for these races in one query
+      const activeRaceIds = races.map((r) => r.id)
+      const { data: allStartlists } = await supabaseAdmin
         .from('cycling_startlists')
-        .select('rider_id')
-        .eq('race_id', targetRace.id)
+        .select('race_id, rider_id')
+        .in('race_id', activeRaceIds)
 
-      for (const row of startlist ?? []) {
-        confirmedRiderIds.push(row.rider_id)
+      // Group by race
+      const ridersByRace = new Map<string, string[]>()
+      for (const row of allStartlists ?? []) {
+        const arr = ridersByRace.get(row.race_id) ?? []
+        arr.push(row.rider_id)
+        ridersByRace.set(row.race_id, arr)
+      }
+
+      for (const race of races) {
+        const riderIds = ridersByRace.get(race.id) ?? []
+        if (riderIds.length > 0) {
+          raceStartlists.push({
+            raceId: race.id,
+            raceName: race.name,
+            riderIds,
+          })
+        }
       }
     }
   }
@@ -171,7 +183,7 @@ export default async function SquadPage({ params }: Props) {
         <SquadBuilder
           gameId={gameId}
           availableRiders={allRiders}
-          confirmedRiderIds={confirmedRiderIds}
+          raceStartlists={raceStartlists}
           initialSquad={initialSquad}
         />
       </div>
