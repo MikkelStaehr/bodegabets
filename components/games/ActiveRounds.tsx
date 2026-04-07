@@ -13,6 +13,7 @@ export type ActiveRoundRow = {
   leagueType: 'league' | 'cup'
   logo_url?: string | null
   hasRivalry?: boolean
+  href?: string
 }
 
 interface ActiveRoundsProps {
@@ -213,7 +214,7 @@ export default function ActiveRounds({ rounds, gameId }: ActiveRoundsProps) {
 
             {/* Button */}
             <Link
-              href={`/games/${gameId}/rounds/${round.id}`}
+              href={round.href ?? `/games/${gameId}/rounds/${round.id}`}
               style={{
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontSize: 11,

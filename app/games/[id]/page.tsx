@@ -650,11 +650,13 @@ export default async function GamePage({ params }: Props) {
     const champBetMatchIds = new Set((champUserBets ?? []).map((b) => b.match_id))
 
     // Build ActiveRoundRows fra championship_rounds
+    // Vis kun runder med status active/open ELLER mindst én kamp
     const champActiveRows: ActiveRoundRow[] = championshipRounds
       .filter((cr) => {
         if (cr.status === 'finished') return false
-        if (!cr.betting_closes_at) return true
-        return new Date(cr.betting_closes_at) > now2 || cr.status === 'active'
+        const hasMatches = cr.championship_round_matches.length > 0
+        const isActiveOrOpen = cr.status === 'active' || (cr.betting_closes_at && new Date(cr.betting_closes_at) > now2)
+        return isActiveOrOpen || hasMatches
       })
       .map((cr) => {
         const matchIds = cr.championship_round_matches.map((crm) => crm.matches.id)
@@ -669,6 +671,7 @@ export default async function GamePage({ params }: Props) {
           leagueType: 'cup' as const,
           logo_url: null,
           hasRivalry: true,
+          href: `/games/${gameId}`,
         }
       })
 
@@ -849,7 +852,7 @@ export default async function GamePage({ params }: Props) {
               <CalendarSlider
                 matches={allMatches}
                 rounds={(typedGame.championship_mode
-                  ? championshipRounds.map((cr) => {
+                  ? championshipRounds.filter((cr) => cr.status === 'active' || (cr.betting_closes_at && new Date(cr.betting_closes_at) > new Date()) || cr.championship_round_matches.length > 0).map((cr) => {
                       const now2 = new Date()
                       const status = cr.status === 'finished' ? 'finished' as const
                         : cr.betting_closes_at && new Date(cr.betting_closes_at) > now2 ? 'open' as const
