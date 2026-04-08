@@ -48,6 +48,7 @@ type Props = {
   scores: Score[]
   results: Result[]
   riders: Rider[]
+  onEditRole?: (roleKey: string) => void
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -180,7 +181,7 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupResults({ race, lineup, scores, results, riders }: Props) {
+export default function LineupResults({ race, lineup, scores, results, riders, onEditRole }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
@@ -268,14 +269,18 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
           posLabel = '—'
         }
 
+        const canEdit = !!onEditRole && race.status !== 'finished'
+
         return (
           <div
             key={entry.rider_id}
+            onClick={() => { if (canEdit) onEditRole(entry.role.startsWith('equipier') ? `equipier_${entry.slot_index}` : entry.role) }}
             style={{
               display: 'grid',
               gridTemplateColumns: '36px 36px 1fr auto',
               alignItems: 'center',
               gap: 10,
+              cursor: canEdit ? 'pointer' : 'default',
               padding: '8px 14px',
               borderBottom: idx < activeRiders.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
             }}
@@ -315,7 +320,7 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
                   onMouseEnter={() => { if (ROLE_TOOLTIPS[role]) setHoveredRole(entry.rider_id) }}
                   onMouseLeave={() => setHoveredRole(null)}
                 >
-                  {ROLE_LABELS[role] ?? role} · Kat {rider.category}
+                  {ROLE_LABELS[role] ?? role} · Kat {rider.category} · UCI #—
                 </span>
                 {result?.jersey && (
                   <span style={{ color: '#FAC775' }}>

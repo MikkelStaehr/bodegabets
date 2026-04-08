@@ -111,16 +111,24 @@ export async function GET(req: NextRequest, { params }: Props) {
     scoresByLineup.get(key)!.push(s)
   }
 
-  // Fetch race results for riders in lineups
+  // Fetch race results — kun for løb med status 'finished'
   const allRiderIds = [...new Set((lineupRiders ?? []).map((lr) => lr.rider_id))]
-  const allRaceIds = [...new Set(lineups.map((l) => l.race_id))]
+
+  // Find finished race IDs only
+  const { data: finishedRaces } = await supabaseAdmin
+    .from('cycling_races')
+    .select('id')
+    .in('id', lineups.map((l) => l.race_id))
+    .eq('status', 'finished')
+
+  const finishedRaceIds = (finishedRaces ?? []).map((r) => r.id)
 
   let resultsByRace = new Map<string, Map<string, { position: number | null; dnf: boolean; abandon_type: string | null; jersey: string | null }>>()
-  if (allRiderIds.length > 0 && allRaceIds.length > 0) {
+  if (allRiderIds.length > 0 && finishedRaceIds.length > 0) {
     const { data: raceResults } = await supabaseAdmin
       .from('cycling_results')
       .select('race_id, rider_id, position, dnf, abandon_type, jersey')
-      .in('race_id', allRaceIds)
+      .in('race_id', finishedRaceIds)
       .in('rider_id', allRiderIds)
 
     for (const rr of raceResults ?? []) {

@@ -110,41 +110,6 @@ export default function CyclingGameroom({ gameId, squadId, activeBlock, races, s
         </div>
       </div>
 
-      {/* ── Brutto trup kort ──────────────────────────────────────── */}
-      {hasSquad && (
-        <Link
-          href={`/games/${gameId}/squad`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 16px',
-            background: '#FDFAF5',
-            border: '1px solid #E8E0D3',
-            borderRadius: 2,
-            textDecoration: 'none',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
-              Din brutto trup
-            </span>
-            <span style={{
-              padding: '2px 8px',
-              borderRadius: 999,
-              background: '#E1F5EE',
-              color: '#085041',
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 10,
-              fontWeight: 700,
-            }}>
-              {squadRiders.length}/25 ryttere
-            </span>
-          </div>
-          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: '#1E3A5F', fontWeight: 700 }}>›</span>
-        </Link>
-      )}
-
       {/* ── Aktiv lineup label ────────────────────────────────────── */}
       {races.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
