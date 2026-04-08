@@ -258,8 +258,8 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
     setSavingRace(null)
   }
 
-  // No squad or no races — CyclingGameroom handles messaging
-  if (!squadId || squadRiders.length === 0 || races.length === 0) {
+  // No squad — CyclingGameroom handles messaging
+  if (!squadId || squadRiders.length === 0) {
     return null
   }
 
