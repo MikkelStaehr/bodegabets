@@ -296,24 +296,6 @@ def scrape_team_riders(team: dict, client: httpx.Client) -> tuple[list[dict], st
     return riders, logo_url
 
 
-def scrape_race_profile_image(pcs_slug: str, year: int, client: httpx.Client) -> str | None:
-    """Extract route profile image from PCS race page.
-
-    Looks for an <img> whose src contains 'images/profiles/' or 'profile'.
-    """
-    url = f"{PCS_BASE}/race/{pcs_slug}/{year}"
-    soup = pcs_get(url, client)
-    time.sleep(REQUEST_DELAY)
-
-    for img in soup.find_all("img", src=re.compile(r"images/profiles/|profile")):
-        src = img.get("src", "")
-        if not src:
-            continue
-        return f"{PCS_BASE}/{src}" if not src.startswith("http") else src
-
-    return None
-
-
 def scrape_rankings_index(client: httpx.Client, target_slugs: set[str]) -> dict[str, int]:
     index: dict[str, int] = {}
     offset = 0
@@ -777,18 +759,10 @@ def main() -> None:
         riders = scrape_all_riders(client)
         save_json(RIDERS_JSON, riders)
 
-        # 1b. Races + profile images
+        # 1b. Races
         _log("\n─ 1b. Races ─")
         races = [dict(r) for r in RACES]
         _log(f"  Defined {len(races)} races")
-        _log("  Scraping race profile images...")
-        for race in races:
-            img_url = scrape_race_profile_image(race["pcs_slug"], race["year"], client)
-            race["profile_image_url"] = img_url
-            if img_url:
-                _log(f"    {race['pcs_slug']}: {img_url[:70]}")
-            else:
-                _warn(f"    {race['pcs_slug']}: no profile image found")
         save_json(RACES_JSON, races)
 
         # 1c. Stages
