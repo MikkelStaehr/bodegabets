@@ -610,7 +610,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
       {!noSquadForBlock && activeRace && (
         <LineupResults
           race={activeRace}
-          lineup={raceLineupRiders[activeRace.id] ?? []}
+          slots={slots}
           scores={raceScores[activeRace.id] ?? []}
           results={raceResults[activeRace.id] ?? []}
           riders={squadRiders}

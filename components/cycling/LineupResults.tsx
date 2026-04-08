@@ -44,7 +44,7 @@ type Props = {
     status: string
     profile: string | null
   }
-  lineup: { rider_id: string; role: string; slot_index: number }[]
+  slots: Record<string, string | null>
   scores: Score[]
   results: Result[]
   riders: Rider[]
@@ -202,7 +202,7 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupResults({ race, lineup, scores, results, riders, onEditRole }: Props) {
+export default function LineupResults({ race, slots, scores, results, riders, onEditRole }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
@@ -226,16 +226,6 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
     for (const r of results) map.set(r.rider_id, r)
     return map
   }, [results])
-
-  // Build a map of roleKey → lineup entry
-  const lineupByRole = useMemo(() => {
-    const map = new Map<string, typeof lineup[0]>()
-    for (const l of lineup) {
-      const key = l.role === 'equipier' ? `equipier_${l.slot_index}` : l.role
-      map.set(key, l)
-    }
-    return map
-  }, [lineup])
 
   const benchScores = hasScores ? scores.filter((s) => s.is_bench) : []
   const totalPoints = hasScores ? scores.reduce((sum, s) => sum + s.total_points, 0) : 0
@@ -288,14 +278,14 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
 
       {/* ── Role rows (always all 8) ────────────────────────── */}
       {ALL_ROLES.map((roleSlot, idx) => {
-        const entry = lineupByRole.get(roleSlot.key)
-        const rider = entry ? riderMap.get(entry.rider_id) : null
+        const riderId = slots[roleSlot.key] ?? null
+        const rider = riderId ? riderMap.get(riderId) : null
         const baseRole = roleSlot.key.startsWith('equipier_') ? 'equipier' : roleSlot.key
 
-        if (rider && entry) {
+        if (rider && riderId) {
           // Filled slot
-          const score = scoreMap.get(entry.rider_id)
-          const result = resultMap.get(entry.rider_id)
+          const score = scoreMap.get(riderId)
+          const result = resultMap.get(riderId)
           const role = score?.role ?? baseRole
 
           const isDnf = result?.dnf ?? false
@@ -389,7 +379,7 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
               {score ? (
                 <div
                   style={{ position: 'relative', cursor: 'default' }}
-                  onMouseEnter={() => setHoveredRider(entry.rider_id)}
+                  onMouseEnter={() => setHoveredRider(riderId)}
                   onMouseLeave={() => setHoveredRider(null)}
                 >
                   <span style={{
@@ -399,7 +389,7 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
                   }}>
                     {isJokerDnf ? '0 pt (immun)' : `${score.total_points} pt`}
                   </span>
-                  {hoveredRider === entry.rider_id && (
+                  {hoveredRider === riderId && (
                     <PointsTooltip score={score} isJokerDnf={isJokerDnf} />
                   )}
                 </div>
