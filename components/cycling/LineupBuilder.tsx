@@ -11,7 +11,6 @@ type Race = {
   status: string
   race_type: string
   profile: string | null
-  profile_image_url: string | null
 }
 
 type SquadRider = {
@@ -325,23 +324,15 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
                 textAlign: 'left',
               }}
             >
-              {/* Race logo */}
-              {race.profile_image_url ? (
-                <img
-                  src={race.profile_image_url}
-                  alt={race.name}
-                  style={{ width: 32, height: 32, objectFit: 'contain', filter: 'brightness(0) invert(1)', flexShrink: 0, opacity: 0.8 }}
-                />
-              ) : (
-                <div style={{
-                  width: 32, height: 32, borderRadius: 2, background: '#2B4F7A',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700,
-                  color: '#8FABC4', flexShrink: 0,
-                }}>
-                  {race.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-              )}
+              {/* Race initials */}
+              <div style={{
+                width: 32, height: 32, borderRadius: 2, background: '#2B4F7A',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700,
+                color: '#8FABC4', flexShrink: 0,
+              }}>
+                {race.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700,

@@ -330,7 +330,7 @@ export default async function GamePage({ params }: Props) {
 
   // Lineup builder data — brugerens squad + løb med status upcoming/active
   let userSquad: { id: string } | null = null
-  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null }[] = []
+  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
 
@@ -370,19 +370,17 @@ export default async function GamePage({ params }: Props) {
     // Hent løb tilknyttet aktive blok (eller alle hvis ingen blok)
     const gameRacesQuery = supabaseAdmin
       .from('cycling_game_races')
-      .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type, profile, profile_image_url)')
+      .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type, profile)')
       .eq('game_id', gameId)
 
     if (activeBlockIds.length > 0) {
       gameRacesQuery.in('cycling_block_id', activeBlockIds)
     }
 
-    const { data: gameRacesFull, error: gameRacesErr } = await gameRacesQuery
-
-    console.log('DEBUG gameRaces:', { count: gameRacesFull?.length ?? 0, error: gameRacesErr?.message ?? null, activeBlockIds })
+    const { data: gameRacesFull } = await gameRacesQuery
 
     lineupRaces = (gameRacesFull ?? [])
-      .map((gr) => gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null })
+      .map((gr) => gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null })
 
     if (userSquad) {
       const { data: srData } = await supabaseAdmin
