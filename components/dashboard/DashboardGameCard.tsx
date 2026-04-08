@@ -151,6 +151,7 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, ac
           href={`/games/${game.id}`}
           className="text-[12px] font-semibold transition-colors duration-300 flex items-center gap-1"
           style={{ color: 'var(--accent)' }}
+          onClick={() => { try { sessionStorage.setItem('game-sport', game.sport_type) } catch {} }}
         >
           Gå til spilrum ›
         </Link>
