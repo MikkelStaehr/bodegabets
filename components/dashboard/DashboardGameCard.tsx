@@ -59,7 +59,7 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, ac
       }`}
     >
       {/* Top — sport badge + name + status */}
-      <div className="bg-[#2C4A3E] px-5 py-4">
+      <div className="px-5 py-4" style={{ background: game.sport_type === 'cycling' ? '#1E3A5F' : '#2C4A3E' }}>
         {/* Sport + league badge */}
         {logoUrls && logoUrls.length > 0 ? (
           <div className="flex items-center gap-1.5 mb-2">

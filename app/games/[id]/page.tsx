@@ -15,6 +15,7 @@ import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
 import LineupBuilder from '@/components/cycling/LineupBuilder'
 import CyclingGameroom from '@/components/cycling/CyclingGameroom'
+import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
 
 export const dynamic = 'force-dynamic'
 
@@ -858,6 +859,7 @@ export default async function GamePage({ params }: Props) {
   return (
     <LiveMatchesProvider gameId={gameId} enabled={true}>
     <div className="min-h-screen" style={{ background: '#F2EDE4', fontFamily: "'Barlow', sans-serif" }}>
+      <NavbarSportTheme sport={typedGame.sport} />
       <GameTicker items={tickerItems} />
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}

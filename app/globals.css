@@ -68,6 +68,10 @@
   transition: background 300ms, border-color 300ms;
 }
 
+[data-navbar][data-sport="cycling"] {
+  background: #1E3A5F;
+}
+
 [data-navbar][data-transparent] {
   background: transparent !important;
   border-bottom: 1px solid transparent;
