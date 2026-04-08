@@ -98,6 +98,41 @@ export async function GET(req: NextRequest, { params }: Props) {
     ridersByLineup.get(key)!.push(lr)
   }
 
+  // Fetch scores for all lineups
+  const { data: allScores } = await supabaseAdmin
+    .from('cycling_scores')
+    .select('lineup_id, rider_id, race_id, role, is_bench, base_points, role_bonus, role_multiplier, jersey_points, team_bonus, bench_penalty, dnf_penalty, total_points')
+    .in('lineup_id', lineupIds)
+
+  const scoresByLineup = new Map<string, typeof allScores>()
+  for (const s of allScores ?? []) {
+    const key = String(s.lineup_id)
+    if (!scoresByLineup.has(key)) scoresByLineup.set(key, [])
+    scoresByLineup.get(key)!.push(s)
+  }
+
+  // Fetch race results for riders in lineups
+  const allRiderIds = [...new Set((lineupRiders ?? []).map((lr) => lr.rider_id))]
+  const allRaceIds = [...new Set(lineups.map((l) => l.race_id))]
+
+  let resultsByRace = new Map<string, Map<string, { position: number | null; dnf: boolean; abandon_type: string | null; jersey: string | null }>>()
+  if (allRiderIds.length > 0 && allRaceIds.length > 0) {
+    const { data: raceResults } = await supabaseAdmin
+      .from('cycling_results')
+      .select('race_id, rider_id, position, dnf, abandon_type, jersey')
+      .in('race_id', allRaceIds)
+      .in('rider_id', allRiderIds)
+
+    for (const rr of raceResults ?? []) {
+      const raceKey = String(rr.race_id)
+      if (!resultsByRace.has(raceKey)) resultsByRace.set(raceKey, new Map())
+      resultsByRace.get(raceKey)!.set(String(rr.rider_id), {
+        position: rr.position, dnf: rr.dnf ?? false,
+        abandon_type: rr.abandon_type ?? null, jersey: rr.jersey ?? null,
+      })
+    }
+  }
+
   const result = lineups.map((lineup) => {
     const riders = (ridersByLineup.get(String(lineup.id)) ?? []).map((lr) => {
       const r = lr.rider as unknown as {
@@ -114,10 +149,35 @@ export async function GET(req: NextRequest, { params }: Props) {
         category: r.category,
       }
     })
+
+    const scores = (scoresByLineup.get(String(lineup.id)) ?? []).map((s) => ({
+      rider_id: s.rider_id,
+      role: s.role,
+      is_bench: s.is_bench,
+      base_points: Number(s.base_points),
+      role_bonus: Number(s.role_bonus),
+      role_multiplier: Number(s.role_multiplier),
+      jersey_points: Number(s.jersey_points),
+      team_bonus: Number(s.team_bonus),
+      bench_penalty: Number(s.bench_penalty),
+      dnf_penalty: Number(s.dnf_penalty),
+      total_points: Number(s.total_points),
+    }))
+
+    const raceResults = resultsByRace.get(String(lineup.race_id))
+    const resultsArr = riders
+      .map((r) => {
+        const rr = raceResults?.get(String(r.rider_id))
+        return rr ? { rider_id: r.rider_id, ...rr } : null
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+
     return {
       race_id: lineup.race_id,
       is_locked: lineup.is_locked,
       riders,
+      scores,
+      results: resultsArr,
     }
   })
 

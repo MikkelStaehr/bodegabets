@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import LineupResults from './LineupResults'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,14 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
   const [modalSearch, setModalSearch] = useState('')
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
+  // Scores & results per race (for finished races)
+  type ScoreEntry = { rider_id: string; role: string; is_bench: boolean; base_points: number; role_bonus: number; role_multiplier: number; jersey_points: number; team_bonus: number; bench_penalty: number; dnf_penalty: number; total_points: number }
+  type ResultEntry = { rider_id: string; position: number | null; dnf: boolean; abandon_type: string | null; jersey: string | null }
+  type LineupEntry = { rider_id: string; role: string; slot_index: number }
+  const [raceScores, setRaceScores] = useState<Record<string, ScoreEntry[]>>({})
+  const [raceResults, setRaceResults] = useState<Record<string, ResultEntry[]>>({})
+  const [raceLineupRiders, setRaceLineupRiders] = useState<Record<string, LineupEntry[]>>({})
+
   const riderMap = useMemo(() => {
     const map = new Map<string, SquadRider>()
     for (const r of squadRiders) map.set(r.id, r)
@@ -219,9 +228,22 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
           }
           state[lineup.race_id] = raceSlots
         }
+        const scoresState: Record<string, ScoreEntry[]> = {}
+        const resultsState: Record<string, ResultEntry[]> = {}
+        const lineupRidersState: Record<string, LineupEntry[]> = {}
+        for (const lineup of data.lineups) {
+          if (lineup.scores?.length) scoresState[lineup.race_id] = lineup.scores
+          if (lineup.results?.length) resultsState[lineup.race_id] = lineup.results
+          lineupRidersState[lineup.race_id] = lineup.riders.map((r: { rider_id: string; role: string; slot_index: number }) => ({
+            rider_id: r.rider_id, role: r.role, slot_index: r.slot_index,
+          }))
+        }
         setLineups(state)
         setInitialLineups(JSON.parse(JSON.stringify(state)))
         setLockedRaces(locked)
+        setRaceScores(scoresState)
+        setRaceResults(resultsState)
+        setRaceLineupRiders(lineupRidersState)
       })
       .catch(() => {})
   }, [gameId, hasAnySquad]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -463,12 +485,17 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         )}
       </div>
 
-      {/* ── Finished placeholder ──────────────────────────── */}
-      {isFinished && (
-        <div style={{
-          padding: '32px 14px',
-          textAlign: 'center',
-        }}>
+      {/* ── Finished: results or placeholder ────────────── */}
+      {isFinished && activeRace && (raceScores[activeRace.id]?.length ? (
+        <LineupResults
+          race={activeRace}
+          lineup={raceLineupRiders[activeRace.id] ?? []}
+          scores={raceScores[activeRace.id]}
+          results={raceResults[activeRace.id] ?? []}
+          riders={squadRiders}
+        />
+      ) : (
+        <div style={{ padding: '32px 14px', textAlign: 'center' }}>
           <div style={{
             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
             fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 4,
@@ -482,7 +509,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             Resultater kommer snart
           </div>
         </div>
-      )}
+      ))}
 
       {/* ── No squad placeholder ──────────────────────────── */}
       {!isFinished && noSquadForBlock && (
