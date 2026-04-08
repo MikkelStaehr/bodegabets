@@ -11,6 +11,20 @@
   -- Hvis updated_at ikke findes:
   ALTER TABLE cycling_lineups
   ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+  -- Fix: udvid role check constraint til at inkludere alle roller
+  ALTER TABLE cycling_lineup_riders
+  DROP CONSTRAINT IF EXISTS cycling_lineup_riders_role_check;
+
+  ALTER TABLE cycling_lineup_riders
+  ADD CONSTRAINT cycling_lineup_riders_role_check
+  CHECK (role IN (
+    'leader', 'lieutenant', 'grimpeur', 'sprinter',
+    'domestique', 'equipier', 'joker',
+    'captain', 'solo_attack', 'sprint_assist',
+    'bench', 'bench_1', 'bench_2', 'bench_3', 'bench_4',
+    'helper', 'helper_0', 'helper_1', 'helper_2', 'luxury_helper'
+  ));
 */
 
 import { NextRequest, NextResponse } from 'next/server'
