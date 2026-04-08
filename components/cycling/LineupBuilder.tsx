@@ -165,8 +165,21 @@ function shortBlockName(name: string): string {
 
 export default function LineupBuilder({ gameId, blockSquadMap, races, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId }: Props) {
   const sortedBlocks = useMemo(() =>
-    [...blocks].sort((a, b) => a.block_order - b.block_order),
+    [...blocks]
+      .filter((b) => b.parent_block_id === null)
+      .sort((a, b) => a.block_order - b.block_order),
   [blocks])
+
+  const blockDateRange = useCallback((blockId: string) => {
+    const br = races.filter((r) => r.cycling_block_id === blockId)
+    if (!br.length) return ''
+    const dates = br.map((r) => new Date(r.start_date)).sort((a, b) => +a - +b)
+    const fmt = (d: Date) => {
+      const months = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+      return `${d.getDate()}. ${months[d.getMonth()]}`
+    }
+    return dates.length === 1 ? fmt(dates[0]) : `${fmt(dates[0])} — ${fmt(dates[dates.length - 1])}`
+  }, [races])
 
   const sortedRaces = useMemo(() =>
     [...races].sort((a, b) => a.start_date.localeCompare(b.start_date)),
@@ -363,13 +376,16 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
                 type="button"
                 onClick={() => setActiveBlockId(block.id)}
                 style={{
-                  padding: '8px 14px',
+                  padding: '8px 14px 6px',
                   background: isActive ? '#1E3A5F' : 'transparent',
                   border: 'none',
                   borderRadius: isActive ? '6px 6px 0 0' : 0,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                 }}
               >
                 <span style={{
@@ -381,6 +397,13 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
                   letterSpacing: '0.08em',
                 }}>
                   {shortBlockName(block.name)}
+                </span>
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.3)',
+                }}>
+                  {blockDateRange(block.id)}
                 </span>
               </button>
             )
@@ -512,28 +535,29 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          {activeRace.logo_url && (
+          {activeRace.logo_url ? (
             <img
               src={activeRace.logo_url}
               alt={activeRace.name}
               style={{
-                height: 48, width: 'auto', maxWidth: 120,
+                height: 64, width: 'auto', maxWidth: 160,
                 objectFit: 'contain',
                 filter: 'brightness(0) invert(1)',
                 flexShrink: 0,
               }}
             />
+          ) : (
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 500,
+              color: '#F2EDE4', lineHeight: 1.2,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {isLocked ? '🔒 ' : ''}{activeRace.name}
+            </span>
           )}
           <span style={{
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 500,
-            color: '#F2EDE4', lineHeight: 1.2,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {isLocked ? '🔒 ' : ''}{activeRace.name}
-          </span>
-          <span style={{
             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-            padding: '2px 6px', borderRadius: 2, flexShrink: 0,
+            padding: '2px 6px', borderRadius: 2, flexShrink: 0, marginLeft: 'auto',
             background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
             color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
           }}>

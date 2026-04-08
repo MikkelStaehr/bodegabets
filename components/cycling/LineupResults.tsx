@@ -287,7 +287,7 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
             onClick={() => { if (canEdit) onEditRole(entry.role.startsWith('equipier') ? `equipier_${entry.slot_index}` : entry.role) }}
             style={{
               display: 'grid',
-              gridTemplateColumns: '36px 36px 1fr auto',
+              gridTemplateColumns: '40px 40px 1fr auto auto',
               alignItems: 'center',
               gap: 10,
               cursor: canEdit ? 'pointer' : 'default',
@@ -309,45 +309,41 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
             {/* Photo */}
             <RiderPhoto rider={rider} />
 
-            {/* Name + role pill */}
-            <div style={{ minWidth: 0, position: 'relative' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
-                  fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
-                  {' '}{rider.first_name}
+            {/* Name */}
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
+              fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              minWidth: 0,
+            }}>
+              <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
+              {' '}{rider.first_name}
+              {result?.jersey && (
+                <span style={{ marginLeft: 4, color: '#FAC775', fontSize: 10, fontWeight: 700 }}>
+                  {result.jersey}
                 </span>
-                <span
-                  style={{
-                    padding: '2px 6px', borderRadius: 999, flexShrink: 0,
-                    background: ROLE_COLORS[role]?.bg ?? '#D3D1C7',
-                    color: ROLE_COLORS[role]?.color ?? '#444441',
-                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-                    cursor: ROLE_TOOLTIPS[role] ? 'help' : 'default',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={() => { if (ROLE_TOOLTIPS[role]) setHoveredRole(entry.rider_id) }}
-                  onMouseLeave={() => setHoveredRole(null)}
-                >
-                  {ROLE_LABELS[role] ?? role}
-                </span>
-                {result?.jersey && (
-                  <span style={{
-                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-                    color: '#FAC775',
-                  }}>
-                    {result.jersey}
-                  </span>
-                )}
-              </div>
+              )}
+            </span>
+
+            {/* Role pill */}
+            <div style={{ position: 'relative' }}>
+              <span
+                style={{
+                  padding: '2px 6px', borderRadius: 999,
+                  background: ROLE_COLORS[role]?.bg ?? '#D3D1C7',
+                  color: ROLE_COLORS[role]?.color ?? '#444441',
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                  cursor: ROLE_TOOLTIPS[role] ? 'help' : 'default',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={() => { if (ROLE_TOOLTIPS[role]) setHoveredRole(entry.rider_id) }}
+                onMouseLeave={() => setHoveredRole(null)}
+              >
+                {ROLE_LABELS[role] ?? role}
+              </span>
               {hoveredRole === entry.rider_id && ROLE_TOOLTIPS[role] && (
                 <div style={{
-                  position: 'absolute', left: 0, top: '100%', marginTop: 4, zIndex: 10,
+                  position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
                   background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
                   padding: '8px 12px', maxWidth: 260,
                   fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
