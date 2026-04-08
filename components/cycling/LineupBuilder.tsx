@@ -342,65 +342,6 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
   return (
     <div style={{ background: '#1E3A5F', borderRadius: 2, overflow: 'hidden' }}>
-      {/* ── Brutto trup bar (per blok) ────────────────────── */}
-      {(() => {
-        const activeBlock = sortedBlocks.find((b) => b.id === activeBlockId)
-        const blockLabel = activeBlock ? shortBlockName(activeBlock.name) : ''
-        const hasSquadForBlock = !!(activeBlockId && blockSquadMap[activeBlockId])
-        const squadLink = `/games/${gameId}/squad${activeBlockId ? `?block=${activeBlockId}` : ''}`
-
-        return hasSquadForBlock ? (
-          <a
-            href={squadLink}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 16px',
-              background: '#162d4a',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-              textDecoration: 'none',
-            }}
-          >
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
-              color: '#F2EDE4',
-            }}>
-              Din brutto trup{blockLabel ? ` — ${blockLabel}` : ''}
-            </span>
-            <span style={{
-              padding: '2px 8px', borderRadius: 999,
-              background: 'rgba(107,143,113,0.25)', color: '#6B8F71',
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-            }}>
-              {squadRiderCount ?? 0}/25 ryttere
-            </span>
-          </a>
-        ) : (
-          <a
-            href={squadLink}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 16px',
-              background: '#162d4a',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-              textDecoration: 'none',
-            }}
-          >
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
-              color: 'rgba(255,255,255,0.5)',
-            }}>
-              Udtag brutto trup{blockLabel ? ` — ${blockLabel}` : ''}
-            </span>
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 600,
-              color: '#4A90D9',
-            }}>
-              Udtag trup →
-            </span>
-          </a>
-        )
-      })()}
-
       {/* ── Niveau 1: Blok-tabs ────────────────────────────── */}
       {sortedBlocks.length > 0 && (
         <div
@@ -503,6 +444,65 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
           )
         })}
       </div>
+
+      {/* ── Brutto trup bar (per blok) ────────────────────── */}
+      {(() => {
+        const ab = sortedBlocks.find((b) => b.id === activeBlockId)
+        const blockLabel = ab ? shortBlockName(ab.name) : ''
+        const hasSquadForBlock = !!(activeBlockId && blockSquadMap[activeBlockId])
+        const squadLink = `/games/${gameId}/squad${activeBlockId ? `?block=${activeBlockId}` : ''}`
+
+        return hasSquadForBlock ? (
+          <a
+            href={squadLink}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px',
+              background: '#162d4a',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              textDecoration: 'none',
+            }}
+          >
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
+              color: '#F2EDE4',
+            }}>
+              Din brutto trup{blockLabel ? ` — ${blockLabel}` : ''}
+            </span>
+            <span style={{
+              padding: '2px 8px', borderRadius: 999,
+              background: 'rgba(107,143,113,0.25)', color: '#6B8F71',
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+            }}>
+              {squadRiderCount ?? 0}/25 ryttere
+            </span>
+          </a>
+        ) : (
+          <a
+            href={squadLink}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px',
+              background: '#162d4a',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              textDecoration: 'none',
+            }}
+          >
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
+              color: 'rgba(255,255,255,0.5)',
+            }}>
+              Udtag brutto trup{blockLabel ? ` — ${blockLabel}` : ''}
+            </span>
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 600,
+              color: '#4A90D9',
+            }}>
+              Udtag trup →
+            </span>
+          </a>
+        )
+      })()}
 
       {/* ── Race header ──────────────────────────────────────── */}
       <div style={{

@@ -64,6 +64,16 @@ const ROLE_LABELS: Record<string, string> = {
   bench: 'Bænk',
 }
 
+const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
+  leader:     { bg: '#FAC775', color: '#633806' },
+  lieutenant: { bg: '#B5D4F4', color: '#0C447C' },
+  grimpeur:   { bg: '#9FE1CB', color: '#085041' },
+  sprinter:   { bg: '#F5C4B3', color: '#712B13' },
+  domestique: { bg: '#C0DD97', color: '#27500A' },
+  equipier:   { bg: '#D3D1C7', color: '#444441' },
+  joker:      { bg: '#CECBF6', color: '#3C3489' },
+}
+
 const ROLE_TOOLTIPS: Record<string, string> = {
   leader: 'Scorer point baseret på placering × kategori-multiplikator',
   lieutenant: 'Top 10 → ×1.8. Top 10 + Leader DNF → ×2.8. Kun Kat 2-3',
@@ -299,47 +309,54 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
             {/* Photo */}
             <RiderPhoto rider={rider} />
 
-            {/* Name + role */}
-            <div style={{ minWidth: 0 }}>
+            {/* Name + role pill */}
+            <div style={{ minWidth: 0, position: 'relative' }}>
               <div style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
-                fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                display: 'flex', alignItems: 'center', gap: 6,
               }}>
-                <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
-                {' '}{rider.first_name}
-              </div>
-              <div style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
-                color: 'rgba(255,255,255,0.35)', lineHeight: 1.2,
-                display: 'flex', alignItems: 'center', gap: 4,
-                position: 'relative',
-              }}>
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
+                  fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
+                  {' '}{rider.first_name}
+                </span>
                 <span
-                  style={{ cursor: ROLE_TOOLTIPS[role] ? 'help' : 'default' }}
+                  style={{
+                    padding: '2px 6px', borderRadius: 999, flexShrink: 0,
+                    background: ROLE_COLORS[role]?.bg ?? '#D3D1C7',
+                    color: ROLE_COLORS[role]?.color ?? '#444441',
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                    cursor: ROLE_TOOLTIPS[role] ? 'help' : 'default',
+                    position: 'relative',
+                  }}
                   onMouseEnter={() => { if (ROLE_TOOLTIPS[role]) setHoveredRole(entry.rider_id) }}
                   onMouseLeave={() => setHoveredRole(null)}
                 >
-                  {ROLE_LABELS[role] ?? role} · Kat {rider.category} · UCI #—
+                  {ROLE_LABELS[role] ?? role}
                 </span>
                 {result?.jersey && (
-                  <span style={{ color: '#FAC775' }}>
+                  <span style={{
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                    color: '#FAC775',
+                  }}>
                     {result.jersey}
                   </span>
                 )}
-                {hoveredRole === entry.rider_id && ROLE_TOOLTIPS[role] && (
-                  <div style={{
-                    position: 'absolute', left: 0, top: '100%', marginTop: 4, zIndex: 10,
-                    background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
-                    padding: '8px 12px', maxWidth: 260,
-                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
-                    color: 'rgba(255,255,255,0.7)', lineHeight: 1.4,
-                    whiteSpace: 'normal',
-                  }}>
-                    {ROLE_TOOLTIPS[role]}
-                  </div>
-                )}
               </div>
+              {hoveredRole === entry.rider_id && ROLE_TOOLTIPS[role] && (
+                <div style={{
+                  position: 'absolute', left: 0, top: '100%', marginTop: 4, zIndex: 10,
+                  background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
+                  padding: '8px 12px', maxWidth: 260,
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                  color: 'rgba(255,255,255,0.7)', lineHeight: 1.4,
+                  whiteSpace: 'normal',
+                }}>
+                  {ROLE_TOOLTIPS[role]}
+                </div>
+              )}
             </div>
 
             {/* Points */}
