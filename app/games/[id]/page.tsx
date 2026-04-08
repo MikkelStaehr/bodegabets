@@ -394,6 +394,15 @@ export default async function GamePage({ params }: Props) {
         category: number; team_logo_url: string | null; photo_url: string | null
       })
     }
+
+    console.log('DEBUG cycling squad:', {
+      userId: user.id,
+      gameId,
+      userSquad,
+      squadRidersCount: lineupSquadRiders.length,
+      lineupRacesCount: lineupRaces.length,
+      activeBlock: cyclingActiveBlock,
+    })
   }
 
   // ── Championship mode data ────────────────────────────────────────────────
