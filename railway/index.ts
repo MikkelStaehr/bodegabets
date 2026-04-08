@@ -763,7 +763,7 @@ app.listen(PORT, () => {
       const now = new Date()
       const soon = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
 
-      // Hent kun round_ids fra aktive spil
+      // ── 1) Regular games: round_ids fra game_seasons ──────────────────
       const { data: activeGameSeasons } = await supabaseAdmin
         .from('game_seasons')
         .select('season_id, games!inner(status)')
@@ -771,44 +771,90 @@ app.listen(PORT, () => {
 
       const activeSeasonIds = [...new Set((activeGameSeasons ?? []).map(gs => gs.season_id as number))]
 
-      const { data: activeRounds } = await supabaseAdmin
-        .from('rounds')
+      let activeRoundIds: number[] = []
+      if (activeSeasonIds.length > 0) {
+        const { data: activeRounds } = await supabaseAdmin
+          .from('rounds')
+          .select('id')
+          .in('season_id', activeSeasonIds)
+        activeRoundIds = (activeRounds ?? []).map(r => r.id as number)
+      }
+
+      // ── 2) Championship games (Bodega Rounds): match_ids via championship_round_matches ──
+      let champMatchIds: number[] = []
+      const { data: champGames } = await supabaseAdmin
+        .from('games')
         .select('id')
-        .in('season_id', activeSeasonIds.length > 0 ? activeSeasonIds : [0])
+        .eq('status', 'active')
+        .eq('championship_mode', true)
 
-      const activeRoundIds = (activeRounds ?? []).map(r => r.id as number)
-      if (activeRoundIds.length === 0) return
+      if (champGames && champGames.length > 0) {
+        // Hent alle match_ids fra ikke-færdige championship_rounds
+        const { data: champRoundMatches } = await supabaseAdmin
+          .from('championship_round_matches')
+          .select('match_id, championship_rounds!inner(id, status)')
+          .neq('championship_rounds.status', 'finished')
 
-      // Tjek om der er live kampe i aktive spil
-      const { data: liveMatches } = await supabaseAdmin
-        .from('matches')
-        .select('id')
-        .in('status', ['live', 'halftime'])
-        .in('round_id', activeRoundIds)
-        .limit(1)
+        champMatchIds = (champRoundMatches ?? []).map(crm => crm.match_id as number)
+      }
 
-      // Tjek om der er kampe der starter inden for 30 min i aktive spil
-      const { data: soonMatches } = await supabaseAdmin
-        .from('matches')
-        .select('id')
-        .eq('status', 'scheduled')
-        .lte('kickoff', soon)
-        .gte('kickoff', now.toISOString())
-        .in('round_id', activeRoundIds)
-        .limit(1)
+      if (activeRoundIds.length === 0 && champMatchIds.length === 0) return
 
-      // Tjek om der er kampe der er scheduled men kickoff er passeret (bør være live)
-      const { data: startedMatches } = await supabaseAdmin
-        .from('matches')
-        .select('id')
-        .eq('status', 'scheduled')
-        .lt('kickoff', now.toISOString())
-        .in('round_id', activeRoundIds)
-        .limit(1)
+      // ── 3) Tjek for live/soon/started kampe ───────────────────────────
 
-      const hasLive = (liveMatches?.length ?? 0) > 0
-      const hasSoon = (soonMatches?.length ?? 0) > 0
-      const hasStarted = (startedMatches?.length ?? 0) > 0
+      let hasLive = false
+      let hasSoon = false
+      let hasStarted = false
+
+      // Check regular round matches
+      if (activeRoundIds.length > 0) {
+        const { data: liveMatches } = await supabaseAdmin
+          .from('matches').select('id')
+          .in('status', ['live', 'halftime'])
+          .in('round_id', activeRoundIds).limit(1)
+        if (liveMatches?.length) hasLive = true
+
+        if (!hasLive) {
+          const { data: soonMatches } = await supabaseAdmin
+            .from('matches').select('id')
+            .eq('status', 'scheduled').lte('kickoff', soon).gte('kickoff', now.toISOString())
+            .in('round_id', activeRoundIds).limit(1)
+          if (soonMatches?.length) hasSoon = true
+        }
+
+        const { data: startedMatches } = await supabaseAdmin
+          .from('matches').select('id')
+          .eq('status', 'scheduled').lt('kickoff', now.toISOString())
+          .in('round_id', activeRoundIds).limit(1)
+        if (startedMatches?.length) hasStarted = true
+      }
+
+      // Check championship round matches (Bodega Rounds)
+      if (champMatchIds.length > 0) {
+        if (!hasLive) {
+          const { data: champLive } = await supabaseAdmin
+            .from('matches').select('id')
+            .in('status', ['live', 'halftime'])
+            .in('id', champMatchIds).limit(1)
+          if (champLive?.length) hasLive = true
+        }
+
+        if (!hasSoon) {
+          const { data: champSoon } = await supabaseAdmin
+            .from('matches').select('id')
+            .eq('status', 'scheduled').lte('kickoff', soon).gte('kickoff', now.toISOString())
+            .in('id', champMatchIds).limit(1)
+          if (champSoon?.length) hasSoon = true
+        }
+
+        if (!hasStarted) {
+          const { data: champStarted } = await supabaseAdmin
+            .from('matches').select('id')
+            .eq('status', 'scheduled').lt('kickoff', now.toISOString())
+            .in('id', champMatchIds).limit(1)
+          if (champStarted?.length) hasStarted = true
+        }
+      }
 
       if (hasLive || hasSoon || hasStarted) {
         console.log(`[cron] Dynamic sync — live: ${hasLive}, soon: ${hasSoon}, started: ${hasStarted}`)
