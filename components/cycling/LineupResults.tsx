@@ -251,6 +251,27 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
         </span>
       </div>
 
+      {/* ── Column headers ──────────────────────────────────── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '40px 40px 1fr auto auto',
+        alignItems: 'center',
+        gap: 10,
+        padding: '6px 14px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        {['PL.', '', 'RYTTER', 'ROLLE', 'PT.'].map((label, i) => (
+          <span key={i} style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
+            fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em',
+            color: 'rgba(255,255,255,0.3)',
+            textAlign: i === 0 ? 'center' : i >= 3 ? 'right' : 'left',
+          }}>
+            {label}
+          </span>
+        ))}
+      </div>
+
       {/* ── Active riders ────────────────────────────────────── */}
       {activeRiders.map((entry, idx) => {
         const rider = riderMap.get(entry.rider_id)
@@ -325,14 +346,12 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
               )}
             </span>
 
-            {/* Role pill */}
+            {/* Role */}
             <div style={{ position: 'relative' }}>
               <span
                 style={{
-                  padding: '2px 6px', borderRadius: 999,
-                  background: ROLE_COLORS[role]?.bg ?? '#D3D1C7',
-                  color: ROLE_COLORS[role]?.color ?? '#444441',
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                  color: 'rgba(255,255,255,0.5)', textAlign: 'right',
                   cursor: ROLE_TOOLTIPS[role] ? 'help' : 'default',
                   whiteSpace: 'nowrap',
                 }}
