@@ -485,34 +485,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         )}
       </div>
 
-      {/* ── Finished: results or placeholder ────────────── */}
-      {isFinished && activeRace && (raceScores[activeRace.id]?.length ? (
-        <LineupResults
-          race={activeRace}
-          lineup={raceLineupRiders[activeRace.id] ?? []}
-          scores={raceScores[activeRace.id]}
-          results={raceResults[activeRace.id] ?? []}
-          riders={squadRiders}
-        />
-      ) : (
-        <div style={{ padding: '32px 14px', textAlign: 'center' }}>
-          <div style={{
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
-            fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 4,
-          }}>
-            Løbet er afsluttet
-          </div>
-          <div style={{
-            fontFamily: "'Barlow', sans-serif", fontSize: 12,
-            color: 'rgba(255,255,255,0.3)',
-          }}>
-            Resultater kommer snart
-          </div>
-        </div>
-      ))}
-
       {/* ── No squad placeholder ──────────────────────────── */}
-      {!isFinished && noSquadForBlock && (
+      {noSquadForBlock && (
         <div style={{ padding: '24px 14px', textAlign: 'center' }}>
           <div style={{
             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
@@ -535,71 +509,19 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         </div>
       )}
 
-      {/* ── Role slots ───────────────────────────────────────── */}
-      {!isFinished && !noSquadForBlock && (<>
-      <div>
-        {ROLES.map((role, idx) => {
-          const riderId = slots[role.key]
-          const rider = riderId ? riderMap.get(riderId) : null
-
-          return (
-            <button
-              key={role.key}
-              type="button"
-              disabled={isLocked}
-              onClick={() => {
-                if (isLocked) return
-                setModalOpen({ raceId: activeRace.id, roleKey: role.key })
-                setModalSearch('')
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '10px 14px',
-                background: 'transparent', border: 'none',
-                borderBottom: idx < ROLES.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                cursor: isLocked ? 'not-allowed' : 'pointer',
-                opacity: isLocked ? 0.6 : 1,
-                textAlign: 'left', transition: 'background 0.1s',
-              }}
-              onMouseEnter={(e) => { if (!isLocked) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-            >
-              <div style={{ width: 85, flexShrink: 0 }}>
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 600,
-                  color: 'rgba(255,255,255,0.5)', letterSpacing: '0.02em', whiteSpace: 'nowrap',
-                }}>
-                  {role.label}
-                </span>
-              </div>
-              {rider ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  <TeamLogo url={rider.team_logo_url} team={rider.team_name} />
-                  <span style={{
-                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
-                    color: '#F2EDE4', lineHeight: 1.2,
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>
-                    {rider.first_name} {rider.last_name}
-                  </span>
-                  <CatBadge cat={rider.category} />
-                </div>
-              ) : (
-                <div style={{ flex: 1 }}>
-                  <span style={{
-                    fontFamily: "'Barlow', sans-serif", fontSize: 12,
-                    color: 'rgba(255,255,255,0.2)', fontStyle: 'italic',
-                  }}>
-                    Vælg rytter
-                  </span>
-                </div>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {/* ── Lineup results view ──────────────────────────────── */}
+      {!noSquadForBlock && activeRace && (
+        <LineupResults
+          race={activeRace}
+          lineup={raceLineupRiders[activeRace.id] ?? []}
+          scores={raceScores[activeRace.id] ?? []}
+          results={raceResults[activeRace.id] ?? []}
+          riders={squadRiders}
+        />
+      )}
 
       {/* ── Save button ──────────────────────────────────────── */}
+      {!noSquadForBlock && !isFinished && activeRace && (<>
       <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <button
           type="button"

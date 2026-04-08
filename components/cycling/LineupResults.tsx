@@ -169,6 +169,8 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
 
+  const hasScores = scores.length > 0
+
   const riderMap = useMemo(() => {
     const map = new Map<string, Rider>()
     for (const r of riders) map.set(r.id, r)
@@ -187,9 +189,17 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
     return map
   }, [results])
 
-  const activeScores = scores.filter((s) => !s.is_bench)
-  const benchScores = scores.filter((s) => s.is_bench)
-  const totalPoints = scores.reduce((sum, s) => sum + s.total_points, 0)
+  // Build display rows from lineup (primary) enriched with scores/results
+  const activeRiders = lineup.filter((l) => {
+    if (hasScores) {
+      const score = scoreMap.get(l.rider_id)
+      return score ? !score.is_bench : true
+    }
+    return true
+  })
+
+  const benchScores = hasScores ? scores.filter((s) => s.is_bench) : []
+  const totalPoints = hasScores ? scores.reduce((sum, s) => sum + s.total_points, 0) : 0
   const benchPenaltyTotal = benchScores.reduce((sum, s) => sum + s.bench_penalty, 0)
 
   return (
@@ -204,29 +214,35 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
           fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em',
           color: 'rgba(255,255,255,0.4)',
         }}>
-          Resultater
+          Lineup
         </span>
         <span style={{
           fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16,
-          fontWeight: 700, color: '#F2EDE4',
+          fontWeight: 700, color: hasScores ? '#F2EDE4' : 'rgba(255,255,255,0.35)',
         }}>
-          {totalPoints} pt
+          {hasScores ? `${totalPoints} pt` : 'N/A'}
         </span>
       </div>
 
       {/* ── Active riders ────────────────────────────────────── */}
-      {activeScores.map((score, idx) => {
-        const rider = riderMap.get(score.rider_id)
-        const result = resultMap.get(score.rider_id)
+      {activeRiders.map((entry, idx) => {
+        const rider = riderMap.get(entry.rider_id)
         if (!rider) return null
+
+        const score = scoreMap.get(entry.rider_id)
+        const result = resultMap.get(entry.rider_id)
+        const role = score?.role ?? entry.role
 
         const isDnf = result?.dnf ?? false
         const position = result?.position ?? null
-        const isJokerDnf = score.role === 'joker' && isDnf
+        const isJokerDnf = role === 'joker' && isDnf
 
         let posLabel: string
-        let posColor = 'rgba(255,255,255,0.5)'
-        if (isDnf) {
+        let posColor = 'rgba(255,255,255,0.3)'
+        if (!hasScores && !result) {
+          posLabel = 'N/A'
+          posColor = 'rgba(255,255,255,0.25)'
+        } else if (isDnf) {
           posLabel = 'DNF'
           posColor = '#ff6b6b'
         } else if (position) {
@@ -238,20 +254,20 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
 
         return (
           <div
-            key={score.rider_id}
+            key={entry.rider_id}
             style={{
               display: 'grid',
               gridTemplateColumns: '36px 32px 1fr auto',
               alignItems: 'center',
               gap: 10,
               padding: '8px 14px',
-              borderBottom: idx < activeScores.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              borderBottom: idx < activeRiders.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
             }}
           >
             {/* Position */}
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: isDnf ? 11 : 14,
+              fontSize: isDnf ? 11 : posLabel === 'N/A' ? 11 : 14,
               fontWeight: 700,
               color: posColor,
               textAlign: 'center',
@@ -276,7 +292,7 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
                 fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
                 color: 'rgba(255,255,255,0.35)', lineHeight: 1.2,
               }}>
-                {ROLE_LABELS[score.role] ?? score.role}
+                {ROLE_LABELS[role] ?? role}
                 {result?.jersey && (
                   <span style={{ marginLeft: 6, color: '#FAC775' }}>
                     {result.jersey}
@@ -286,22 +302,31 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
             </div>
 
             {/* Points */}
-            <div
-              style={{ position: 'relative', cursor: 'default' }}
-              onMouseEnter={() => setHoveredRider(score.rider_id)}
-              onMouseLeave={() => setHoveredRider(null)}
-            >
+            {score ? (
+              <div
+                style={{ position: 'relative', cursor: 'default' }}
+                onMouseEnter={() => setHoveredRider(entry.rider_id)}
+                onMouseLeave={() => setHoveredRider(null)}
+              >
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
+                  fontWeight: 700,
+                  color: isJokerDnf ? 'rgba(255,255,255,0.4)' : score.total_points > 0 ? '#6B8F71' : score.total_points < 0 ? '#ff6b6b' : 'rgba(255,255,255,0.4)',
+                }}>
+                  {isJokerDnf ? '0 pt (immun)' : `${score.total_points} pt`}
+                </span>
+                {hoveredRider === entry.rider_id && (
+                  <PointsTooltip score={score} isJokerDnf={isJokerDnf} />
+                )}
+              </div>
+            ) : (
               <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
-                fontWeight: 700,
-                color: isJokerDnf ? 'rgba(255,255,255,0.4)' : score.total_points > 0 ? '#6B8F71' : score.total_points < 0 ? '#ff6b6b' : 'rgba(255,255,255,0.4)',
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+                fontWeight: 600, color: 'rgba(255,255,255,0.25)',
               }}>
-                {isJokerDnf ? '0 pt (immun)' : `${score.total_points} pt`}
+                N/A
               </span>
-              {hoveredRider === score.rider_id && (
-                <PointsTooltip score={score} isJokerDnf={isJokerDnf} />
-              )}
-            </div>
+            )}
           </div>
         )
       })}
