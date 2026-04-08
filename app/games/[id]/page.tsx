@@ -377,11 +377,12 @@ export default async function GamePage({ params }: Props) {
       gameRacesQuery.in('cycling_block_id', activeBlockIds)
     }
 
-    const { data: gameRacesFull } = await gameRacesQuery
+    const { data: gameRacesFull, error: gameRacesErr } = await gameRacesQuery
+
+    console.log('DEBUG gameRaces:', { count: gameRacesFull?.length ?? 0, error: gameRacesErr?.message ?? null, activeBlockIds })
 
     lineupRaces = (gameRacesFull ?? [])
       .map((gr) => gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null })
-      // Show all races in the block — upcoming, active, and finished
 
     if (userSquad) {
       const { data: srData } = await supabaseAdmin

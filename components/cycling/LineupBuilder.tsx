@@ -263,6 +263,7 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
     return null
   }
 
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Section header */}
