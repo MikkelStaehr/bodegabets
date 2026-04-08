@@ -395,6 +395,7 @@ export default async function GamePage({ params }: Props) {
       })
     }
 
+    console.log('DEBUG cycling:', { squadId: userSquad?.id, squadRiders: lineupSquadRiders.length, races: lineupRaces.length, activeBlockIds })
   }
 
   // ── Championship mode data ────────────────────────────────────────────────
