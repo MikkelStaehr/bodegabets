@@ -618,6 +618,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             setModalOpen({ raceId: activeRace.id, roleKey: roleKey as RoleKey })
             setModalSearch('')
           } : undefined}
+          onEditLineup={!isFinished && !isLocked ? () => {
+            setModalOpen({ raceId: activeRace.id, roleKey: 'leader' as RoleKey })
+            setModalSearch('')
+          } : undefined}
         />
       )}
 

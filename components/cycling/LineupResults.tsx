@@ -49,6 +49,7 @@ type Props = {
   results: Result[]
   riders: Rider[]
   onEditRole?: (roleKey: string) => void
+  onEditLineup?: () => void
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -191,7 +192,7 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupResults({ race, lineup, scores, results, riders, onEditRole }: Props) {
+export default function LineupResults({ race, lineup, scores, results, riders, onEditRole, onEditLineup }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
@@ -251,8 +252,35 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
         </span>
       </div>
 
+      {/* ── Empty lineup placeholder ────────────────────────── */}
+      {lineup.length === 0 && (
+        <div style={{ padding: '32px 14px', textAlign: 'center' }}>
+          <div style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
+            color: 'rgba(255,255,255,0.5)', marginBottom: 12,
+          }}>
+            Ingen lineup sat endnu
+          </div>
+          {onEditLineup && (
+            <button
+              type="button"
+              onClick={onEditLineup}
+              style={{
+                padding: '8px 20px',
+                background: '#4A90D9', border: 'none', borderRadius: 2,
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+                fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                color: '#fff', cursor: 'pointer',
+              }}
+            >
+              Sæt lineup
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Column headers ──────────────────────────────────── */}
-      <div style={{
+      {lineup.length > 0 && <div style={{
         display: 'grid',
         gridTemplateColumns: '40px 40px 1fr auto auto',
         alignItems: 'center',
@@ -270,10 +298,10 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
             {label}
           </span>
         ))}
-      </div>
+      </div>}
 
       {/* ── Active riders ────────────────────────────────────── */}
-      {activeRiders.map((entry, idx) => {
+      {lineup.length > 0 && activeRiders.map((entry, idx) => {
         const rider = riderMap.get(entry.rider_id)
         if (!rider) return null
 
