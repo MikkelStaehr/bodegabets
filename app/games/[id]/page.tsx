@@ -330,9 +330,10 @@ export default async function GamePage({ params }: Props) {
 
   // Lineup builder data — brugerens squad + løb med status upcoming/active
   let userSquad: { id: string } | null = null
-  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null }[] = []
+  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
+  let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string }[] = []
 
   if (typedGame.sport === 'cycling') {
     const { data: sq } = await supabaseAdmin
@@ -367,20 +368,26 @@ export default async function GamePage({ params }: Props) {
       }
     }
 
-    // Hent løb tilknyttet aktive blok (eller alle hvis ingen blok)
-    const gameRacesQuery = supabaseAdmin
+    // Hent alle blokke for gameroom
+    const { data: blocksData } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('id, name, block_order, parent_block_id, lock_deadline')
+      .eq('game_id', gameId)
+      .order('block_order', { ascending: true })
+
+    cyclingBlocks = (blocksData ?? []) as typeof cyclingBlocks
+
+    // Hent alle løb for gameroom (filtrering sker client-side via blok-tabs)
+    const { data: gameRacesFull } = await supabaseAdmin
       .from('cycling_game_races')
       .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type, profile, profile_image_url)')
       .eq('game_id', gameId)
 
-    if (activeBlockIds.length > 0) {
-      gameRacesQuery.in('cycling_block_id', activeBlockIds)
-    }
-
-    const { data: gameRacesFull } = await gameRacesQuery
-
     lineupRaces = (gameRacesFull ?? [])
-      .map((gr) => gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null })
+      .map((gr) => {
+        const race = gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null }
+        return { ...race, cycling_block_id: gr.cycling_block_id as string | null }
+      })
 
     if (userSquad) {
       const { data: srData } = await supabaseAdmin
@@ -951,6 +958,8 @@ export default async function GamePage({ params }: Props) {
               squadId={userSquad?.id ?? null}
               races={lineupRaces}
               squadRiders={lineupSquadRiders}
+              blocks={cyclingBlocks}
+              defaultBlockId={(userSquad as { cycling_block_id?: string } | null)?.cycling_block_id ?? null}
               lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
             />
           </>

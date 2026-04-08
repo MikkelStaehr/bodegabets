@@ -12,6 +12,15 @@ type Race = {
   race_type: string
   profile: string | null
   profile_image_url: string | null
+  cycling_block_id: string | null
+}
+
+type Block = {
+  id: string
+  name: string
+  block_order: number
+  parent_block_id: string | null
+  lock_deadline: string
 }
 
 type SquadRider = {
@@ -33,6 +42,8 @@ type Props = {
   squadId: string | null
   races: Race[]
   squadRiders: SquadRider[]
+  blocks: Block[]
+  defaultBlockId?: string | null
   lockDeadline?: string | null
 }
 
@@ -125,15 +136,47 @@ function shortName(name: string): string {
   return SHORT_NAMES[name] ?? name
 }
 
+function shortBlockName(name: string): string {
+  // "Giro d'Italia — Uge 1 (Etape 1-7)" → "Giro Uge 1"
+  const weekMatch = name.match(/^(.+?)\s*—\s*Uge\s*(\d+)/i)
+  if (weekMatch) {
+    const base = weekMatch[1]
+      .replace(/d'Italia/i, '').replace(/de France/i, '').replace(/a España/i, '')
+      .trim()
+    return `${base} Uge ${weekMatch[2]}`
+  }
+  // "Flandern-klassikerne" → "Flandern"
+  return name.replace(/-?klassikerne$/i, '').trim()
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, squadId, races, squadRiders, lockDeadline }: Props) {
+export default function LineupBuilder({ gameId, squadId, races, squadRiders, blocks, defaultBlockId, lockDeadline }: Props) {
+  const sortedBlocks = useMemo(() =>
+    [...blocks].sort((a, b) => a.block_order - b.block_order),
+  [blocks])
+
   const sortedRaces = useMemo(() =>
     [...races].sort((a, b) => a.start_date.localeCompare(b.start_date)),
   [races])
-  const defaultTabId = sortedRaces.find((r) => r.status === 'upcoming')?.id ?? sortedRaces[0]?.id ?? null
+
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(
+    defaultBlockId ?? sortedBlocks[0]?.id ?? null
+  )
+
+  const blockRaces = useMemo(() =>
+    activeBlockId ? sortedRaces.filter((r) => r.cycling_block_id === activeBlockId) : sortedRaces,
+  [sortedRaces, activeBlockId])
+
+  const defaultTabId = blockRaces.find((r) => r.status === 'upcoming')?.id ?? blockRaces[0]?.id ?? null
 
   const [activeTab, setActiveTab] = useState<string | null>(defaultTabId)
+
+  // Reset race tab when block changes
+  useEffect(() => {
+    const firstUpcoming = blockRaces.find((r) => r.status === 'upcoming')?.id ?? blockRaces[0]?.id ?? null
+    setActiveTab(firstUpcoming)
+  }, [activeBlockId]) // eslint-disable-line react-hooks/exhaustive-deps
   const [lineups, setLineups] = useState<LineupState>({})
   const [lockedRaces, setLockedRaces] = useState<Set<string>>(new Set())
   const [savingRace, setSavingRace] = useState<string | null>(null)
@@ -239,7 +282,7 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, loc
 
   if (!squadId || squadRiders.length === 0) return null
 
-  const activeRace = sortedRaces.find((r) => r.id === activeTab) ?? sortedRaces[0]
+  const activeRace = blockRaces.find((r) => r.id === activeTab) ?? blockRaces[0]
   if (!activeRace) return null
 
   const isLocked = lockedRaces.has(activeRace.id)
@@ -250,8 +293,9 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, loc
   const filledCount = Object.values(slots).filter((v) => v !== null).length
   const profileLabel = PROFILE_LABELS[activeRace.profile ?? ''] ?? 'Endagsløb'
 
-  // Lock deadline: use prop or race start_date - 30min
-  const deadlineStr = lockDeadline ?? (() => {
+  // Lock deadline: active block deadline > prop > race start_date - 30min
+  const activeBlock = sortedBlocks.find((b) => b.id === activeBlockId)
+  const deadlineStr = activeBlock?.lock_deadline ?? lockDeadline ?? (() => {
     const d = new Date(activeRace.start_date)
     d.setMinutes(d.getMinutes() - 30)
     return d.toISOString()
@@ -259,7 +303,52 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, loc
 
   return (
     <div style={{ background: '#1E3A5F', borderRadius: 2, overflow: 'hidden' }}>
-      {/* ── Tab bar ──────────────────────────────────────────── */}
+      {/* ── Niveau 1: Blok-tabs ────────────────────────────── */}
+      {sortedBlocks.length > 0 && (
+        <div
+          className="scrollbar-hide"
+          style={{
+            display: 'flex',
+            overflowX: 'auto',
+            background: '#0F2137',
+            padding: '8px 12px 0',
+            gap: 0,
+          }}
+        >
+          {sortedBlocks.map((block) => {
+            const isActive = block.id === activeBlockId
+            return (
+              <button
+                key={block.id}
+                type="button"
+                onClick={() => setActiveBlockId(block.id)}
+                style={{
+                  padding: '8px 14px',
+                  background: isActive ? '#1E3A5F' : 'transparent',
+                  border: 'none',
+                  borderRadius: isActive ? '6px 6px 0 0' : 0,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 11,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? '#F2EDE4' : 'rgba(255,255,255,0.45)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                }}>
+                  {shortBlockName(block.name)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Niveau 2: Løbs-tabs ─────────────────────────────── */}
       <div
         className="scrollbar-hide"
         style={{
@@ -270,7 +359,7 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, loc
           gap: 0,
         }}
       >
-        {sortedRaces.map((race) => {
+        {blockRaces.map((race) => {
           const isActive = race.id === activeTab
           const isFinished = race.status === 'finished'
           const raceSlots = lineups[race.id]
