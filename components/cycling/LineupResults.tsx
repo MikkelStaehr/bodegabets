@@ -63,6 +63,16 @@ const ROLE_LABELS: Record<string, string> = {
   bench: 'Bænk',
 }
 
+const ROLE_TOOLTIPS: Record<string, string> = {
+  leader: 'Scorer point baseret på placering × kategori-multiplikator',
+  lieutenant: 'Top 10 → ×1.8. Top 10 + Leader DNF → ×2.8. Kun Kat 2-3',
+  grimpeur: 'Bjergbonus: Mountain ×1.5, Hilly ×1.2. Kun Kat 3-5',
+  sprinter: 'Spurtbonus: Flat ×1.5, Hilly ×1.2. Kun Kat 1-3',
+  domestique: '+8p hvis top 40 OG Leader top 10. Kun Kat 4',
+  equipier: '+7p hvis samme hold som vinder',
+  joker: '+7p hold-bonus. Immun mod alle minuspoint',
+}
+
 const POSITION_COLORS: Record<number, string> = {
   1: '#B8963E',
   2: '#A0A0A0',
@@ -79,15 +89,15 @@ function RiderPhoto({ rider }: { rider: Rider }) {
         src={src}
         alt={rider.last_name}
         style={{
-          width: 32, height: 32, borderRadius: 2,
-          objectFit: 'cover', flexShrink: 0,
+          width: 32, height: 32, borderRadius: '50%',
+          objectFit: 'cover', objectPosition: 'center top', flexShrink: 0,
         }}
       />
     )
   }
   return (
     <div style={{
-      width: 32, height: 32, borderRadius: 2,
+      width: 32, height: 32, borderRadius: '50%',
       background: '#2B4F7A', display: 'flex',
       alignItems: 'center', justifyContent: 'center',
       fontSize: 10, fontWeight: 700, color: '#8FABC4', flexShrink: 0,
@@ -167,6 +177,7 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 export default function LineupResults({ race, lineup, scores, results, riders }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
+  const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
 
   const hasScores = scores.length > 0
@@ -291,12 +302,32 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
               <div style={{
                 fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
                 color: 'rgba(255,255,255,0.35)', lineHeight: 1.2,
+                display: 'flex', alignItems: 'center', gap: 4,
+                position: 'relative',
               }}>
-                {ROLE_LABELS[role] ?? role}
+                <span
+                  style={{ cursor: ROLE_TOOLTIPS[role] ? 'help' : 'default' }}
+                  onMouseEnter={() => { if (ROLE_TOOLTIPS[role]) setHoveredRole(entry.rider_id) }}
+                  onMouseLeave={() => setHoveredRole(null)}
+                >
+                  {ROLE_LABELS[role] ?? role} · Kat {rider.category}
+                </span>
                 {result?.jersey && (
-                  <span style={{ marginLeft: 6, color: '#FAC775' }}>
+                  <span style={{ color: '#FAC775' }}>
                     {result.jersey}
                   </span>
+                )}
+                {hoveredRole === entry.rider_id && ROLE_TOOLTIPS[role] && (
+                  <div style={{
+                    position: 'absolute', left: 0, top: '100%', marginTop: 4, zIndex: 10,
+                    background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
+                    padding: '8px 12px', maxWidth: 260,
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                    color: 'rgba(255,255,255,0.7)', lineHeight: 1.4,
+                    whiteSpace: 'normal',
+                  }}>
+                    {ROLE_TOOLTIPS[role]}
+                  </div>
                 )}
               </div>
             </div>
