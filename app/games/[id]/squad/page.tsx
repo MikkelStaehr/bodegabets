@@ -7,10 +7,12 @@ export const dynamic = 'force-dynamic'
 
 type Props = {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ block?: string }>
 }
 
-export default async function SquadPage({ params }: Props) {
+export default async function SquadPage({ params, searchParams }: Props) {
   const { id } = await params
+  const { block: blockId } = await searchParams
   const gameId = Number(id)
 
   const supabase = await createServerSupabaseClient()
@@ -101,15 +103,31 @@ export default async function SquadPage({ params }: Props) {
     }
   }
 
-  // Fetch existing squad
+  // Fetch block name if blockId is provided
+  let blockName: string | null = null
+  if (blockId) {
+    const { data: blockData } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('name')
+      .eq('id', blockId)
+      .single()
+    blockName = blockData?.name ?? null
+  }
+
+  // Fetch existing squad (per block if blockId is provided)
   let initialSquad: Rider[] = []
 
-  const { data: existingSquad } = await supabaseAdmin
+  const existingSquadQuery = supabaseAdmin
     .from('cycling_squads')
     .select('id')
     .eq('game_id', gameId)
     .eq('user_id', user.id)
-    .maybeSingle()
+
+  if (blockId) {
+    existingSquadQuery.eq('cycling_block_id', blockId)
+  }
+
+  const { data: existingSquad } = await existingSquadQuery.maybeSingle()
 
   if (existingSquad) {
     const { data: squadRiders } = await supabaseAdmin
@@ -162,7 +180,7 @@ export default async function SquadPage({ params }: Props) {
               margin: 0,
             }}
           >
-            Brutto trup
+            {blockName ? `Brutto trup — ${blockName}` : 'Brutto trup'}
           </h1>
           <p
             style={{
@@ -185,6 +203,7 @@ export default async function SquadPage({ params }: Props) {
           availableRiders={allRiders}
           raceStartlists={raceStartlists}
           initialSquad={initialSquad}
+          blockId={blockId ?? null}
         />
       </div>
     </div>

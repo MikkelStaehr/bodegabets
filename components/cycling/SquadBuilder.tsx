@@ -26,6 +26,7 @@ type Props = {
   availableRiders: Rider[]
   raceStartlists: RaceStartlist[]
   initialSquad: Rider[]
+  blockId: string | null
 }
 
 // Short race name aliases
@@ -152,7 +153,7 @@ function Spinner() {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad }: Props) {
+export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId }: Props) {
   const router = useRouter()
   const [squad, setSquad] = useState<Rider[]>(initialSquad)
   const [search, setSearch] = useState('')
@@ -240,7 +241,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
       const res = await fetch(`/api/cycling-games/${gameId}/squad`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rider_ids: squad.map((r) => r.id) }),
+        body: JSON.stringify({ rider_ids: squad.map((r) => r.id), cycling_block_id: blockId }),
       })
       const data = await res.json()
       if (!res.ok) {

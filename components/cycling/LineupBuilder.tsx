@@ -39,7 +39,7 @@ type LineupState = Record<string, Record<RoleKey, string | null>>
 
 type Props = {
   gameId: number
-  squadId: string | null
+  blockSquadMap: Record<string, string>
   races: Race[]
   squadRiders: SquadRider[]
   blocks: Block[]
@@ -151,7 +151,7 @@ function shortBlockName(name: string): string {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, squadId, races, squadRiders, blocks, defaultBlockId, lockDeadline }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, squadRiders, blocks, defaultBlockId, lockDeadline }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks].sort((a, b) => a.block_order - b.block_order),
   [blocks])
@@ -192,9 +192,13 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, blo
     return map
   }, [squadRiders])
 
-  // Fetch existing lineups on mount
+  // Derive current squad from active block
+  const currentSquadId = activeBlockId ? blockSquadMap[activeBlockId] ?? null : null
+  const hasAnySquad = Object.keys(blockSquadMap).length > 0
+
+  // Fetch existing lineups on mount (fetches all lineups across squads)
   useEffect(() => {
-    if (!squadId) return
+    if (!hasAnySquad) return
     fetch(`/api/cycling-games/${gameId}/lineup`)
       .then((res) => res.json())
       .then((data) => {
@@ -220,7 +224,7 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, blo
         setLockedRaces(locked)
       })
       .catch(() => {})
-  }, [gameId, squadId])
+  }, [gameId, hasAnySquad]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setSlot = useCallback((raceId: string, roleKey: RoleKey, riderId: string | null) => {
     setLineups((prev) => ({
@@ -280,26 +284,28 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, blo
     setSavingRace(null)
   }
 
-  if (!squadId || squadRiders.length === 0) return null
+  if (blocks.length === 0) return null
 
-  const activeRace = blockRaces.find((r) => r.id === activeTab) ?? blockRaces[0]
-  if (!activeRace) return null
+  const activeRace = blockRaces.find((r) => r.id === activeTab) ?? blockRaces[0] ?? null
+  const activeBlock = sortedBlocks.find((b) => b.id === activeBlockId)
 
-  const isLocked = lockedRaces.has(activeRace.id)
-  const slots = lineups[activeRace.id] ?? { ...EMPTY_SLOTS }
-  const changed = hasChanges(activeRace.id)
-  const isSaving = savingRace === activeRace.id
-  const isSuccess = success === activeRace.id
+  // No squad for this block?
+  const noSquadForBlock = !currentSquadId
+
+  const isLocked = activeRace ? lockedRaces.has(activeRace.id) : false
+  const slots = activeRace ? (lineups[activeRace.id] ?? { ...EMPTY_SLOTS }) : { ...EMPTY_SLOTS }
+  const changed = activeRace ? hasChanges(activeRace.id) : false
+  const isSaving = activeRace ? savingRace === activeRace.id : false
+  const isSuccess = activeRace ? success === activeRace.id : false
   const filledCount = Object.values(slots).filter((v) => v !== null).length
-  const profileLabel = PROFILE_LABELS[activeRace.profile ?? ''] ?? 'Endagsløb'
+  const profileLabel = activeRace ? (PROFILE_LABELS[activeRace.profile ?? ''] ?? 'Endagsløb') : ''
 
   // Lock deadline: active block deadline > prop > race start_date - 30min
-  const activeBlock = sortedBlocks.find((b) => b.id === activeBlockId)
-  const deadlineStr = activeBlock?.lock_deadline ?? lockDeadline ?? (() => {
+  const deadlineStr = activeBlock?.lock_deadline ?? lockDeadline ?? (activeRace ? (() => {
     const d = new Date(activeRace.start_date)
     d.setMinutes(d.getMinutes() - 30)
     return d.toISOString()
-  })()
+  })() : null)
 
   return (
     <div style={{ background: '#1E3A5F', borderRadius: 2, overflow: 'hidden' }}>
@@ -348,7 +354,32 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, blo
         </div>
       )}
 
-      {/* ── Niveau 2: Løbs-tabs ─────────────────────────────── */}
+      {/* ── No squad for block ─────────────────────────────── */}
+      {noSquadForBlock && (
+        <div style={{ padding: '24px 14px', textAlign: 'center' }}>
+          <div style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
+            color: 'rgba(255,255,255,0.5)', marginBottom: 8,
+          }}>
+            0/25 ryttere — Udtag brutto trup
+          </div>
+          <a
+            href={`/games/${gameId}/squad${activeBlockId ? `?block=${activeBlockId}` : ''}`}
+            style={{
+              display: 'inline-block', padding: '8px 20px',
+              background: '#4A90D9', border: 'none', borderRadius: 2,
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+              fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+              color: '#fff', textDecoration: 'none', cursor: 'pointer',
+            }}
+          >
+            Udtag brutto trup
+          </a>
+        </div>
+      )}
+
+      {/* ── Niveau 2: Løbs-tabs + lineup content ──────────── */}
+      {!noSquadForBlock && activeRace && (<>
       <div
         className="scrollbar-hide"
         style={{
@@ -683,6 +714,7 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders, blo
           </div>
         )
       })()}
+      </>)}
     </div>
   )
 }

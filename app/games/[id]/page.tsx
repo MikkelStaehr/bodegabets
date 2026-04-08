@@ -328,28 +328,33 @@ export default async function GamePage({ params }: Props) {
     }
   }
 
-  // Lineup builder data — brugerens squad + løb med status upcoming/active
+  // Lineup builder data — brugerens squads + løb
   let userSquad: { id: string } | null = null
   let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string }[] = []
+  let blockSquadMap: Record<string, string> = {}
 
   if (typedGame.sport === 'cycling') {
-    const { data: sq } = await supabaseAdmin
+    // Hent ALLE squads for brugeren i dette game
+    const { data: userSquads } = await supabaseAdmin
       .from('cycling_squads')
       .select('id, cycling_block_id')
       .eq('game_id', gameId)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
 
-    userSquad = sq
+    // Byg blockSquadMap: block_id → squad_id
+    for (const sq of userSquads ?? []) {
+      const blockId = (sq as { cycling_block_id?: string | null }).cycling_block_id
+      if (blockId) blockSquadMap[blockId] = sq.id
+    }
 
-    // Find brugerens aktive blok via cycling_block_id
-    const cyclingBlockId = (sq as { cycling_block_id?: string | null } | null)?.cycling_block_id ?? null
-    let activeBlockIds: string[] = []
+    // Brug første squad som userSquad (for CyclingGameroom backward compat)
+    userSquad = (userSquads ?? [])[0] ?? null
+
+    // Find brugerens aktive blok (fra første squad med cycling_block_id)
+    const cyclingBlockId = (userSquads ?? []).map((sq) => (sq as { cycling_block_id?: string | null }).cycling_block_id).find((id) => id) ?? null
 
     if (cyclingBlockId) {
       const { data: fetchedBlock } = await supabaseAdmin
@@ -360,11 +365,6 @@ export default async function GamePage({ params }: Props) {
 
       if (fetchedBlock) {
         cyclingActiveBlock = fetchedBlock
-        // Include both the block itself and its parent to match cycling_game_races
-        activeBlockIds = [fetchedBlock.id]
-        if (fetchedBlock.parent_block_id) {
-          activeBlockIds.push(fetchedBlock.parent_block_id)
-        }
       }
     }
 
@@ -389,16 +389,22 @@ export default async function GamePage({ params }: Props) {
         return { ...race, cycling_block_id: gr.cycling_block_id as string | null }
       })
 
-    if (userSquad) {
+    // Hent squad riders fra alle squads
+    const allSquadIds = (userSquads ?? []).map((sq) => sq.id)
+    if (allSquadIds.length > 0) {
       const { data: srData } = await supabaseAdmin
         .from('cycling_squad_riders')
         .select('rider_id, cycling_riders!inner(id, first_name, last_name, team_name, category, team_logo_url, photo_url)')
-        .eq('squad_id', userSquad.id)
+        .in('squad_id', allSquadIds)
 
-      lineupSquadRiders = (srData ?? []).map((r) => r.cycling_riders as unknown as {
-        id: string; first_name: string; last_name: string; team_name: string
-        category: number; team_logo_url: string | null; photo_url: string | null
-      })
+      // Deduplicate riders across squads
+      const seen = new Set<string>()
+      lineupSquadRiders = (srData ?? [])
+        .map((r) => r.cycling_riders as unknown as {
+          id: string; first_name: string; last_name: string; team_name: string
+          category: number; team_logo_url: string | null; photo_url: string | null
+        })
+        .filter((r) => { if (seen.has(r.id)) return false; seen.add(r.id); return true })
     }
 
   }
@@ -955,11 +961,11 @@ export default async function GamePage({ params }: Props) {
             />
             <LineupBuilder
               gameId={gameId}
-              squadId={userSquad?.id ?? null}
+              blockSquadMap={blockSquadMap}
               races={lineupRaces}
               squadRiders={lineupSquadRiders}
               blocks={cyclingBlocks}
-              defaultBlockId={(userSquad as { cycling_block_id?: string } | null)?.cycling_block_id ?? null}
+              defaultBlockId={cyclingActiveBlock?.id ?? null}
               lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
             />
           </>

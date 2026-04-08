@@ -15,13 +15,19 @@ export async function GET(req: NextRequest, { params }: Props) {
   if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
 
   const { id: gameId } = await params
+  const blockId = req.nextUrl.searchParams.get('block')
 
-  const { data: squad } = await supabaseAdmin
+  const squadQuery = supabaseAdmin
     .from('cycling_squads')
     .select('id')
     .eq('game_id', Number(gameId))
     .eq('user_id', user.id)
-    .maybeSingle()
+
+  if (blockId) {
+    squadQuery.eq('cycling_block_id', blockId)
+  }
+
+  const { data: squad } = await squadQuery.maybeSingle()
 
   if (!squad) return NextResponse.json({ riders: [] })
 
@@ -64,6 +70,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   const { id: gameId } = await params
   const body = await req.json()
   const riderIds: string[] = body.rider_ids
+  const bodyBlockId: string | null = body.cycling_block_id ?? null
 
   if (!Array.isArray(riderIds) || riderIds.length === 0) {
     return NextResponse.json({ error: 'Vælg mindst én rytter' }, { status: 400 })
@@ -129,12 +136,15 @@ export async function POST(req: NextRequest, { params }: Props) {
     .limit(1)
     .maybeSingle()
 
-  // Upsert squad
+  // Brug block_id fra body (squad page) eller fallback til auto-detekteret blok
+  const cyclingBlockId = bodyBlockId ?? activeBlock?.id ?? null
+
+  // Upsert squad per blok
   const { data: squad, error: squadErr } = await supabaseAdmin
     .from('cycling_squads')
     .upsert(
-      { game_id: Number(gameId), user_id: user.id, cycling_block_id: activeBlock?.id ?? null },
-      { onConflict: 'game_id,user_id' }
+      { game_id: Number(gameId), user_id: user.id, cycling_block_id: cyclingBlockId },
+      { onConflict: 'game_id,user_id,cycling_block_id' }
     )
     .select('id')
     .single()
