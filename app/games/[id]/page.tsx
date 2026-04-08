@@ -381,12 +381,12 @@ export default async function GamePage({ params }: Props) {
     // Hent alle løb for gameroom (filtrering sker client-side via blok-tabs)
     const { data: gameRacesFull } = await supabaseAdmin
       .from('cycling_game_races')
-      .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type, profile, profile_image_url, logo_url)')
+      .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type, profile, profile_image_url, logo_url, race_photo_url)')
       .eq('game_id', gameId)
 
     lineupRaces = (gameRacesFull ?? [])
       .map((gr) => {
-        const race = gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null }
+        const race = gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null }
         return { ...race, cycling_block_id: gr.cycling_block_id as string | null }
       })
 

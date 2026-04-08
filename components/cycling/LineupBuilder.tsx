@@ -15,6 +15,7 @@ type Race = {
   profile: string | null
   profile_image_url: string | null
   logo_url: string | null
+  race_photo_url: string | null
   cycling_block_id: string | null
 }
 
@@ -590,56 +591,79 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
       {/* ── Race header ──────────────────────────────────────── */}
       <div style={{
-        padding: '12px 16px',
-        background: theme.bg,
+        position: 'relative',
+        overflow: 'hidden',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          {activeRace.logo_url ? (
+        {activeRace.race_photo_url && (
+          <>
             <img
-              src={activeRace.logo_url}
-              alt={activeRace.name}
+              src={activeRace.race_photo_url}
+              alt=""
               style={{
-                height: 64, width: 'auto', maxWidth: 160,
-                objectFit: 'contain',
-                filter: 'brightness(0) invert(1)',
-                flexShrink: 0,
+                position: 'absolute', inset: 0,
+                width: '100%', height: '100%',
+                objectFit: 'cover', objectPosition: 'center',
               }}
             />
-          ) : (
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 500,
-              color: '#F2EDE4', lineHeight: 1.2,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-              {isLocked ? '🔒 ' : ''}{activeRace.name}
-            </span>
-          )}
-          <span style={{
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-            padding: '2px 6px', borderRadius: 2, flexShrink: 0, marginLeft: 'auto',
-            background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
-            color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
-          }}>
-            {filledCount}/8
-          </span>
-        </div>
-        <div style={{
-          fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
-          color: 'rgba(255,255,255,0.5)',
-        }}>
-          {formatDate(activeRace.start_date)}
-          {activeRace.profile && profileLabel && <> · {profileLabel}</>}
-          {activeRace.race_type && <> · {RACE_TYPE_LABELS[activeRace.race_type] ?? activeRace.race_type}</>}
-        </div>
-        {deadlineStr && (
-          <div style={{
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
-            color: '#ff6b6b', fontWeight: 600, marginTop: 6,
-          }}>
-            Låser {formatDeadline(deadlineStr)}
-          </div>
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: `linear-gradient(to right, ${theme.bg}F5 0%, ${theme.bg}CC 40%, ${theme.bg}55 100%)`,
+            }} />
+          </>
         )}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          padding: '12px 16px',
+          background: activeRace.race_photo_url ? 'transparent' : theme.bg,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            {activeRace.logo_url ? (
+              <img
+                src={activeRace.logo_url}
+                alt={activeRace.name}
+                style={{
+                  height: 64, width: 'auto', maxWidth: 160,
+                  objectFit: 'contain',
+                  filter: 'brightness(0) invert(1)',
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 500,
+                color: '#F2EDE4', lineHeight: 1.2,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                {isLocked ? '🔒 ' : ''}{activeRace.name}
+              </span>
+            )}
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+              padding: '2px 6px', borderRadius: 2, flexShrink: 0, marginLeft: 'auto',
+              background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
+              color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
+            }}>
+              {filledCount}/8
+            </span>
+          </div>
+          <div style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+            color: 'rgba(255,255,255,0.5)',
+          }}>
+            {formatDate(activeRace.start_date)}
+            {activeRace.profile && profileLabel && <> · {profileLabel}</>}
+            {activeRace.race_type && <> · {RACE_TYPE_LABELS[activeRace.race_type] ?? activeRace.race_type}</>}
+          </div>
+          {deadlineStr && (
+            <div style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
+              color: '#ff6b6b', fontWeight: 600, marginTop: 6,
+            }}>
+              Låser {formatDeadline(deadlineStr)}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── No squad placeholder ──────────────────────────── */}
