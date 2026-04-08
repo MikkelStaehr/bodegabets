@@ -10,6 +10,8 @@ type Race = {
   start_date: string
   status: string
   race_type: string
+  profile: string | null
+  profile_image_url: string | null
 }
 
 type SquadRider = {
@@ -45,6 +47,15 @@ const ROLES: { key: RoleKey; label: string; catRule: number[] | null }[] = [
   { key: 'equipier_1',  label: 'Équipier',   catRule: null },
   { key: 'joker',       label: 'Joker',      catRule: null },
 ]
+
+const PROFILE_LABELS: Record<string, string> = {
+  cobbled: 'Brosten',
+  mountain: 'Bjerg',
+  hilly: 'Kuperet',
+  flat: 'Flad',
+  itt: 'Enkeltstart',
+  mixed: 'Blandet',
+}
 
 const CAT_LABELS: Record<number, string> = { 1: 'Kat 1', 2: 'Kat 2', 3: 'Kat 3', 4: 'Kat 4', 5: 'Kat 5' }
 const CAT_COLORS: Record<number, string> = {
@@ -120,6 +131,13 @@ function formatDanishDate(dateStr: string): string {
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function LineupBuilder({ gameId, squadId, races, squadRiders }: Props) {
+  // Default expand: first upcoming race sorted by date
+  const sortedRaces = useMemo(() =>
+    [...races].sort((a, b) => a.start_date.localeCompare(b.start_date)),
+  [races])
+  const defaultExpandId = sortedRaces.find((r) => r.status === 'upcoming')?.id ?? sortedRaces[0]?.id ?? null
+
+  const [expandedRaceId, setExpandedRaceId] = useState<string | null>(defaultExpandId)
   const [lineups, setLineups] = useState<LineupState>({})
   const [lockedRaces, setLockedRaces] = useState<Set<string>>(new Set())
   const [savingRace, setSavingRace] = useState<string | null>(null)
@@ -240,55 +258,9 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
     setSavingRace(null)
   }
 
-  // No squad
-  if (!squadId || squadRiders.length === 0) {
-    return (
-      <div
-        style={{
-          padding: '20px 16px',
-          background: '#1E3A5F',
-          border: '1px solid #2B4F7A',
-          borderRadius: 2,
-          textAlign: 'center',
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#8FABC4',
-          }}
-        >
-          Udtag din brutto trup først
-        </span>
-      </div>
-    )
-  }
-
-  if (races.length === 0) {
-    return (
-      <div
-        style={{
-          padding: '20px 16px',
-          background: '#1E3A5F',
-          border: '1px solid #2B4F7A',
-          borderRadius: 2,
-          textAlign: 'center',
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#8FABC4',
-          }}
-        >
-          Ingen kommende løb
-        </span>
-      </div>
-    )
+  // No squad or no races — CyclingGameroom handles messaging
+  if (!squadId || squadRiders.length === 0 || races.length === 0) {
+    return null
   }
 
   return (
@@ -308,19 +280,23 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
         </span>
       </div>
 
-      {races.map((race) => {
+      {sortedRaces.map((race) => {
         const isLocked = lockedRaces.has(race.id)
+        const isExpanded = expandedRaceId === race.id
         const slots = lineups[race.id] ?? {
-          captain: null, solo_attack: null, sprint_assist: null, domestique: null,
-          helper_0: null, helper_1: null, helper_2: null, luxury_helper: null,
+          leader: null, lieutenant: null, grimpeur: null, sprinter: null,
+          domestique: null, equipier_0: null, equipier_1: null, joker: null,
         }
         const changed = hasChanges(race.id)
         const isSaving = savingRace === race.id
         const isSuccess = success === race.id
+        const filledCount = Object.values(slots).filter((v) => v !== null).length
+        const profileLabel = PROFILE_LABELS[race.profile ?? ''] ?? 'Endagsløb'
 
         return (
           <div
             key={race.id}
+            id={`lineup-${race.id}`}
             style={{
               background: '#1E3A5F',
               border: '1px solid #2B4F7A',
@@ -328,44 +304,86 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
               overflow: 'hidden',
             }}
           >
-            {/* Header */}
-            <div
+            {/* Header — clickable to expand/collapse */}
+            <button
+              type="button"
+              onClick={() => setExpandedRaceId(isExpanded ? null : race.id)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                gap: 10,
+                width: '100%',
                 padding: '12px 14px',
-                borderBottom: '1px solid #2B4F7A',
+                borderBottom: isExpanded ? '1px solid #2B4F7A' : 'none',
                 background: '#162E4A',
+                border: 'none',
+                borderBottomStyle: isExpanded ? 'solid' : 'none',
+                borderBottomWidth: isExpanded ? 1 : 0,
+                borderBottomColor: '#2B4F7A',
+                cursor: 'pointer',
+                textAlign: 'left',
               }}
             >
-              <div>
-                <div
-                  style={{
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: '#F2EDE4',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {isLocked && '🔒 '}{race.name}
+              {/* Race logo */}
+              {race.profile_image_url ? (
+                <img
+                  src={race.profile_image_url}
+                  alt={race.name}
+                  style={{ width: 32, height: 32, objectFit: 'contain', filter: 'brightness(0) invert(1)', flexShrink: 0, opacity: 0.8 }}
+                />
+              ) : (
+                <div style={{
+                  width: 32, height: 32, borderRadius: 2, background: '#2B4F7A',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700,
+                  color: '#8FABC4', flexShrink: 0,
+                }}>
+                  {race.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
-                <div
-                  style={{
-                    fontFamily: "'Barlow Condensed', sans-serif",
-                    fontSize: 11,
-                    color: '#8FABC4',
-                    marginTop: 2,
-                  }}
-                >
-                  {formatDanishDate(race.start_date)} · {race.race_type === 'stage_race' ? 'Etapeløb' : 'Endagsløb'}
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700,
+                  color: '#F2EDE4', lineHeight: 1.2,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {isLocked ? '🔒 ' : ''}{race.name}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: '#8FABC4' }}>
+                    {formatDanishDate(race.start_date)}
+                  </span>
+                  <span style={{
+                    padding: '1px 5px', borderRadius: 2,
+                    background: '#2B4F7A', color: '#8FABC4',
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 600,
+                  }}>
+                    {profileLabel}
+                  </span>
+                  {filledCount > 0 && (
+                    <span style={{
+                      padding: '1px 5px', borderRadius: 2,
+                      background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(138,155,168,0.2)',
+                      color: filledCount === 8 ? '#6B8F71' : '#8FABC4',
+                      fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,
+                    }}>
+                      {filledCount}/8
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
+              {!isExpanded && (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 600,
+                  color: '#4A6FA5', whiteSpace: 'nowrap', flexShrink: 0,
+                }}>
+                  {filledCount > 0 ? 'Rediger' : 'Sæt lineup'} →
+                </span>
+              )}
+            </button>
 
-            {/* Slot rows */}
-            <div>
+            {/* Slot rows — only when expanded */}
+            {isExpanded && <><div>
               {ROLES.map((role, idx) => {
                 const riderId = slots[role.key]
                 const rider = riderId ? riderMap.get(riderId) : null
@@ -506,6 +524,7 @@ export default function LineupBuilder({ gameId, squadId, races, squadRiders }: P
                 </span>
               )}
             </div>
+            </>}
           </div>
         )
       })}
