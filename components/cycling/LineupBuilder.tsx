@@ -13,6 +13,7 @@ type Race = {
   race_type: string
   profile: string | null
   profile_image_url: string | null
+  logo_url: string | null
   cycling_block_id: string | null
 }
 
@@ -511,6 +512,18 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          {activeRace.logo_url && (
+            <img
+              src={activeRace.logo_url}
+              alt={activeRace.name}
+              style={{
+                height: 32, width: 'auto', maxWidth: 80,
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)',
+                flexShrink: 0,
+              }}
+            />
+          )}
           {activeRace.profile && PROFILE_ICONS[activeRace.profile] && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
