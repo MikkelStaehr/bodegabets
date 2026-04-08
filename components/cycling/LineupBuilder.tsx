@@ -355,32 +355,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         </div>
       )}
 
-      {/* ── No squad for block ─────────────────────────────── */}
-      {noSquadForBlock && (
-        <div style={{ padding: '24px 14px', textAlign: 'center' }}>
-          <div style={{
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
-            color: 'rgba(255,255,255,0.5)', marginBottom: 8,
-          }}>
-            0/25 ryttere — Udtag brutto trup
-          </div>
-          <a
-            href={`/games/${gameId}/squad${activeBlockId ? `?block=${activeBlockId}` : ''}`}
-            style={{
-              display: 'inline-block', padding: '8px 20px',
-              background: '#4A90D9', border: 'none', borderRadius: 2,
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
-              fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-              color: '#fff', textDecoration: 'none', cursor: 'pointer',
-            }}
-          >
-            Udtag brutto trup
-          </a>
-        </div>
-      )}
-
       {/* ── Niveau 2: Løbs-tabs + lineup content ──────────── */}
-      {!noSquadForBlock && activeRace && (<>
+      {activeRace && (<>
       <div
         className="scrollbar-hide"
         style={{
@@ -508,8 +484,32 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         </div>
       )}
 
+      {/* ── No squad placeholder ──────────────────────────── */}
+      {!isFinished && noSquadForBlock && (
+        <div style={{ padding: '24px 14px', textAlign: 'center' }}>
+          <div style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
+            color: 'rgba(255,255,255,0.5)', marginBottom: 8,
+          }}>
+            Udtag din brutto trup for at sætte lineup
+          </div>
+          <a
+            href={`/games/${gameId}/squad${activeBlockId ? `?block=${activeBlockId}` : ''}`}
+            style={{
+              display: 'inline-block', padding: '8px 20px',
+              background: '#4A90D9', border: 'none', borderRadius: 2,
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+              fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+              color: '#fff', textDecoration: 'none', cursor: 'pointer',
+            }}
+          >
+            Udtag brutto trup
+          </a>
+        </div>
+      )}
+
       {/* ── Role slots ───────────────────────────────────────── */}
-      {!isFinished && (<>
+      {!isFinished && !noSquadForBlock && (<>
       <div>
         {ROLES.map((role, idx) => {
           const riderId = slots[role.key]
