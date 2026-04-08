@@ -400,7 +400,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
               type="button"
               onClick={() => setActiveTab(race.id)}
               style={{
-                padding: '10px 14px',
+                padding: '12px 16px',
                 background: 'transparent',
                 border: 'none',
                 borderBottom: isActive ? '2px solid #4A90D9' : '2px solid transparent',
@@ -441,7 +441,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
           <img
             src={activeRace.profile_image_url}
             alt={activeRace.name}
-            style={{ width: '100%', height: 80, objectFit: 'cover', objectPosition: 'center', display: 'block', filter: 'brightness(0.7)' }}
+            style={{ width: '100%', height: 120, objectFit: 'cover', objectPosition: 'center', display: 'block' }}
           />
         </div>
       )}
