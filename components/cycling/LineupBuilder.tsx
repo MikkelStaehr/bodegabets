@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import LineupResults from './LineupResults'
+import { getBlockTheme } from '@/lib/cyclingBlockThemes'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -77,18 +78,6 @@ const PROFILE_LABELS: Record<string, string> = {
 const PROFILE_ICONS: Record<string, string> = {
   mountain: '⛰', hilly: '〜', cobbled: '⊞', flat: '—', itt: '⏱',
 }
-
-const BLOCK_THEMES: Record<string, { bg: string; bgDark: string; accent: string; accentBg: string }> = {
-  'Ardennerne-klassikerne': { bg: '#1E3A5F', bgDark: '#162D4A', accent: '#4A9EFF', accentBg: 'rgba(74,158,255,0.12)' },
-  'Flandern-klassikerne': { bg: '#1E3A5F', bgDark: '#162D4A', accent: '#4A9EFF', accentBg: 'rgba(74,158,255,0.12)' },
-  "Giro d'Italia": { bg: '#2A0D1E', bgDark: '#3D0D28', accent: '#E8409A', accentBg: 'rgba(232,64,154,0.15)' },
-  'Tour de France': { bg: '#1A1600', bgDark: '#2A2400', accent: '#C9A84C', accentBg: 'rgba(201,168,76,0.13)' },
-  'Vuelta a España': { bg: '#2A0800', bgDark: '#3D0D00', accent: '#E84030', accentBg: 'rgba(232,64,48,0.15)' },
-  'Critérium du Dauphiné': { bg: '#0D1F15', bgDark: '#102A1A', accent: '#3D9B62', accentBg: 'rgba(61,155,98,0.15)' },
-  'Tour de Suisse': { bg: '#0F0F2A', bgDark: '#161640', accent: '#9999EE', accentBg: 'rgba(153,153,238,0.15)' },
-  'Paris-Nice': { bg: '#051828', bgDark: '#072340', accent: '#2BAEE0', accentBg: 'rgba(43,174,224,0.15)' },
-}
-const DEFAULT_THEME = { bg: '#1E3A5F', bgDark: '#162D4A', accent: '#4A9EFF', accentBg: 'rgba(74,158,255,0.12)' }
 
 const RACE_TYPE_LABELS: Record<string, string> = {
   one_day: 'Endagsløb', stage_race: 'Etapeløb',
@@ -406,7 +395,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
   const activeRace = blockRaces.find((r) => r.id === activeTab) ?? blockRaces[0] ?? null
   const activeBlock = sortedBlocks.find((b) => b.id === activeBlockId)
-  const theme = (activeBlock ? BLOCK_THEMES[activeBlock.name] : null) ?? DEFAULT_THEME
+  const theme = getBlockTheme(activeBlock?.name)
 
   // No squad for this block?
   const noSquadForBlock = !currentSquadId
@@ -429,6 +418,15 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
   return (
     <div style={{ background: theme.bg, borderRadius: 2, overflow: 'hidden', transition: 'background 0.3s' }}>
+      {/* ── Stripes bar (VM, EM osv.) ────────────────────────── */}
+      {theme.stripes && (
+        <div style={{ display: 'flex', height: 4 }}>
+          {theme.stripes.map((color, i) => (
+            <div key={i} style={{ flex: 1, background: color }} />
+          ))}
+        </div>
+      )}
+
       {/* ── Niveau 1: Blok-tabs ────────────────────────────── */}
       {sortedBlocks.length > 0 && (
         <ScrollableTabs background="#0F2137">
