@@ -381,7 +381,7 @@ export default async function GamePage({ params }: Props) {
 
     lineupRaces = (gameRacesFull ?? [])
       .map((gr) => gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null })
-      .filter((r) => r.status === 'upcoming' || r.status === 'active')
+      // Show all races in the block — upcoming, active, and finished
 
     if (userSquad) {
       const { data: srData } = await supabaseAdmin
@@ -395,18 +395,6 @@ export default async function GamePage({ params }: Props) {
       })
     }
 
-    // Debug: also fetch raw game_races to see cycling_block_id values
-    const { data: debugRaces } = await supabaseAdmin
-      .from('cycling_game_races')
-      .select('race_id, cycling_block_id')
-      .eq('game_id', gameId)
-    console.log('DEBUG cycling:', {
-      squadId: userSquad?.id,
-      squadRiders: lineupSquadRiders.length,
-      races: lineupRaces.length,
-      activeBlockIds,
-      rawGameRaces: debugRaces,
-    })
   }
 
   // ── Championship mode data ────────────────────────────────────────────────
