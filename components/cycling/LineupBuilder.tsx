@@ -511,28 +511,18 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         background: '#1E3A5F',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           {activeRace.logo_url && (
             <img
               src={activeRace.logo_url}
               alt={activeRace.name}
               style={{
-                height: 32, width: 'auto', maxWidth: 80,
+                height: 48, width: 'auto', maxWidth: 120,
                 objectFit: 'contain',
                 filter: 'brightness(0) invert(1)',
                 flexShrink: 0,
               }}
             />
-          )}
-          {activeRace.profile && PROFILE_ICONS[activeRace.profile] && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 22, borderRadius: 4, flexShrink: 0,
-              background: 'rgba(255,255,255,0.08)',
-              fontSize: 12, lineHeight: 1,
-            }}>
-              {PROFILE_ICONS[activeRace.profile]}
-            </span>
           )}
           <span style={{
             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 500,
@@ -550,31 +540,13 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             {filledCount}/8
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
-            color: 'rgba(255,255,255,0.5)',
-          }}>
-            {formatDate(activeRace.start_date)}
-          </span>
-          {activeRace.profile && (
-            <span style={{
-              padding: '1px 6px', borderRadius: 2,
-              background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)',
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 600,
-            }}>
-              {profileLabel}
-            </span>
-          )}
-          {activeRace.race_type && (
-            <span style={{
-              padding: '1px 6px', borderRadius: 2,
-              background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)',
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 600,
-            }}>
-              {RACE_TYPE_LABELS[activeRace.race_type] ?? activeRace.race_type}
-            </span>
-          )}
+        <div style={{
+          fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+          color: 'rgba(255,255,255,0.5)',
+        }}>
+          {formatDate(activeRace.start_date)}
+          {activeRace.profile && profileLabel && <> · {profileLabel}</>}
+          {activeRace.race_type && <> · {RACE_TYPE_LABELS[activeRace.race_type] ?? activeRace.race_type}</>}
         </div>
         {deadlineStr && (
           <div style={{
