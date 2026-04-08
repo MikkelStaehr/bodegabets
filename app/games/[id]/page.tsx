@@ -959,15 +959,6 @@ export default async function GamePage({ params }: Props) {
               races={lineupRaces}
               squadRiders={lineupSquadRiders}
             />
-            <LineupBuilder
-              gameId={gameId}
-              blockSquadMap={blockSquadMap}
-              races={lineupRaces}
-              squadRiders={lineupSquadRiders}
-              blocks={cyclingBlocks}
-              defaultBlockId={cyclingActiveBlock?.id ?? null}
-              lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
-            />
             {userSquad && lineupSquadRiders.length > 0 && (
               <a
                 href={`/games/${gameId}/squad`}
@@ -1001,6 +992,15 @@ export default async function GamePage({ params }: Props) {
                 <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, color: '#1E3A5F', fontWeight: 700 }}>›</span>
               </a>
             )}
+            <LineupBuilder
+              gameId={gameId}
+              blockSquadMap={blockSquadMap}
+              races={lineupRaces}
+              squadRiders={lineupSquadRiders}
+              blocks={cyclingBlocks}
+              defaultBlockId={cyclingActiveBlock?.id ?? null}
+              lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
+            />
           </>
         )}
 
