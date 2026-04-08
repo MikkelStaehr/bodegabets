@@ -27,6 +27,7 @@ type Props = {
   raceStartlists: RaceStartlist[]
   initialSquad: Rider[]
   blockId: string | null
+  blockRaceIds: string[]
 }
 
 // Short race name aliases
@@ -153,7 +154,7 @@ function Spinner() {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId }: Props) {
+export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId, blockRaceIds }: Props) {
   const router = useRouter()
   const [squad, setSquad] = useState<Rider[]>(initialSquad)
   const [search, setSearch] = useState('')
@@ -164,9 +165,12 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
   const [success, setSuccess] = useState(false)
 
   // Build per-rider race lookup: rider_id → list of short race names
+  // Filter to only block races if blockRaceIds is provided
   const riderRaces = useMemo(() => {
+    const blockSet = blockRaceIds.length > 0 ? new Set(blockRaceIds) : null
+    const filtered = blockSet ? raceStartlists.filter((rs) => blockSet.has(rs.raceId)) : raceStartlists
     const map = new Map<string, string[]>()
-    for (const rs of raceStartlists) {
+    for (const rs of filtered) {
       const short = shortRaceName(rs.raceName)
       for (const rid of rs.riderIds) {
         const arr = map.get(rid) ?? []
@@ -175,7 +179,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
       }
     }
     return map
-  }, [raceStartlists])
+  }, [raceStartlists, blockRaceIds])
 
   const confirmedSet = useMemo(() => new Set(riderRaces.keys()), [riderRaces])
   const squadIds = useMemo(() => new Set(squad.map((r) => r.id)), [squad])

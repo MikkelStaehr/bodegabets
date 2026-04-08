@@ -103,8 +103,9 @@ export default async function SquadPage({ params, searchParams }: Props) {
     }
   }
 
-  // Fetch block name if blockId is provided
+  // Fetch block name and block race IDs if blockId is provided
   let blockName: string | null = null
+  let blockRaceIds: string[] = []
   if (blockId) {
     const { data: blockData } = await supabaseAdmin
       .from('cycling_blocks')
@@ -112,6 +113,14 @@ export default async function SquadPage({ params, searchParams }: Props) {
       .eq('id', blockId)
       .single()
     blockName = blockData?.name ?? null
+
+    const { data: blockRaces } = await supabaseAdmin
+      .from('cycling_game_races')
+      .select('race_id')
+      .eq('game_id', gameId)
+      .eq('cycling_block_id', blockId)
+
+    blockRaceIds = (blockRaces ?? []).map((r) => r.race_id)
   }
 
   // Fetch existing squad (per block if blockId is provided)
@@ -204,6 +213,7 @@ export default async function SquadPage({ params, searchParams }: Props) {
           raceStartlists={raceStartlists}
           initialSquad={initialSquad}
           blockId={blockId ?? null}
+          blockRaceIds={blockRaceIds}
         />
       </div>
     </div>

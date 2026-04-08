@@ -84,8 +84,7 @@ export default function CyclingGameroom({ gameId, squadId, activeBlock, races, s
   if (!hasSquad) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Link
-          href={`/games/${gameId}/squad`}
+        <div
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -94,59 +93,23 @@ export default function CyclingGameroom({ gameId, squadId, activeBlock, races, s
             background: '#FDFAF5',
             border: '1px solid #E8E0D3',
             borderRadius: 2,
-            textDecoration: 'none',
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>
-                Sæt din trup
-              </span>
-              {activeBlock && (
-                <span style={{
-                  padding: '2px 8px',
-                  borderRadius: 999,
-                  background: '#E6F1FB',
-                  color: '#0C447C',
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: '0.02em',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {activeBlock.name}
-                </span>
-              )}
-            </div>
-            {raceNames && (
-              <p style={{
-                fontFamily: "'Barlow', sans-serif",
-                fontSize: 12,
-                color: '#9E9486',
-                lineHeight: 1.4,
-                marginBottom: 4,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical' as const,
-              }}>
-                {raceNames}
-              </p>
-            )}
-            {activeBlock?.lock_deadline && (
-              <p style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontSize: 11,
-                color: '#C8392B',
-                fontWeight: 600,
-              }}>
-                Låser {formatDeadline(activeBlock.lock_deadline)}
-              </p>
-            )}
+            <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>
+              Live feed
+            </span>
+            <p style={{
+              fontFamily: "'Barlow', sans-serif",
+              fontSize: 12,
+              color: '#9E9486',
+              lineHeight: 1.4,
+              marginTop: 4,
+            }}>
+              Kommer snart
+            </p>
           </div>
-          <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, color: '#1E3A5F', fontWeight: 700, marginLeft: 12, flexShrink: 0 }}>›</span>
-        </Link>
+        </div>
       </div>
     )
   }
