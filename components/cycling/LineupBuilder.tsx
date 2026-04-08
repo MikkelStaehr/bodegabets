@@ -46,6 +46,8 @@ type Props = {
   blocks: Block[]
   defaultBlockId?: string | null
   lockDeadline?: string | null
+  squadRiderCount?: number
+  squadId?: string | null
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -156,7 +158,7 @@ function shortBlockName(name: string): string {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, squadRiders, blocks, defaultBlockId, lockDeadline }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks].sort((a, b) => a.block_order - b.block_order),
   [blocks])
@@ -336,6 +338,34 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
   return (
     <div style={{ background: '#1E3A5F', borderRadius: 2, overflow: 'hidden' }}>
+      {/* ── Brutto trup bar ─────────────────────────────────── */}
+      {squadId && squadRiderCount != null && squadRiderCount > 0 && (
+        <a
+          href={`/games/${gameId}/squad`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 16px',
+            background: '#162d4a',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            textDecoration: 'none',
+          }}
+        >
+          <span style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
+            color: '#F2EDE4',
+          }}>
+            Din brutto trup
+          </span>
+          <span style={{
+            padding: '2px 8px', borderRadius: 999,
+            background: 'rgba(107,143,113,0.25)', color: '#6B8F71',
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+          }}>
+            {squadRiderCount}/25 ryttere
+          </span>
+        </a>
+      )}
+
       {/* ── Niveau 1: Blok-tabs ────────────────────────────── */}
       {sortedBlocks.length > 0 && (
         <div
