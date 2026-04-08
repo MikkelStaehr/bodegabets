@@ -503,12 +503,12 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
         {/* Right: ruteprofil billede */}
         {activeRace.profile_image_url && (
-          <div style={{ flex: '0 0 40%', lineHeight: 0, position: 'relative' }}>
+          <div style={{ flex: '0 0 40%', lineHeight: 0 }}>
             <a
               href={activeRace.profile_image_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'block', cursor: 'zoom-in' }}
+              style={{ display: 'block', cursor: 'zoom-in', position: 'relative' }}
             >
               <img
                 src={activeRace.profile_image_url}
@@ -521,11 +521,11 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
               />
               <span style={{
                 position: 'absolute', top: 4, right: 4,
-                background: 'rgba(0,0,0,0.5)', color: '#fff',
-                fontSize: 12, lineHeight: 1, padding: '3px 5px',
-                borderRadius: 4,
+                background: 'rgba(0,0,0,0.5)', color: 'white',
+                fontSize: 10, padding: '1px 4px',
+                borderRadius: 3,
               }}>
-                ↗
+                ⤢
               </span>
             </a>
           </div>
