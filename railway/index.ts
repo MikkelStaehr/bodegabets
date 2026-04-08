@@ -573,6 +573,63 @@ app.post('/api/cycling/calculate-points', async (req, res) => {
   }
 })
 
+// ─── GET /cycling-points ────────────────────────────────────────────────────
+// Finder cykling-løb der netop er skiftet til 'finished' og beregner point
+/*
+  SQL — kør manuelt i Supabase:
+
+  ALTER TABLE cycling_races
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+  CREATE OR REPLACE FUNCTION update_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN NEW.updated_at = now(); RETURN NEW; END;
+  $$ LANGUAGE plpgsql;
+
+  CREATE TRIGGER cycling_races_updated_at
+  BEFORE UPDATE ON cycling_races
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+*/
+
+app.get('/cycling-points', async (_req, res) => {
+  try {
+    // Find løb der er finished og opdateret inden for de seneste 10 minutter
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+
+    const { data: newlyFinishedRaces } = await supabaseAdmin
+      .from('cycling_races')
+      .select('id, name')
+      .eq('status', 'finished')
+      .gte('updated_at', tenMinAgo)
+
+    const processed: string[] = []
+
+    for (const race of newlyFinishedRaces ?? []) {
+      console.log(`[cycling-points] Beregner point for ${race.name}...`)
+      await runCyclingPointsForAllGames(race.id)
+      console.log(`[cycling-points] Point beregnet for ${race.name}`)
+      processed.push(race.name)
+    }
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_points',
+      status: processed.length > 0 ? 'success' : 'info',
+      message: `cycling-points: ${processed.length} løb beregnet`,
+      metadata: { races: processed },
+    })
+
+    res.json({ ok: true, processed: processed.length, races: processed })
+  } catch (err) {
+    console.error('[cycling-points]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_points',
+      status: 'error',
+      message: `cycling-points failed: ${String(err)}`,
+    })
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /admin/test-fetch (temporary) ─────────────────────────────────────
 
 app.get('/admin/test-fetch', async (_req, res) => {
@@ -778,6 +835,9 @@ app.listen(PORT, () => {
 
   // Dagligt kl. 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
+
+  // Hvert 10. minut — tjek for nyligt finished cykling-løb og beregn point
+  cron.schedule('*/10 * * * *', () => callEndpoint('/cycling-points'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')
 })
