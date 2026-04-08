@@ -591,8 +591,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
               style={{
                 height: 64, width: 'auto', maxWidth: 160,
                 objectFit: 'contain',
+                filter: 'brightness(0) invert(1)',
                 flexShrink: 0,
-                background: 'rgba(255,255,255,0.9)', borderRadius: 4, padding: '2px 4px',
               }}
             />
           ) : (
