@@ -49,7 +49,6 @@ type Props = {
   results: Result[]
   riders: Rider[]
   onEditRole?: (roleKey: string) => void
-  onEditLineup?: () => void
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -74,6 +73,17 @@ const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
   equipier:   { bg: '#D3D1C7', color: '#444441' },
   joker:      { bg: '#CECBF6', color: '#3C3489' },
 }
+
+const ALL_ROLES: { key: string; label: string }[] = [
+  { key: 'leader', label: 'Leader' },
+  { key: 'lieutenant', label: 'Lieutenant' },
+  { key: 'grimpeur', label: 'Grimpeur' },
+  { key: 'sprinter', label: 'Sprinter' },
+  { key: 'domestique', label: 'Domestique' },
+  { key: 'equipier_0', label: 'Équipier' },
+  { key: 'equipier_1', label: 'Équipier' },
+  { key: 'joker', label: 'Joker' },
+]
 
 const ROLE_TOOLTIPS: Record<string, string> = {
   leader: 'Scorer point baseret på placering × kategori-multiplikator',
@@ -192,7 +202,7 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupResults({ race, lineup, scores, results, riders, onEditRole, onEditLineup }: Props) {
+export default function LineupResults({ race, lineup, scores, results, riders, onEditRole }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
@@ -217,18 +227,21 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
     return map
   }, [results])
 
-  // Build display rows from lineup (primary) enriched with scores/results
-  const activeRiders = lineup.filter((l) => {
-    if (hasScores) {
-      const score = scoreMap.get(l.rider_id)
-      return score ? !score.is_bench : true
+  // Build a map of roleKey → lineup entry
+  const lineupByRole = useMemo(() => {
+    const map = new Map<string, typeof lineup[0]>()
+    for (const l of lineup) {
+      const key = l.role === 'equipier' ? `equipier_${l.slot_index}` : l.role
+      map.set(key, l)
     }
-    return true
-  })
+    return map
+  }, [lineup])
 
   const benchScores = hasScores ? scores.filter((s) => s.is_bench) : []
   const totalPoints = hasScores ? scores.reduce((sum, s) => sum + s.total_points, 0) : 0
   const benchPenaltyTotal = benchScores.reduce((sum, s) => sum + s.bench_penalty, 0)
+
+  const canEdit = !!onEditRole && race.status !== 'finished'
 
   return (
     <div>
@@ -252,35 +265,8 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
         </span>
       </div>
 
-      {/* ── Empty lineup placeholder ────────────────────────── */}
-      {lineup.length === 0 && (
-        <div style={{ padding: '32px 14px', textAlign: 'center' }}>
-          <div style={{
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
-            color: 'rgba(255,255,255,0.5)', marginBottom: 12,
-          }}>
-            Ingen lineup sat endnu
-          </div>
-          {onEditLineup && (
-            <button
-              type="button"
-              onClick={onEditLineup}
-              style={{
-                padding: '8px 20px',
-                background: '#4A90D9', border: 'none', borderRadius: 2,
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
-                fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-                color: '#fff', cursor: 'pointer',
-              }}
-            >
-              Sæt lineup
-            </button>
-          )}
-        </div>
-      )}
-
       {/* ── Column headers ──────────────────────────────────── */}
-      {lineup.length > 0 && <div style={{
+      <div style={{
         display: 'grid',
         gridTemplateColumns: '40px 40px 1fr auto auto',
         alignItems: 'center',
@@ -298,42 +284,142 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
             {label}
           </span>
         ))}
-      </div>}
+      </div>
 
-      {/* ── Active riders ────────────────────────────────────── */}
-      {lineup.length > 0 && activeRiders.map((entry, idx) => {
-        const rider = riderMap.get(entry.rider_id)
-        if (!rider) return null
+      {/* ── Role rows (always all 8) ────────────────────────── */}
+      {ALL_ROLES.map((roleSlot, idx) => {
+        const entry = lineupByRole.get(roleSlot.key)
+        const rider = entry ? riderMap.get(entry.rider_id) : null
+        const baseRole = roleSlot.key.startsWith('equipier_') ? 'equipier' : roleSlot.key
 
-        const score = scoreMap.get(entry.rider_id)
-        const result = resultMap.get(entry.rider_id)
-        const role = score?.role ?? entry.role
+        if (rider && entry) {
+          // Filled slot
+          const score = scoreMap.get(entry.rider_id)
+          const result = resultMap.get(entry.rider_id)
+          const role = score?.role ?? baseRole
 
-        const isDnf = result?.dnf ?? false
-        const position = result?.position ?? null
-        const isJokerDnf = role === 'joker' && isDnf
+          const isDnf = result?.dnf ?? false
+          const position = result?.position ?? null
+          const isJokerDnf = role === 'joker' && isDnf
 
-        let posLabel: string
-        let posColor = 'rgba(255,255,255,0.3)'
-        if (!hasScores && !result) {
-          posLabel = 'N/A'
-          posColor = 'rgba(255,255,255,0.25)'
-        } else if (isDnf) {
-          posLabel = 'DNF'
-          posColor = '#ff6b6b'
-        } else if (position) {
-          posLabel = `${position}.`
-          posColor = POSITION_COLORS[position] ?? 'rgba(255,255,255,0.5)'
-        } else {
-          posLabel = '—'
+          let posLabel: string
+          let posColor = 'rgba(255,255,255,0.3)'
+          if (!hasScores && !result) {
+            posLabel = '—'
+            posColor = 'rgba(255,255,255,0.25)'
+          } else if (isDnf) {
+            posLabel = 'DNF'
+            posColor = '#ff6b6b'
+          } else if (position) {
+            posLabel = `${position}.`
+            posColor = POSITION_COLORS[position] ?? 'rgba(255,255,255,0.5)'
+          } else {
+            posLabel = '—'
+          }
+
+          return (
+            <div
+              key={roleSlot.key}
+              onClick={() => { if (canEdit) onEditRole!(roleSlot.key) }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '40px 40px 1fr auto auto',
+                alignItems: 'center',
+                gap: 10,
+                cursor: canEdit ? 'pointer' : 'default',
+                padding: '8px 14px',
+                borderBottom: idx < ALL_ROLES.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: isDnf ? 11 : 14,
+                fontWeight: 700, color: posColor, textAlign: 'center',
+              }}>
+                {posLabel}
+              </span>
+
+              <RiderPhoto rider={rider} />
+
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
+                fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                minWidth: 0,
+              }}>
+                <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
+                {' '}{rider.first_name}
+                {result?.jersey && (
+                  <span style={{ marginLeft: 4, color: '#FAC775', fontSize: 10, fontWeight: 700 }}>
+                    {result.jersey}
+                  </span>
+                )}
+              </span>
+
+              <div style={{ position: 'relative' }}>
+                <span
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                    color: 'rgba(255,255,255,0.5)', textAlign: 'right',
+                    cursor: ROLE_TOOLTIPS[baseRole] ? 'help' : 'default',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={() => { if (ROLE_TOOLTIPS[baseRole]) setHoveredRole(roleSlot.key) }}
+                  onMouseLeave={() => setHoveredRole(null)}
+                >
+                  {roleSlot.label}
+                </span>
+                {hoveredRole === roleSlot.key && ROLE_TOOLTIPS[baseRole] && (
+                  <div style={{
+                    position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
+                    background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
+                    padding: '8px 12px', maxWidth: 260,
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                    color: 'rgba(255,255,255,0.7)', lineHeight: 1.4,
+                    whiteSpace: 'normal',
+                  }}>
+                    {ROLE_TOOLTIPS[baseRole]}
+                  </div>
+                )}
+              </div>
+
+              {score ? (
+                <div
+                  style={{ position: 'relative', cursor: 'default' }}
+                  onMouseEnter={() => setHoveredRider(entry.rider_id)}
+                  onMouseLeave={() => setHoveredRider(null)}
+                >
+                  <span style={{
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
+                    fontWeight: 700,
+                    color: isJokerDnf ? 'rgba(255,255,255,0.4)' : score.total_points > 0 ? '#6B8F71' : score.total_points < 0 ? '#ff6b6b' : 'rgba(255,255,255,0.4)',
+                  }}>
+                    {isJokerDnf ? '0 pt (immun)' : `${score.total_points} pt`}
+                  </span>
+                  {hoveredRider === entry.rider_id && (
+                    <PointsTooltip score={score} isJokerDnf={isJokerDnf} />
+                  )}
+                </div>
+              ) : (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+                  fontWeight: 600, color: 'rgba(255,255,255,0.25)',
+                }}>
+                  —
+                </span>
+              )}
+            </div>
+          )
         }
 
-        const canEdit = !!onEditRole && race.status !== 'finished'
-
+        // Empty slot
         return (
           <div
-            key={entry.rider_id}
-            onClick={() => { if (canEdit) onEditRole(entry.role.startsWith('equipier') ? `equipier_${entry.slot_index}` : entry.role) }}
+            key={roleSlot.key}
+            onClick={() => { if (canEdit) onEditRole!(roleSlot.key) }}
             style={{
               display: 'grid',
               gridTemplateColumns: '40px 40px 1fr auto auto',
@@ -341,93 +427,47 @@ export default function LineupResults({ race, lineup, scores, results, riders, o
               gap: 10,
               cursor: canEdit ? 'pointer' : 'default',
               padding: '8px 14px',
-              borderBottom: idx < activeRiders.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              borderBottom: idx < ALL_ROLES.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              transition: 'background 0.1s',
             }}
+            onMouseEnter={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
           >
-            {/* Position */}
             <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: isDnf ? 11 : posLabel === 'N/A' ? 11 : 14,
-              fontWeight: 700,
-              color: posColor,
-              textAlign: 'center',
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
+              fontWeight: 700, color: 'rgba(255,255,255,0.15)', textAlign: 'center',
             }}>
-              {posLabel}
+              —
             </span>
 
-            {/* Photo */}
-            <RiderPhoto rider={rider} />
+            {/* Empty avatar */}
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              border: '1px dashed rgba(255,255,255,0.15)',
+              flexShrink: 0,
+            }} />
 
-            {/* Name */}
             <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
-              fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              fontFamily: "'Barlow', sans-serif", fontSize: 12,
+              color: 'rgba(255,255,255,0.25)', fontStyle: 'italic',
               minWidth: 0,
             }}>
-              <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
-              {' '}{rider.first_name}
-              {result?.jersey && (
-                <span style={{ marginLeft: 4, color: '#FAC775', fontSize: 10, fontWeight: 700 }}>
-                  {result.jersey}
-                </span>
-              )}
+              Vælg rytter
             </span>
 
-            {/* Role */}
-            <div style={{ position: 'relative' }}>
-              <span
-                style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
-                  color: 'rgba(255,255,255,0.5)', textAlign: 'right',
-                  cursor: ROLE_TOOLTIPS[role] ? 'help' : 'default',
-                  whiteSpace: 'nowrap',
-                }}
-                onMouseEnter={() => { if (ROLE_TOOLTIPS[role]) setHoveredRole(entry.rider_id) }}
-                onMouseLeave={() => setHoveredRole(null)}
-              >
-                {ROLE_LABELS[role] ?? role}
-              </span>
-              {hoveredRole === entry.rider_id && ROLE_TOOLTIPS[role] && (
-                <div style={{
-                  position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
-                  background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
-                  padding: '8px 12px', maxWidth: 260,
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
-                  color: 'rgba(255,255,255,0.7)', lineHeight: 1.4,
-                  whiteSpace: 'normal',
-                }}>
-                  {ROLE_TOOLTIPS[role]}
-                </div>
-              )}
-            </div>
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+              color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap',
+            }}>
+              {roleSlot.label}
+            </span>
 
-            {/* Points */}
-            {score ? (
-              <div
-                style={{ position: 'relative', cursor: 'default' }}
-                onMouseEnter={() => setHoveredRider(entry.rider_id)}
-                onMouseLeave={() => setHoveredRider(null)}
-              >
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
-                  fontWeight: 700,
-                  color: isJokerDnf ? 'rgba(255,255,255,0.4)' : score.total_points > 0 ? '#6B8F71' : score.total_points < 0 ? '#ff6b6b' : 'rgba(255,255,255,0.4)',
-                }}>
-                  {isJokerDnf ? '0 pt (immun)' : `${score.total_points} pt`}
-                </span>
-                {hoveredRider === entry.rider_id && (
-                  <PointsTooltip score={score} isJokerDnf={isJokerDnf} />
-                )}
-              </div>
-            ) : (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
-                fontWeight: 600, color: 'rgba(255,255,255,0.25)',
-              }}>
-                N/A
-              </span>
-            )}
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+              fontWeight: 600, color: 'rgba(255,255,255,0.15)',
+            }}>
+              —
+            </span>
           </div>
         )
       })}
