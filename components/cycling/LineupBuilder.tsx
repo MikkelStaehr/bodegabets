@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import LineupResults from './LineupResults'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -159,6 +159,66 @@ function shortBlockName(name: string): string {
   }
   // "Flandern-klassikerne" → "Flandern"
   return name.replace(/-?klassikerne$/i, '').trim()
+}
+
+// ── Scrollable tab bar ─────────────────────────────────────────────────────
+
+function ScrollableTabs({ children, background }: { children: React.ReactNode; background: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const checkScroll = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 0)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  }, [])
+
+  useEffect(() => {
+    checkScroll()
+    const el = ref.current
+    if (!el) return
+    el.addEventListener('scroll', checkScroll, { passive: true })
+    const ro = new ResizeObserver(checkScroll)
+    ro.observe(el)
+    return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect() }
+  }, [checkScroll])
+
+  const scroll = (dir: number) => {
+    ref.current?.scrollBy({ left: dir * 200, behavior: 'smooth' })
+  }
+
+  const btnStyle = (side: 'left' | 'right'): React.CSSProperties => ({
+    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+    [side]: 0,
+    width: 28, height: 28, borderRadius: '50%',
+    background: 'rgba(0,0,0,0.45)', border: 'none',
+    color: '#fff', fontSize: 14, lineHeight: 1,
+    cursor: 'pointer', zIndex: 2,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  })
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {canScrollLeft && (
+        <button type="button" onClick={() => scroll(-1)} style={btnStyle('left')}>←</button>
+      )}
+      <div
+        ref={ref}
+        style={{
+          display: 'flex', overflowX: 'auto', gap: 0,
+          background, scrollbarWidth: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {children}
+      </div>
+      {canScrollRight && (
+        <button type="button" onClick={() => scroll(1)} style={btnStyle('right')}>→</button>
+      )}
+    </div>
+  )
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -358,16 +418,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
     <div style={{ background: '#1E3A5F', borderRadius: 2, overflow: 'hidden' }}>
       {/* ── Niveau 1: Blok-tabs ────────────────────────────── */}
       {sortedBlocks.length > 0 && (
-        <div
-          className="scrollbar-hide"
-          style={{
-            display: 'flex',
-            overflowX: 'auto',
-            background: '#0F2137',
-            padding: '8px 12px 0',
-            gap: 0,
-          }}
-        >
+        <ScrollableTabs background="#0F2137">
+          <div style={{ display: 'flex', padding: '8px 12px 0', gap: 0 }}>
           {sortedBlocks.map((block) => {
             const isActive = block.id === activeBlockId
             return (
@@ -408,21 +460,17 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
               </button>
             )
           })}
-        </div>
+          </div>
+        </ScrollableTabs>
       )}
 
       {/* ── Niveau 2: Løbs-tabs + lineup content ──────────── */}
       {activeRace && (<>
-      <div
-        className="scrollbar-hide"
-        style={{
-          display: 'flex',
-          overflowX: 'auto',
-          background: '#162d4a',
+      <ScrollableTabs background="#162d4a">
+        <div style={{
+          display: 'flex', gap: 0,
           borderBottom: '1px solid rgba(255,255,255,0.06)',
-          gap: 0,
-        }}
-      >
+        }}>
         {blockRaces.map((race) => {
           const isActive = race.id === activeTab
           const isFinished = race.status === 'finished'
@@ -467,7 +515,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             </button>
           )
         })}
-      </div>
+        </div>
+      </ScrollableTabs>
 
       {/* ── Brutto trup bar (per blok) ────────────────────── */}
       {(() => {
