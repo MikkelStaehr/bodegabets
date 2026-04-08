@@ -181,7 +181,12 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
     return map
   }, [raceStartlists, blockRaceIds])
 
-  const confirmedSet = useMemo(() => new Set(riderRaces.keys()), [riderRaces])
+  // Bekræftede ryttere: baseret på filtrerede startlister (blok-scoped)
+  const confirmedSet = useMemo(() => {
+    const blockSet = blockRaceIds.length > 0 ? new Set(blockRaceIds) : null
+    const filtered = blockSet ? raceStartlists.filter((sl) => blockSet.has(sl.raceId)) : raceStartlists
+    return new Set(filtered.flatMap((sl) => sl.riderIds))
+  }, [raceStartlists, blockRaceIds])
   const squadIds = useMemo(() => new Set(squad.map((r) => r.id)), [squad])
 
   // Category counts
@@ -262,6 +267,30 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
 
   return (
     <div>
+      {/* ── Regler ──────────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          marginBottom: 8,
+          padding: '8px 12px',
+          background: '#F8F7F4',
+          border: '1px solid #E5E0D8',
+          borderRadius: 8,
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: 12,
+          color: '#6B6560',
+        }}
+      >
+        <span>Max 3 × Kat 1</span>
+        <span>Max 5 × Kat 2</span>
+        <span>Max 5 × Kat 3</span>
+        <span>Max 5 × Kat 4</span>
+        <span>Max 7 × Kat 5</span>
+        <span>Max 3 fra samme hold</span>
+      </div>
+
       {/* ── Category counter ──────────────────────────────────────── */}
       <div
         style={{

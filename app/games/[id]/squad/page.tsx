@@ -191,17 +191,6 @@ export default async function SquadPage({ params, searchParams }: Props) {
           >
             {blockName ? `Brutto trup — ${blockName}` : 'Brutto trup'}
           </h1>
-          <p
-            style={{
-              fontFamily: "'Barlow', sans-serif",
-              fontSize: 13,
-              color: 'rgba(242,237,228,0.6)',
-              marginTop: 6,
-              lineHeight: 1.4,
-            }}
-          >
-            Vælg op til 25 ryttere. Max 3 kat 1, 5 kat 2, 5 kat 3, 5 kat 4, 7 kat 5. Max 3 fra samme hold.
-          </p>
         </div>
       </div>
 
