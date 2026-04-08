@@ -416,13 +416,13 @@ export default function NewCyclingGameForm({ races }: Props) {
     raceBySlug[r.pcs_slug] = r
   }
 
-  // Race er "finished" hvis start_date er mere end 7 dage i fortiden
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  // Race er "finished" hvis start_date er mere end 2 dage i fortiden
+  const twoDaysAgo = new Date()
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
 
   function isRaceFinished(race: Race): boolean {
     if (!race.start_date) return false
-    return new Date(race.start_date) < sevenDaysAgo
+    return new Date(race.start_date) < twoDaysAgo
   }
 
   function isBlockFinished(block: BlockDef): boolean {
@@ -430,8 +430,6 @@ export default function NewCyclingGameForm({ races }: Props) {
     if (blockRaces.length === 0) return false
     return blockRaces.every((r) => isRaceFinished(r))
   }
-
-  const visibleBlocks = BLOCKS.filter((b) => !isBlockFinished(b))
 
   const step2Active = name.trim().length >= 2
   const step3Active = step2Active && selectedRaceIds.size > 0
@@ -579,12 +577,13 @@ export default function NewCyclingGameForm({ races }: Props) {
             </p>
 
             <div className="space-y-4">
-              {visibleBlocks.map((block) => {
+              {BLOCKS.map((block) => {
                 const blockRaces = block.slugs
                   .map((s) => raceBySlug[s])
                   .filter((r): r is Race => !!r)
                 const fullySelected = isBlockFullySelected(block)
                 const partiallySelected = isBlockPartiallySelected(block)
+                const blockFinished = isBlockFinished(block)
 
                 return (
                   <div
@@ -598,7 +597,7 @@ export default function NewCyclingGameForm({ races }: Props) {
                     }`}
                     style={{
                       borderRadius: '2px',
-                      ...(block.key === 'monuments' && monumentsDisabled
+                      ...((block.key === 'monuments' && monumentsDisabled) || blockFinished
                         ? { opacity: 0.4, pointerEvents: 'none' as const }
                         : {}),
                     }}
