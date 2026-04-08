@@ -437,11 +437,11 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
       {/* ── Race header ──────────────────────────────────────── */}
       {activeRace.profile_image_url && (
-        <div style={{ width: '100%', overflow: 'hidden' }}>
+        <div style={{ width: '100%', margin: 0, padding: 0, lineHeight: 0 }}>
           <img
             src={activeRace.profile_image_url}
             alt={activeRace.name}
-            style={{ width: '100%', height: 120, objectFit: 'cover', objectPosition: 'center', display: 'block' }}
+            style={{ width: '100%', height: 100, objectFit: 'cover', objectPosition: 'center top', display: 'block', margin: 0, padding: 0 }}
           />
         </div>
       )}

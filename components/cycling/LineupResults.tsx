@@ -85,19 +85,24 @@ function RiderPhoto({ rider }: { rider: Rider }) {
   const src = rider.photo_url ?? rider.team_logo_url
   if (src) {
     return (
-      <img
-        src={src}
-        alt={rider.last_name}
-        style={{
-          width: 32, height: 32, borderRadius: '50%',
-          objectFit: 'cover', objectPosition: 'center top', flexShrink: 0,
-        }}
-      />
+      <div style={{
+        width: 36, height: 36, borderRadius: '50%',
+        background: '#fff', overflow: 'hidden', flexShrink: 0,
+      }}>
+        <img
+          src={src}
+          alt={rider.last_name}
+          style={{
+            width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center top',
+          }}
+        />
+      </div>
     )
   }
   return (
     <div style={{
-      width: 32, height: 32, borderRadius: '50%',
+      width: 36, height: 36, borderRadius: '50%',
       background: '#2B4F7A', display: 'flex',
       alignItems: 'center', justifyContent: 'center',
       fontSize: 10, fontWeight: 700, color: '#8FABC4', flexShrink: 0,
@@ -268,7 +273,7 @@ export default function LineupResults({ race, lineup, scores, results, riders }:
             key={entry.rider_id}
             style={{
               display: 'grid',
-              gridTemplateColumns: '36px 32px 1fr auto',
+              gridTemplateColumns: '36px 36px 1fr auto',
               alignItems: 'center',
               gap: 10,
               padding: '8px 14px',
