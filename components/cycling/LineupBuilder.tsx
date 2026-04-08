@@ -71,6 +71,10 @@ const PROFILE_LABELS: Record<string, string> = {
   flat: 'Flad', itt: 'Enkeltstart', mixed: 'Blandet',
 }
 
+const RACE_TYPE_LABELS: Record<string, string> = {
+  one_day: 'Endagsløb', stage_race: 'Etapeløb',
+}
+
 const CAT_LABELS: Record<number, string> = { 1: 'Kat 1', 2: 'Kat 2', 3: 'Kat 3', 4: 'Kat 4', 5: 'Kat 5' }
 const CAT_COLORS: Record<number, string> = {
   1: '#B8963E', 2: '#6B8F71', 3: '#4A6FA5', 4: '#8B6F47', 5: '#7A7060',
@@ -435,13 +439,24 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         })}
       </div>
 
-      {/* ── Race header ──────────────────────────────────────── */}
+      {/* ── Race info bar ────────────────────────────────────── */}
+      <div style={{
+        padding: '8px 14px',
+        fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+        color: 'rgba(255,255,255,0.5)',
+      }}>
+        {formatDate(activeRace.start_date)}
+        {activeRace.race_type && <> · {RACE_TYPE_LABELS[activeRace.race_type] ?? activeRace.race_type}</>}
+        {activeRace.profile && <> · {PROFILE_LABELS[activeRace.profile] ?? activeRace.profile}</>}
+      </div>
+
+      {/* ── Ruteprofil billede ────────────────────────────────── */}
       {activeRace.profile_image_url && (
-        <div style={{ width: '100%', margin: 0, padding: 0, lineHeight: 0 }}>
+        <div style={{ width: '100%', margin: 0, padding: 0, lineHeight: 0, background: '#162d4a' }}>
           <img
             src={activeRace.profile_image_url}
             alt={activeRace.name}
-            style={{ width: '100%', height: 100, objectFit: 'cover', objectPosition: 'center top', display: 'block', margin: 0, padding: 0 }}
+            style={{ width: '100%', height: 'auto', maxHeight: 120, objectFit: 'contain', objectPosition: 'center', display: 'block', margin: 0, padding: 0 }}
           />
         </div>
       )}
