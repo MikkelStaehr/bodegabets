@@ -395,7 +395,18 @@ export default async function GamePage({ params }: Props) {
       })
     }
 
-    console.log('DEBUG cycling:', { squadId: userSquad?.id, squadRiders: lineupSquadRiders.length, races: lineupRaces.length, activeBlockIds })
+    // Debug: also fetch raw game_races to see cycling_block_id values
+    const { data: debugRaces } = await supabaseAdmin
+      .from('cycling_game_races')
+      .select('race_id, cycling_block_id')
+      .eq('game_id', gameId)
+    console.log('DEBUG cycling:', {
+      squadId: userSquad?.id,
+      squadRiders: lineupSquadRiders.length,
+      races: lineupRaces.length,
+      activeBlockIds,
+      rawGameRaces: debugRaces,
+    })
   }
 
   // ── Championship mode data ────────────────────────────────────────────────
