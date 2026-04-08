@@ -50,36 +50,23 @@ const OTHER_SLUGS = [
   'bretagne-classic', 'gp-quebec', 'gp-montreal',
 ]
 
-// Blokke der ekskluderer hinanden (monumenter ↔ flandern/ardennerne/øvrige)
-const MONUMENT_CONFLICTS = ['flandern', 'ardennerne', 'other']
-
 type BlockDef = {
   key: string
   label: string
   desc: string
   icon: string
   slugs: string[]
-  isBundle: boolean
   blockNumber: number
 }
 
 const BLOCKS: BlockDef[] = [
-  {
-    key: 'monuments',
-    label: 'De 5 Monumenter',
-    desc: 'Milano-Sanremo, Ronde, Roubaix, Liège og Lombardiet',
-    icon: '🏛️',
-    slugs: MONUMENT_SLUGS,
-    isBundle: true,
-    blockNumber: 0,
-  },
   {
     key: 'flandern',
     label: 'Flandern-klassikerne',
     desc: '7 forårsklassikere fra Omloop til Ronde',
     icon: '🧱',
     slugs: FLANDERN_SLUGS,
-    isBundle: false,
+
     blockNumber: 1,
   },
   {
@@ -88,7 +75,7 @@ const BLOCKS: BlockDef[] = [
     desc: 'Paris-Roubaix, Amstel, Flèche og Liège',
     icon: '⛰️',
     slugs: ARDENNERNE_SLUGS,
-    isBundle: false,
+
     blockNumber: 2,
   },
   {
@@ -97,7 +84,7 @@ const BLOCKS: BlockDef[] = [
     desc: 'De tre store etapeløb',
     icon: '🏔️',
     slugs: GRAND_TOUR_SLUGS,
-    isBundle: false,
+
     blockNumber: 3,
   },
   {
@@ -106,7 +93,7 @@ const BLOCKS: BlockDef[] = [
     desc: 'Ugelange etapeløb gennem sæsonen',
     icon: '🗺️',
     slugs: MAJOR_TOUR_SLUGS,
-    isBundle: false,
+
     blockNumber: 4,
   },
   {
@@ -115,7 +102,7 @@ const BLOCKS: BlockDef[] = [
     desc: 'VM og EM på landevej',
     icon: '🏅',
     slugs: CHAMPIONSHIP_SLUGS,
-    isBundle: false,
+
     blockNumber: 5,
   },
   {
@@ -124,7 +111,7 @@ const BLOCKS: BlockDef[] = [
     desc: 'Lombardiet, Eschborn-Frankfurt og efterårsløb',
     icon: '🍂',
     slugs: OTHER_SLUGS,
-    isBundle: false,
+
     blockNumber: 6,
   },
 ]
@@ -446,18 +433,6 @@ export default function NewCyclingGameForm({ races }: Props) {
       if (allSelected) {
         for (const id of blockRaceIds) next.delete(id)
       } else {
-        // Kun Monumenter deselekter overlappende blokke
-        if (block.key === 'monuments') {
-          for (const conflictKey of MONUMENT_CONFLICTS) {
-            const conflictBlock = BLOCKS.find((b) => b.key === conflictKey)
-            if (conflictBlock) {
-              for (const slug of conflictBlock.slugs) {
-                const race = raceBySlug[slug]
-                if (race) next.delete(race.id)
-              }
-            }
-          }
-        }
         for (const id of blockRaceIds) next.add(id)
       }
       return next
@@ -485,12 +460,6 @@ export default function NewCyclingGameForm({ races }: Props) {
       return race && selectedRaceIds.has(race.id)
     })
   }
-
-  // Monumenter disabled når Flandern eller Ardennerne har valgte løb
-  const monumentsDisabled = MONUMENT_CONFLICTS.some((key) => {
-    const block = BLOCKS.find((b) => b.key === key)
-    return block && isBlockPartiallySelected(block)
-  })
 
   // Build the race_selections for the API: { race_id, block_number }[]
   function buildRaceSelections(): { race_id: string; block_number: number }[] {
@@ -597,7 +566,7 @@ export default function NewCyclingGameForm({ races }: Props) {
                     }`}
                     style={{
                       borderRadius: '2px',
-                      ...((block.key === 'monuments' && monumentsDisabled) || blockFinished
+                      ...(blockFinished
                         ? { opacity: 0.4, pointerEvents: 'none' as const }
                         : {}),
                     }}
@@ -634,12 +603,13 @@ export default function NewCyclingGameForm({ races }: Props) {
                       </span>
                     </button>
 
-                    {/* Individual races (for non-bundle blocks, or when bundle is expanded) */}
-                    {!block.isBundle && (fullySelected || partiallySelected) && (
+                    {/* Individual races */}
+                    {(fullySelected || partiallySelected) && (
                       <div className="border-t border-border/50 px-4 py-2 space-y-0.5">
                         {blockRaces.map((race) => {
                           const selected = selectedRaceIds.has(race.id)
                           const finished = isRaceFinished(race)
+                          const isMonument = MONUMENT_SLUGS.includes(race.pcs_slug)
                           return (
                             <button
                               key={race.id}
@@ -657,6 +627,16 @@ export default function NewCyclingGameForm({ races }: Props) {
                               <span className={`font-body text-[13px] ${selected ? 'text-primary' : 'text-text-warm'}`}>
                                 {race.name}
                               </span>
+                              {isMonument && (
+                                <span style={{
+                                  fontSize: 10, padding: '1px 5px', borderRadius: 999,
+                                  background: '#FAC775', color: '#633806',
+                                  fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 700,
+                                  whiteSpace: 'nowrap', flexShrink: 0,
+                                }}>
+                                  Monument
+                                </span>
+                              )}
                               {race.start_date && (
                                 <span className="font-condensed text-[10px] text-text-warm ml-auto">
                                   {race.start_date}
@@ -665,19 +645,6 @@ export default function NewCyclingGameForm({ races }: Props) {
                             </button>
                           )
                         })}
-                      </div>
-                    )}
-
-                    {/* Show race list for bundles when selected */}
-                    {block.isBundle && fullySelected && (
-                      <div className="border-t border-border/50 px-4 py-2">
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                          {blockRaces.map((race) => (
-                            <span key={race.id} className="font-body text-[11px] text-text-warm">
-                              {race.name}
-                            </span>
-                          ))}
-                        </div>
                       </div>
                     )}
                   </div>
