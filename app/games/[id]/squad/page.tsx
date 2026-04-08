@@ -71,7 +71,7 @@ export default async function SquadPage({ params, searchParams }: Props) {
       .from('cycling_races')
       .select('id, name, status, start_date')
       .in('id', raceIds)
-      .in('status', ['active', 'upcoming'])
+      .in('status', ['active', 'upcoming', 'finished'])
       .order('start_date', { ascending: true })
 
     if (races?.length) {

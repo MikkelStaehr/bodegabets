@@ -416,6 +416,23 @@ export default function NewCyclingGameForm({ races }: Props) {
     raceBySlug[r.pcs_slug] = r
   }
 
+  // Race er "finished" hvis start_date er mere end 7 dage i fortiden
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+  function isRaceFinished(race: Race): boolean {
+    if (!race.start_date) return false
+    return new Date(race.start_date) < sevenDaysAgo
+  }
+
+  function isBlockFinished(block: BlockDef): boolean {
+    const blockRaces = block.slugs.map((s) => raceBySlug[s]).filter((r): r is Race => !!r)
+    if (blockRaces.length === 0) return false
+    return blockRaces.every((r) => isRaceFinished(r))
+  }
+
+  const visibleBlocks = BLOCKS.filter((b) => !isBlockFinished(b))
+
   const step2Active = name.trim().length >= 2
   const step3Active = step2Active && selectedRaceIds.size > 0
   const canSubmit = name.trim().length >= 2 && selectedRaceIds.size > 0
@@ -562,7 +579,7 @@ export default function NewCyclingGameForm({ races }: Props) {
             </p>
 
             <div className="space-y-4">
-              {BLOCKS.map((block) => {
+              {visibleBlocks.map((block) => {
                 const blockRaces = block.slugs
                   .map((s) => raceBySlug[s])
                   .filter((r): r is Race => !!r)
@@ -623,13 +640,15 @@ export default function NewCyclingGameForm({ races }: Props) {
                       <div className="border-t border-border/50 px-4 py-2 space-y-0.5">
                         {blockRaces.map((race) => {
                           const selected = selectedRaceIds.has(race.id)
+                          const finished = isRaceFinished(race)
                           return (
                             <button
                               key={race.id}
                               type="button"
-                              onClick={() => toggleRace(race.id)}
+                              onClick={() => { if (!finished) toggleRace(race.id) }}
+                              disabled={finished}
                               className="w-full flex items-center gap-3 py-1.5 text-left hover:bg-cream-dark/50 px-1 transition-colors"
-                              style={{ borderRadius: '2px' }}
+                              style={{ borderRadius: '2px', opacity: finished ? 0.35 : 1, cursor: finished ? 'not-allowed' : 'pointer' }}
                             >
                               <span className={`w-4 h-4 rounded-sm border-[1.5px] flex items-center justify-center shrink-0 transition-colors ${
                                 selected ? 'bg-forest border-forest text-cream' : 'border-border'

@@ -292,6 +292,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
   // No squad for this block?
   const noSquadForBlock = !currentSquadId
 
+  const isFinished = activeRace?.status === 'finished'
   const isLocked = activeRace ? lockedRaces.has(activeRace.id) : false
   const slots = activeRace ? (lineups[activeRace.id] ?? { ...EMPTY_SLOTS }) : { ...EMPTY_SLOTS }
   const changed = activeRace ? hasChanges(activeRace.id) : false
@@ -486,7 +487,29 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         )}
       </div>
 
+      {/* ── Finished placeholder ──────────────────────────── */}
+      {isFinished && (
+        <div style={{
+          padding: '32px 14px',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14,
+            fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 4,
+          }}>
+            Løbet er afsluttet
+          </div>
+          <div style={{
+            fontFamily: "'Barlow', sans-serif", fontSize: 12,
+            color: 'rgba(255,255,255,0.3)',
+          }}>
+            Resultater kommer snart
+          </div>
+        </div>
+      )}
+
       {/* ── Role slots ───────────────────────────────────────── */}
+      {!isFinished && (<>
       <div>
         {ROLES.map((role, idx) => {
           const riderId = slots[role.key]
@@ -580,6 +603,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
           {error}
         </div>
       )}
+      </>)}
 
       {/* ── Modal ────────────────────────────────────────────── */}
       {modalOpen && (() => {
