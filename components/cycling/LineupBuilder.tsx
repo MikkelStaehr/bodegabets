@@ -78,6 +78,18 @@ const PROFILE_ICONS: Record<string, string> = {
   mountain: '⛰', hilly: '〜', cobbled: '⊞', flat: '—', itt: '⏱',
 }
 
+const BLOCK_THEMES: Record<string, { bg: string; bgDark: string; accent: string; accentBg: string }> = {
+  'Ardennerne-klassikerne': { bg: '#1E3A5F', bgDark: '#162D4A', accent: '#4A9EFF', accentBg: 'rgba(74,158,255,0.12)' },
+  'Flandern-klassikerne': { bg: '#1E3A5F', bgDark: '#162D4A', accent: '#4A9EFF', accentBg: 'rgba(74,158,255,0.12)' },
+  "Giro d'Italia": { bg: '#2A0D1E', bgDark: '#3D0D28', accent: '#E8409A', accentBg: 'rgba(232,64,154,0.15)' },
+  'Tour de France': { bg: '#1A1600', bgDark: '#2A2400', accent: '#C9A84C', accentBg: 'rgba(201,168,76,0.13)' },
+  'Vuelta a España': { bg: '#2A0800', bgDark: '#3D0D00', accent: '#E84030', accentBg: 'rgba(232,64,48,0.15)' },
+  'Critérium du Dauphiné': { bg: '#0D1F15', bgDark: '#102A1A', accent: '#3D9B62', accentBg: 'rgba(61,155,98,0.15)' },
+  'Tour de Suisse': { bg: '#0F0F2A', bgDark: '#161640', accent: '#9999EE', accentBg: 'rgba(153,153,238,0.15)' },
+  'Paris-Nice': { bg: '#051828', bgDark: '#072340', accent: '#2BAEE0', accentBg: 'rgba(43,174,224,0.15)' },
+}
+const DEFAULT_THEME = { bg: '#1E3A5F', bgDark: '#162D4A', accent: '#4A9EFF', accentBg: 'rgba(74,158,255,0.12)' }
+
 const RACE_TYPE_LABELS: Record<string, string> = {
   one_day: 'Endagsløb', stage_race: 'Etapeløb',
 }
@@ -394,6 +406,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
   const activeRace = blockRaces.find((r) => r.id === activeTab) ?? blockRaces[0] ?? null
   const activeBlock = sortedBlocks.find((b) => b.id === activeBlockId)
+  const theme = (activeBlock ? BLOCK_THEMES[activeBlock.name] : null) ?? DEFAULT_THEME
 
   // No squad for this block?
   const noSquadForBlock = !currentSquadId
@@ -415,7 +428,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
   })() : null)
 
   return (
-    <div style={{ background: '#1E3A5F', borderRadius: 2, overflow: 'hidden' }}>
+    <div style={{ background: theme.bg, borderRadius: 2, overflow: 'hidden', transition: 'background 0.3s' }}>
       {/* ── Niveau 1: Blok-tabs ────────────────────────────── */}
       {sortedBlocks.length > 0 && (
         <ScrollableTabs background="#0F2137">
@@ -429,7 +442,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
                 onClick={() => setActiveBlockId(block.id)}
                 style={{
                   padding: '8px 14px 6px',
-                  background: isActive ? '#1E3A5F' : 'transparent',
+                  background: isActive ? theme.bg : 'transparent',
                   border: 'none',
                   borderRadius: isActive ? '6px 6px 0 0' : 0,
                   cursor: 'pointer',
@@ -466,7 +479,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
       {/* ── Niveau 2: Løbs-tabs + lineup content ──────────── */}
       {activeRace && (<>
-      <ScrollableTabs background="#162d4a">
+      <ScrollableTabs background={theme.bgDark}>
         <div style={{
           display: 'flex', gap: 0,
           borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -485,7 +498,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
                 padding: '12px 16px',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: isActive ? '2px solid #4A90D9' : '2px solid transparent',
+                borderBottom: isActive ? `2px solid ${theme.accent}` : '2px solid transparent',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
@@ -531,7 +544,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '10px 16px',
-              background: '#162d4a',
+              background: theme.bgDark,
               borderBottom: '1px solid rgba(255,255,255,0.08)',
               textDecoration: 'none',
             }}
@@ -556,7 +569,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '10px 16px',
-              background: '#162d4a',
+              background: theme.bgDark,
               borderBottom: '1px solid rgba(255,255,255,0.08)',
               textDecoration: 'none',
             }}
@@ -569,7 +582,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             </span>
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 600,
-              color: '#4A90D9',
+              color: theme.accent,
             }}>
               Udtag trup →
             </span>
@@ -580,7 +593,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
       {/* ── Race header ──────────────────────────────────────── */}
       <div style={{
         padding: '12px 16px',
-        background: '#1E3A5F',
+        background: theme.bg,
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -680,7 +693,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
           style={{
             width: '100%', padding: '10px 0',
             border: 'none', borderRadius: 2,
-            background: '#4A90D9',
+            background: theme.accent,
             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
             fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
             color: '#fff',
