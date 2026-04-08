@@ -359,10 +359,10 @@ export default async function GamePage({ params }: Props) {
 
       if (fetchedBlock) {
         cyclingActiveBlock = fetchedBlock
+        // Include both the block itself and its parent to match cycling_game_races
+        activeBlockIds = [fetchedBlock.id]
         if (fetchedBlock.parent_block_id) {
-          activeBlockIds = [fetchedBlock.parent_block_id]
-        } else {
-          activeBlockIds = [fetchedBlock.id]
+          activeBlockIds.push(fetchedBlock.parent_block_id)
         }
       }
     }
@@ -395,14 +395,6 @@ export default async function GamePage({ params }: Props) {
       })
     }
 
-    console.log('DEBUG cycling squad:', {
-      userId: user.id,
-      gameId,
-      userSquad,
-      squadRidersCount: lineupSquadRiders.length,
-      lineupRacesCount: lineupRaces.length,
-      activeBlock: cyclingActiveBlock,
-    })
   }
 
   // ── Championship mode data ────────────────────────────────────────────────
