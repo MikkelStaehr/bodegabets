@@ -794,6 +794,16 @@ def main() -> None:
 
     results = upload_all(riders, races, stages, supabase)
 
+    # ── Step 3: Scrape race info (distance, departure, etc.) ────
+    _log("\n→ Step 3: Scraping race information from PCS...")
+
+    from sync_race_info import sync_race_info as _sync_race_info
+
+    with httpx.Client(headers=PCS_HEADERS) as client:
+        race_info_result = _sync_race_info(supabase, client, only_missing=True)
+        results["race_info_updated"] = race_info_result["updated"]
+        results["errors"].extend(race_info_result.get("errors", []))
+
     # Log
     log_sync(supabase, results)
 
@@ -801,9 +811,10 @@ def main() -> None:
     _log("\n" + "=" * 60)
     _log("  SYNC COMPLETE")
     _log("=" * 60)
-    _log(f"  Riders: {results['riders_upserted']}")
-    _log(f"  Races:  {results['races_upserted']}")
-    _log(f"  Stages: {results['stages_upserted']}")
+    _log(f"  Riders:    {results['riders_upserted']}")
+    _log(f"  Races:     {results['races_upserted']}")
+    _log(f"  Stages:    {results['stages_upserted']}")
+    _log(f"  Race info: {results['race_info_updated']}")
 
     if results["errors"]:
         _warn(f"\n  {len(results['errors'])} error(s):")
