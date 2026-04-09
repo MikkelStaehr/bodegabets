@@ -92,9 +92,15 @@ function getGrimpeurMultiplier(profile: string): number {
 }
 
 function getSprinterMultiplier(profile: string): number {
-  if (profile === 'flat' || profile === 'mixed') return 1.5
+  if (profile === 'flat' || profile === 'mixed') return 1.8
   if (profile === 'hilly') return 1.2
   return 1.0
+}
+
+const WON_HOW_SPRINTER_BONUS: Record<string, number> = {
+  'Bunch sprint': 20,
+  'Small group sprint': 25,
+  'Sprint a deux': 50,
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -145,7 +151,7 @@ export async function calculateCyclingPoints(
   // 1. Fetch stage profile (falls back to race profile)
   const { data: stage } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, profile')
+    .select('id, profile, won_how')
     .eq('id', stageId)
     .single()
 
@@ -157,6 +163,7 @@ export async function calculateCyclingPoints(
 
   if (!race) throw new Error(`Race ${raceId} not found`)
   const profile = stage?.profile ?? race.profile ?? 'mixed'
+  const wonHow: string | null = (stage as { won_how?: string | null } | null)?.won_how ?? null
 
   // 2. Fetch results for this stage
   const { data: resultsRaw } = await supabaseAdmin
@@ -299,6 +306,9 @@ export async function calculateCyclingPoints(
 
         case 'sprinter':
           roleMul = catMul * getSprinterMultiplier(profile)
+          if (wonHow && position != null && position <= 10) {
+            roleBonus = WON_HOW_SPRINTER_BONUS[wonHow] ?? 0
+          }
           break
 
         case 'domestique':
@@ -340,7 +350,7 @@ export async function calculateCyclingPoints(
       // Total for active rider (before DNF)
       const rolePoints = (rider.role === 'domestique' || rider.role === 'equipier' || rider.role === 'joker')
         ? base + roleBonus
-        : Math.round(base * roleMul * 10) / 10
+        : Math.round(base * roleMul * 10) / 10 + roleBonus
 
       // DNF penalty: -50% of would-be score, minimum -5
       if (isDnf && !isJoker) {
