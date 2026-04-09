@@ -41,10 +41,25 @@ type RoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' 
 
 type LineupState = Record<string, Record<RoleKey, string | null>>
 
+type Stage = {
+  id: string
+  race_id: string
+  stage_number: number
+  name: string
+  profile: string | null
+  profile_image_url: string | null
+  start_date: string
+  race_name: string
+  race_type: string
+  race_profile_image_url: string | null
+  cycling_block_id: string | null
+}
+
 type Props = {
   gameId: number
   blockSquadMap: Record<string, string>
   races: Race[]
+  stages: Stage[]
   squadRiders: SquadRider[]
   blocks: Block[]
   defaultBlockId?: string | null
@@ -225,7 +240,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -247,29 +262,38 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
     [...races].sort((a, b) => a.start_date.localeCompare(b.start_date)),
   [races])
 
+  const sortedStages = useMemo(() =>
+    [...stages].sort((a, b) => a.start_date.localeCompare(b.start_date) || a.stage_number - b.stage_number),
+  [stages])
+
   const [activeBlockId, setActiveBlockId] = useState<string | null>(
     defaultBlockId ?? sortedBlocks[0]?.id ?? null
   )
 
+  const blockStages = useMemo(() =>
+    activeBlockId ? sortedStages.filter((s) => s.cycling_block_id === activeBlockId) : sortedStages,
+  [sortedStages, activeBlockId])
+
+  // Keep blockRaces for backward compat (block date range etc.)
   const blockRaces = useMemo(() =>
     activeBlockId ? sortedRaces.filter((r) => r.cycling_block_id === activeBlockId) : sortedRaces,
   [sortedRaces, activeBlockId])
 
-  const defaultTabId = blockRaces.find((r) => r.status === 'upcoming')?.id ?? blockRaces[0]?.id ?? null
+  const defaultTabId = blockStages.find((s) => new Date(s.start_date) > new Date())?.id ?? blockStages[0]?.id ?? null
 
   const [activeTab, setActiveTab] = useState<string | null>(defaultTabId)
 
-  // Reset race tab when block changes
+  // Reset stage tab when block changes
   useEffect(() => {
-    const firstUpcoming = blockRaces.find((r) => r.status === 'upcoming')?.id ?? blockRaces[0]?.id ?? null
+    const firstUpcoming = blockStages.find((s) => new Date(s.start_date) > new Date())?.id ?? blockStages[0]?.id ?? null
     setActiveTab(firstUpcoming)
   }, [activeBlockId]) // eslint-disable-line react-hooks/exhaustive-deps
   const [lineups, setLineups] = useState<LineupState>({})
-  const [lockedRaces, setLockedRaces] = useState<Set<string>>(new Set())
-  const [savingRace, setSavingRace] = useState<string | null>(null)
+  const [lockedStages, setLockedStages] = useState<Set<string>>(new Set())
+  const [savingStage, setSavingStage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [modalOpen, setModalOpen] = useState<{ raceId: string; roleKey: RoleKey } | null>(null)
+  const [modalOpen, setModalOpen] = useState<{ stageId: string; roleKey: RoleKey } | null>(null)
   const [modalSearch, setModalSearch] = useState('')
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
@@ -301,8 +325,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         const state: LineupState = {}
         const locked = new Set<string>()
         for (const lineup of data.lineups) {
+          const key = lineup.stage_id ?? lineup.race_id // stage_id is primary key
           const raceSlots: Record<RoleKey, string | null> = { ...EMPTY_SLOTS }
-          if (lineup.is_locked) locked.add(lineup.race_id)
+          if (lineup.is_locked) locked.add(key)
           for (const rider of lineup.riders) {
             let roleKey: RoleKey = rider.role as RoleKey
             if (rider.role === 'equipier') {
@@ -312,21 +337,22 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
               raceSlots[roleKey] = rider.rider_id
             }
           }
-          state[lineup.race_id] = raceSlots
+          state[key] = raceSlots
         }
         const scoresState: Record<string, ScoreEntry[]> = {}
         const resultsState: Record<string, ResultEntry[]> = {}
         const lineupRidersState: Record<string, LineupEntry[]> = {}
         for (const lineup of data.lineups) {
-          if (lineup.scores?.length) scoresState[lineup.race_id] = lineup.scores
-          if (lineup.results?.length) resultsState[lineup.race_id] = lineup.results
-          lineupRidersState[lineup.race_id] = lineup.riders.map((r: { rider_id: string; role: string; slot_index: number }) => ({
+          const key = lineup.stage_id ?? lineup.race_id
+          if (lineup.scores?.length) scoresState[key] = lineup.scores
+          if (lineup.results?.length) resultsState[key] = lineup.results
+          lineupRidersState[key] = lineup.riders.map((r: { rider_id: string; role: string; slot_index: number }) => ({
             rider_id: r.rider_id, role: r.role, slot_index: r.slot_index,
           }))
         }
         setLineups(state)
         setInitialLineups(JSON.parse(JSON.stringify(state)))
-        setLockedRaces(locked)
+        setLockedStages(locked)
         setRaceScores(scoresState)
         setRaceResults(resultsState)
         setRaceLineupRiders(lineupRidersState)
@@ -353,13 +379,17 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
     return JSON.stringify(lineups[raceId]) !== JSON.stringify(initialLineups[raceId])
   }, [lineups, initialLineups])
 
-  async function handleSave(raceId: string) {
+  async function handleSave(stageId: string) {
     setError(null)
     setSuccess(null)
-    setSavingRace(raceId)
+    setSavingStage(stageId)
 
-    const slots = lineups[raceId]
-    if (!slots) { setSavingRace(null); return }
+    const slots = lineups[stageId]
+    if (!slots) { setSavingStage(null); return }
+
+    // Find the stage to get race_id
+    const stage = stages.find((s) => s.id === stageId)
+    if (!stage) { setSavingStage(null); return }
 
     const riders: { rider_id: string; role: string; slot_index: number }[] = []
     for (const role of ROLES) {
@@ -374,45 +404,47 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
       const res = await fetch(`/api/cycling-games/${gameId}/lineup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ race_id: raceId, riders }),
+        body: JSON.stringify({ race_id: stage.race_id, stage_id: stageId, riders }),
       })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? 'Noget gik galt')
       } else {
-        setSuccess(raceId)
+        setSuccess(stageId)
         setInitialLineups((prev) => ({
           ...prev,
-          [raceId]: JSON.parse(JSON.stringify(lineups[raceId])),
+          [stageId]: JSON.parse(JSON.stringify(lineups[stageId])),
         }))
       }
     } catch {
       setError('Noget gik galt')
     }
-    setSavingRace(null)
+    setSavingStage(null)
   }
 
   if (blocks.length === 0) return null
 
-  const activeRace = blockRaces.find((r) => r.id === activeTab) ?? blockRaces[0] ?? null
+  const activeStage = blockStages.find((s) => s.id === activeTab) ?? blockStages[0] ?? null
+  const activeRace = activeStage ? races.find((r) => r.id === activeStage.race_id) ?? null : null
   const activeBlock = sortedBlocks.find((b) => b.id === activeBlockId)
   const theme = getBlockTheme(activeBlock?.name)
 
   // No squad for this block?
   const noSquadForBlock = !currentSquadId
 
+  const isStageRace = activeStage?.race_type === 'stage_race'
   const isFinished = activeRace?.status === 'finished'
-  const isLocked = activeRace ? lockedRaces.has(activeRace.id) : false
-  const slots = activeRace ? (lineups[activeRace.id] ?? { ...EMPTY_SLOTS }) : { ...EMPTY_SLOTS }
-  const changed = activeRace ? hasChanges(activeRace.id) : false
-  const isSaving = activeRace ? savingRace === activeRace.id : false
-  const isSuccess = activeRace ? success === activeRace.id : false
+  const isLocked = activeStage ? lockedStages.has(activeStage.id) : false
+  const slots = activeStage ? (lineups[activeStage.id] ?? { ...EMPTY_SLOTS }) : { ...EMPTY_SLOTS }
+  const changed = activeStage ? hasChanges(activeStage.id) : false
+  const isSaving = activeStage ? savingStage === activeStage.id : false
+  const isSuccess = activeStage ? success === activeStage.id : false
   const filledCount = Object.values(slots).filter((v) => v !== null).length
-  const profileLabel = activeRace ? (PROFILE_LABELS[activeRace.profile ?? ''] ?? 'Endagsløb') : ''
+  const profileLabel = activeStage ? (PROFILE_LABELS[activeStage.profile ?? ''] ?? 'Endagsløb') : ''
 
-  // Lock deadline: active block deadline > prop > race start_date - 30min
-  const deadlineStr = activeBlock?.lock_deadline ?? lockDeadline ?? (activeRace ? (() => {
-    const d = new Date(activeRace.start_date)
+  // Lock deadline: active block deadline > prop > stage start_date - 30min
+  const deadlineStr = activeBlock?.lock_deadline ?? lockDeadline ?? (activeStage ? (() => {
+    const d = new Date(activeStage.start_date)
     d.setMinutes(d.getMinutes() - 30)
     return d.toISOString()
   })() : null)
@@ -476,23 +508,27 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         </ScrollableTabs>
       )}
 
-      {/* ── Niveau 2: Løbs-tabs + lineup content ──────────── */}
-      {activeRace && (<>
+      {/* ── Niveau 2: Stage-tabs + lineup content ──────────── */}
+      {activeStage && (<>
       <ScrollableTabs background={theme.bgDark}>
         <div style={{
           display: 'flex', gap: 0,
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
-        {blockRaces.map((race) => {
-          const isActive = race.id === activeTab
-          const isFinished = race.status === 'finished'
-          const raceSlots = lineups[race.id]
-          const filled = raceSlots ? Object.values(raceSlots).filter((v) => v !== null).length : 0
+        {blockStages.map((stage) => {
+          const isActive = stage.id === activeTab
+          const isPast = new Date(stage.start_date) < new Date()
+          const stageSlots = lineups[stage.id]
+          const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
+          // One-day races: show race short name. Stage races: show "Etape N"
+          const tabLabel = stage.race_type === 'one_day'
+            ? shortName(stage.race_name)
+            : `Etape ${stage.stage_number}`
           return (
             <button
-              key={race.id}
+              key={stage.id}
               type="button"
-              onClick={() => setActiveTab(race.id)}
+              onClick={() => setActiveTab(stage.id)}
               style={{
                 padding: '12px 16px',
                 background: 'transparent',
@@ -510,10 +546,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontSize: 12,
                 fontWeight: isActive ? 700 : 500,
-                color: isActive ? '#F2EDE4' : isFinished ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.55)',
+                color: isActive ? '#F2EDE4' : isPast ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.55)',
                 letterSpacing: '0.01em',
               }}>
-                {shortName(race.name)}{isFinished ? ' ✓' : ''}
+                {tabLabel}{isPast ? ' ✓' : ''}
               </span>
               {filled > 0 && (
                 <span style={{
@@ -589,16 +625,16 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         )
       })()}
 
-      {/* ── Race header ──────────────────────────────────────── */}
+      {/* ── Race/Stage header ──────────────────────────────── */}
       <div style={{
         position: 'relative',
         overflow: 'hidden',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
-        {activeRace.race_photo_url && (
+        {(activeStage.race_profile_image_url || activeRace?.race_photo_url) && (
           <>
             <img
-              src={activeRace.race_photo_url}
+              src={activeStage.race_profile_image_url ?? activeRace?.race_photo_url ?? ''}
               alt=""
               style={{
                 position: 'absolute', inset: 0,
@@ -615,13 +651,13 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
         <div style={{
           position: 'relative', zIndex: 1,
           padding: '12px 16px',
-          background: activeRace.race_photo_url ? 'transparent' : theme.bg,
+          background: (activeStage.race_profile_image_url || activeRace?.race_photo_url) ? 'transparent' : theme.bg,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            {activeRace.logo_url ? (
+            {activeRace?.logo_url ? (
               <img
                 src={activeRace.logo_url}
-                alt={activeRace.name}
+                alt={activeStage.race_name}
                 style={{
                   height: 64, width: 'auto', maxWidth: 160,
                   objectFit: 'contain',
@@ -635,7 +671,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
                 color: '#F2EDE4', lineHeight: 1.2,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
-                {isLocked ? '🔒 ' : ''}{activeRace.name}
+                {isLocked ? '🔒 ' : ''}
+                {isStageRace ? `${activeStage.race_name} — Etape ${activeStage.stage_number}` : activeStage.race_name}
               </span>
             )}
             <span style={{
@@ -651,9 +688,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
             color: 'rgba(255,255,255,0.5)',
           }}>
-            {formatDate(activeRace.start_date)}
-            {activeRace.profile && profileLabel && <> · {profileLabel}</>}
-            {activeRace.race_type && <> · {RACE_TYPE_LABELS[activeRace.race_type] ?? activeRace.race_type}</>}
+            {formatDate(activeStage.start_date)}
+            {activeStage.profile && profileLabel && <> · {profileLabel}</>}
+            {!isStageRace && activeStage.race_type && <> · {RACE_TYPE_LABELS[activeStage.race_type] ?? activeStage.race_type}</>}
           </div>
           {deadlineStr && (
             <div style={{
@@ -691,26 +728,26 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
       )}
 
       {/* ── Lineup results view ──────────────────────────────── */}
-      {!noSquadForBlock && activeRace && (
+      {!noSquadForBlock && activeStage && activeRace && (
         <LineupResults
           race={activeRace}
           slots={slots}
-          scores={raceScores[activeRace.id] ?? []}
-          results={raceResults[activeRace.id] ?? []}
+          scores={raceScores[activeStage.id] ?? []}
+          results={raceResults[activeStage.id] ?? []}
           riders={squadRiders}
           onEditRole={!isFinished && !isLocked ? (roleKey) => {
-            setModalOpen({ raceId: activeRace.id, roleKey: roleKey as RoleKey })
+            setModalOpen({ stageId: activeStage.id, roleKey: roleKey as RoleKey })
             setModalSearch('')
           } : undefined}
         />
       )}
 
       {/* ── Save button ──────────────────────────────────────── */}
-      {!noSquadForBlock && !isFinished && activeRace && (<>
+      {!noSquadForBlock && !isFinished && activeStage && (<>
       <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <button
           type="button"
-          onClick={() => handleSave(activeRace.id)}
+          onClick={() => handleSave(activeStage.id)}
           disabled={!changed || isLocked || isSaving}
           style={{
             width: '100%', padding: '10px 0',
@@ -741,9 +778,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
 
       {/* ── Modal ────────────────────────────────────────────── */}
       {modalOpen && (() => {
-        const { raceId, roleKey } = modalOpen
+        const { stageId, roleKey } = modalOpen
         const role = ROLES.find((r) => r.key === roleKey)!
-        const usedIds = getUsedRiderIds(raceId)
+        const usedIds = getUsedRiderIds(stageId)
 
         const filteredRiders = squadRiders.filter((r) => {
           if (role.catRule && !role.catRule.includes(r.category)) return false
@@ -813,12 +850,12 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
                   </div>
                 ) : (
                   filteredRiders.map((rider, idx) => {
-                    const alreadyUsed = usedIds.has(rider.id) && lineups[raceId]?.[roleKey] !== rider.id
+                    const alreadyUsed = usedIds.has(rider.id) && lineups[stageId]?.[roleKey] !== rider.id
                     return (
                       <button
                         key={rider.id} type="button" disabled={alreadyUsed}
                         title={alreadyUsed ? 'Allerede valgt i en anden rolle' : undefined}
-                        onClick={() => { setSlot(raceId, roleKey, rider.id); setModalOpen(null) }}
+                        onClick={() => { setSlot(stageId, roleKey, rider.id); setModalOpen(null) }}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
                           width: '100%', padding: '10px 16px',
@@ -853,11 +890,11 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, squadRider
               </div>
 
               {/* Clear slot */}
-              {lineups[modalOpen.raceId]?.[modalOpen.roleKey] && (
+              {lineups[modalOpen.stageId]?.[modalOpen.roleKey] && (
                 <div style={{ borderTop: '1px solid #2B4F7A', padding: '8px 16px' }}>
                   <button
                     type="button"
-                    onClick={() => { setSlot(modalOpen.raceId, modalOpen.roleKey, null); setModalOpen(null) }}
+                    onClick={() => { setSlot(modalOpen.stageId, modalOpen.roleKey, null); setModalOpen(null) }}
                     style={{
                       width: '100%', padding: '8px 0', background: 'none', border: 'none',
                       fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 600,

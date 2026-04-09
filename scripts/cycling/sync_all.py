@@ -549,33 +549,47 @@ def upload_all(
     _log(f"  → {count} races")
 
     # Stages — need race_id from DB
-    if stages:
-        _log("  Resolving race IDs for stages...")
-        slug_to_id = _resolve_race_ids(supabase)
+    _log("  Resolving race IDs for stages...")
+    slug_to_id = _resolve_race_ids(supabase)
 
-        stage_rows = []
-        for s in stages:
-            race_id = slug_to_id.get(s["race_pcs_slug"])
-            if not race_id:
-                _warn(f"No race_id for {s['race_pcs_slug']} stage {s['stage_number']}")
-                continue
-            stage_rows.append({
-                "race_id": race_id,
-                "stage_number": s["stage_number"],
-                "start_date": s["date"],
-                "name": s["name"],
-                "profile": s["profile"],
-            })
+    stage_rows = []
 
-        _log(f"  Upserting {len(stage_rows)} stages...")
-        count, errs = upsert_batch(
-            supabase, "cycling_stages", stage_rows, "race_id,stage_number"
-        )
-        results["stages_upserted"] = count
-        results["errors"].extend(errs)
-        _log(f"  → {count} stages")
-    else:
-        results["stages_upserted"] = 0
+    # Scraped stages (etapeløb)
+    for s in stages:
+        race_id = slug_to_id.get(s["race_pcs_slug"])
+        if not race_id:
+            _warn(f"No race_id for {s['race_pcs_slug']} stage {s['stage_number']}")
+            continue
+        stage_rows.append({
+            "race_id": race_id,
+            "stage_number": s["stage_number"],
+            "start_date": s["date"],
+            "name": s["name"],
+            "profile": s["profile"],
+        })
+
+    # One-day races get a single stage (stage_number=1)
+    for r in RACES:
+        if r["race_type"] != "one_day":
+            continue
+        race_id = slug_to_id.get(r["pcs_slug"])
+        if not race_id:
+            continue
+        stage_rows.append({
+            "race_id": race_id,
+            "stage_number": 1,
+            "start_date": r["start_date"],
+            "name": r["name"],
+            "profile": r["profile"],
+        })
+
+    _log(f"  Upserting {len(stage_rows)} stages...")
+    count, errs = upsert_batch(
+        supabase, "cycling_stages", stage_rows, "race_id,stage_number"
+    )
+    results["stages_upserted"] = count
+    results["errors"].extend(errs)
+    _log(f"  → {count} stages")
 
     return results
 

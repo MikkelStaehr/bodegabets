@@ -2,8 +2,8 @@
   SQL — kør manuelt i Supabase før deploy:
 
   ALTER TABLE cycling_lineups
-  ADD CONSTRAINT cycling_lineups_squad_race_unique
-  UNIQUE (squad_id, race_id);
+  ADD CONSTRAINT cycling_lineups_squad_stage_unique
+  UNIQUE (squad_id, stage_id);
 
   ALTER TABLE cycling_lineup_riders
   ADD COLUMN IF NOT EXISTS slot_index integer NOT NULL DEFAULT 0;
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const { data: lineups } = await supabaseAdmin
     .from('cycling_lineups')
-    .select('id, race_id, is_locked')
+    .select('id, race_id, stage_id, is_locked')
     .eq('squad_id', squad.id)
 
   if (!lineups?.length) return NextResponse.json({ lineups: [] })
@@ -182,6 +182,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
     return {
       race_id: lineup.race_id,
+      stage_id: lineup.stage_id,
       is_locked: lineup.is_locked,
       riders,
       scores,
@@ -201,13 +202,14 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   const { id: gameId } = await params
   const body = await req.json()
-  const { race_id, riders } = body as {
+  const { race_id, stage_id, riders } = body as {
     race_id: string
+    stage_id: string
     riders: { rider_id: string; role: string; slot_index: number }[]
   }
 
-  if (!race_id || !Array.isArray(riders)) {
-    return NextResponse.json({ error: 'Ugyldigt input' }, { status: 400 })
+  if (!race_id || !stage_id || !Array.isArray(riders)) {
+    return NextResponse.json({ error: 'Ugyldigt input (race_id, stage_id og riders påkrævet)' }, { status: 400 })
   }
 
   // Find brugerens squad
@@ -290,8 +292,8 @@ export async function POST(req: NextRequest, { params }: Props) {
   const { data: lineup, error: lineupErr } = await supabaseAdmin
     .from('cycling_lineups')
     .upsert(
-      { squad_id: squad.id, race_id, is_locked: false, updated_at: new Date().toISOString() },
-      { onConflict: 'squad_id,race_id' }
+      { squad_id: squad.id, race_id, stage_id, is_locked: false, updated_at: new Date().toISOString() },
+      { onConflict: 'squad_id,stage_id' }
     )
     .select('id, is_locked')
     .single()

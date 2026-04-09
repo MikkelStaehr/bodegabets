@@ -117,6 +117,7 @@ type ScoreRow = {
   lineup_id: string
   rider_id: string
   race_id: string
+  stage_id: string
   game_id: number
   role: string
   is_bench: boolean
@@ -135,9 +136,17 @@ type ScoreRow = {
 
 export async function calculateCyclingPoints(
   raceId: string,
+  stageId: string,
+  stageNumber: number,
   gameId: number,
 ): Promise<void> {
-  // 1. Fetch race profile
+  // 1. Fetch stage profile (falls back to race profile)
+  const { data: stage } = await supabaseAdmin
+    .from('cycling_stages')
+    .select('id, profile')
+    .eq('id', stageId)
+    .single()
+
   const { data: race } = await supabaseAdmin
     .from('cycling_races')
     .select('id, profile')
@@ -145,14 +154,14 @@ export async function calculateCyclingPoints(
     .single()
 
   if (!race) throw new Error(`Race ${raceId} not found`)
-  const profile = race.profile ?? 'mixed'
+  const profile = stage?.profile ?? race.profile ?? 'mixed'
 
-  // 2. Fetch results for this race (all stage_numbers — use 0 for one-day)
+  // 2. Fetch results for this stage
   const { data: resultsRaw } = await supabaseAdmin
     .from('cycling_results')
     .select('rider_id, position, dnf, abandon_type, jersey')
     .eq('race_id', raceId)
-    .eq('stage_number', 0) // one-day / GC classification
+    .eq('stage_number', stageNumber)
 
   const resultMap = new Map<string, RiderResult>()
   for (const r of resultsRaw ?? []) {
@@ -183,8 +192,8 @@ export async function calculateCyclingPoints(
 
   const { data: lineups } = await supabaseAdmin
     .from('cycling_lineups')
-    .select('id, squad_id, race_id')
-    .eq('race_id', raceId)
+    .select('id, squad_id, race_id, stage_id')
+    .eq('stage_id', stageId)
     .in('squad_id', squadIds)
 
   if (!lineups?.length) return
@@ -342,6 +351,7 @@ export async function calculateCyclingPoints(
         lineup_id: lineup.id,
         rider_id: rider.rider_id,
         race_id: raceId,
+        stage_id: stageId,
         game_id: gameId,
         role: rider.role,
         is_bench: false,
@@ -411,6 +421,7 @@ export async function calculateCyclingPoints(
         lineup_id: lineup.id,
         rider_id: riderId,
         race_id: raceId,
+        stage_id: stageId,
         game_id: gameId,
         role: 'bench',
         is_bench: true,
@@ -434,25 +445,49 @@ export async function calculateCyclingPoints(
       const batch = allScores.slice(i, i + batchSize)
       await supabaseAdmin
         .from('cycling_scores')
-        .upsert(batch, { onConflict: 'lineup_id,rider_id,race_id' })
+        .upsert(batch, { onConflict: 'lineup_id,rider_id,stage_id' })
         .throwOnError()
     }
   }
 }
 
-// ── Run for all games that include this race ────────────────────────────────
+// ── Run for a specific stage across all games ────────────────────────────────
 
-export async function runCyclingPointsForAllGames(
-  raceId: string,
+export async function runCyclingPointsForStage(
+  stageId: string,
 ): Promise<void> {
+  const { data: stage } = await supabaseAdmin
+    .from('cycling_stages')
+    .select('id, race_id, stage_number')
+    .eq('id', stageId)
+    .single()
+
+  if (!stage) throw new Error(`Stage ${stageId} not found`)
+
   const { data: gameRaces } = await supabaseAdmin
     .from('cycling_game_races')
     .select('game_id')
-    .eq('race_id', raceId)
+    .eq('race_id', stage.race_id)
 
   const gameIds = [...new Set((gameRaces ?? []).map((gr) => gr.game_id))]
 
   for (const gameId of gameIds) {
-    await calculateCyclingPoints(raceId, gameId)
+    await calculateCyclingPoints(stage.race_id, stageId, stage.stage_number, gameId)
+  }
+}
+
+// ── Legacy wrapper — run all stages for a race across all games ──────────────
+
+export async function runCyclingPointsForAllGames(
+  raceId: string,
+): Promise<void> {
+  const { data: stages } = await supabaseAdmin
+    .from('cycling_stages')
+    .select('id, stage_number')
+    .eq('race_id', raceId)
+    .order('stage_number')
+
+  for (const stage of stages ?? []) {
+    await runCyclingPointsForStage(stage.id)
   }
 }

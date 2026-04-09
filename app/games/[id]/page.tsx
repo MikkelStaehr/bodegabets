@@ -331,10 +331,11 @@ export default async function GamePage({ params }: Props) {
 
   // Lineup builder data — brugerens squads + løb
   let userSquad: { id: string } | null = null
-  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; cycling_block_id: string | null }[] = []
+  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null; cycling_block_id: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string }[] = []
+  let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let blockSquadMap: Record<string, string> = {}
 
   if (typedGame.sport === 'cycling') {
@@ -389,6 +390,27 @@ export default async function GamePage({ params }: Props) {
         const race = gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null }
         return { ...race, cycling_block_id: gr.cycling_block_id as string | null }
       })
+
+    // Hent stages for alle løb i spillet
+    const raceIdsForStages = lineupRaces.map((r) => r.id)
+    if (raceIdsForStages.length > 0) {
+      const { data: stagesData } = await supabaseAdmin
+        .from('cycling_stages')
+        .select('id, race_id, stage_number, name, profile, profile_image_url, start_date')
+        .in('race_id', raceIdsForStages)
+        .order('start_date', { ascending: true })
+
+      lineupStages = (stagesData ?? []).map((s) => {
+        const race = lineupRaces.find((r) => r.id === s.race_id)
+        return {
+          ...s,
+          race_name: race?.name ?? '',
+          race_type: race?.race_type ?? 'one_day',
+          race_profile_image_url: race?.profile_image_url ?? null,
+          cycling_block_id: race?.cycling_block_id ?? null,
+        }
+      })
+    }
 
     // Hent squad riders fra alle squads
     const allSquadIds = (userSquads ?? []).map((sq) => sq.id)
@@ -965,6 +987,7 @@ export default async function GamePage({ params }: Props) {
               gameId={gameId}
               blockSquadMap={blockSquadMap}
               races={lineupRaces}
+              stages={lineupStages}
               squadRiders={lineupSquadRiders}
               blocks={cyclingBlocks}
               defaultBlockId={cyclingActiveBlock?.id ?? null}

@@ -30,7 +30,7 @@ import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
-import { calculateCyclingPoints, runCyclingPointsForAllGames } from '@/lib/calculateCyclingPoints'
+import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage } from '@/lib/calculateCyclingPoints'
 
 const app = express()
 app.use(express.json())
@@ -547,20 +547,27 @@ app.get('/send-reminders', async (_req, res) => {
 
 app.post('/api/cycling/calculate-points', async (req, res) => {
   try {
-    const { race_id, game_id } = req.body as { race_id?: string; game_id?: number }
+    const { race_id, stage_id, game_id } = req.body as { race_id?: string; stage_id?: string; game_id?: number }
 
-    if (!race_id) {
-      res.status(400).json({ error: 'race_id is required' })
+    // Stage-based: beregn for én specifik etape
+    if (stage_id) {
+      await runCyclingPointsForStage(stage_id)
+      const { count } = await supabaseAdmin
+        .from('cycling_scores')
+        .select('*', { count: 'exact', head: true })
+        .eq('stage_id', stage_id)
+      res.json({ ok: true, scores_calculated: count ?? 0 })
       return
     }
 
-    if (game_id != null) {
-      await calculateCyclingPoints(race_id, game_id)
-    } else {
-      await runCyclingPointsForAllGames(race_id)
+    // Race-based: beregn for alle etaper i et løb
+    if (!race_id) {
+      res.status(400).json({ error: 'race_id eller stage_id er påkrævet' })
+      return
     }
 
-    // Count scores created
+    await runCyclingPointsForAllGames(race_id)
+
     const { count } = await supabaseAdmin
       .from('cycling_scores')
       .select('*', { count: 'exact', head: true })
