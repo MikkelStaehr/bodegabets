@@ -580,6 +580,95 @@ app.post('/api/cycling/calculate-points', async (req, res) => {
   }
 })
 
+// ─── GET /cycling-lock-lineups ──────────────────────────────────────────────
+// Lås cycling lineups hvor deadline er passeret
+
+app.get('/cycling-lock-lineups', async (_req, res) => {
+  try {
+    const now = new Date().toISOString()
+
+    // Find alle blocks med passeret lock_deadline
+    const { data: expiredBlocks } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('id, lock_deadline')
+      .lt('lock_deadline', now)
+
+    const expiredBlockIds = (expiredBlocks ?? []).map((b) => b.id)
+
+    // Find alle stages i de expired blocks (via cycling_game_races → cycling_stages)
+    let lockedCount = 0
+
+    if (expiredBlockIds.length > 0) {
+      // Find race_ids i expired blocks
+      const { data: gameRaces } = await supabaseAdmin
+        .from('cycling_game_races')
+        .select('race_id')
+        .in('cycling_block_id', expiredBlockIds)
+
+      const raceIds = [...new Set((gameRaces ?? []).map((gr) => gr.race_id as string))]
+
+      if (raceIds.length > 0) {
+        // Find stages for disse races
+        const { data: stages } = await supabaseAdmin
+          .from('cycling_stages')
+          .select('id, start_date')
+          .in('race_id', raceIds)
+
+        const expiredStageIds = (stages ?? [])
+          .filter((s) => {
+            // Stage is expired if start_date - 30min < now
+            if (!s.start_date) return false
+            const stageDeadline = new Date(new Date(s.start_date).getTime() - 30 * 60 * 1000)
+            return stageDeadline < new Date()
+          })
+          .map((s) => s.id)
+
+        if (expiredStageIds.length > 0) {
+          // Lock all unlocked lineups for expired stages
+          const { data: locked } = await supabaseAdmin
+            .from('cycling_lineups')
+            .update({ is_locked: true })
+            .eq('is_locked', false)
+            .in('stage_id', expiredStageIds)
+            .select('id')
+
+          lockedCount = locked?.length ?? 0
+        }
+      }
+    }
+
+    // Also lock based on individual stage start_date - 30min (fallback for stages without blocks)
+    const { data: allUnlocked } = await supabaseAdmin
+      .from('cycling_lineups')
+      .select('id, stage_id, cycling_stages!inner(start_date)')
+      .eq('is_locked', false)
+
+    for (const lineup of allUnlocked ?? []) {
+      const stage = lineup.cycling_stages as unknown as { start_date: string }
+      if (!stage?.start_date) continue
+      const stageDeadline = new Date(new Date(stage.start_date).getTime() - 30 * 60 * 1000)
+      if (stageDeadline < new Date()) {
+        await supabaseAdmin.from('cycling_lineups').update({ is_locked: true }).eq('id', lineup.id)
+        lockedCount++
+      }
+    }
+
+    if (lockedCount > 0) {
+      console.log(`[cycling-lock] Låste ${lockedCount} lineups`)
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'cycling_lock',
+        status: 'success',
+        message: `cycling-lock: ${lockedCount} lineups låst`,
+      })
+    }
+
+    res.json({ ok: true, locked: lockedCount })
+  } catch (err) {
+    console.error('[cycling-lock]', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /cycling-points ────────────────────────────────────────────────────
 // Finder cykling-løb der netop er skiftet til 'finished' og beregner point
 /*
@@ -890,6 +979,10 @@ app.listen(PORT, () => {
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
 
   // Hvert 10. minut — tjek for nyligt finished cykling-løb og beregn point
+  // Hvert 5. minut — lås cycling lineups med passeret deadline
+  cron.schedule('*/5 * * * *', () => callEndpoint('/cycling-lock-lineups'))
+
+  // Hvert 10. minut — beregn point for nyligt afsluttede løb
   cron.schedule('*/10 * * * *', () => callEndpoint('/cycling-points'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')

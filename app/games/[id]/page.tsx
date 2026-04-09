@@ -15,6 +15,7 @@ import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
 import LineupBuilder from '@/components/cycling/LineupBuilder'
 import CyclingGameroom from '@/components/cycling/CyclingGameroom'
+import CyclingLeaderboard from '@/components/cycling/CyclingLeaderboard'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
 
 export const dynamic = 'force-dynamic'
@@ -995,6 +996,7 @@ export default async function GamePage({ params }: Props) {
               squadRiderCount={lineupSquadRiders.length}
               squadId={userSquad?.id ?? null}
             />
+            <CyclingLeaderboard gameId={gameId} />
           </>
         )}
 

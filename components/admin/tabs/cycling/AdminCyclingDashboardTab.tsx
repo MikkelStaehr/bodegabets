@@ -31,6 +31,10 @@ export function AdminCyclingDashboardTab({ adminSecret }: Props) {
   const [loading, setLoading] = useState(true)
   const [syncLoading, setSyncLoading] = useState(false)
   const [syncMsg, setSyncMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [pointsLoading, setPointsLoading] = useState(false)
+  const [pointsMsg, setPointsMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [lockLoading, setLockLoading] = useState(false)
+  const [lockMsg, setLockMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const authHeader = {
     'Content-Type': 'application/json',
@@ -74,6 +78,50 @@ export function AdminCyclingDashboardTab({ adminSecret }: Props) {
     }
   }
 
+  async function handleCalcPoints() {
+    setPointsLoading(true)
+    setPointsMsg(null)
+    try {
+      const res = await fetch('/api/admin/cycling/calculate-points', {
+        method: 'POST',
+        headers: authHeader,
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPointsMsg({ type: 'ok', text: data.message ?? `${data.processed ?? 0} l\u00f8b beregnet` })
+      } else {
+        setPointsMsg({ type: 'err', text: data.error ?? 'Fejl' })
+      }
+    } catch {
+      setPointsMsg({ type: 'err', text: 'Netv\u00e6rksfejl' })
+    } finally {
+      setPointsLoading(false)
+      setTimeout(() => setPointsMsg(null), 5000)
+    }
+  }
+
+  async function handleLockLineups() {
+    setLockLoading(true)
+    setLockMsg(null)
+    try {
+      const res = await fetch('/api/admin/cycling/lock-lineups', {
+        method: 'POST',
+        headers: authHeader,
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setLockMsg({ type: 'ok', text: `${data.locked ?? 0} lineups l\u00e5st` })
+      } else {
+        setLockMsg({ type: 'err', text: data.error ?? 'Fejl' })
+      }
+    } catch {
+      setLockMsg({ type: 'err', text: 'Netv\u00e6rksfejl' })
+    } finally {
+      setLockLoading(false)
+      setTimeout(() => setLockMsg(null), 5000)
+    }
+  }
+
   if (loading) {
     return (
       <div className="border border-warm-border bg-cream p-8 text-center" style={{ borderRadius: '2px' }}>
@@ -103,7 +151,7 @@ export function AdminCyclingDashboardTab({ adminSecret }: Props) {
       {/* ── Sync actions ─────────────────────────────────────────── */}
       <div className="border border-warm-border bg-cream p-5" style={{ borderRadius: '2px' }}>
         <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Synkronisering</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleFullSync}
             disabled={syncLoading}
@@ -112,11 +160,25 @@ export function AdminCyclingDashboardTab({ adminSecret }: Props) {
           >
             {syncLoading ? 'Synkroniserer...' : 'K\u00f8r fuld sync'}
           </button>
-          {syncMsg && (
-            <span className={`font-body text-[12px] ${syncMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>
-              {syncMsg.text}
-            </span>
-          )}
+          <button
+            onClick={handleCalcPoints}
+            disabled={pointsLoading}
+            className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-forest px-4 py-2 border border-warm-border hover:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderRadius: '2px' }}
+          >
+            {pointsLoading ? 'Beregner...' : 'Beregn point'}
+          </button>
+          <button
+            onClick={handleLockLineups}
+            disabled={lockLoading}
+            className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-vintage-red px-4 py-2 border border-vintage-red/30 hover:bg-vintage-red/5 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderRadius: '2px' }}
+          >
+            {lockLoading ? 'L\u00e5ser...' : 'L\u00e5s lineups'}
+          </button>
+          {syncMsg && <span className={`font-body text-[12px] ${syncMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{syncMsg.text}</span>}
+          {pointsMsg && <span className={`font-body text-[12px] ${pointsMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{pointsMsg.text}</span>}
+          {lockMsg && <span className={`font-body text-[12px] ${lockMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{lockMsg.text}</span>}
         </div>
       </div>
 

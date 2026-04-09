@@ -224,6 +224,34 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   if (!squad) return NextResponse.json({ error: 'Ingen brutto trup fundet' }, { status: 400 })
 
+  // Tjek deadline — find stage → race → block lock_deadline, eller stage start - 30 min
+  const { data: stageData } = await supabaseAdmin
+    .from('cycling_stages')
+    .select('id, race_id, start_date')
+    .eq('id', stage_id)
+    .single()
+
+  if (stageData) {
+    // Check block lock_deadline first
+    const { data: gameRace } = await supabaseAdmin
+      .from('cycling_game_races')
+      .select('cycling_block_id, cycling_blocks(lock_deadline)')
+      .eq('race_id', stageData.race_id)
+      .eq('game_id', Number(gameId))
+      .maybeSingle()
+
+    const blockDeadline = (gameRace?.cycling_blocks as unknown as { lock_deadline: string } | null)?.lock_deadline
+    // Fallback: stage start_date - 30 min
+    const stageDeadline = stageData.start_date
+      ? new Date(new Date(stageData.start_date).getTime() - 30 * 60 * 1000).toISOString()
+      : null
+    const deadline = blockDeadline ?? stageDeadline
+
+    if (deadline && new Date(deadline) < new Date()) {
+      return NextResponse.json({ error: 'Deadline er passeret — lineup kan ikke ændres' }, { status: 400 })
+    }
+  }
+
   // Valider antal per rolle
   const roleCounts: Record<string, number> = {}
   for (const r of riders) {
