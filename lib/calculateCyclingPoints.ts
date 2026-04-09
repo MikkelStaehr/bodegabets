@@ -56,7 +56,8 @@ const JERSEY_POINTS: Record<string, number> = {
   white: 3,
 }
 
-const DNF_PENALTY = -20
+const DNF_PENALTY_PCT = 0.5   // 50% of would-be score
+const DNF_PENALTY_MIN = -5    // minimum penalty even if no placement points
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -336,15 +337,19 @@ export async function calculateCyclingPoints(
         }
       }
 
-      // DNF penalty
-      if (isDnf && !isJoker) {
-        dnfPen = DNF_PENALTY
-      }
-
-      // Total for active rider
+      // Total for active rider (before DNF)
       const rolePoints = (rider.role === 'domestique' || rider.role === 'equipier' || rider.role === 'joker')
         ? base + roleBonus
         : Math.round(base * roleMul * 10) / 10
+
+      // DNF penalty: -50% of would-be score, minimum -5
+      if (isDnf && !isJoker) {
+        const wouldScore = rolePoints + jerseyPts + teamBonus
+        dnfPen = wouldScore > 0
+          ? -Math.round(wouldScore * DNF_PENALTY_PCT * 10) / 10
+          : DNF_PENALTY_MIN
+        dnfPen = Math.min(dnfPen, DNF_PENALTY_MIN)
+      }
 
       const total = rolePoints + jerseyPts + teamBonus + dnfPen
 
@@ -389,7 +394,7 @@ export async function calculateCyclingPoints(
       let dnfPen = 0
 
       if (isDnf) {
-        dnfPen = DNF_PENALTY
+        dnfPen = DNF_PENALTY_MIN
       }
 
       if (position != null && !isDnf) {
