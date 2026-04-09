@@ -692,8 +692,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
           {/* ── Route line: departure → arrival ────────────── */}
           {(activeStage.departure || activeStage.arrival) && (
             <div style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
-              color: 'rgba(255,255,255,0.6)', marginBottom: 6, fontWeight: 500,
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
+              color: '#F2EDE4', marginBottom: 6, fontWeight: 500,
+              textShadow: '0 1px 3px rgba(0,0,0,0.5)',
             }}>
               {activeStage.departure && activeStage.arrival
                 ? `${activeStage.departure} → ${activeStage.arrival}`
@@ -703,51 +704,24 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
 
           {/* ── Info pills row ──────────────────────────────── */}
           <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center',
+            display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center',
           }}>
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600,
-              padding: '2px 7px', borderRadius: 2,
-              background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
-            }}>
-              {formatDate(activeStage.start_date)}
-            </span>
-            {activeStage.profile && profileLabel && (
-              <span style={{
+            {[
+              formatDate(activeStage.start_date),
+              activeStage.profile && profileLabel ? `${PROFILE_ICONS[activeStage.profile ?? ''] ?? ''} ${profileLabel}` : null,
+              activeStage.distance_km != null && activeStage.distance_km > 0 ? `${activeStage.distance_km} km` : null,
+              activeStage.vertical_meters != null && activeStage.vertical_meters > 0 ? `↑ ${activeStage.vertical_meters.toLocaleString()} m` : null,
+              activeStage.profile_score != null && activeStage.profile_score > 0 ? `PS ${activeStage.profile_score}` : null,
+            ].filter(Boolean).map((text, i) => (
+              <span key={i} style={{
                 fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600,
                 padding: '2px 7px', borderRadius: 2,
-                background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
+                background: `${theme.bg}CC`, color: 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(4px)',
               }}>
-                {PROFILE_ICONS[activeStage.profile ?? ''] ?? ''} {profileLabel}
+                {text}
               </span>
-            )}
-            {activeStage.distance_km != null && activeStage.distance_km > 0 && (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600,
-                padding: '2px 7px', borderRadius: 2,
-                background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
-              }}>
-                {activeStage.distance_km} km
-              </span>
-            )}
-            {activeStage.vertical_meters != null && activeStage.vertical_meters > 0 && (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600,
-                padding: '2px 7px', borderRadius: 2,
-                background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
-              }}>
-                ↑ {activeStage.vertical_meters.toLocaleString()} m
-              </span>
-            )}
-            {activeStage.profile_score != null && activeStage.profile_score > 0 && (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600,
-                padding: '2px 7px', borderRadius: 2,
-                background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
-              }}>
-                PS {activeStage.profile_score}
-              </span>
-            )}
+            ))}
           </div>
           {deadlineStr && (
             <div style={{
