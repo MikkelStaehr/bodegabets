@@ -86,7 +86,7 @@ function getJerseyList(jerseyStr: string | null): string[] {
 // ── Profile-based role multipliers ──────────────────────────────────────────
 
 function getGrimpeurMultiplier(profile: string): number {
-  if (profile === 'mountain') return 1.5
+  if (profile === 'mountain') return 1.8
   if (profile === 'hilly') return 1.2
   return 1.0
 }
@@ -101,6 +101,12 @@ const WON_HOW_SPRINTER_BONUS: Record<string, number> = {
   'Bunch sprint': 20,
   'Small group sprint': 25,
   'Sprint a deux': 50,
+}
+
+const WON_HOW_GRIMPEUR_BONUS: Record<string, number> = {
+  'Solo': 50,
+  'Sprint a deux': 25,
+  'Small group sprint': 20,
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -302,6 +308,9 @@ export async function calculateCyclingPoints(
 
         case 'grimpeur':
           roleMul = catMul * getGrimpeurMultiplier(profile)
+          if (wonHow && position != null && position <= 10) {
+            roleBonus = WON_HOW_GRIMPEUR_BONUS[wonHow] ?? 0
+          }
           break
 
         case 'sprinter':
