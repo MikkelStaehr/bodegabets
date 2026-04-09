@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 type LeaderboardEntry = {
   user_id: string
-  display_name: string
+  username: string
   avatar_url: string | null
   stage_wins: number
   stage_points: number
@@ -100,7 +100,7 @@ export default function CyclingLeaderboard({ gameId }: Props) {
               color: '#1a1a1a',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
-              {entry.display_name}
+              {entry.username}
             </span>
 
             {/* Stage wins */}

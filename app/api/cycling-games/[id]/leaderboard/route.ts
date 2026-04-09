@@ -7,7 +7,7 @@ type Props = { params: Promise<{ id: string }> }
  * GET /api/cycling-games/[id]/leaderboard
  *
  * Returns leaderboard with:
- * - position, user_id, display_name
+ * - position, user_id, username
  * - Per-stage points (runde_points) and wins (runde_wins)
  * - Per-block totals (block_points, block_wins)
  */
@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: Props) {
   // 1. Get all game members
   const { data: members } = await supabaseAdmin
     .from('game_members')
-    .select('user_id, profiles!inner(display_name, avatar_url)')
+    .select('user_id, profiles!inner(username, avatar_url)')
     .eq('game_id', numericGameId)
 
   if (!members?.length) return NextResponse.json({ leaderboard: [] })
@@ -50,7 +50,7 @@ export async function GET(_req: NextRequest, { params }: Props) {
   // 4. Aggregate scores per user per stage and per block
   type UserScore = {
     user_id: string
-    display_name: string
+    username: string
     avatar_url: string | null
     stage_points: Map<string, number> // stage_id → total
     block_points: Map<string, number> // block_id → total
@@ -60,10 +60,10 @@ export async function GET(_req: NextRequest, { params }: Props) {
 
   // Initialize all members
   for (const m of members) {
-    const profile = m.profiles as unknown as { display_name: string; avatar_url: string | null }
+    const profile = m.profiles as unknown as { username: string; avatar_url: string | null }
     userScores.set(m.user_id, {
       user_id: m.user_id,
-      display_name: profile.display_name ?? 'Anonym',
+      username: profile.username ?? 'Anonym',
       avatar_url: profile.avatar_url ?? null,
       stage_points: new Map(),
       block_points: new Map(),
@@ -137,7 +137,7 @@ export async function GET(_req: NextRequest, { params }: Props) {
 
     return {
       user_id: u.user_id,
-      display_name: u.display_name,
+      username: u.username,
       avatar_url: u.avatar_url,
       stage_wins: stageWins.get(u.user_id) ?? 0,
       stage_points: Math.round(totalStagePoints * 10) / 10,
