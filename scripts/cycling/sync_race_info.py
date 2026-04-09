@@ -212,6 +212,10 @@ def _extract_field(info: dict, label: str, value: str, element=None) -> None:
         if m:
             info["gradient_final_km"] = float(m.group(1))
 
+    elif "won how" in label:
+        if value and value != "-":
+            info["won_how"] = value
+
     elif "parcours" in label:
         # Parcours type — check for profile icon in the element
         if element is not None:
@@ -318,6 +322,8 @@ def sync_race_info(supabase: Client, client: httpx.Client, only_missing: bool = 
             update["profile_score"] = info["profile_score"]
         if "vertical_meters" in info:
             update["vertical_meters"] = info["vertical_meters"]
+        if "won_how" in info:
+            update["won_how"] = info["won_how"]
         if "gradient_final_km" in info:
             update["gradient_final_km"] = info["gradient_final_km"]
         if "profile" in info:
