@@ -144,20 +144,22 @@ def save_json(path: str, data: object) -> None:
 # ---------------------------------------------------------------------------
 
 
-def scrape_race_results(slug: str, client: httpx.Client) -> list[dict]:
-    """Scrape ALL results from a one-day race using /result endpoint."""
+def scrape_race_results(slug: str, client: httpx.Client) -> tuple[list[dict], str | None]:
+    """Scrape ALL results from a one-day race using /result endpoint.
+    Returns (results, won_how).
+    """
     url = f"{PCS_BASE}/race/{slug}/{YEAR}/result"
     _log(f"    Fetching: {url}")
     soup = pcs_get(url, client)
     time.sleep(REQUEST_DELAY)
-    return _parse_results_table(soup)
+    return _parse_results_table(soup), _parse_won_how(soup)
 
 
-def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tuple[list[dict], dict[str, list[str]], str | None]:
+def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tuple[list[dict], dict[str, list[str]], str | None, str | None]:
     """Scrape ALL results from a specific stage.
     Uses /stage-{N} page for jerseys and profile, then fetches
     /stage-{N}/result for the full results table.
-    Returns (results, jersey_holders, stage_profile).
+    Returns (results, jersey_holders, stage_profile, won_how).
     """
     if stage_num == 0:
         base = f"{PCS_BASE}/race/{slug}/{YEAR}/prologue"
@@ -171,6 +173,7 @@ def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tup
 
     jerseys = _parse_jerseys(soup)
     profile = _parse_stage_profile(soup)
+    won_how = _parse_won_how(soup)
 
     # Fetch full results from /result sub-page
     result_url = f"{base}/result"
@@ -180,13 +183,17 @@ def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tup
 
     results = _parse_results_table(result_soup)
 
+    # Also try won_how from result page if not found on stage page
+    if not won_how:
+        won_how = _parse_won_how(result_soup)
+
     # Fallback: if /result returned fewer than the stage page, use stage page
     stage_results = _parse_results_table(soup)
     if len(stage_results) > len(results):
         _log(f"    Fallback: stage page had {len(stage_results)} vs /result {len(results)}")
         results = stage_results
 
-    return results, jerseys, profile
+    return results, jerseys, profile, won_how
 
 
 def parse_time_to_seconds(text: str) -> int | None:
@@ -404,6 +411,20 @@ def _parse_stage_profile(soup: BeautifulSoup) -> str | None:
         if "cobble" in text:
             return "cobbled"
 
+    return None
+
+
+def _parse_won_how(soup: BeautifulSoup) -> str | None:
+    """Parse 'Won how' from PCS race/stage page (keyvalueList)."""
+    for ul in soup.find_all("ul", class_=re.compile(r"keyvalueList")):
+        for li in ul.find_all("li"):
+            divs = li.find_all("div")
+            if len(divs) >= 2:
+                label = divs[0].get_text(strip=True).lower().rstrip(":")
+                if "won how" in label:
+                    value = divs[1].get_text(strip=True)
+                    if value and value != "-":
+                        return value
     return None
 
 
@@ -901,7 +922,7 @@ def main() -> None:
 
             if race["race_type"] == "one_day":
                 # Scrape one-day race
-                results = scrape_race_results(race["pcs_slug"], client)
+                results, won_how = scrape_race_results(race["pcs_slug"], client)
                 if not results:
                     _warn(f"  No results found for {race['name']}")
                     continue
@@ -917,6 +938,16 @@ def main() -> None:
                 total_unmatched += unmatched
                 _log(f"  Upserted {upserted}, unmatched {unmatched}")
 
+                # Update won_how on stage (stage_number=1 for one-day)
+                if won_how:
+                    try:
+                        supabase.table("cycling_stages").update(
+                            {"won_how": won_how}
+                        ).eq("race_id", race["id"]).eq("stage_number", 1).execute()
+                        _log(f"  Won how: {won_how}")
+                    except APIError as e:
+                        _warn(f"  Failed to update won_how: {e}")
+
                 update_results_timestamp(supabase, "cycling_races", race["id"])
 
             elif race["race_type"] == "stage_race":
@@ -931,7 +962,7 @@ def main() -> None:
                     stage_num = stage["stage_number"]
                     _log(f"  Stage {stage_num}:")
 
-                    results, jerseys, stage_profile = scrape_stage_results(
+                    results, jerseys, stage_profile, won_how = scrape_stage_results(
                         race["pcs_slug"], stage_num, client,
                     )
                     if not results:
@@ -953,15 +984,23 @@ def main() -> None:
                     total_unmatched += unmatched
                     _log(f"    Upserted {upserted}, unmatched {unmatched}")
 
-                    # Update stage profile if parsed
+                    # Update stage profile + won_how if parsed
+                    stage_update: dict = {}
                     if stage_profile:
+                        stage_update["profile"] = stage_profile
+                    if won_how:
+                        stage_update["won_how"] = won_how
+                    if stage_update:
                         try:
                             supabase.table("cycling_stages").update(
-                                {"profile": stage_profile}
+                                stage_update
                             ).eq("id", stage["id"]).execute()
-                            _log(f"    Profile: {stage_profile}")
+                            if stage_profile:
+                                _log(f"    Profile: {stage_profile}")
+                            if won_how:
+                                _log(f"    Won how: {won_how}")
                         except APIError as e:
-                            _warn(f"    Failed to update stage profile: {e}")
+                            _warn(f"    Failed to update stage info: {e}")
 
                     update_results_timestamp(supabase, "cycling_stages", stage["id"])
 
