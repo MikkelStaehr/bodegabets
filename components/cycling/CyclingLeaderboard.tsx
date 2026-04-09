@@ -31,9 +31,7 @@ export default function CyclingLeaderboard({ gameId }: Props) {
   if (loading) return null
   if (entries.length === 0) return null
 
-  // Check if there are any points at all
   const hasPoints = entries.some((e) => e.block_points > 0 || e.stage_points > 0)
-  if (!hasPoints) return null
 
   return (
     <div>
