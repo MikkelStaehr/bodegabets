@@ -640,7 +640,7 @@ def upload_results(
     jersey_holders: dict[str, list[str]] | None = None,
 ) -> tuple[int, int]:
     """Match and upsert results. Returns (upserted, unmatched).
-    stage_number=0 for one-day races and GC classification."""
+    stage_number=1 for one-day races, sequential for stage races."""
     rows: list[dict] = []
     unmatched = 0
 
@@ -932,7 +932,7 @@ def main() -> None:
                 _log(f"  Parsed {len(results)} results")
 
                 upserted, unmatched = upload_results(
-                    results, race["id"], 0, rider_index, supabase,
+                    results, race["id"], 1, rider_index, supabase,
                 )
                 total_upserted += upserted
                 total_unmatched += unmatched
