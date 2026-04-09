@@ -1000,8 +1000,8 @@ export default async function GamePage({ params }: Props) {
           </>
         )}
 
-        {/* Block leaderboard — kun hvis aktiv block */}
-        {activeBlock && blockLeaderboardRows.length > 0 && (
+        {/* Block leaderboard — kun fodbold, kun hvis aktiv block */}
+        {typedGame.sport !== 'cycling' && activeBlock && blockLeaderboardRows.length > 0 && (
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
               <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6b6b6b' }}>
@@ -1067,8 +1067,8 @@ export default async function GamePage({ params }: Props) {
           </>
         )}
 
-        {/* Leaderboard */}
-        <div>
+        {/* Leaderboard — kun fodbold */}
+        {typedGame.sport !== 'cycling' && <div>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6b6b6b' }}>Leaderboard</span>
           </div>
@@ -1193,7 +1193,7 @@ export default async function GamePage({ params }: Props) {
               W · L · —
             </div>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
     </LiveMatchesProvider>
