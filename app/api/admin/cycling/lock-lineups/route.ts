@@ -10,21 +10,60 @@ export async function POST(req: NextRequest) {
     const now = new Date()
     let lockedCount = 0
 
-    // Find all unlocked lineups where the stage start_date - 30min has passed
-    const { data: unlocked } = await supabaseAdmin
+    // 1. Lock via block deadline
+    const { data: expiredBlocks } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('id')
+      .lt('lock_deadline', now.toISOString())
+
+    const expiredBlockIds = (expiredBlocks ?? []).map((b) => b.id)
+
+    if (expiredBlockIds.length > 0) {
+      const { data: gameRaces } = await supabaseAdmin
+        .from('cycling_game_races')
+        .select('race_id')
+        .in('cycling_block_id', expiredBlockIds)
+
+      const raceIds = [...new Set((gameRaces ?? []).map((gr) => gr.race_id as string))]
+
+      if (raceIds.length > 0) {
+        const { data: stages } = await supabaseAdmin
+          .from('cycling_stages')
+          .select('id, start_date')
+          .in('race_id', raceIds)
+
+        const expiredStageIds = (stages ?? [])
+          .filter((s) => {
+            if (!s.start_date) return false
+            return new Date(new Date(s.start_date).getTime() - 30 * 60 * 1000) < now
+          })
+          .map((s) => s.id)
+
+        if (expiredStageIds.length > 0) {
+          const { data: locked } = await supabaseAdmin
+            .from('cycling_lineups')
+            .update({ is_locked: true })
+            .eq('is_locked', false)
+            .in('stage_id', expiredStageIds)
+            .select('id')
+
+          lockedCount += locked?.length ?? 0
+        }
+      }
+    }
+
+    // 2. Fallback: lock via individual stage start_date - 30min
+    const { data: allUnlocked } = await supabaseAdmin
       .from('cycling_lineups')
       .select('id, stage_id, cycling_stages!inner(start_date)')
       .eq('is_locked', false)
 
-    for (const lineup of unlocked ?? []) {
+    for (const lineup of allUnlocked ?? []) {
       const stage = lineup.cycling_stages as unknown as { start_date: string }
       if (!stage?.start_date) continue
       const deadline = new Date(new Date(stage.start_date).getTime() - 30 * 60 * 1000)
       if (deadline < now) {
-        await supabaseAdmin
-          .from('cycling_lineups')
-          .update({ is_locked: true })
-          .eq('id', lineup.id)
+        await supabaseAdmin.from('cycling_lineups').update({ is_locked: true }).eq('id', lineup.id)
         lockedCount++
       }
     }
