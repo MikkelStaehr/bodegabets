@@ -132,7 +132,7 @@ def parse_race_info(soup: BeautifulSoup) -> dict:
     """
     info: dict = {}
 
-    # Strategy 1: <ul class="infolist"> — most common on PCS
+    # Strategy 1: <ul class="infolist"> (legacy PCS)
     infolist = soup.find("ul", class_="infolist")
     if infolist:
         for li in infolist.find_all("li"):
@@ -142,17 +142,28 @@ def parse_race_info(soup: BeautifulSoup) -> dict:
                 value = divs[1].get_text(strip=True)
                 _extract_field(info, label, value, divs[1])
 
-    # Strategy 2: look for labeled text anywhere in Race information section
-    # Some PCS pages use a different layout
-    if not info:
-        for div in soup.find_all("div", class_=re.compile(r"(raceinfo|race-info|info)")):
-            text = div.get_text("\n", strip=True)
-            for line in text.split("\n"):
-                parts = line.split(":", 1)
-                if len(parts) == 2:
-                    label = parts[0].strip().lower()
-                    value = parts[1].strip()
-                    _extract_field(info, label, value)
+    # Strategy 2: <ul class="list keyvalueList ..."> (current PCS layout)
+    if not info or len(info) <= 1:
+        for ul in soup.find_all("ul", class_=re.compile(r"keyvalueList")):
+            for li in ul.find_all("li"):
+                divs = li.find_all("div")
+                if len(divs) >= 2:
+                    label = divs[0].get_text(strip=True).rstrip(":").lower()
+                    value = divs[1].get_text(strip=True)
+                    _extract_field(info, label, value, divs[1])
+
+    # Strategy 3: look for "Distance:" in a div.title (one-day race pages)
+    if "distance_km" not in info:
+        for div in soup.find_all("div", class_="title"):
+            text = div.get_text(strip=True).lower()
+            if "distance" in text:
+                # Value is usually in the next sibling or parent's next div
+                parent = div.parent
+                if parent:
+                    full_text = parent.get_text(strip=True)
+                    m = re.search(r"([\d.]+)\s*km", full_text)
+                    if m:
+                        info["distance_km"] = float(m.group(1))
 
     # Strategy 3: parse profile from span classes (same as sync_results.py)
     if "profile" not in info:
@@ -170,18 +181,20 @@ def parse_race_info(soup: BeautifulSoup) -> dict:
 
 def _extract_field(info: dict, label: str, value: str, element=None) -> None:
     """Extract a single field from a label/value pair."""
+    label = label.rstrip(":").strip()
 
-    if "distance" in label:
-        # "220 km" → 220
+    if "distance" in label:  # matches "Distance" and "Total distance"
         m = re.search(r"([\d.]+)", value)
         if m:
             info["distance_km"] = float(m.group(1))
 
     elif "departure" in label:
-        info["departure"] = value
+        if value:
+            info["departure"] = value
 
     elif "arrival" in label:
-        info["arrival"] = value
+        if value:
+            info["arrival"] = value
 
     elif "profilescore" in label:
         m = re.search(r"(\d+)", value)
@@ -189,9 +202,15 @@ def _extract_field(info: dict, label: str, value: str, element=None) -> None:
             info["profile_score"] = int(m.group(1))
 
     elif "vertical" in label:
-        m = re.search(r"([\d,.]+)", value.replace(",", ""))
+        clean = value.replace(",", "").replace(".", "")
+        m = re.search(r"(\d+)", clean)
         if m:
-            info["vertical_meters"] = int(float(m.group(1)))
+            info["vertical_meters"] = int(m.group(1))
+
+    elif "gradient" in label and "final" in label:
+        m = re.search(r"([\d.]+)", value)
+        if m:
+            info["gradient_final_km"] = float(m.group(1))
 
     elif "parcours" in label:
         # Parcours type — check for profile icon in the element
@@ -260,7 +279,8 @@ def sync_race_info(supabase: Client, client: httpx.Client, only_missing: bool = 
 
         # Build URL
         if race_type == "one_day":
-            url = f"{PCS_BASE}/race/{slug}/{year}"
+            # One-day races: /result page has the most info
+            url = f"{PCS_BASE}/race/{slug}/{year}/result"
         elif stage_num == 0:
             url = f"{PCS_BASE}/race/{slug}/{year}/prologue"
         else:
@@ -271,6 +291,15 @@ def sync_race_info(supabase: Client, client: httpx.Client, only_missing: bool = 
         time.sleep(REQUEST_DELAY)
 
         info = parse_race_info(soup)
+
+        # Fallback: for one-day races, try the overview page if /result failed
+        if not info and race_type == "one_day":
+            fallback_url = f"{PCS_BASE}/race/{slug}/{year}"
+            _log(f"    Fallback: {fallback_url}")
+            soup = pcs_get(fallback_url, client)
+            time.sleep(REQUEST_DELAY)
+            info = parse_race_info(soup)
+
         if not info:
             _warn(f"    No race info found")
             continue
@@ -289,6 +318,8 @@ def sync_race_info(supabase: Client, client: httpx.Client, only_missing: bool = 
             update["profile_score"] = info["profile_score"]
         if "vertical_meters" in info:
             update["vertical_meters"] = info["vertical_meters"]
+        if "gradient_final_km" in info:
+            update["gradient_final_km"] = info["gradient_final_km"]
         if "profile" in info:
             update["profile"] = info["profile"]
 
