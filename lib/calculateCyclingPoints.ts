@@ -103,10 +103,14 @@ const WON_HOW_SPRINTER_BONUS: Record<string, number> = {
   'Sprint a deux': 50,
 }
 
-const WON_HOW_GRIMPEUR_BONUS: Record<string, number> = {
-  'Solo': 50,
-  'Sprint a deux': 25,
-  'Small group sprint': 20,
+function getWonHowGrimpeurBonus(wonHow: string): number {
+  if (wonHow === 'Sprint a deux') return 25
+  if (wonHow === 'Small group sprint') return 20
+  // "XX.xx km solo" → floor(km) bonus points + 50 base solo bonus
+  const soloMatch = wonHow.match(/^([\d.]+)\s*km\s+solo$/i)
+  if (soloMatch) return 50 + Math.floor(parseFloat(soloMatch[1]))
+  if (wonHow === 'Solo') return 50
+  return 0
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -309,7 +313,7 @@ export async function calculateCyclingPoints(
         case 'grimpeur':
           roleMul = catMul * getGrimpeurMultiplier(profile)
           if (wonHow && position != null && position <= 10) {
-            roleBonus = WON_HOW_GRIMPEUR_BONUS[wonHow] ?? 0
+            roleBonus = getWonHowGrimpeurBonus(wonHow)
           }
           break
 
