@@ -9,6 +9,7 @@
     lineup_id uuid NOT NULL REFERENCES cycling_lineups(id) ON DELETE CASCADE,
     rider_id uuid NOT NULL,
     race_id uuid NOT NULL,
+    stage_id uuid NOT NULL REFERENCES cycling_stages(id) ON DELETE CASCADE,
     game_id int NOT NULL REFERENCES games(id) ON DELETE CASCADE,
     role text NOT NULL,
     is_bench boolean NOT NULL DEFAULT false,
@@ -21,7 +22,7 @@
     dnf_penalty numeric NOT NULL DEFAULT 0,
     total_points numeric NOT NULL DEFAULT 0,
     calculated_at timestamptz DEFAULT now(),
-    UNIQUE (lineup_id, rider_id, race_id)
+    UNIQUE (lineup_id, rider_id, stage_id)
   );
 
   ALTER TABLE cycling_scores ENABLE ROW LEVEL SECURITY;
