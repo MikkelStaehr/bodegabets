@@ -86,13 +86,13 @@ const ALL_ROLES: { key: string; label: string }[] = [
 ]
 
 const ROLE_TOOLTIPS: Record<string, string> = {
-  leader: 'Scorer point baseret på placering × kategori-multiplikator',
-  lieutenant: 'Top 10 → ×1.8. Top 10 + Leader DNF → ×2.8. Kun Kat 2-3',
-  grimpeur: 'Bjergbonus: Mountain ×1.5, Hilly ×1.2. Kun Kat 3-5',
-  sprinter: 'Spurtbonus: Flat ×1.5, Hilly ×1.2. Kun Kat 1-3',
-  domestique: '+8p hvis top 40 OG Leader top 10. Kun Kat 4',
-  equipier: '+7p hvis samme hold som vinder',
-  joker: '+7p hold-bonus. Immun mod alle minuspoint',
+  leader: 'Point = placering × kat-multiplikator. +5 holdbonus hvis vinderhold. DNF: -50% af score (min -5)',
+  lieutenant: 'Top 10 → ×1.8 (×2.8 hvis Leader DNF). +5 holdbonus. Kun Kat 2-3',
+  grimpeur: 'Mountain ×1.8, Hilly ×1.2. Won how bonus: Solo +50 (+1/km), Sprint a deux +25, Small group +20. Kun Kat 3-5',
+  sprinter: 'Flat/Mixed ×1.8, Hilly ×1.2. Won how bonus: Bunch sprint +20, Small group +25, Sprint a deux +50. Kun Kat 1-3',
+  domestique: '+8p hvis top 40 OG Leader top 10. Ingen multiplikator. Kun Kat 4',
+  equipier: '+7p hvis samme hold som vinder. Ingen multiplikator',
+  joker: '+7p hvis vinderhold. Immun mod DNF-straf og minuspoint',
 }
 
 const POSITION_COLORS: Record<number, string> = {
