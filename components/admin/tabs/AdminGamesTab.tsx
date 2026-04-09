@@ -15,10 +15,11 @@ type GameSummary = {
 
 type Props = {
   adminSecret: string
+  sport?: string
 }
 
 
-export function AdminGamesTab({ adminSecret }: Props) {
+export function AdminGamesTab({ adminSecret, sport }: Props) {
   const router = useRouter()
   const [games, setGames] = useState<GameSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,7 +36,8 @@ export function AdminGamesTab({ adminSecret }: Props) {
   async function fetchGames() {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/games', { headers: authHeader })
+      const url = sport ? `/api/admin/games?sport=${sport}` : '/api/admin/games'
+      const res = await fetch(url, { headers: authHeader })
       const data = await res.json()
       if (data.games) setGames(data.games)
     } catch {

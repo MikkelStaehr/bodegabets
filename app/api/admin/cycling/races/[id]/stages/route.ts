@@ -17,7 +17,7 @@ export async function GET(
   try {
     const { data, error } = await supabaseAdmin
       .from('cycling_stages')
-      .select('id, stage_number, name, profile, start_date, results_uploaded_at')
+      .select('id, stage_number, name, profile, start_date, results_uploaded_at, distance_km, departure, arrival, profile_score, vertical_meters, won_how')
       .eq('race_id', raceId)
       .order('stage_number', { ascending: true })
 

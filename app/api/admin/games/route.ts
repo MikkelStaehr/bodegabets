@@ -6,10 +6,18 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.response
 
-  const { data: games, error } = await supabaseAdmin
+  const sport = req.nextUrl.searchParams.get('sport')
+
+  let query = supabaseAdmin
     .from('games')
-    .select('id, name, invite_code, status, created_at, game_members(count)')
+    .select('id, name, invite_code, status, created_at, sport, game_members(count)')
     .order('created_at', { ascending: false })
+
+  if (sport) {
+    query = query.eq('sport', sport)
+  }
+
+  const { data: games, error } = await query
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
