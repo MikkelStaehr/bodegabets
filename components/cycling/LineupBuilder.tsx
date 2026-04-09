@@ -49,6 +49,11 @@ type Stage = {
   profile: string | null
   profile_image_url: string | null
   start_date: string
+  distance_km: number | null
+  departure: string | null
+  arrival: string | null
+  profile_score: number | null
+  vertical_meters: number | null
   race_name: string
   race_type: string
   race_profile_image_url: string | null
@@ -690,8 +695,43 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
           }}>
             {formatDate(activeStage.start_date)}
             {activeStage.profile && profileLabel && <> · {profileLabel}</>}
+            {activeStage.distance_km && <> · {activeStage.distance_km} km</>}
             {!isStageRace && activeStage.race_type && <> · {RACE_TYPE_LABELS[activeStage.race_type] ?? activeStage.race_type}</>}
           </div>
+          {(activeStage.departure || activeStage.arrival) && (
+            <div style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+              color: 'rgba(255,255,255,0.45)', marginTop: 2,
+            }}>
+              {activeStage.departure && activeStage.arrival
+                ? `${activeStage.departure} → ${activeStage.arrival}`
+                : activeStage.departure ?? activeStage.arrival}
+            </div>
+          )}
+          {(activeStage.vertical_meters || activeStage.profile_score) && (
+            <div style={{
+              display: 'flex', gap: 8, marginTop: 4,
+            }}>
+              {activeStage.vertical_meters && (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600,
+                  padding: '2px 6px', borderRadius: 2,
+                  background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
+                }}>
+                  ↑ {activeStage.vertical_meters.toLocaleString()} m
+                </span>
+              )}
+              {activeStage.profile_score && (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 600,
+                  padding: '2px 6px', borderRadius: 2,
+                  background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
+                }}>
+                  ProfileScore {activeStage.profile_score}
+                </span>
+              )}
+            </div>
+          )}
           {deadlineStr && (
             <div style={{
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
