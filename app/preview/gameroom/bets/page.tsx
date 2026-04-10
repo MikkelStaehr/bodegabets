@@ -65,13 +65,15 @@ function Topbar({ onBack, breadcrumb }: { onBack: () => void; breadcrumb: React.
   )
 }
 
+const B = 'https://bold.dk/img/tag/64x64'
+
 const bets = [
-  { match: 'FCK vs Brøndby', league: 'Superliga', pick: 'FCK', odds: '1.85', status: 'won', pts: '+22' },
-  { match: 'Liverpool vs Man Utd', league: 'Premier League', pick: 'Liverpool', odds: '1.60', status: 'lost', pts: '0' },
-  { match: 'Bayern vs BVB', league: 'Bundesliga', pick: 'Bayern', odds: '1.70', status: 'won', pts: '+18' },
-  { match: 'PSG vs Marseille', league: 'Ligue 1', pick: 'PSG', odds: '1.45', status: 'won', pts: '+14' },
-  { match: 'Real Madrid vs Barça', league: 'La Liga', pick: 'Barça', odds: '3.60', status: 'open', pts: '—' },
-  { match: 'Man City vs Arsenal', league: 'Premier League', pick: 'Man City', odds: '1.60', status: 'open', pts: '—' },
+  { home: 'FCK', away: 'Brøndby', homeLogo: `${B}/fc-koebenhavn.png`, awayLogo: `${B}/broendby-if.png`, league: 'Superliga', leagueLogo: `${B}/3f-superliga.png`, pick: 'FCK', odds: '1.85', status: 'won', pts: '+22' },
+  { home: 'Liverpool', away: 'Man Utd', homeLogo: `${B}/liverpool.png`, awayLogo: `${B}/manchester-united.png`, league: 'Premier League', leagueLogo: `${B}/premier-league.png`, pick: 'Liverpool', odds: '1.60', status: 'lost', pts: '0' },
+  { home: 'Bayern', away: 'BVB', homeLogo: `${B}/bayern-muenchen.png`, awayLogo: `${B}/borussia-dortmund.png`, league: 'Bundesliga', leagueLogo: `${B}/1-bundesliga.png`, pick: 'Bayern', odds: '1.70', status: 'won', pts: '+18' },
+  { home: 'PSG', away: 'Marseille', homeLogo: `${B}/paris-saint-germain.png`, awayLogo: `${B}/olympique-marseille.png`, league: 'Ligue 1', leagueLogo: `${B}/ligue-1.png`, pick: 'PSG', odds: '1.45', status: 'won', pts: '+14' },
+  { home: 'Real Madrid', away: 'Barça', homeLogo: `${B}/real-madrid.png`, awayLogo: `${B}/fc-barcelona.png`, league: 'La Liga', leagueLogo: `${B}/la-liga.png`, pick: 'Barça', odds: '3.60', status: 'open', pts: '—' },
+  { home: 'Man City', away: 'Arsenal', homeLogo: `${B}/manchester-city.png`, awayLogo: `${B}/arsenal.png`, league: 'Premier League', leagueLogo: `${B}/premier-league.png`, pick: 'Man City', odds: '1.60', status: 'open', pts: '—' },
 ]
 
 const statusPill = (s: string) => {
@@ -231,8 +233,17 @@ export default function BetsPage() {
                 borderBottom: idx < bets.length - 1 ? `1px solid ${C.border}` : 'none',
               }}>
                 <div>
-                  <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 600, color: C.charcoal }}>{bet.match}</div>
-                  <div style={{ fontFamily: FONT, fontSize: 9, color: C.muted }}>{bet.league}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <img src={bet.homeLogo} alt="" style={{ width: 16, height: 16, objectFit: 'contain' }} />
+                    <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 600, color: C.charcoal }}>{bet.home}</span>
+                    <span style={{ fontFamily: FONT, fontSize: 10, color: C.muted }}>vs</span>
+                    <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 600, color: C.charcoal }}>{bet.away}</span>
+                    <img src={bet.awayLogo} alt="" style={{ width: 16, height: 16, objectFit: 'contain' }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    {bet.leagueLogo && <img src={bet.leagueLogo} alt="" style={{ width: 10, height: 10, objectFit: 'contain' }} />}
+                    <span style={{ fontFamily: FONT, fontSize: 9, color: C.muted }}>{bet.league}</span>
+                  </div>
                 </div>
                 <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 600, color: C.charcoal }}>{bet.pick}</span>
                 <span style={{ fontFamily: FONT, fontSize: 12, color: C.charcoal }}>{bet.odds}</span>

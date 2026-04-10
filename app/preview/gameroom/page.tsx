@@ -22,6 +22,22 @@ const C = {
 }
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
+// Bold.dk CDN logos
+const LOGOS = {
+  // Leagues
+  superliga: 'https://bold.dk/img/tag/64x64/3f-superliga.png',
+  premierLeague: 'https://bold.dk/img/tag/64x64/premier-league.png',
+  laLiga: 'https://bold.dk/img/tag/64x64/la-liga.png',
+  championsLeague: 'https://bold.dk/img/tag/64x64/champions-league.png',
+  // Teams
+  fck: 'https://bold.dk/img/tag/64x64/fc-koebenhavn.png',
+  brondby: 'https://bold.dk/img/tag/64x64/broendby-if.png',
+  realMadrid: 'https://bold.dk/img/tag/64x64/real-madrid.png',
+  barcelona: 'https://bold.dk/img/tag/64x64/fc-barcelona.png',
+  manCity: 'https://bold.dk/img/tag/64x64/manchester-city.png',
+  arsenal: 'https://bold.dk/img/tag/64x64/arsenal.png',
+}
+
 function pill(label: string, bg: string, color: string) {
   return (
     <span style={{
@@ -65,8 +81,35 @@ function Topbar({ onBack, breadcrumb }: { onBack: () => void; breadcrumb: React.
   )
 }
 
-function MatchCard({ league, home, away, odds, picked }: {
-  league: string; home: string; away: string
+function TeamBadge({ name, logo, size = 28, dark }: { name: string; logo?: string; size?: number; dark?: boolean }) {
+  if (logo) {
+    return <img src={logo} alt={name} style={{ width: size, height: size, objectFit: 'contain' }} />
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: dark ? 'rgba(255,255,255,0.1)' : C.greenLight,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.32, fontWeight: 800,
+      color: dark ? 'rgba(255,255,255,0.5)' : C.greenDeep,
+    }}>
+      {name.slice(0, 3).toUpperCase()}
+    </div>
+  )
+}
+
+function LeagueBadge({ name, logo }: { name: string; logo?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      {logo && <img src={logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
+      <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 600, color: C.muted, letterSpacing: '0.08em' }}>{name}</span>
+    </div>
+  )
+}
+
+function MatchCard({ league, leagueLogo, home, away, homeLogo, awayLogo, odds, picked }: {
+  league: string; leagueLogo?: string; home: string; away: string
+  homeLogo?: string; awayLogo?: string
   odds: [string, string, string]; picked?: number
 }) {
   return (
@@ -75,13 +118,19 @@ function MatchCard({ league, home, away, odds, picked }: {
       border: `1px solid ${C.border}`,
       boxShadow: '0 2px 12px rgba(27,67,50,0.06)',
     }}>
-      <div style={{ fontFamily: FONT, fontSize: 10, fontWeight: 600, color: C.muted, letterSpacing: '0.08em', marginBottom: 10 }}>
-        {league}
+      <div style={{ marginBottom: 10 }}>
+        <LeagueBadge name={league} logo={leagueLogo} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: C.charcoal }}>{home}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TeamBadge name={home} logo={homeLogo} size={24} />
+          <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: C.charcoal }}>{home}</span>
+        </div>
         <span style={{ fontFamily: FONT, fontSize: 11, color: C.muted }}>vs</span>
-        <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: C.charcoal }}>{away}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: C.charcoal }}>{away}</span>
+          <TeamBadge name={away} logo={awayLogo} size={24} />
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
         {['1', 'X', '2'].map((label, i) => {
@@ -217,9 +266,9 @@ export default function GameroomPage() {
               ÅBNE KAMPE
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-              <MatchCard league="SUPERLIGA" home="FCK" away="Brøndby" odds={['1.85', '3.40', '4.10']} picked={0} />
-              <MatchCard league="LA LIGA" home="Real Madrid" away="Barça" odds={['2.10', '3.30', '3.60']} picked={2} />
-              <MatchCard league="PREMIER LEAGUE" home="Man City" away="Arsenal" odds={['1.60', '3.80', '5.50']} />
+              <MatchCard league="SUPERLIGA" leagueLogo={LOGOS.superliga} home="FCK" away="Brøndby" homeLogo={LOGOS.fck} awayLogo={LOGOS.brondby} odds={['1.85', '3.40', '4.10']} picked={0} />
+              <MatchCard league="LA LIGA" leagueLogo={LOGOS.laLiga} home="Real Madrid" away="Barça" homeLogo={LOGOS.realMadrid} awayLogo={LOGOS.barcelona} odds={['2.10', '3.30', '3.60']} picked={2} />
+              <MatchCard league="PREMIER LEAGUE" leagueLogo={LOGOS.premierLeague} home="Man City" away="Arsenal" homeLogo={LOGOS.manCity} awayLogo={LOGOS.arsenal} odds={['1.60', '3.80', '5.50']} />
             </div>
           </div>
         </div>
