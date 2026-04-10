@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { CAT_LABELS, CAT_COLORS } from '@/lib/cyclingUtils'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -72,76 +73,10 @@ function shortRaceName(name: string): string {
 const CAT_LIMITS: Record<number, number> = { 1: 3, 2: 5, 3: 5, 4: 5, 5: 7 }
 const MAX_TOTAL = 25
 const MAX_PER_TEAM = 3
-const CAT_LABELS: Record<number, string> = {
-  1: 'Kat 1',
-  2: 'Kat 2',
-  3: 'Kat 3',
-  4: 'Kat 4',
-  5: 'Kat 5',
-}
-const CAT_COLORS: Record<number, string> = {
-  1: '#B8963E',
-  2: '#6B8F71',
-  3: '#4A6FA5',
-  4: '#8B6F47',
-  5: '#7A7060',
-}
+// ── Shared components ──────────────────────────────────────────────────────
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function CatBadge({ cat }: { cat: number }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1px 6px',
-        borderRadius: 2,
-        background: `${CAT_COLORS[cat] ?? '#7A7060'}18`,
-        color: CAT_COLORS[cat] ?? '#7A7060',
-        fontFamily: "'Barlow Condensed', sans-serif",
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.04em',
-        lineHeight: 1.4,
-      }}
-    >
-      {CAT_LABELS[cat] ?? `K${cat}`}
-    </span>
-  )
-}
-
-function TeamLogo({ url, team }: { url: string | null; team: string }) {
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt={team}
-        style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
-      />
-    )
-  }
-  return (
-    <div
-      style={{
-        width: 20,
-        height: 20,
-        borderRadius: 2,
-        background: '#E8E0D3',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 8,
-        fontWeight: 700,
-        color: '#9E9486',
-        flexShrink: 0,
-      }}
-    >
-      {team.slice(0, 2).toUpperCase()}
-    </div>
-  )
-}
+import CatBadge from './CatBadge'
+import TeamLogo from './TeamLogo'
 
 function Spinner() {
   return (

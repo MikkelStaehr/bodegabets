@@ -1,26 +1,9 @@
 'use client'
 
-import Link from 'next/link'
+import type { CyclingRace, CyclingSquadRider } from '@/types/cycling'
+import { formatCyclingDeadline } from '@/lib/cyclingUtils'
 
 // ── Types ───────────────────────────────────────────────────────────────────
-
-type Race = {
-  id: string
-  name: string
-  start_date: string
-  status: string
-  race_type: string
-}
-
-type SquadRider = {
-  id: string
-  first_name: string
-  last_name: string
-  team_name: string
-  category: number
-  team_logo_url: string | null
-  photo_url: string | null
-}
 
 type ActiveBlock = {
   id: string
@@ -33,52 +16,13 @@ type Props = {
   gameId: number
   squadId: string | null
   activeBlock: ActiveBlock | null
-  races: Race[]
-  squadRiders: SquadRider[]
-}
-
-// ── Constants ───────────────────────────────────────────────────────────────
-
-const SHORT_NAMES: Record<string, string> = {
-  'Tour de France': 'Tour',
-  "Giro d'Italia": 'Giro',
-  'Vuelta a España': 'Vuelta',
-  'Itzulia Basque Country': 'Itzulia',
-  'Critérium du Dauphiné': 'Dauphiné',
-  'Volta a Catalunya': 'Catalunya',
-  'Tour de Romandie': 'Romandie',
-  'Ronde van Vlaanderen': 'Flandern',
-  'Omloop Het Nieuwsblad': 'Omloop',
-  'Dwars door Vlaanderen': 'Dwars',
-  'La Flèche Wallonne': 'Flèche',
-  'Liège-Bastogne-Liège': 'Liège',
-  'Amstel Gold Race': 'Amstel',
-  'European Championships': 'EM',
-  'World Championships': 'VM',
-  'GP Québec': 'Québec',
-  'GP Montréal': 'Montréal',
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDeadline(iso: string): string {
-  const d = new Date(iso)
-  const months = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-  const hours = String(d.getHours()).padStart(2, '0')
-  const mins = String(d.getMinutes()).padStart(2, '0')
-  return `${d.getDate()}. ${months[d.getMonth()]} kl. ${hours}:${mins}`
-}
-
-function shortName(name: string): string {
-  return SHORT_NAMES[name] ?? name
+  races: CyclingRace[]
+  squadRiders: CyclingSquadRider[]
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function CyclingGameroom({ gameId, squadId, activeBlock, races, squadRiders }: Props) {
-  const hasSquad = !!squadId
-  const raceNames = races.map((r) => shortName(r.name)).join(' · ')
-
+export default function CyclingGameroom({ activeBlock, races }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -143,7 +87,7 @@ export default function CyclingGameroom({ gameId, squadId, activeBlock, races, s
               fontWeight: 600,
               marginLeft: 'auto',
             }}>
-              Låser {formatDeadline(activeBlock.lock_deadline)}
+              Låser {formatCyclingDeadline(activeBlock.lock_deadline)}
             </span>
           )}
         </div>

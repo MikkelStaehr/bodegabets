@@ -3,70 +3,20 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import LineupResults from './LineupResults'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
+import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey } from '@/types/cycling'
+import { formatCyclingDate, formatCyclingDeadline, shortRaceName, shortBlockName, PROFILE_LABELS, PROFILE_ICONS, RACE_TYPE_LABELS, CAT_LABELS, CAT_COLORS } from '@/lib/cyclingUtils'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type Race = {
-  id: string
-  name: string
-  start_date: string
-  status: string
-  race_type: string
-  profile: string | null
-  profile_image_url: string | null
-  logo_url: string | null
-  race_photo_url: string | null
-  cycling_block_id: string | null
-}
-
-type Block = {
-  id: string
-  name: string
-  block_order: number
-  parent_block_id: string | null
-  lock_deadline: string
-}
-
-type SquadRider = {
-  id: string
-  first_name: string
-  last_name: string
-  team_name: string
-  category: number
-  team_logo_url: string | null
-  photo_url: string | null
-}
-
-type RoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' | 'equipier_0' | 'equipier_1' | 'joker'
-
-type LineupState = Record<string, Record<RoleKey, string | null>>
-
-type Stage = {
-  id: string
-  race_id: string
-  stage_number: number
-  name: string
-  profile: string | null
-  profile_image_url: string | null
-  start_date: string
-  distance_km: number | null
-  departure: string | null
-  arrival: string | null
-  profile_score: number | null
-  vertical_meters: number | null
-  race_name: string
-  race_type: string
-  race_profile_image_url: string | null
-  cycling_block_id: string | null
-}
+type LineupState = Record<string, Record<CyclingRoleKey, string | null>>
 
 type Props = {
   gameId: number
   blockSquadMap: Record<string, string>
-  races: Race[]
-  stages: Stage[]
-  squadRiders: SquadRider[]
-  blocks: Block[]
+  races: CyclingRace[]
+  stages: CyclingStage[]
+  squadRiders: CyclingSquadRider[]
+  blocks: CyclingBlock[]
   defaultBlockId?: string | null
   lockDeadline?: string | null
   squadRiderCount?: number
@@ -75,7 +25,7 @@ type Props = {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const ROLES: { key: RoleKey; label: string; catRule: number[] | null }[] = [
+const ROLES: { key: CyclingRoleKey; label: string; catRule: number[] | null }[] = [
   { key: 'leader',      label: 'Leader',     catRule: null },
   { key: 'lieutenant',  label: 'Lieutenant', catRule: [2, 3] },
   { key: 'grimpeur',    label: 'Grimpeur',   catRule: [3, 4, 5] },
@@ -86,102 +36,17 @@ const ROLES: { key: RoleKey; label: string; catRule: number[] | null }[] = [
   { key: 'joker',       label: 'Joker',      catRule: null },
 ]
 
-const EMPTY_SLOTS: Record<RoleKey, null> = {
+const EMPTY_SLOTS: Record<CyclingRoleKey, null> = {
   leader: null, lieutenant: null, grimpeur: null, sprinter: null,
   domestique: null, equipier_0: null, equipier_1: null, joker: null,
 }
 
-const PROFILE_LABELS: Record<string, string> = {
-  cobbled: 'Brosten', mountain: 'Bjerg', hilly: 'Kuperet',
-  flat: 'Flad', itt: 'Enkeltstart', mixed: 'Blandet',
-}
+// Constants imported from @/lib/cyclingUtils
 
-const PROFILE_ICONS: Record<string, string> = {
-  mountain: '⛰', hilly: '〜', cobbled: '⊞', flat: '—', itt: '⏱',
-}
+// ── Shared components ──────────────────────────────────────────────────────
 
-const RACE_TYPE_LABELS: Record<string, string> = {
-  one_day: 'Endagsløb', stage_race: 'Etapeløb',
-}
-
-const CAT_LABELS: Record<number, string> = { 1: 'Kat 1', 2: 'Kat 2', 3: 'Kat 3', 4: 'Kat 4', 5: 'Kat 5' }
-const CAT_COLORS: Record<number, string> = {
-  1: '#B8963E', 2: '#6B8F71', 3: '#4A6FA5', 4: '#8B6F47', 5: '#7A7060',
-}
-
-const SHORT_NAMES: Record<string, string> = {
-  'Paris-Roubaix': 'Roubaix', 'Amstel Gold Race': 'Amstel',
-  'La Flèche Wallonne': 'Flèche', 'Liège-Bastogne-Liège': 'Liège',
-  'Ronde van Vlaanderen': 'Flandern', 'Milano-Sanremo': 'Sanremo',
-  'Omloop Het Nieuwsblad': 'Omloop', 'Dwars door Vlaanderen': 'Dwars',
-  'Itzulia Basque Country': 'Itzulia', 'Critérium du Dauphiné': 'Dauphiné',
-  'Volta a Catalunya': 'Catalunya', 'Tour de Romandie': 'Romandie',
-  'Tour de Suisse': 'Suisse', 'Eschborn-Frankfurt': 'Frankfurt',
-  'GP Québec': 'Québec', 'GP Montréal': 'Montréal',
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function CatBadge({ cat }: { cat: number }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      padding: '1px 6px', borderRadius: 2,
-      background: `${CAT_COLORS[cat] ?? '#7A7060'}18`,
-      color: CAT_COLORS[cat] ?? '#7A7060',
-      fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
-      fontWeight: 700, letterSpacing: '0.04em', lineHeight: 1.4,
-    }}>
-      {CAT_LABELS[cat] ?? `K${cat}`}
-    </span>
-  )
-}
-
-function TeamLogo({ url, team }: { url: string | null; team: string }) {
-  if (url) {
-    return <img src={url} alt={team} style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }} />
-  }
-  return (
-    <div style={{
-      width: 20, height: 20, borderRadius: 2, background: '#2B4F7A',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 8, fontWeight: 700, color: '#8FABC4', flexShrink: 0,
-    }}>
-      {team.slice(0, 2).toUpperCase()}
-    </div>
-  )
-}
-
-function formatDate(dateStr: string): string {
-  const months = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-  const d = new Date(dateStr)
-  return `${d.getDate()}. ${months[d.getMonth()]}`
-}
-
-function formatDeadline(iso: string): string {
-  const d = new Date(iso)
-  const months = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
-  const h = String(d.getHours()).padStart(2, '0')
-  const m = String(d.getMinutes()).padStart(2, '0')
-  return `${d.getDate()}. ${months[d.getMonth()]} kl. ${h}:${m}`
-}
-
-function shortName(name: string): string {
-  return SHORT_NAMES[name] ?? name
-}
-
-function shortBlockName(name: string): string {
-  // "Giro d'Italia — Uge 1 (Etape 1-7)" → "Giro Uge 1"
-  const weekMatch = name.match(/^(.+?)\s*—\s*Uge\s*(\d+)/i)
-  if (weekMatch) {
-    const base = weekMatch[1]
-      .replace(/d'Italia/i, '').replace(/de France/i, '').replace(/a España/i, '')
-      .trim()
-    return `${base} Uge ${weekMatch[2]}`
-  }
-  // "Flandern-klassikerne" → "Flandern"
-  return name.replace(/-?klassikerne$/i, '').trim()
-}
+import CatBadge from './CatBadge'
+import TeamLogo from './TeamLogo'
 
 // ── Scrollable tab bar ─────────────────────────────────────────────────────
 
@@ -298,7 +163,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
   const [savingStage, setSavingStage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [modalOpen, setModalOpen] = useState<{ stageId: string; roleKey: RoleKey } | null>(null)
+  const [modalOpen, setModalOpen] = useState<{ stageId: string; roleKey: CyclingRoleKey } | null>(null)
   const [modalSearch, setModalSearch] = useState('')
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
@@ -311,7 +176,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
   const [raceLineupRiders, setRaceLineupRiders] = useState<Record<string, LineupEntry[]>>({})
 
   const riderMap = useMemo(() => {
-    const map = new Map<string, SquadRider>()
+    const map = new Map<string, CyclingSquadRider>()
     for (const r of squadRiders) map.set(r.id, r)
     return map
   }, [squadRiders])
@@ -331,12 +196,12 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
         const locked = new Set<string>()
         for (const lineup of data.lineups) {
           const key = lineup.stage_id ?? lineup.race_id // stage_id is primary key
-          const raceSlots: Record<RoleKey, string | null> = { ...EMPTY_SLOTS }
+          const raceSlots: Record<CyclingRoleKey, string | null> = { ...EMPTY_SLOTS }
           if (lineup.is_locked) locked.add(key)
           for (const rider of lineup.riders) {
-            let roleKey: RoleKey = rider.role as RoleKey
+            let roleKey: CyclingRoleKey = rider.role as CyclingRoleKey
             if (rider.role === 'equipier') {
-              roleKey = `equipier_${rider.slot_index}` as RoleKey
+              roleKey = `equipier_${rider.slot_index}` as CyclingRoleKey
             }
             if (roleKey in raceSlots) {
               raceSlots[roleKey] = rider.rider_id
@@ -365,7 +230,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
       .catch(() => {})
   }, [gameId, hasAnySquad]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setSlot = useCallback((raceId: string, roleKey: RoleKey, riderId: string | null) => {
+  const setSlot = useCallback((raceId: string, roleKey: CyclingRoleKey, riderId: string | null) => {
     setLineups((prev) => ({
       ...prev,
       [raceId]: { ...(prev[raceId] ?? { ...EMPTY_SLOTS }), [roleKey]: riderId },
@@ -527,7 +392,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
           const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
           // One-day races: show race short name. Stage races: show "Etape N"
           const tabLabel = stage.race_type === 'one_day'
-            ? shortName(stage.race_name)
+            ? shortRaceName(stage.race_name)
             : `Etape ${stage.stage_number}`
           return (
             <button
@@ -707,7 +572,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
             display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center',
           }}>
             {[
-              formatDate(activeStage.start_date),
+              formatCyclingDate(activeStage.start_date),
               activeStage.profile && profileLabel ? `${PROFILE_ICONS[activeStage.profile ?? ''] ?? ''} ${profileLabel}` : null,
               activeStage.distance_km != null && activeStage.distance_km > 0 ? `${activeStage.distance_km} km` : null,
               activeStage.vertical_meters != null && activeStage.vertical_meters > 0 ? `↑ ${activeStage.vertical_meters.toLocaleString()} m` : null,
@@ -728,7 +593,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
               color: '#ff6b6b', fontWeight: 600, marginTop: 6,
             }}>
-              Låser {formatDeadline(deadlineStr)}
+              Låser {formatCyclingDeadline(deadlineStr)}
             </div>
           )}
         </div>
@@ -767,7 +632,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
           results={raceResults[activeStage.id] ?? []}
           riders={squadRiders}
           onEditRole={!isFinished && !isLocked ? (roleKey) => {
-            setModalOpen({ stageId: activeStage.id, roleKey: roleKey as RoleKey })
+            setModalOpen({ stageId: activeStage.id, roleKey: roleKey as CyclingRoleKey })
             setModalSearch('')
           } : undefined}
         />

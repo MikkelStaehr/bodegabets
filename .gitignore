@@ -44,3 +44,4 @@ supabase/.temp/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+scripts/cycling/__pycache__/
