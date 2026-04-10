@@ -13,6 +13,16 @@ export async function GET(_req: NextRequest, { params }: Props) {
   }
 
   const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
+
+  const { data: membership } = await supabaseAdmin
+    .from('game_members')
+    .select('id')
+    .eq('game_id', gameId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!membership) return NextResponse.json({ count: 0 })
 
   // Hent season_id via game_seasons junction table
   const { data: gameSeason } = await supabase

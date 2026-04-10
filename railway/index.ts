@@ -115,6 +115,11 @@ app.get('/batch-sync', async (_req, res) => {
     res.json({ ok: true, ...totals })
   } catch (err) {
     console.error('[batch-sync]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cron_sync',
+      status: 'error',
+      message: `batch-sync failed: ${String(err)}`,
+    })
     res.status(500).json({ error: String(err) })
   }
 })

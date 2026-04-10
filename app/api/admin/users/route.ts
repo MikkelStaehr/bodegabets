@@ -38,7 +38,6 @@ export async function GET(req: NextRequest) {
 
   const users = profiles.map((p) => ({
     id: p.id,
-    email: emailById.get(p.id) ?? '',
     username: p.username ?? '—',
     created_at: p.created_at,
     games_count: gamesByUser.get(p.id) ?? 0,

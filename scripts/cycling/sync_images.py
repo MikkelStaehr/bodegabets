@@ -20,86 +20,13 @@ Scrapes three types of images:
 Only scrapes rows where the image column IS NULL.
 """
 
-import sys
-import os
 import re
 import time
 
 import httpx
-from bs4 import BeautifulSoup
-from supabase import create_client, Client
 from postgrest.exceptions import APIError
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-PCS_BASE = "https://www.procyclingstats.com"
-
-PCS_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
-
-REQUEST_DELAY = 1.5
-YEAR = 2026
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def load_dotenv_local() -> None:
-    env_path = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", ".env.local")
-    )
-    if not os.path.exists(env_path):
-        return
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, _, v = line.partition("=")
-            k = k.strip()
-            if k and k not in os.environ:
-                os.environ[k] = v.strip()
-
-
-def require_env(name: str) -> str:
-    value = os.environ.get(name)
-    if not value:
-        print(f"ERROR: Missing {name}", file=sys.stderr)
-        sys.exit(1)
-    return value
-
-
-def _log(msg: str) -> None:
-    print(msg, flush=True)
-
-
-def _warn(msg: str) -> None:
-    print(f"WARNING: {msg}", file=sys.stderr)
-
-
-def pcs_get(url: str, client: httpx.Client) -> BeautifulSoup:
-    try:
-        resp = client.get(url, timeout=30, follow_redirects=True)
-        if resp.status_code == 404:
-            return BeautifulSoup("", "html.parser")
-        resp.raise_for_status()
-        return BeautifulSoup(resp.text, "html.parser")
-    except httpx.HTTPStatusError as e:
-        _warn(f"HTTP {e.response.status_code} for {url} — skipping")
-        return BeautifulSoup("", "html.parser")
-    except httpx.HTTPError as e:
-        _warn(f"HTTP error for {url}: {e} — skipping")
-        return BeautifulSoup("", "html.parser")
+from helpers import PCS_BASE, PCS_HEADERS, REQUEST_DELAY, YEAR, init_supabase, pcs_get, _log, _warn
 
 
 def find_profile_image(soup: BeautifulSoup) -> str | None:
@@ -303,11 +230,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    load_dotenv_local()
-
-    supabase_url = require_env("NEXT_PUBLIC_SUPABASE_URL")
-    service_key = require_env("SUPABASE_SERVICE_ROLE_KEY")
-    supabase = create_client(supabase_url, service_key)
+    supabase = init_supabase()
 
     _log("=" * 60)
     _log("  CYCLING IMAGE SYNC")

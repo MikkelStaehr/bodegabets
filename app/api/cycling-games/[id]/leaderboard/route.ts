@@ -1,21 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 
 type Props = { params: Promise<{ id: string }> }
 
-/**
- * GET /api/cycling-games/[id]/leaderboard
- *
- * Returns leaderboard with:
- * - position, user_id, username
- * - Per-stage points (runde_points) and wins (runde_wins)
- * - Per-block totals (block_points, block_wins)
- */
 export async function GET(_req: NextRequest, { params }: Props) {
   const { id: gameId } = await params
   const numericGameId = Number(gameId)
 
-  // 1. Get all game members
+  // Auth + membership check
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Ikke logget ind' }, { status: 401 })
+
+  const { data: membership } = await supabaseAdmin
+    .from('game_members')
+    .select('id')
+    .eq('game_id', numericGameId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!membership) return NextResponse.json({ error: 'Ikke medlem' }, { status: 403 })
+
+  // Get all game members
   const { data: members } = await supabaseAdmin
     .from('game_members')
     .select('user_id, profiles!inner(username, avatar_url)')

@@ -242,15 +242,16 @@ export async function calculateCyclingPoints(
     })
   }
 
-  // 6. Also fetch full squad riders for bench penalty calculation
+  // 6. Batch-fetch all squad riders for bench penalty calculation
   const squadRidersBySquad = new Map<string, Set<string>>()
-  for (const sq of squads) {
-    const { data: srData } = await supabaseAdmin
-      .from('cycling_squad_riders')
-      .select('rider_id')
-      .eq('squad_id', sq.id)
-    const rids = new Set((srData ?? []).map((r) => r.rider_id))
-    squadRidersBySquad.set(sq.id, rids)
+  const { data: allSquadRidersRaw } = await supabaseAdmin
+    .from('cycling_squad_riders')
+    .select('squad_id, rider_id')
+    .in('squad_id', squadIds)
+
+  for (const sr of allSquadRidersRaw ?? []) {
+    if (!squadRidersBySquad.has(sr.squad_id)) squadRidersBySquad.set(sr.squad_id, new Set())
+    squadRidersBySquad.get(sr.squad_id)!.add(sr.rider_id)
   }
 
   // Fetch all squad rider details (category, team) for bench riders
