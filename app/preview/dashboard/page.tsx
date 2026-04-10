@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { Home, Trophy, Bike, TrendingUp, Users, Clock, Zap, ChevronRight, AlertTriangle } from 'lucide-react'
 
 const C = {
   bg: '#EDE8DF',
@@ -21,18 +22,6 @@ const C = {
   gold: '#F0B429',
 }
 const FONT = "'Plus Jakarta Sans', sans-serif"
-
-function pill(label: string, bg: string, color: string) {
-  return (
-    <span style={{
-      background: bg, color, borderRadius: 20,
-      padding: '3px 10px', fontSize: 10, fontWeight: 700,
-      letterSpacing: '0.06em', display: 'inline-block',
-    }}>
-      {label}
-    </span>
-  )
-}
 
 function Topbar() {
   return (
@@ -61,71 +50,115 @@ function Topbar() {
   )
 }
 
-function FootballSVG() {
+function StatCard({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
   return (
-    <svg width="100%" height="100%" viewBox="0 0 300 100" style={{ position: 'absolute', inset: 0, opacity: 0.06 }}>
-      <line x1="150" y1="0" x2="150" y2="100" stroke="#fff" strokeWidth="1" />
-      <circle cx="150" cy="50" r="30" stroke="#fff" strokeWidth="1" fill="none" />
-    </svg>
-  )
-}
-
-function CyclingSVG() {
-  return (
-    <svg width="100%" height="100%" viewBox="0 0 300 100" style={{ position: 'absolute', inset: 0, opacity: 0.06 }}>
-      <line x1="0" y1="80" x2="300" y2="20" stroke="#fff" strokeWidth="1" />
-      <line x1="0" y1="90" x2="300" y2="30" stroke="#fff" strokeWidth="1" />
-      <line x1="0" y1="100" x2="300" y2="40" stroke="#fff" strokeWidth="1" />
-    </svg>
+    <div style={{
+      background: C.surface, borderRadius: 14, padding: '16px 14px',
+      border: `1px solid ${C.border}`,
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{
+        width: 40, height: 40, borderRadius: 10,
+        background: C.greenLight,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: C.greenDark,
+      }}>
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontFamily: FONT, fontSize: 20, fontWeight: 800, color: C.charcoal, lineHeight: 1 }}>{value}</div>
+        <div style={{ fontFamily: FONT, fontSize: 10, color: C.muted, marginTop: 2 }}>{label}</div>
+      </div>
+    </div>
   )
 }
 
 function RoomCard({ name, sport, badge, rank, rankColor, progress, progressColor, warning, disabled, onClick }: {
-  name: string; sport: string; badge: { label: string; bg: string; color: string }
+  name: string; sport: string; badge: { label: string; bg: string; color: string; icon?: React.ReactNode }
   rank: string; rankColor: string; progress: number; progressColor: string
   warning?: string; disabled?: boolean; onClick?: () => void
 }) {
   return (
     <div
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       style={{
-        borderRadius: 14, overflow: 'hidden', cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.55 : 1, border: `1px solid ${C.border}`,
-        boxShadow: '0 2px 12px rgba(27,67,50,0.06)',
+        borderRadius: 16, overflow: 'hidden',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.55 : 1,
+        border: `1px solid ${C.border}`,
+        boxShadow: '0 2px 16px rgba(27,67,50,0.06)',
+        transition: 'transform 0.15s, box-shadow 0.15s',
       }}
+      onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(27,67,50,0.1)' } }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 16px rgba(27,67,50,0.06)' }}
     >
+      {/* Header */}
       <div style={{
-        height: 100, background: C.greenDeep,
-        position: 'relative', padding: '14px 16px',
+        height: 110, background: `linear-gradient(135deg, ${C.greenDeep} 0%, #244E3D 100%)`,
+        position: 'relative', padding: '16px 18px',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
       }}>
-        {sport === 'football' ? <FootballSVG /> : <CyclingSVG />}
-        <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
-          <span style={{ fontFamily: FONT, fontSize: 9, fontWeight: 700, color: C.greenMid, letterSpacing: '0.1em' }}>
-            {sport === 'football' ? 'FODBOLD' : 'CYKLING'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {sport === 'football' ? <Trophy size={12} color={C.greenMid} /> : <Bike size={12} color={C.greenMid} />}
+            <span style={{ fontFamily: FONT, fontSize: 9, fontWeight: 700, color: C.greenMid, letterSpacing: '0.1em' }}>
+              {sport === 'football' ? 'FODBOLD' : 'CYKLING'}
+            </span>
+          </div>
+          <span style={{
+            background: badge.bg, color: badge.color,
+            borderRadius: 20, padding: '3px 10px',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            {badge.icon}{badge.label}
           </span>
-          {pill(badge.label, badge.bg, badge.color)}
         </div>
-        <div style={{ position: 'relative' }}>
-          <div style={{ fontFamily: FONT, fontSize: 16, fontWeight: 800, color: '#fff' }}>{name}</div>
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 800, color: '#fff' }}>{name}</div>
         </div>
+        {/* Decorative */}
+        <div style={{
+          position: 'absolute', top: -30, right: -30,
+          width: 120, height: 120, borderRadius: '50%',
+          border: '1px solid rgba(116,198,157,0.08)',
+        }} />
       </div>
-      <div style={{ background: C.surface, padding: '14px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontFamily: FONT, fontSize: 11, color: C.muted }}>6 spillere</span>
+
+      {/* Body */}
+      <div style={{ background: C.surface, padding: '14px 18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Users size={12} color={C.muted} />
+            <span style={{ fontFamily: FONT, fontSize: 11, color: C.muted }}>6 spillere</span>
+          </div>
           <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: rankColor }}>{rank}</span>
         </div>
-        <div style={{ height: 3, borderRadius: 3, background: C.border, marginBottom: 10 }}>
-          <div style={{ height: '100%', borderRadius: 3, background: progressColor, width: `${progress}%` }} />
+
+        {/* Progress */}
+        <div style={{ height: 4, borderRadius: 4, background: `${C.border}`, marginBottom: 12 }}>
+          <div style={{
+            height: '100%', borderRadius: 4, background: progressColor,
+            width: `${progress}%`, transition: 'width 0.5s ease',
+          }} />
         </div>
+
         {warning && (
-          <div style={{ fontFamily: FONT, fontSize: 10, color: C.red, fontWeight: 600, marginBottom: 6 }}>{warning}</div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            fontFamily: FONT, fontSize: 10, color: C.red, fontWeight: 600, marginBottom: 8,
+            padding: '5px 8px', borderRadius: 6, background: C.redLight,
+          }}>
+            <AlertTriangle size={11} />
+            {warning}
+          </div>
         )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: -4 }}>
+          <div style={{ display: 'flex' }}>
             {['JR', 'PL', 'MK'].map((a, i) => (
               <div key={a} style={{
-                width: 22, height: 22, borderRadius: '50%',
+                width: 24, height: 24, borderRadius: '50%',
                 background: C.greenLight, border: `2px solid ${C.surface}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 7, fontWeight: 800, color: C.greenDeep,
@@ -134,7 +167,12 @@ function RoomCard({ name, sport, badge, rank, rankColor, progress, progressColor
             ))}
           </div>
           {!disabled && (
-            <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 700, color: C.greenDark }}>Åben →</span>
+            <span style={{
+              fontFamily: FONT, fontSize: 11, fontWeight: 700, color: C.greenDark,
+              display: 'flex', alignItems: 'center', gap: 2,
+            }}>
+              Åben <ChevronRight size={14} />
+            </span>
           )}
         </div>
       </div>
@@ -148,23 +186,36 @@ export default function DashboardPage() {
   return (
     <div style={{ fontFamily: FONT, background: C.bg, minHeight: '100vh' }}>
       <Topbar />
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 24px' }}>
         {/* Greeting */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 24, fontWeight: 800, color: C.charcoal }}>
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: C.charcoal, lineHeight: 1.2 }}>
             God morgen, <span style={{ color: C.greenMid }}>Mikkel</span>.
           </div>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
             Du spiller i 3 rum · 2 runder åbne · Paris–Roubaix om 2 dage
           </div>
         </div>
 
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 28 }}>
+          <StatCard icon={<Zap size={18} />} value="342" label="Total point" />
+          <StatCard icon={<TrendingUp size={18} />} value="62%" label="Hit rate" />
+          <StatCard icon={<Clock size={18} />} value="14" label="Runder spillet" />
+          <StatCard icon={<Home size={18} />} value="3" label="Aktive rum" />
+        </div>
+
         {/* Room cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 28 }}>
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: '0.12em' }}>
+            DINE RUM
+          </span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
           <RoomCard
             name="Bodega Betting"
             sport="football"
-            badge={{ label: 'LIVE', bg: C.greenLight, color: C.greenDark }}
+            badge={{ label: 'LIVE', bg: C.greenLight, color: C.greenDark, icon: <Zap size={10} /> }}
             rank="3. plads"
             rankColor={C.greenDark}
             progress={60}
@@ -191,24 +242,6 @@ export default function DashboardPage() {
             progressColor={C.muted}
             disabled
           />
-        </div>
-
-        {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
-          {[
-            { value: '342', label: 'Total point' },
-            { value: '62%', label: 'Hit rate' },
-            { value: '14', label: 'Runder' },
-            { value: '3', label: 'Aktive rum' },
-          ].map((s) => (
-            <div key={s.label} style={{
-              background: C.surface, borderRadius: 12, padding: 14,
-              textAlign: 'center', border: `1px solid ${C.border}`,
-            }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: C.charcoal }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{s.label}</div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { ArrowLeft, ChevronRight, Target, Award, BarChart3 } from 'lucide-react'
 
 const C = {
   bg: '#EDE8DF',
@@ -21,34 +22,7 @@ const C = {
   gold: '#F0B429',
 }
 const FONT = "'Plus Jakarta Sans', sans-serif"
-
-// Bold.dk CDN logos
-const LOGOS = {
-  // Leagues
-  superliga: 'https://bold.dk/img/tag/64x64/3f-superliga.png',
-  premierLeague: 'https://bold.dk/img/tag/64x64/premier-league.png',
-  laLiga: 'https://bold.dk/img/tag/64x64/la-liga.png',
-  championsLeague: 'https://bold.dk/img/tag/64x64/champions-league.png',
-  // Teams
-  fck: 'https://bold.dk/img/tag/64x64/fc-koebenhavn.png',
-  brondby: 'https://bold.dk/img/tag/64x64/broendby-if.png',
-  realMadrid: 'https://bold.dk/img/tag/64x64/real-madrid.png',
-  barcelona: 'https://bold.dk/img/tag/64x64/fc-barcelona.png',
-  manCity: 'https://bold.dk/img/tag/64x64/manchester-city.png',
-  arsenal: 'https://bold.dk/img/tag/64x64/arsenal.png',
-}
-
-function pill(label: string, bg: string, color: string) {
-  return (
-    <span style={{
-      background: bg, color, borderRadius: 20,
-      padding: '3px 10px', fontSize: 10, fontWeight: 700,
-      letterSpacing: '0.06em', display: 'inline-block',
-    }}>
-      {label}
-    </span>
-  )
-}
+const B = 'https://bold.dk/img/tag/64x64'
 
 function Topbar({ onBack, breadcrumb }: { onBack: () => void; breadcrumb: React.ReactNode }) {
   return (
@@ -64,9 +38,11 @@ function Topbar({ onBack, breadcrumb }: { onBack: () => void; breadcrumb: React.
           width: 30, height: 30, borderRadius: 8,
           background: C.greenDeep,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 14, color: C.greenLight, cursor: 'pointer',
+          cursor: 'pointer', color: C.greenLight,
         }}
-      >←</div>
+      >
+        <ArrowLeft size={14} />
+      </div>
       <span style={{ fontFamily: FONT, fontSize: 16, fontWeight: 800, color: C.charcoal }}>
         Bodega<span style={{ color: C.greenMid }}>.</span>Bets
       </span>
@@ -81,32 +57,6 @@ function Topbar({ onBack, breadcrumb }: { onBack: () => void; breadcrumb: React.
   )
 }
 
-function TeamBadge({ name, logo, size = 28, dark }: { name: string; logo?: string; size?: number; dark?: boolean }) {
-  if (logo) {
-    return <img src={logo} alt={name} style={{ width: size, height: size, objectFit: 'contain' }} />
-  }
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: dark ? 'rgba(255,255,255,0.1)' : C.greenLight,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.32, fontWeight: 800,
-      color: dark ? 'rgba(255,255,255,0.5)' : C.greenDeep,
-    }}>
-      {name.slice(0, 3).toUpperCase()}
-    </div>
-  )
-}
-
-function LeagueBadge({ name, logo }: { name: string; logo?: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-      {logo && <img src={logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
-      <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 600, color: C.muted, letterSpacing: '0.08em' }}>{name}</span>
-    </div>
-  )
-}
-
 function MatchCard({ league, leagueLogo, home, away, homeLogo, awayLogo, odds, picked }: {
   league: string; leagueLogo?: string; home: string; away: string
   homeLogo?: string; awayLogo?: string
@@ -114,34 +64,50 @@ function MatchCard({ league, leagueLogo, home, away, homeLogo, awayLogo, odds, p
 }) {
   return (
     <div style={{
-      background: C.white, borderRadius: 14, padding: '14px 16px',
+      background: C.white, borderRadius: 16, padding: '16px 18px',
       border: `1px solid ${C.border}`,
       boxShadow: '0 2px 12px rgba(27,67,50,0.06)',
     }}>
-      <div style={{ marginBottom: 10 }}>
-        <LeagueBadge name={league} logo={leagueLogo} />
+      {/* League */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+        {leagueLogo && <img src={leagueLogo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
+        <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 600, color: C.muted, letterSpacing: '0.06em' }}>{league}</span>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+
+      {/* Teams */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <TeamBadge name={home} logo={homeLogo} size={24} />
-          <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: C.charcoal }}>{home}</span>
+          {homeLogo ? (
+            <img src={homeLogo} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+          ) : (
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: C.greenLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: C.greenDeep }}>{home.slice(0, 3)}</div>
+          )}
+          <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: C.charcoal }}>{home}</span>
         </div>
-        <span style={{ fontFamily: FONT, fontSize: 11, color: C.muted }}>vs</span>
+        <span style={{ fontFamily: FONT, fontSize: 10, fontWeight: 600, color: C.muted, padding: '2px 8px', background: C.bg, borderRadius: 6 }}>VS</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700, color: C.charcoal }}>{away}</span>
-          <TeamBadge name={away} logo={awayLogo} size={24} />
+          <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 700, color: C.charcoal }}>{away}</span>
+          {awayLogo ? (
+            <img src={awayLogo} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+          ) : (
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: C.greenLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: C.greenDeep }}>{away.slice(0, 3)}</div>
+          )}
         </div>
       </div>
+
+      {/* Odds */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
         {['1', 'X', '2'].map((label, i) => {
           const isPicked = picked === i
           return (
             <div key={label} style={{
               background: isPicked ? C.greenDeep : C.bg,
-              borderRadius: 8, padding: '6px 4px', textAlign: 'center', cursor: 'pointer',
+              borderRadius: 10, padding: '8px 4px', textAlign: 'center', cursor: 'pointer',
+              transition: 'all 0.15s',
+              border: isPicked ? `1px solid ${C.greenDeep}` : '1px solid transparent',
             }}>
-              <div style={{ fontSize: 9, color: isPicked ? C.greenLight : C.muted, marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: isPicked ? C.greenLight : C.charcoal }}>{odds[i]}</div>
+              <div style={{ fontSize: 9, color: isPicked ? C.greenMid : C.muted, fontWeight: 600, marginBottom: 3 }}>{label}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: isPicked ? '#fff' : C.charcoal }}>{odds[i]}</div>
             </div>
           )
         })}
@@ -152,19 +118,19 @@ function MatchCard({ league, leagueLogo, home, away, homeLogo, awayLogo, odds, p
 
 function ConsensusBar({ home, away, pcts }: { home: string; away: string; pcts: [number, number, number] }) {
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 16 }}>
       <div style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: C.charcoal, marginBottom: 6 }}>
         {home} vs {away}
       </div>
       <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 1 }}>
-        <div style={{ width: `${pcts[0]}%`, background: C.greenMid }} />
-        <div style={{ width: `${pcts[1]}%`, background: C.warm }} />
-        <div style={{ width: `${pcts[2]}%`, background: C.red }} />
+        <div style={{ width: `${pcts[0]}%`, background: C.greenMid, transition: 'width 0.5s' }} />
+        <div style={{ width: `${pcts[1]}%`, background: C.warm, transition: 'width 0.5s' }} />
+        <div style={{ width: `${pcts[2]}%`, background: C.red, transition: 'width 0.5s' }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-        <span style={{ fontFamily: FONT, fontSize: 9, color: C.muted }}>{pcts[0]}%</span>
-        <span style={{ fontFamily: FONT, fontSize: 9, color: C.muted }}>{pcts[1]}%</span>
-        <span style={{ fontFamily: FONT, fontSize: 9, color: C.muted }}>{pcts[2]}%</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        {['1', 'X', '2'].map((l, i) => (
+          <span key={l} style={{ fontFamily: FONT, fontSize: 9, color: C.muted }}>{l}: {pcts[i]}%</span>
+        ))}
       </div>
     </div>
   )
@@ -176,21 +142,24 @@ function LeaderboardRow({ rank, name, av, pts, delta, me }: {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '8px 10px', borderRadius: 10,
+      padding: '9px 10px', borderRadius: 10,
       background: me ? C.greenLight : 'transparent',
+      transition: 'background 0.15s',
     }}>
       <span style={{
         fontFamily: FONT, fontSize: 12, fontWeight: 800, width: 18, textAlign: 'center',
         color: rank === 1 ? C.gold : rank === 2 ? '#94A3B8' : C.muted,
       }}>{rank}</span>
       <div style={{
-        width: 26, height: 26, borderRadius: '50%',
+        width: 28, height: 28, borderRadius: '50%',
         background: me ? C.greenDeep : C.greenLight,
         color: me ? C.greenLight : C.greenDeep,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 8, fontWeight: 800,
+        fontSize: 9, fontWeight: 800,
       }}>{av}</div>
-      <span style={{ flex: 1, fontFamily: FONT, fontSize: 13, fontWeight: me ? 700 : 500, color: C.charcoal }}>{name}</span>
+      <span style={{ flex: 1, fontFamily: FONT, fontSize: 13, fontWeight: me ? 700 : 500, color: C.charcoal }}>
+        {name}{me ? ' ◂' : ''}
+      </span>
       <span style={{ fontFamily: FONT, fontSize: 14, fontWeight: 800, color: C.charcoal }}>{pts}</span>
       <span style={{
         fontFamily: FONT, fontSize: 10, fontWeight: 700, width: 28, textAlign: 'right',
@@ -216,44 +185,38 @@ export default function GameroomPage() {
 
       <div style={{ display: 'flex', minHeight: 'calc(100vh - 52px)' }}>
         {/* Main */}
-        <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* Hero */}
           <div style={{
-            background: C.greenDeep, borderRadius: 20, padding: 24,
+            background: `linear-gradient(135deg, ${C.greenDeep} 0%, #244E3D 100%)`,
+            borderRadius: 20, padding: 28,
             position: 'relative', overflow: 'hidden',
           }}>
-            <div style={{
-              position: 'absolute', top: -60, right: -60,
-              width: 240, height: 240, borderRadius: '50%',
-              border: '1px solid rgba(116,198,157,0.08)', pointerEvents: 'none',
-            }} />
-            <div style={{
-              position: 'absolute', top: -30, right: -30,
-              width: 160, height: 160, borderRadius: '50%',
-              border: '1px solid rgba(116,198,157,0.06)', pointerEvents: 'none',
-            }} />
+            <div style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: '50%', border: '1px solid rgba(116,198,157,0.08)' }} />
+            <div style={{ position: 'absolute', top: -20, right: -20, width: 120, height: 120, borderRadius: '50%', border: '1px solid rgba(116,198,157,0.06)' }} />
             <div style={{ position: 'relative' }}>
-              <div style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.greenMid, letterSpacing: '0.1em', marginBottom: 6 }}>
+              <div style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.greenMid, letterSpacing: '0.1em', marginBottom: 8 }}>
                 BLOCK 3 · UGE 28 · 9 KAMPE
               </div>
-              <div style={{ fontFamily: FONT, fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+              <div style={{ fontFamily: FONT, fontSize: 26, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
                 Bodega Betting
               </div>
-              <div style={{ fontFamily: FONT, fontSize: 12, color: C.muted, marginBottom: 18 }}>
+              <div style={{ fontFamily: FONT, fontSize: 12, color: C.muted, marginBottom: 20 }}>
                 Bets lukker mandag · 3 kampe tilbage at spille
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 {[
-                  { value: '124', label: 'DINE POINT' },
-                  { value: '3.', label: 'PLADS' },
-                  { value: '6/9', label: 'BETS LAGT' },
+                  { value: '124', label: 'DINE POINT', icon: <Target size={14} color={C.greenMid} /> },
+                  { value: '3.', label: 'PLADS', icon: <Award size={14} color={C.greenMid} /> },
+                  { value: '6/9', label: 'BETS LAGT', icon: <BarChart3 size={14} color={C.greenMid} /> },
                 ].map((s) => (
                   <div key={s.label} style={{
-                    flex: 1, textAlign: 'center', padding: '10px 0',
-                    borderRadius: 10, background: 'rgba(255,255,255,0.07)',
+                    flex: 1, textAlign: 'center', padding: '12px 0',
+                    borderRadius: 12, background: 'rgba(255,255,255,0.07)',
                   }}>
-                    <div style={{ fontFamily: FONT, fontSize: 20, fontWeight: 800, color: '#fff' }}>{s.value}</div>
-                    <div style={{ fontFamily: FONT, fontSize: 9, color: C.greenMid, marginTop: 2 }}>{s.label}</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>{s.icon}</div>
+                    <div style={{ fontFamily: FONT, fontSize: 22, fontWeight: 800, color: '#fff' }}>{s.value}</div>
+                    <div style={{ fontFamily: FONT, fontSize: 8, color: C.greenMid, marginTop: 2, letterSpacing: '0.06em' }}>{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -262,13 +225,13 @@ export default function GameroomPage() {
 
           {/* Open matches */}
           <div>
-            <div style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: '0.12em', marginBottom: 10 }}>
+            <div style={{ fontFamily: FONT, fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: '0.12em', marginBottom: 12 }}>
               ÅBNE KAMPE
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-              <MatchCard league="SUPERLIGA" leagueLogo={LOGOS.superliga} home="FCK" away="Brøndby" homeLogo={LOGOS.fck} awayLogo={LOGOS.brondby} odds={['1.85', '3.40', '4.10']} picked={0} />
-              <MatchCard league="LA LIGA" leagueLogo={LOGOS.laLiga} home="Real Madrid" away="Barça" homeLogo={LOGOS.realMadrid} awayLogo={LOGOS.barcelona} odds={['2.10', '3.30', '3.60']} picked={2} />
-              <MatchCard league="PREMIER LEAGUE" leagueLogo={LOGOS.premierLeague} home="Man City" away="Arsenal" homeLogo={LOGOS.manCity} awayLogo={LOGOS.arsenal} odds={['1.60', '3.80', '5.50']} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <MatchCard league="SUPERLIGA" leagueLogo={`${B}/3f-superliga.png`} home="FCK" away="Brøndby" homeLogo={`${B}/fc-koebenhavn.png`} awayLogo={`${B}/broendby-if.png`} odds={['1.85', '3.40', '4.10']} picked={0} />
+              <MatchCard league="LA LIGA" leagueLogo={`${B}/la-liga.png`} home="Real Madrid" away="Barça" homeLogo={`${B}/real-madrid.png`} awayLogo={`${B}/fc-barcelona.png`} odds={['2.10', '3.30', '3.60']} picked={2} />
+              <MatchCard league="PREMIER LEAGUE" leagueLogo={`${B}/premier-league.png`} home="Man City" away="Arsenal" homeLogo={`${B}/manchester-city.png`} awayLogo={`${B}/arsenal.png`} odds={['1.60', '3.80', '5.50']} />
             </div>
           </div>
         </div>
@@ -279,9 +242,8 @@ export default function GameroomPage() {
           borderLeft: `1px solid ${C.border}`,
           padding: 20, display: 'flex', flexDirection: 'column', gap: 16,
         }}>
-          {/* Consensus */}
           <div>
-            <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: C.charcoal, marginBottom: 12 }}>
+            <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: C.charcoal, marginBottom: 14 }}>
               Hvad tror de andre?
             </div>
             <ConsensusBar home="FCK" away="Brøndby" pcts={[55, 25, 20]} />
@@ -291,7 +253,6 @@ export default function GameroomPage() {
 
           <div style={{ height: 1, background: C.border }} />
 
-          {/* Leaderboard */}
           <div>
             <div style={{ fontFamily: FONT, fontSize: 12, fontWeight: 700, color: C.charcoal, marginBottom: 10 }}>
               Leaderboard
@@ -301,17 +262,20 @@ export default function GameroomPage() {
             <LeaderboardRow rank={3} name="Mikkel" av="MK" pts={124} delta="+8" me />
           </div>
 
-          {/* CTA */}
           <div
             onClick={() => router.push('/preview/gameroom/bets')}
             style={{
               background: C.greenDeep, color: C.greenLight,
-              borderRadius: 10, padding: 12, textAlign: 'center',
+              borderRadius: 12, padding: '13px 16px',
               fontFamily: FONT, fontSize: 13, fontWeight: 700,
               cursor: 'pointer', marginTop: 'auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              transition: 'opacity 0.15s',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
           >
-            Se mine bets →
+            Se mine bets <ChevronRight size={16} />
           </div>
         </div>
       </div>
