@@ -39,90 +39,15 @@ from datetime import datetime
 
 import httpx
 from bs4 import BeautifulSoup
-from supabase import create_client, Client
+from supabase import Client
 from postgrest.exceptions import APIError
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+from helpers import (
+    PCS_BASE, PCS_HEADERS, REQUEST_DELAY, YEAR,
+    init_supabase, pcs_get, _log, _warn,
+)
 
-PCS_BASE = "https://www.procyclingstats.com"
-
-PCS_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
-
-REQUEST_DELAY = 1.5
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-YEAR = 2026
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def load_dotenv_local() -> None:
-    env_path = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", ".env.local")
-    )
-    if not os.path.exists(env_path):
-        return
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, _, v = line.partition("=")
-            k = k.strip()
-            if k and k not in os.environ:
-                os.environ[k] = v.strip()
-
-
-def require_env(name: str) -> str:
-    value = os.environ.get(name)
-    if not value:
-        _die(f"Missing required environment variable: {name}")
-    return value  # type: ignore[return-value]
-
-
-def _die(msg: str) -> None:
-    print(f"ERROR: {msg}", file=sys.stderr)
-    sys.exit(1)
-
-
-def _warn(msg: str) -> None:
-    print(f"WARNING: {msg}", file=sys.stderr)
-
-
-def _log(msg: str) -> None:
-    print(msg, flush=True)
-
-
-def pcs_get(url: str, client: httpx.Client, retries: int = 2) -> BeautifulSoup:
-    for attempt in range(retries + 1):
-        try:
-            resp = client.get(url, timeout=30, follow_redirects=True)
-            if resp.status_code == 404:
-                return BeautifulSoup("", "html.parser")
-            resp.raise_for_status()
-            return BeautifulSoup(resp.text, "html.parser")
-        except httpx.HTTPStatusError as e:
-            if attempt < retries and e.response.status_code >= 500:
-                _warn(f"HTTP {e.response.status_code} for {url} — retrying in 3s")
-                time.sleep(3)
-                continue
-            _warn(f"PCS returned HTTP {e.response.status_code} for {url} — skipping")
-            return BeautifulSoup("", "html.parser")
-        except httpx.HTTPError as e:
-            _warn(f"HTTP error for {url}: {e} — skipping")
-            return BeautifulSoup("", "html.parser")
-    return BeautifulSoup("", "html.parser")
 
 
 def normalize_name(s: str) -> str:
@@ -738,6 +663,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    from helpers import load_dotenv_local
     load_dotenv_local()
     os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -820,9 +746,7 @@ def main() -> None:
     _log("  CYCLING RESULTS SYNC")
     _log("=" * 60)
 
-    supabase_url = require_env("NEXT_PUBLIC_SUPABASE_URL")
-    service_key = require_env("SUPABASE_SERVICE_ROLE_KEY")
-    supabase = create_client(supabase_url, service_key)
+    supabase = init_supabase()
 
     # ── Auto-update race statuses based on dates ─────────────
     _log("\n→ Auto-updating race statuses...")

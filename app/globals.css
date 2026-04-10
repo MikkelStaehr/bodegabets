@@ -59,6 +59,15 @@
   --color-warm-taupe: #7a7060;
   --color-green-dark: #27ae60;
   --color-red-dark:   #c0392b;
+
+  /* ── Cycling sport theme ───────────────────────────────── */
+  --cycling-primary:       #1E3A5F;
+  --cycling-primary-light: #2B4F7A;
+  --cycling-accent:        #4A6FA5;
+  --cycling-bg-dark:       #0F2137;
+  --cycling-bg:            #162d4a;
+  --cycling-text:          #F2EDE4;
+  --cycling-text-muted:    #8FABC4;
 }
 
 /* ── Navbar transparency ─────────────────────────────────── */
