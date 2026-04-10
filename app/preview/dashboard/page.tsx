@@ -2,227 +2,142 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Zap, ChevronRight, Trophy, Bike, Clock, Flame, TrendingUp, Star, Users } from 'lucide-react'
+import { Trophy, Bike, ChevronRight, Users, Clock, TrendingUp, CalendarDays, Star, Bell } from 'lucide-react'
 
-// ─── Dark premium tokens ────────────────────────────────────
+// ─── Soft earth palette ─────────────────────────────────────
 
 const T = {
-  bg: '#0B0D0F',
-  surface: '#141619',
-  elevated: '#1A1D21',
-  card: '#1E2227',
-  border: 'rgba(255,255,255,0.06)',
-  borderLight: 'rgba(255,255,255,0.1)',
-  accent: '#00E676',
-  accentDim: 'rgba(0,230,118,0.12)',
-  accentGlow: 'rgba(0,230,118,0.25)',
-  purple: '#7C6AFF',
-  purpleDim: 'rgba(124,106,255,0.12)',
-  gold: '#FFD54F',
-  goldDim: 'rgba(255,213,79,0.12)',
-  red: '#FF5252',
-  redDim: 'rgba(255,82,82,0.12)',
+  bg: '#F6F3EE',
+  sand: '#EDE9E1',
+  cream: '#FDFBF7',
   white: '#FFFFFF',
-  t1: '#F5F5F5',
-  t2: '#9CA3AF',
-  t3: '#6B7280',
-  t4: '#3B3F45',
+  olive: '#5C6B55',
+  oliveMuted: '#8A9683',
+  oliveLight: '#E8EDE5',
+  olivePale: '#F2F5F0',
+  sage: '#A3B899',
+  sageDeep: '#3D4F35',
+  terracotta: '#C4705A',
+  terracottaLight: '#F5E6E1',
+  sky: '#7BA7C2',
+  skyLight: '#E4F0F7',
+  warm: '#B8A88A',
+  warmLight: '#F0EBE1',
+  ink: '#2D2A26',
+  t2: '#6B665E',
+  t3: '#9E9890',
+  border: '#E5E0D8',
+  borderLight: '#EDEBE6',
 }
 const F = "'Plus Jakarta Sans', sans-serif"
-const B = 'https://bold.dk/img/tag/64x64'
-
-// ─── Helpers ────────────────────────────────────────────────
-
-function Glass({ children, style, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div style={{
-      background: T.surface,
-      border: `1px solid ${T.border}`,
-      borderRadius: 16,
-      backdropFilter: 'blur(20px)',
-      ...style,
-    }} {...props}>
-      {children}
-    </div>
-  )
-}
-
-function Stat({ value, label, accent }: { value: string; label: string; accent?: string }) {
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: F, fontSize: 28, fontWeight: 800, color: accent ?? T.white, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontFamily: F, fontSize: 9, fontWeight: 600, color: T.t3, letterSpacing: '0.1em', marginTop: 4, textTransform: 'uppercase' }}>{label}</div>
-    </div>
-  )
-}
 
 // ─── Components ─────────────────────────────────────────────
 
 function Topbar() {
   return (
     <div style={{
-      height: 56, display: 'flex', alignItems: 'center',
-      padding: '0 28px', gap: 16,
+      height: 60, display: 'flex', alignItems: 'center',
+      padding: '0 32px', gap: 16,
+      background: T.cream,
       borderBottom: `1px solid ${T.border}`,
     }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 10,
-        background: `linear-gradient(135deg, ${T.accent}, #00C853)`,
+        width: 34, height: 34, borderRadius: 10,
+        background: T.sageDeep,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, fontWeight: 900, color: T.bg,
+        fontSize: 13, fontWeight: 900, color: T.oliveLight,
+        letterSpacing: '-0.5px',
       }}>B</div>
-      <span style={{ fontFamily: F, fontSize: 17, fontWeight: 800, color: T.white, flex: 1 }}>
-        bodega<span style={{ color: T.accent }}>.</span>bets
+      <span style={{ fontFamily: F, fontSize: 17, fontWeight: 800, color: T.ink, flex: 1 }}>
+        bodega<span style={{ color: T.sage }}>.</span>bets
       </span>
       <div style={{
-        padding: '5px 12px', borderRadius: 20,
-        background: T.accentDim, border: `1px solid rgba(0,230,118,0.15)`,
-        fontFamily: F, fontSize: 10, fontWeight: 700, color: T.accent,
-        display: 'flex', alignItems: 'center', gap: 5,
+        position: 'relative', width: 34, height: 34, borderRadius: '50%',
+        background: T.sand, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', marginRight: 8,
       }}>
-        <Zap size={10} /> LIVE
+        <Bell size={16} color={T.t2} />
+        <div style={{
+          position: 'absolute', top: -1, right: -1,
+          width: 8, height: 8, borderRadius: '50%',
+          background: T.terracotta, border: `2px solid ${T.cream}`,
+        }} />
       </div>
       <div style={{
-        width: 34, height: 34, borderRadius: '50%',
-        background: `linear-gradient(135deg, ${T.purple}, #9C8AFF)`,
+        width: 36, height: 36, borderRadius: '50%',
+        background: `linear-gradient(135deg, ${T.sage}, ${T.olive})`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 800, color: '#fff',
+        fontSize: 12, fontWeight: 800, color: '#fff',
       }}>MS</div>
     </div>
   )
 }
 
-function LiveMatchHero() {
+function TimelineItem({ time, text, accent }: { time: string; text: string; accent: string }) {
   return (
-    <div style={{
-      background: `linear-gradient(135deg, ${T.surface} 0%, #151A1E 50%, ${T.surface} 100%)`,
-      borderRadius: 20, padding: '28px 32px',
-      position: 'relative', overflow: 'hidden',
-      border: `1px solid ${T.border}`,
-    }}>
-      {/* Glow */}
-      <div style={{
-        position: 'absolute', top: -100, left: '50%', transform: 'translateX(-50%)',
-        width: 400, height: 400, borderRadius: '50%',
-        background: `radial-gradient(circle, ${T.accentGlow} 0%, transparent 70%)`,
-        pointerEvents: 'none',
-      }} />
-
-      <div style={{ position: 'relative' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Flame size={14} color={T.accent} />
-            <span style={{ fontFamily: F, fontSize: 10, fontWeight: 700, color: T.accent, letterSpacing: '0.12em' }}>FEATURED MATCH</span>
-          </div>
-          <span style={{
-            fontFamily: F, fontSize: 10, fontWeight: 600, color: T.t3,
-            padding: '4px 10px', borderRadius: 8, background: T.elevated,
-          }}>
-            Søndag 13:00
-          </span>
-        </div>
-
-        {/* Teams */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40, marginBottom: 28 }}>
-          <div style={{ textAlign: 'center' }}>
-            <img src={`${B}/fc-koebenhavn.png`} alt="" style={{ width: 64, height: 64, objectFit: 'contain', marginBottom: 10 }} />
-            <div style={{ fontFamily: F, fontSize: 18, fontWeight: 800, color: T.white }}>FCK</div>
-            <div style={{ fontFamily: F, fontSize: 10, color: T.t3, marginTop: 2 }}>Hjemme</div>
-          </div>
-
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontFamily: F, fontSize: 11, fontWeight: 700, color: T.t4,
-              padding: '6px 14px', borderRadius: 8, background: T.elevated,
-              border: `1px solid ${T.border}`,
-            }}>VS</div>
-          </div>
-
-          <div style={{ textAlign: 'center' }}>
-            <img src={`${B}/broendby-if.png`} alt="" style={{ width: 64, height: 64, objectFit: 'contain', marginBottom: 10 }} />
-            <div style={{ fontFamily: F, fontSize: 18, fontWeight: 800, color: T.white }}>Brøndby</div>
-            <div style={{ fontFamily: F, fontSize: 10, color: T.t3, marginTop: 2 }}>Ude</div>
-          </div>
-        </div>
-
-        {/* Odds */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          {[
-            { label: '1', odds: '1.85', picked: true },
-            { label: 'X', odds: '3.40', picked: false },
-            { label: '2', odds: '4.10', picked: false },
-          ].map((o) => (
-            <div key={o.label} style={{
-              padding: '12px 8px', borderRadius: 12, textAlign: 'center', cursor: 'pointer',
-              background: o.picked ? T.accent : T.elevated,
-              border: `1px solid ${o.picked ? T.accent : T.border}`,
-              transition: 'all 0.2s',
-            }}>
-              <div style={{ fontFamily: F, fontSize: 9, fontWeight: 600, color: o.picked ? T.bg : T.t3, marginBottom: 4 }}>{o.label}</div>
-              <div style={{ fontFamily: F, fontSize: 22, fontWeight: 800, color: o.picked ? T.bg : T.white }}>{o.odds}</div>
-            </div>
-          ))}
-        </div>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+      <div style={{ width: 6, height: 6, borderRadius: '50%', background: accent, marginTop: 5, flexShrink: 0 }} />
+      <div>
+        <span style={{ fontFamily: F, fontSize: 10, fontWeight: 700, color: T.t3, letterSpacing: '0.06em' }}>{time}</span>
+        <div style={{ fontFamily: F, fontSize: 12, color: T.ink, marginTop: 1 }}>{text}</div>
       </div>
     </div>
   )
 }
 
-function RoomCard({ name, sport, icon, rank, badge, badgeColor, onClick }: {
-  name: string; sport: string; icon: React.ReactNode
-  rank: string; badge: string; badgeColor: string
-  onClick?: () => void
+function RoomCard({ name, sport, icon, iconBg, accentColor, rank, players, nextEvent, onClick }: {
+  name: string; sport: string; icon: React.ReactNode; iconBg: string; accentColor: string
+  rank: string; players: number; nextEvent: string; onClick?: () => void
 }) {
-  const [hovered, setHovered] = useState(false)
+  const [h, setH] = useState(false)
   return (
-    <Glass
+    <div
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
       style={{
-        padding: 0, cursor: 'pointer', overflow: 'hidden',
-        transform: hovered ? 'translateY(-4px)' : 'none',
-        boxShadow: hovered ? `0 12px 40px rgba(0,0,0,0.4)` : 'none',
-        transition: 'transform 0.2s, box-shadow 0.2s',
+        background: T.white, borderRadius: 20,
+        border: `1px solid ${T.border}`,
+        cursor: 'pointer', overflow: 'hidden',
+        transform: h ? 'translateY(-3px)' : 'none',
+        boxShadow: h ? '0 8px 30px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.02)',
+        transition: 'all 0.25s ease',
       }}
     >
-      <div style={{
-        padding: '20px 20px 16px',
-        background: `linear-gradient(180deg, ${T.elevated} 0%, ${T.surface} 100%)`,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+      {/* Accent strip */}
+      <div style={{ height: 4, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}88)` }} />
+
+      <div style={{ padding: '22px 22px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: T.accentDim,
+            width: 44, height: 44, borderRadius: 14,
+            background: iconBg,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: T.accent,
+            color: accentColor,
           }}>{icon}</div>
           <span style={{
-            fontFamily: F, fontSize: 9, fontWeight: 700,
-            padding: '3px 10px', borderRadius: 20,
-            background: badgeColor, color: T.white,
-            letterSpacing: '0.06em',
-          }}>{badge}</span>
+            fontFamily: F, fontSize: 11, fontWeight: 700, color: accentColor,
+          }}>{rank}</span>
         </div>
-        <div style={{ fontFamily: F, fontSize: 16, fontWeight: 800, color: T.white, marginBottom: 4 }}>{name}</div>
-        <div style={{ fontFamily: F, fontSize: 11, color: T.t3 }}>{sport}</div>
-      </div>
-      <div style={{
-        padding: '12px 20px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        borderTop: `1px solid ${T.border}`,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Users size={12} color={T.t3} />
-          <span style={{ fontFamily: F, fontSize: 11, color: T.t3 }}>6 spillere</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontFamily: F, fontSize: 12, fontWeight: 700, color: T.accent }}>{rank}</span>
-          <ChevronRight size={14} color={T.t3} />
+
+        <div style={{ fontFamily: F, fontSize: 17, fontWeight: 800, color: T.ink, marginBottom: 4 }}>{name}</div>
+        <div style={{ fontFamily: F, fontSize: 11, color: T.t3, marginBottom: 16 }}>{sport}</div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Users size={12} color={T.t3} />
+              <span style={{ fontFamily: F, fontSize: 11, color: T.t3 }}>{players}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock size={12} color={T.t3} />
+              <span style={{ fontFamily: F, fontSize: 11, color: T.t3 }}>{nextEvent}</span>
+            </div>
+          </div>
+          <ChevronRight size={16} color={T.t3} />
         </div>
       </div>
-    </Glass>
+    </div>
   )
 }
 
@@ -232,73 +147,187 @@ export default function DashboardPage() {
   const router = useRouter()
 
   return (
-    <div style={{ fontFamily: F, background: T.bg, minHeight: '100vh', color: T.white }}>
+    <div style={{ fontFamily: F, background: T.bg, minHeight: '100vh' }}>
       <Topbar />
 
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 28px' }}>
-        {/* Greeting */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>
-            Velkommen, <span style={{ color: T.accent }}>Mikkel</span>
-          </div>
-          <div style={{ fontSize: 13, color: T.t3, marginTop: 6 }}>
-            3 aktive rum · 2 runder åbne · Paris–Roubaix om 2 dage
-          </div>
-        </div>
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '36px 32px' }}>
+        {/* Two-column: main + sidebar */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 28 }}>
 
-        {/* Stats strip */}
-        <Glass style={{ padding: '20px 32px', marginBottom: 28, display: 'flex', justifyContent: 'space-around' }}>
-          <Stat value="342" label="Point" accent={T.accent} />
-          <div style={{ width: 1, background: T.border }} />
-          <Stat value="62%" label="Hit rate" />
-          <div style={{ width: 1, background: T.border }} />
-          <Stat value="14" label="Runder" />
-          <div style={{ width: 1, background: T.border }} />
-          <Stat value="3" label="Aktive rum" />
-        </Glass>
+          {/* Left column */}
+          <div>
+            {/* Greeting */}
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ fontFamily: F, fontSize: 28, fontWeight: 800, color: T.ink, lineHeight: 1.2 }}>
+                God morgen, Mikkel
+              </div>
+              <div style={{ fontFamily: F, fontSize: 13, color: T.t3, marginTop: 6 }}>
+                Torsdag 10. april · 3 aktive rum
+              </div>
+            </div>
 
-        {/* Featured match */}
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontFamily: F, fontSize: 10, fontWeight: 700, color: T.t3, letterSpacing: '0.12em', marginBottom: 12 }}>
-            KAMPDAG
-          </div>
-          <LiveMatchHero />
-        </div>
+            {/* Quick stats */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12,
+              marginBottom: 32,
+            }}>
+              {[
+                { value: '342', label: 'Point i alt', icon: <Star size={15} />, color: T.olive },
+                { value: '62%', label: 'Hit rate', icon: <TrendingUp size={15} />, color: T.sage },
+                { value: '14', label: 'Runder', icon: <CalendarDays size={15} />, color: T.sky },
+                { value: '3', label: 'Aktive rum', icon: <Trophy size={15} />, color: T.warm },
+              ].map((s) => (
+                <div key={s.label} style={{
+                  background: T.white, borderRadius: 16, padding: '18px 16px',
+                  border: `1px solid ${T.border}`,
+                  display: 'flex', alignItems: 'center', gap: 14,
+                }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 12,
+                    background: `${s.color}14`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: s.color,
+                  }}>{s.icon}</div>
+                  <div>
+                    <div style={{ fontFamily: F, fontSize: 20, fontWeight: 800, color: T.ink, lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontFamily: F, fontSize: 9, color: T.t3, marginTop: 3, letterSpacing: '0.04em' }}>{s.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-        {/* Rooms */}
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontFamily: F, fontSize: 10, fontWeight: 700, color: T.t3, letterSpacing: '0.12em', marginBottom: 12 }}>
-            DINE RUM
+            {/* Rooms */}
+            <div style={{ fontFamily: F, fontSize: 10, fontWeight: 700, color: T.t3, letterSpacing: '0.12em', marginBottom: 14 }}>
+              DINE SPILRUM
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <RoomCard
+                name="Bodega Betting"
+                sport="Fodbold · Block 3 · Uge 28"
+                icon={<Trophy size={20} />}
+                iconBg={T.oliveLight}
+                accentColor={T.olive}
+                rank="3. plads"
+                players={6}
+                nextEvent="3 åbne kampe"
+                onClick={() => router.push('/preview/gameroom?sport=football')}
+              />
+              <RoomCard
+                name="Fantasy Manager"
+                sport="Cykling · Ardennerne"
+                icon={<Bike size={20} />}
+                iconBg={T.skyLight}
+                accentColor={T.sky}
+                rank="5. plads"
+                players={4}
+                nextEvent="Roubaix søndag"
+                onClick={() => router.push('/preview/gameroom?sport=cycling')}
+              />
+              <RoomCard
+                name="Mesterskabet"
+                sport="Fodbold · Bodega Rounds"
+                icon={<Star size={20} />}
+                iconBg={T.warmLight}
+                accentColor={T.warm}
+                rank="2. plads"
+                players={8}
+                nextEvent="Uge 28 aktiv"
+                onClick={() => router.push('/preview/gameroom?sport=football')}
+              />
+              <RoomCard
+                name="Giro Manager"
+                sport="Cykling · Giro d'Italia"
+                icon={<Bike size={20} />}
+                iconBg={T.terracottaLight}
+                accentColor={T.terracotta}
+                rank="—"
+                players={6}
+                nextEvent="Starter 9. maj"
+                onClick={() => router.push('/preview/gameroom?sport=cycling')}
+              />
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-          <RoomCard
-            name="Bodega Betting"
-            sport="Fodbold · Block 3"
-            icon={<Trophy size={18} />}
-            rank="3. plads"
-            badge="LIVE"
-            badgeColor={T.accent}
-            onClick={() => router.push('/preview/gameroom')}
-          />
-          <RoomCard
-            name="Fantasy Manager"
-            sport="Cykling · Ardennerne"
-            icon={<Bike size={18} />}
-            rank="5. plads"
-            badge="SØNDAG"
-            badgeColor={T.purple}
-            onClick={() => router.push('/preview/gameroom')}
-          />
-          <RoomCard
-            name="Mesterskabet"
-            sport="Fodbold · Bodega Rounds"
-            icon={<Star size={18} />}
-            rank="2. plads"
-            badge="UGE 28"
-            badgeColor={T.gold}
-            onClick={() => router.push('/preview/gameroom')}
-          />
+
+          {/* Right sidebar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Upcoming */}
+            <div style={{
+              background: T.white, borderRadius: 20, padding: '20px 22px',
+              border: `1px solid ${T.border}`,
+            }}>
+              <div style={{ fontFamily: F, fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 16 }}>
+                Kommende
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <TimelineItem time="I DAG" text="3 kampe åbne i Bodega Betting" accent={T.olive} />
+                <TimelineItem time="LØRDAG" text="Bets lukker kl. 13:00" accent={T.terracotta} />
+                <TimelineItem time="SØNDAG" text="Paris–Roubaix · Lineup låser 10:00" accent={T.sky} />
+                <TimelineItem time="MANDAG" text="Uge 28 afslutning · Point beregnes" accent={T.warm} />
+              </div>
+            </div>
+
+            {/* Mini leaderboard */}
+            <div style={{
+              background: T.white, borderRadius: 20, padding: '20px 22px',
+              border: `1px solid ${T.border}`,
+            }}>
+              <div style={{ fontFamily: F, fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 14 }}>
+                Bodega Betting · Top 3
+              </div>
+              {[
+                { rank: 1, name: 'Jonas', pts: 148, delta: '+12' },
+                { rank: 2, name: 'Peter', pts: 138, delta: '—' },
+                { rank: 3, name: 'Mikkel', pts: 124, delta: '+8' },
+              ].map((p) => (
+                <div key={p.name} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 10px', borderRadius: 12,
+                  background: p.rank === 3 ? T.olivePale : 'transparent',
+                }}>
+                  <span style={{
+                    fontFamily: F, fontSize: 13, fontWeight: 800, width: 18,
+                    color: p.rank === 1 ? '#D4A843' : p.rank === 2 ? '#A0A0A0' : T.t3,
+                  }}>{p.rank}</span>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: p.rank === 3 ? T.sageDeep : T.sand,
+                    color: p.rank === 3 ? T.oliveLight : T.t2,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 9, fontWeight: 800,
+                  }}>{p.name.slice(0, 2).toUpperCase()}</div>
+                  <span style={{ flex: 1, fontFamily: F, fontSize: 13, fontWeight: p.rank === 3 ? 700 : 500, color: T.ink }}>{p.name}</span>
+                  <span style={{ fontFamily: F, fontSize: 14, fontWeight: 800, color: T.ink }}>{p.pts}</span>
+                  <span style={{
+                    fontFamily: F, fontSize: 10, fontWeight: 700, width: 28, textAlign: 'right',
+                    color: p.delta.startsWith('+') ? T.olive : T.t3,
+                  }}>{p.delta}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Activity */}
+            <div style={{
+              background: T.white, borderRadius: 20, padding: '20px 22px',
+              border: `1px solid ${T.border}`,
+            }}>
+              <div style={{ fontFamily: F, fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 14 }}>
+                Seneste aktivitet
+              </div>
+              {[
+                { text: 'Jonas spillede FCK i Superliga-derby', time: '2 timer siden' },
+                { text: 'Peter ændrede sin Roubaix-lineup', time: '4 timer siden' },
+                { text: 'Uge 27 afsluttet — du scorede +18', time: 'i går' },
+              ].map((a, i) => (
+                <div key={i} style={{
+                  padding: '10px 0',
+                  borderBottom: i < 2 ? `1px solid ${T.borderLight}` : 'none',
+                }}>
+                  <div style={{ fontFamily: F, fontSize: 12, color: T.ink }}>{a.text}</div>
+                  <div style={{ fontFamily: F, fontSize: 10, color: T.t3, marginTop: 2 }}>{a.time}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
