@@ -24,6 +24,10 @@ export async function middleware(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = req.nextUrl.pathname
+
+  // Skip middleware entirely for preview route
+  if (path.startsWith('/preview')) return res
+
   const isProtected = path.startsWith('/dashboard') || path.startsWith('/games') || path.startsWith('/admin')
 
   // Fetch profile once (suspend + admin check in single query)
