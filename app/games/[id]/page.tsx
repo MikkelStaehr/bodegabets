@@ -15,7 +15,7 @@ import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
 import LineupBuilder from '@/components/cycling/LineupBuilder'
 import CyclingGameroom from '@/components/cycling/CyclingGameroom'
-import CyclingLeaderboard from '@/components/cycling/CyclingLeaderboard'
+import Leaderboard from '@/components/Leaderboard'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
 import { getSportTheme, assignRanks, computeRoundStatus, getLeagueAbbr, getCurrentChampionshipSeason } from '@/lib/gamePageHelpers'
 
@@ -951,7 +951,7 @@ export default async function GamePage({ params }: Props) {
               squadRiderCount={lineupSquadRiders.length}
               squadId={userSquad?.id ?? null}
             />
-            <CyclingLeaderboard gameId={gameId} />
+            <Leaderboard gameId={gameId} />
           </>
         )}
 
@@ -1022,8 +1022,11 @@ export default async function GamePage({ params }: Props) {
           </>
         )}
 
-        {/* Leaderboard — kun fodbold */}
-        {typedGame.sport !== 'cycling' && <div>
+        {/* Fælles Leaderboard — begge sportsgrene */}
+        {typedGame.sport !== 'cycling' && <Leaderboard gameId={gameId} />}
+
+        {/* Detaljeret fodbold leaderboard (form, achievements) */}
+        {false && typedGame.sport !== 'cycling' && <div>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#6b6b6b' }}>Leaderboard</span>
           </div>

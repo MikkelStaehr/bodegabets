@@ -6,8 +6,8 @@ type LeaderboardEntry = {
   user_id: string
   username: string
   avatar_url: string | null
-  stage_wins: number
-  stage_points: number
+  round_wins: number
+  round_points: number
   block_wins: number
   block_points: number
 }
@@ -16,12 +16,12 @@ type Props = {
   gameId: number
 }
 
-export default function CyclingLeaderboard({ gameId }: Props) {
+export default function Leaderboard({ gameId }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/cycling-games/${gameId}/leaderboard`)
+    fetch(`/api/games/${gameId}/leaderboard`)
       .then((r) => r.json())
       .then((data) => setEntries(data.leaderboard ?? []))
       .catch(() => {})
@@ -30,8 +30,6 @@ export default function CyclingLeaderboard({ gameId }: Props) {
 
   if (loading) return null
   if (entries.length === 0) return null
-
-  const hasPoints = entries.some((e) => e.block_points > 0 || e.stage_points > 0)
 
   return (
     <div>
@@ -84,7 +82,6 @@ export default function CyclingLeaderboard({ gameId }: Props) {
               background: idx === 0 && entry.block_points > 0 ? '#F8F5ED' : 'transparent',
             }}
           >
-            {/* Position */}
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 14, fontWeight: 700,
@@ -93,7 +90,6 @@ export default function CyclingLeaderboard({ gameId }: Props) {
               {idx + 1}
             </span>
 
-            {/* Name */}
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 13, fontWeight: 600,
@@ -103,27 +99,24 @@ export default function CyclingLeaderboard({ gameId }: Props) {
               {entry.username}
             </span>
 
-            {/* Stage wins */}
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 12, fontWeight: 600,
-              color: entry.stage_wins > 0 ? '#B8963E' : '#ccc',
+              color: entry.round_wins > 0 ? '#B8963E' : '#ccc',
               textAlign: 'right',
             }}>
-              {entry.stage_wins > 0 ? entry.stage_wins : '-'}
+              {entry.round_wins > 0 ? entry.round_wins : '-'}
             </span>
 
-            {/* Stage points */}
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 12, fontWeight: 600,
-              color: entry.stage_points > 0 ? '#1a1a1a' : '#ccc',
+              color: entry.round_points > 0 ? '#1a1a1a' : '#ccc',
               textAlign: 'right',
             }}>
-              {entry.stage_points > 0 ? entry.stage_points : '-'}
+              {entry.round_points > 0 ? entry.round_points : '-'}
             </span>
 
-            {/* Block wins */}
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 12, fontWeight: 600,
@@ -133,7 +126,6 @@ export default function CyclingLeaderboard({ gameId }: Props) {
               {entry.block_wins > 0 ? entry.block_wins : '-'}
             </span>
 
-            {/* Block points */}
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 13, fontWeight: 700,
