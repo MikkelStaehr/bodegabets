@@ -51,11 +51,7 @@ export async function syncMatchScores(options?: {
     .eq('bet_open', true)
     .lt('bet_lock_at', now.toISOString())
 
-  console.log('[syncMatchScores] toLock query result:', JSON.stringify({ data: toLock, count: toLock?.length }))
-
   if (toLock && toLock.length > 0) {
-    console.log('[syncMatchScores] Låser kamp IDs:', toLock.map((m) => m.id))
-
     const { error: lockError } = await supabaseAdmin
       .from('matches')
       .update({ bet_open: false })
@@ -136,7 +132,6 @@ export async function syncMatchScores(options?: {
           }
         }
 
-        console.log(`[syncMatchScores] Konsensus odds beregnet for ${lockedBets.length} match_result bets på ${lockedMatchIds.length} låste kampe`)
       }
 
       // Beregn konsensus odds for ekstra bets (goals_3plus, clean_sheet, win_margin)
@@ -181,7 +176,6 @@ export async function syncMatchScores(options?: {
           }
         }
 
-        console.log(`[syncMatchScores] Konsensus odds beregnet for ${extraBets.length} ${betType} bets`)
       }
     }
 
@@ -201,7 +195,6 @@ export async function syncMatchScores(options?: {
         .eq('id', roundId)
     }
 
-    console.log(`[syncMatchScores] Låste ${toLock.length} kampe (bet_lock_at passeret)`)
   }
 
   // Hent kun round_ids fra aktive spil
@@ -260,7 +253,6 @@ export async function syncMatchScores(options?: {
   }
 
   if (!activeMatches.length) {
-    console.log('[syncMatchScores] Ingen aktive kampe lige nu')
     return { updated, errors }
   }
 
@@ -401,7 +393,6 @@ export async function syncMatchScores(options?: {
   // Kør calculateRoundPoints for runder med nyligt færdige kampe
   for (const roundId of finishedRoundIds) {
     try {
-      console.log(`[syncMatchScores] Kamp finished → calculateRoundPoints(${roundId})`)
       await calculateRoundPoints(roundId)
     } catch (e) {
       errors.push(`calculateRoundPoints fejl for runde ${roundId}: ${e}`)
@@ -421,8 +412,6 @@ export async function syncMatchScores(options?: {
     }
   }
 
-  console.log(`[syncMatchScores] ${updated} kampe opdateret${dryRun ? ' (dry-run)' : ''}`)
-
   if (dryRun) {
     return { updated, errors, preview, raw_bold_response: rawBoldResponse }
   }
@@ -438,8 +427,6 @@ export async function syncMatchScores(options?: {
   if (missedError) {
     errors.push(`Catch-up fetch fejl: ${missedError.message}`)
   } else if (missedMatches?.length) {
-    console.log(`[syncMatchScores] Catch-up: ${missedMatches.length} finished kampe mangler result`)
-
     for (const m of missedMatches) {
       const result = m.home_score > m.away_score ? '1'
         : m.home_score === m.away_score ? 'X' : '2'
@@ -488,7 +475,6 @@ export async function syncMatchScores(options?: {
       if (!betCount || betCount === 0) continue
 
       try {
-        console.log(`[syncMatchScores] Catch-up: calculateRoundPoints(${catchupRoundId})`)
         await calculateRoundPoints(catchupRoundId)
       } catch (e) {
         errors.push(`Catch-up calculateRoundPoints fejl for runde ${catchupRoundId}: ${e}`)

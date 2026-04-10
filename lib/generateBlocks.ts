@@ -27,7 +27,6 @@ export async function generateBlocksForSeason(seasonId: number): Promise<void> {
   }
 
   if (!rounds?.length) {
-    console.log(`[generateBlocks] Ingen runder for sæson ${seasonId} — springer over`)
     return
   }
 
@@ -38,7 +37,6 @@ export async function generateBlocksForSeason(seasonId: number): Promise<void> {
     .eq('season_id', seasonId)
 
   if (existingCount && existingCount > 0) {
-    console.log(`[generateBlocks] Blocks eksisterer allerede for sæson ${seasonId} — springer over`)
     return
   }
 
@@ -91,8 +89,4 @@ export async function generateBlocksForSeason(seasonId: number): Promise<void> {
     }
   }
 
-  console.log(
-    `[generateBlocks] Oprettede ${numBlocks} blocks for sæson ${seasonId}` +
-    ` (${rounds.length} runder: ${segments.map((s, i) => `block ${i + 1}=${s.length}`).join(', ')})`
-  )
 }

@@ -49,8 +49,6 @@ export async function updateBlockStatuses(seasonId: number): Promise<void> {
 
       if (error) {
         console.error(`[updateBlockStatuses] Fejl ved opdatering af block ${block.id} → ${newStatus}:`, error.message)
-      } else {
-        console.log(`[updateBlockStatuses] Block ${block.id} → ${newStatus}`)
       }
     }
   }
@@ -157,11 +155,6 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
           continue
         }
 
-        console.log(
-          `[evaluateFinishedBlocks] Block ${block.id} (block_number=${block.block_number}) vinder: ` +
-          `user=${winner.user_id.slice(0, 8)} game=${gameId} total=${maxTotal}`
-        )
-
         // Tildel frame_gold achievement (game_id=null, globalt)
         const { count: existing } = await supabaseAdmin
           .from('user_achievements')
@@ -180,8 +173,6 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
               `[evaluateFinishedBlocks] Fejl ved tildeling af frame_gold til ${winner.user_id.slice(0, 8)}:`,
               achError.message
             )
-          } else {
-            console.log(`[evaluateFinishedBlocks] Tildelt frame_gold til ${winner.user_id.slice(0, 8)}`)
           }
         }
       }

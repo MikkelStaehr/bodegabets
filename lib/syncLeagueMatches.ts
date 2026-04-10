@@ -266,7 +266,6 @@ export async function syncBoldFixtures(
     if (page === 1 && rawTotal != null) {
       totalPageCount = typeof rawTotal === 'number' ? rawTotal : parseInt(String(rawTotal), 10) || 1
     }
-    console.log(`[Sæson ${seasonId}] side ${page}/${totalPageCount} — ${pageMatches.length} kampe`)
     if (page >= totalPageCount) break
     if (page > 20) break
     page++
@@ -322,7 +321,6 @@ export async function syncBoldFixtures(
     }
 
     // Parse date — Bold API returns Danish local time (CET/CEST), convert to UTC
-    if (stats.synced < 3) console.log('[Bold raw date]', mt.date)
     const kickoff = (() => {
       const ma = mt.date.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/)
       if (ma) {
@@ -533,12 +531,6 @@ export async function syncBoldFixtures(
 
   stats.synced = parsedMatches.length
 
-  console.log(
-    `[syncBoldFixtures] sæson ${seasonId}: ${stats.synced} kampe, ` +
-    `${stats.rounds_created} runder oprettet, ${stats.matches_created} matches oprettet, ` +
-    `${stats.matches_updated} opdateret (phase_id=${boldPhaseId})`
-  )
-
   return { ...stats, errors }
 }
 
@@ -594,7 +586,6 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
     .not('bold_phase_id', 'is', null)
 
   if (!seasons?.length) {
-    console.log('[sync-fixtures] Ingen sæsoner med bold_phase_id')
     return []
   }
 
@@ -618,12 +609,6 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
       }
 
       const res = await syncBoldFixtures(season.id, season.bold_phase_id)
-
-      console.log(
-        `[sync-fixtures] ${name} (id=${season.id}, bold_phase_id=${season.bold_phase_id}): ` +
-          `${res.synced} kampe synket, ${res.matches_created} matches oprettet, ${res.matches_updated} opdateret` +
-          (res.errors.length ? ` — ${res.errors.length} fejl` : '')
-      )
 
       results.push({
         season_id: season.id,

@@ -28,7 +28,6 @@ export async function generateChampionshipRounds(
     .eq('season', season)
 
   if (count && count > 0) {
-    console.log(`[generateChampionshipRounds] ${count} runder eksisterer allerede for ${season} — skipper`)
     return { created: 0 }
   }
 
@@ -80,6 +79,5 @@ export async function generateChampionshipRounds(
     throw new Error(error.message)
   }
 
-  console.log(`[generateChampionshipRounds] Oprettet ${rounds.length} runder for ${season}`)
   return { created: rounds.length }
 }
