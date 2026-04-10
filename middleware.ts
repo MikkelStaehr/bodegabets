@@ -2,62 +2,53 @@ import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  // Opret response med request videresendt — nødvendigt for cookie-refresh
   let res = NextResponse.next({ request: req })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll: (cookiesToSet) => {
-          // Opdater request-cookies (til server components) OG response-cookies (til browser)
-          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
-          res = NextResponse.next({ request: req })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) return res
 
-  // Sikker server-side JWT validering mod Supabase
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll: () => req.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
+        res = NextResponse.next({ request: req })
+        cookiesToSet.forEach(({ name, value, options }) =>
+          res.cookies.set(name, value, options)
+        )
+      },
+    },
+  })
+
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = req.nextUrl.pathname
-  // Suspend-tjek — redirect til /suspended
-  if (user && !path.startsWith('/suspended') && !path.startsWith('/login') && !path.startsWith('/register')) {
-    const { data: profile, error: suspendedError } = await supabase
+  const isProtected = path.startsWith('/dashboard') || path.startsWith('/games') || path.startsWith('/admin')
+
+  // Fetch profile once (suspend + admin check in single query)
+  let profile: { is_suspended: boolean; is_admin: boolean } | null = null
+  if (user && (isProtected || !path.startsWith('/suspended'))) {
+    const { data } = await supabase
       .from('profiles')
-      .select('is_suspended')
+      .select('is_suspended, is_admin')
       .eq('id', user.id)
       .single()
-
-    if (profile?.is_suspended) {
-      return NextResponse.redirect(new URL('/suspended', req.url))
-    }
+    profile = data
   }
 
-  // Beskyt /admin — kræver login + is_admin
+  // Suspend check
+  if (user && profile?.is_suspended && !path.startsWith('/suspended') && !path.startsWith('/login')) {
+    return NextResponse.redirect(new URL('/suspended', req.url))
+  }
+
+  // Protect /admin
   if (path.startsWith('/admin')) {
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', req.url))
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
+    if (!user) return NextResponse.redirect(new URL('/login', req.url))
+    if (!profile?.is_admin) return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
-  // Beskyt /dashboard og /games — kræver login
+  // Protect /dashboard and /games
   if ((path.startsWith('/dashboard') || path.startsWith('/games')) && !user) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
@@ -67,10 +58,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all routes except static files and Next.js internals.
-     * This ensures auth tokens are refreshed on every navigation.
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }

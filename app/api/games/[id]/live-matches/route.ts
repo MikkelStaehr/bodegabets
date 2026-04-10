@@ -1,5 +1,6 @@
 import { supabaseAdmin, createServerSupabaseClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentChampionshipSeason } from '@/lib/gamePageHelpers'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest, { params }: Props) {
           )
         )
       `)
-      .eq('season', '2025/26')
+      .eq('season', getCurrentChampionshipSeason())
       .neq('status', 'finished')
       .order('betting_closes_at', { ascending: true })
 

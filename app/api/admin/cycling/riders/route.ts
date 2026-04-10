@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     .select('id, first_name, last_name, team_name, category, photo_url, team_logo_url, pcs_slug')
     .order('category', { ascending: true })
     .order('last_name', { ascending: true })
+    .limit(1000)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

@@ -2,9 +2,15 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`Missing required environment variable: ${name}`)
+  return value
+}
+
+const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
+const supabaseAnonKey = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+const supabaseServiceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 

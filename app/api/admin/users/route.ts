@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     .from('profiles')
     .select('id, username, created_at, is_suspended')
     .order('created_at', { ascending: false })
+    .limit(500)
 
   if (!profiles?.length) {
     return NextResponse.json({ users: [] })

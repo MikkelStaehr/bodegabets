@@ -17,7 +17,7 @@ import LineupBuilder from '@/components/cycling/LineupBuilder'
 import CyclingGameroom from '@/components/cycling/CyclingGameroom'
 import CyclingLeaderboard from '@/components/cycling/CyclingLeaderboard'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
-import { getSportTheme, assignRanks, computeRoundStatus, getLeagueAbbr } from '@/lib/gamePageHelpers'
+import { getSportTheme, assignRanks, computeRoundStatus, getLeagueAbbr, getCurrentChampionshipSeason } from '@/lib/gamePageHelpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -425,7 +425,7 @@ export default async function GamePage({ params }: Props) {
           )
         )
       `)
-      .eq('season', '2025/26')
+      .eq('season', getCurrentChampionshipSeason())
       .order('betting_closes_at', { ascending: true })
 
     championshipRounds = (cRounds ?? []).filter(

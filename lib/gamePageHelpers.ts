@@ -1,5 +1,15 @@
 // Utility functions extracted from app/games/[id]/page.tsx
 
+/** Returns the current championship season based on date (e.g., '2025/26') */
+export function getCurrentChampionshipSeason(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  // Season starts in August — before August, we're in previous season
+  const startYear = month >= 8 ? year : year - 1
+  return `${startYear}/${(startYear + 1).toString().slice(2)}`
+}
+
 export function getSportTheme(sport: string) {
   if (sport === 'cycling') {
     return { primary: '#1E3A5F', primaryLight: '#2B4F7A', accent: '#4A6FA5' }
