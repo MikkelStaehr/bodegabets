@@ -787,19 +787,26 @@ app.listen(PORT, () => {
 
   // ─── Intelligent polling ─────────────────────────────────────────────
   //
-  // Strategi:
-  //   Hvert 1. minut: KUN et billigt "heartbeat" tjek
-  //   → Live/started kampe: sync hvert minut (real-time)
-  //   → Kampe inden 30 min: sync hvert minut (gør klar)
-  //   → Ingen kampe snart: sync hvert 30. minut (idle)
+  // Fodbold polling: 11:00–00:00 UTC (12:00–01:00 DK)
+  //   → Live/started kampe: sync hvert minut
+  //   → Kampe inden 30 min: sync hvert 2. minut
+  //   → Idle: sync hvert 30. minut
+  //   → 00:00–11:00 UTC: OFF (ingen kampe)
   //
-  // Dette reducerer fra ~1.440 til ~50-100 daglige sync-kald
-  // på dage uden kampe, men giver stadig real-time under kampe.
+  // Cykling cron: 09:00–20:00 UTC (10:00–21:00 DK)
+  //   → Lock: hvert 15. minut
+  //   → Points: hvert 30. minut
+  //   → 20:00–09:00 UTC: OFF (ingen løb)
 
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date()
+      const utcHour = now.getUTCHours()
       const minute = now.getMinutes()
+
+      // ── Nattepause: 00:00–11:00 UTC (01:00–12:00 DK) — ingen fodboldkampe ──
+      if (utcHour >= 0 && utcHour < 11) return
+
       const soon = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
 
       // ── Quick check: er der overhovedet aktive spil? ───────────────
@@ -929,11 +936,11 @@ app.listen(PORT, () => {
   // Dagligt kl. 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
 
-  // Hvert 15. minut — lås cycling lineups med passeret deadline
-  cron.schedule('*/15 * * * *', () => callEndpoint('/cycling-lock-lineups'))
+  // Hvert 15. minut — lås cycling lineups (kun 09:00–20:00 UTC / 10:00–21:00 DK)
+  cron.schedule('*/15 9-20 * * *', () => callEndpoint('/cycling-lock-lineups'))
 
-  // Hvert 30. minut — beregn point for nyligt afsluttede cykling-løb
-  cron.schedule('*/30 * * * *', () => callEndpoint('/cycling-points'))
+  // Hvert 30. minut — beregn cykling-point (kun 09:00–20:00 UTC)
+  cron.schedule('*/30 9-20 * * *', () => callEndpoint('/cycling-points'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')
 })
