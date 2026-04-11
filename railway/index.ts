@@ -785,13 +785,34 @@ app.listen(PORT, () => {
     }
   }
 
-  // Dynamisk polling — hvert minut
+  // ─── Intelligent polling ─────────────────────────────────────────────
+  //
+  // Strategi:
+  //   Hvert 1. minut: KUN et billigt "heartbeat" tjek
+  //   → Live/started kampe: sync hvert minut (real-time)
+  //   → Kampe inden 30 min: sync hvert minut (gør klar)
+  //   → Ingen kampe snart: sync hvert 30. minut (idle)
+  //
+  // Dette reducerer fra ~1.440 til ~50-100 daglige sync-kald
+  // på dage uden kampe, men giver stadig real-time under kampe.
+
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date()
+      const minute = now.getMinutes()
       const soon = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
 
-      // ── 1) Regular games: round_ids fra game_seasons ──────────────────
+      // ── Quick check: er der overhovedet aktive spil? ───────────────
+      const { data: activeGames } = await supabaseAdmin
+        .from('games')
+        .select('id, championship_mode')
+        .eq('status', 'active')
+        .limit(1)
+
+      if (!activeGames?.length) return // ingen aktive spil, skip alt
+
+      // ── Hent relevante match IDs ──────────────────────────────────
+      // Regular games
       const { data: activeGameSeasons } = await supabaseAdmin
         .from('game_seasons')
         .select('season_id, games!inner(status)')
@@ -808,7 +829,7 @@ app.listen(PORT, () => {
         activeRoundIds = (activeRounds ?? []).map(r => r.id as number)
       }
 
-      // ── 2) Championship games (Bodega Rounds): match_ids via championship_round_matches ──
+      // Championship games
       let champMatchIds: number[] = []
       const { data: champGames } = await supabaseAdmin
         .from('games')
@@ -817,7 +838,6 @@ app.listen(PORT, () => {
         .eq('championship_mode', true)
 
       if (champGames && champGames.length > 0) {
-        // Hent alle match_ids fra ikke-færdige championship_rounds
         const { data: champRoundMatches } = await supabaseAdmin
           .from('championship_round_matches')
           .select('match_id, championship_rounds!inner(id, status)')
@@ -828,13 +848,12 @@ app.listen(PORT, () => {
 
       if (activeRoundIds.length === 0 && champMatchIds.length === 0) return
 
-      // ── 3) Tjek for live/soon/started kampe ───────────────────────────
-
+      // ── Tjek match-tilstand ───────────────────────────────────────
       let hasLive = false
       let hasSoon = false
       let hasStarted = false
 
-      // Check regular round matches
+      // Regular rounds
       if (activeRoundIds.length > 0) {
         const { data: liveMatches } = await supabaseAdmin
           .from('matches').select('id')
@@ -850,53 +869,53 @@ app.listen(PORT, () => {
           if (soonMatches?.length) hasSoon = true
         }
 
-        const { data: startedMatches } = await supabaseAdmin
-          .from('matches').select('id')
-          .eq('status', 'scheduled').lt('kickoff', now.toISOString())
-          .in('round_id', activeRoundIds).limit(1)
-        if (startedMatches?.length) hasStarted = true
-      }
-
-      // Check championship round matches (Bodega Rounds)
-      if (champMatchIds.length > 0) {
-        if (!hasLive) {
-          const { data: champLive } = await supabaseAdmin
-            .from('matches').select('id')
-            .in('status', ['live', 'halftime'])
-            .in('id', champMatchIds).limit(1)
-          if (champLive?.length) hasLive = true
-        }
-
-        if (!hasSoon) {
-          const { data: champSoon } = await supabaseAdmin
-            .from('matches').select('id')
-            .eq('status', 'scheduled').lte('kickoff', soon).gte('kickoff', now.toISOString())
-            .in('id', champMatchIds).limit(1)
-          if (champSoon?.length) hasSoon = true
-        }
-
         if (!hasStarted) {
-          const { data: champStarted } = await supabaseAdmin
+          const { data: startedMatches } = await supabaseAdmin
             .from('matches').select('id')
             .eq('status', 'scheduled').lt('kickoff', now.toISOString())
-            .in('id', champMatchIds).limit(1)
-          if (champStarted?.length) hasStarted = true
+            .in('round_id', activeRoundIds).limit(1)
+          if (startedMatches?.length) hasStarted = true
         }
       }
 
-      if (hasLive || hasSoon || hasStarted) {
-        console.log(`[cron] Dynamic sync — live: ${hasLive}, soon: ${hasSoon}, started: ${hasStarted}`)
-        await callEndpoint('/sync-scores')
-      } else {
-        const minute = now.getMinutes()
-        if (minute % 5 === 0) {
-          await callEndpoint('/sync-scores')
+      // Championship rounds
+      if (champMatchIds.length > 0) {
+        if (!hasLive) {
+          const { data } = await supabaseAdmin.from('matches').select('id')
+            .in('status', ['live', 'halftime']).in('id', champMatchIds).limit(1)
+          if (data?.length) hasLive = true
         }
+        if (!hasSoon) {
+          const { data } = await supabaseAdmin.from('matches').select('id')
+            .eq('status', 'scheduled').lte('kickoff', soon).gte('kickoff', now.toISOString())
+            .in('id', champMatchIds).limit(1)
+          if (data?.length) hasSoon = true
+        }
+        if (!hasStarted) {
+          const { data } = await supabaseAdmin.from('matches').select('id')
+            .eq('status', 'scheduled').lt('kickoff', now.toISOString())
+            .in('id', champMatchIds).limit(1)
+          if (data?.length) hasStarted = true
+        }
+      }
+
+      // ── Beslut sync-frekvens ──────────────────────────────────────
+      if (hasLive || hasStarted) {
+        // Real-time: sync hvert minut
+        await callEndpoint('/sync-scores')
+      } else if (hasSoon) {
+        // Kampe snart: sync hvert 2. minut
+        if (minute % 2 === 0) await callEndpoint('/sync-scores')
+      } else {
+        // Idle: sync hvert 30. minut
+        if (minute % 30 === 0) await callEndpoint('/sync-scores')
       }
     } catch (err) {
       console.error('[cron] Dynamic polling fejl:', err)
     }
   })
+
+  // ─── Faste cron jobs ────────────────────────────────────────────────
 
   // Hver 3. time — batch sync af alle kampe
   cron.schedule('0 */3 * * *', () => callEndpoint('/batch-sync'))
@@ -910,12 +929,11 @@ app.listen(PORT, () => {
   // Dagligt kl. 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
 
-  // Hvert 10. minut — tjek for nyligt finished cykling-løb og beregn point
-  // Hvert 5. minut — lås cycling lineups med passeret deadline
-  cron.schedule('*/5 * * * *', () => callEndpoint('/cycling-lock-lineups'))
+  // Hvert 15. minut — lås cycling lineups med passeret deadline
+  cron.schedule('*/15 * * * *', () => callEndpoint('/cycling-lock-lineups'))
 
-  // Hvert 10. minut — beregn point for nyligt afsluttede løb
-  cron.schedule('*/10 * * * *', () => callEndpoint('/cycling-points'))
+  // Hvert 30. minut — beregn point for nyligt afsluttede cykling-løb
+  cron.schedule('*/30 * * * *', () => callEndpoint('/cycling-points'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')
 })
