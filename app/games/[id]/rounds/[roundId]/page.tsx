@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import AfgivBets from '@/components/AfgivBets'
+import AfgivBets from '@/components/games/AfgivBets'
 import type { Match, Bet, Round } from '@/types'
 
 type Props = {

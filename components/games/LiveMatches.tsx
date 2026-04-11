@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useLiveMatches } from '@/hooks/useLiveMatches'
-import { LiveMatchesTicker } from '@/components/LiveMatchesTicker'
+import { LiveMatchesTicker } from '@/components/games/LiveMatchesTicker'
 
 type Props = {
   roundId: number

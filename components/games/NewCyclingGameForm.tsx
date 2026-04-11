@@ -487,7 +487,7 @@ export default function NewCyclingGameForm({ races }: Props) {
     setCreating(true)
 
     try {
-      const res = await fetch('/api/cycling-games/create', {
+      const res = await fetch('/api/games/cycling-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

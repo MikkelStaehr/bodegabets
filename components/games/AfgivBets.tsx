@@ -7,7 +7,7 @@ import { BET_TYPE_LABELS, PREDICTION_LABELS } from '@/lib/betTypes'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
 import { formatKickoff } from '@/lib/dateUtils'
-import GameTicker from '@/components/GameTicker'
+import GameTicker from '@/components/games/GameTicker'
 
 type MatchWithOptions = Match
 

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import NewGameForm from '@/components/NewGameForm'
+import NewGameForm from '@/components/games/NewGameForm'
 import type { Tournament, Season } from '@/types'
 
 export default async function NewFootballGamePage() {

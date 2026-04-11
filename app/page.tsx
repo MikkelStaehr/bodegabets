@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import GameTicker from '@/components/GameTicker'
-import RotatingWord from '@/components/RotatingWord'
+import GameTicker from '@/components/games/GameTicker'
+import RotatingWord from '@/components/layout/RotatingWord'
 import type { Profile } from '@/types'
 
 function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {

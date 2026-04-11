@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import OnboardingModal from '@/components/OnboardingModal'
+import OnboardingModal from '@/components/layout/OnboardingModal'
 
 type Props = {
   onboardingCompleted: boolean

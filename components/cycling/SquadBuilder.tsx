@@ -182,7 +182,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
     setError(null)
     setSaving(true)
     try {
-      const res = await fetch(`/api/cycling-games/${gameId}/squad`, {
+      const res = await fetch(`/api/games/${gameId}/cycling/squad`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rider_ids: squad.map((r) => r.id), cycling_block_id: blockId }),

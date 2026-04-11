@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import DashboardContent from '@/components/dashboard/DashboardContent'
-import DashboardClient from '@/components/dashboard/DashboardClient'
 import JoinGameCard from '@/components/dashboard/JoinGameCard'
 import type { SportType, GameRowWithSport } from '@/components/dashboard/DashboardContent'
 
@@ -260,7 +259,6 @@ export default async function DashboardPage() {
     rankByGame.set(gid, rankMap)
   }
 
-  const betsByRound = new Set((bets ?? []).map((b: { round_id: number }) => b.round_id))
   const activeRoundIds = [...activeRoundByGame.values()].map((r) => r.id)
   const userBetsInActiveRounds = (bets ?? []).filter((b: { round_id: number }) => activeRoundIds.includes(b.round_id))
   const betsCountByGame = new Map<number, number>()
@@ -365,21 +363,19 @@ export default async function DashboardPage() {
   })()
 
   return (
-    <DashboardClient onboardingCompleted={profile?.onboarding_completed ?? false}>
-      <div className="min-h-screen bg-[#F2EDE4]">
-        <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
-          <DashboardContent
-            games={games}
-            activeRounds={activeRounds}
-            nextRoundDate={nextRoundDate}
-            logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
-            leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
-            top3ByGame={Object.fromEntries(top3ByGame)}
-            username={profile?.username ?? 'Spiller'}
-            activeBlockByGame={Object.fromEntries(activeBlockByGame)}
-          />
-        </div>
+    <div className="min-h-screen bg-[#F2EDE4]">
+      <div className="max-w-[1100px] mx-auto px-4 max-[768px]:px-4 py-8">
+        <DashboardContent
+          games={games}
+          activeRounds={activeRounds}
+          nextRoundDate={nextRoundDate}
+          logoUrlsByGame={Object.fromEntries(logoUrlsByGame)}
+          leagueNamesByGame={Object.fromEntries(leagueNamesByGame)}
+          top3ByGame={Object.fromEntries(top3ByGame)}
+          username={profile?.username ?? 'Spiller'}
+          activeBlockByGame={Object.fromEntries(activeBlockByGame)}
+        />
       </div>
-    </DashboardClient>
+    </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useLiveMatchesContext } from '@/contexts/LiveMatchesContext'
-import { LiveMatchesTicker } from '@/components/LiveMatchesTicker'
+import { LiveMatchesTicker } from '@/components/games/LiveMatchesTicker'
 
 export default function ActiveRoundLiveTicker() {
   const ctx = useLiveMatchesContext()

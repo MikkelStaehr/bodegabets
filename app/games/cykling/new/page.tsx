@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import NewCyclingGameForm from '@/components/NewCyclingGameForm'
+import NewCyclingGameForm from '@/components/games/NewCyclingGameForm'
 
 export default async function NewCyclingGamePage() {
   const supabase = await createServerSupabaseClient()

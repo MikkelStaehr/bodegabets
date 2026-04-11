@@ -188,7 +188,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
   // Fetch existing lineups on mount (fetches all lineups across squads)
   useEffect(() => {
     if (!hasAnySquad) return
-    fetch(`/api/cycling-games/${gameId}/lineup`)
+    fetch(`/api/games/${gameId}/cycling/lineup`)
       .then((res) => res.json())
       .then((data) => {
         if (!data.lineups?.length) return
@@ -271,7 +271,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
     }
 
     try {
-      const res = await fetch(`/api/cycling-games/${gameId}/lineup`, {
+      const res = await fetch(`/api/games/${gameId}/cycling/lineup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ race_id: stage.race_id, stage_id: stageId, riders }),
