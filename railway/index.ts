@@ -936,6 +936,9 @@ app.listen(PORT, () => {
   // Dagligt kl. 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
 
+  // Hvert 10. minut — beregn fodbold + championship point (kun 11:00–00:00 UTC)
+  cron.schedule('*/10 11-23 * * *', () => callEndpoint('/calculate-points'))
+
   // Hvert 15. minut — lås cycling lineups (kun 09:00–20:00 UTC / 10:00–21:00 DK)
   cron.schedule('*/15 9-20 * * *', () => callEndpoint('/cycling-lock-lineups'))
 
