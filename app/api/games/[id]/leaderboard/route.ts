@@ -36,16 +36,17 @@ export async function GET(_req: NextRequest, { params }: Props) {
     .maybeSingle()
   if (!membership) return NextResponse.json({ error: 'Ikke medlem' }, { status: 403 })
 
-  // Determine sport
+  // Determine sport and mode
   const { data: game } = await supabaseAdmin
     .from('games')
-    .select('sport')
+    .select('sport, championship_mode')
     .eq('id', numericGameId)
     .single()
 
   if (!game) return NextResponse.json({ error: 'Spil ikke fundet' }, { status: 404 })
 
   const sport = game.sport ?? 'football'
+  const isChampionship = game.championship_mode === true
 
   // Get all members
   const { data: members } = await supabaseAdmin
@@ -57,6 +58,8 @@ export async function GET(_req: NextRequest, { params }: Props) {
 
   if (sport === 'cycling') {
     return NextResponse.json(await buildCyclingLeaderboard(numericGameId, members))
+  } else if (isChampionship) {
+    return NextResponse.json(await buildChampionshipLeaderboard(numericGameId, members))
   } else {
     return NextResponse.json(await buildFootballLeaderboard(numericGameId, members))
   }
@@ -134,6 +137,59 @@ async function buildFootballLeaderboard(
   const blockIds = new Set<number>()
   for (const r of rounds ?? []) { if (r.block_id) blockIds.add(r.block_id) }
   const blockWins = countWins(userData, 'blockPoints', blockIds)
+
+  return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
+}
+
+// ─── Cycling ───────────────────────────────────────────────────────────────
+
+// ─── Championship (Bodega Rounds) ──────────────────────────────────────────
+
+async function buildChampionshipLeaderboard(
+  gameId: number,
+  members: { user_id: string; profiles: unknown }[],
+) {
+  // Championship has no blocks — round_scores are keyed by championship_round_id
+  // "Block" = entire season, "Round" = individual championship round
+
+  // Get all round_scores for this game
+  const { data: scores } = await supabaseAdmin
+    .from('round_scores')
+    .select('user_id, round_id, earnings_delta')
+    .eq('game_id', gameId)
+
+  if (!scores?.length) {
+    const empty = new Map<string, { roundPoints: Map<unknown, number>; blockPoints: Map<unknown, number> }>()
+    return { leaderboard: buildEntries(members, empty, new Map(), new Map()) }
+  }
+
+  // Get finished championship round IDs (to know which rounds count for wins)
+  const roundIds = [...new Set(scores.map((s) => s.round_id as number))]
+  const { data: champRounds } = await supabaseAdmin
+    .from('championship_rounds')
+    .select('id, status')
+    .in('id', roundIds)
+
+  const finishedRoundIds = new Set(
+    (champRounds ?? []).filter((r) => r.status === 'finished').map((r) => r.id)
+  )
+
+  // Aggregate per user — round points + total (block = all rounds combined, key=0)
+  const userData = new Map<string, { roundPoints: Map<number, number>; blockPoints: Map<number, number> }>()
+  for (const m of members) {
+    userData.set(m.user_id, { roundPoints: new Map(), blockPoints: new Map() })
+  }
+
+  for (const s of scores) {
+    const ud = userData.get(s.user_id as string)
+    if (!ud) continue
+    const pts = Number(s.earnings_delta) || 0
+    ud.roundPoints.set(s.round_id, (ud.roundPoints.get(s.round_id) ?? 0) + pts)
+    ud.blockPoints.set(0, (ud.blockPoints.get(0) ?? 0) + pts) // 0 = samlet sæson
+  }
+
+  const roundWins = countWins(userData, 'roundPoints', finishedRoundIds)
+  const blockWins = countWins(userData, 'blockPoints', new Set([0]))
 
   return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
 }

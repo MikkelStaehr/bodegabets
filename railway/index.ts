@@ -28,7 +28,7 @@ import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
-import { calculateRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
+import { calculateRoundPoints, calculateChampionshipRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
 import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage } from '@/lib/calculateCyclingPoints'
 
@@ -408,16 +408,49 @@ app.get('/calculate-points', async (_req, res) => {
       }
     }
 
+    // Championship rounds — beregn for alle aktive championship_mode games
+    let champProcessed = 0
+    const { data: champGames } = await supabaseAdmin
+      .from('games')
+      .select('id')
+      .eq('status', 'active')
+      .eq('championship_mode', true)
+
+    if (champGames && champGames.length > 0) {
+      // Find alle ikke-færdige championship rounds med mindst én finished kamp
+      const { data: champRounds } = await supabaseAdmin
+        .from('championship_rounds')
+        .select(`
+          id,
+          championship_round_matches(
+            match_id,
+            matches(id, status)
+          )
+        `)
+        .neq('status', 'finished')
+
+      for (const cr of champRounds ?? []) {
+        const crMatches = (cr.championship_round_matches as unknown as { matches: { id: number; status: string } | null }[])
+          .map((crm) => crm.matches)
+          .filter((m): m is { id: number; status: string } => m !== null)
+        const anyFinished = crMatches.some((m) => m.status === 'finished')
+        if (!anyFinished) continue
+
+        await calculateChampionshipRoundPoints(cr.id)
+        champProcessed++
+      }
+    }
+
     const { updated } = await syncProfilesPoints()
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'cron_sync',
-      status: processed > 0 ? 'success' : 'info',
-      message: `calculate-points: ${processed} rounds processed, ${updated} profiles updated`,
-      metadata: { rounds_processed: processed, profiles_updated: updated },
+      status: (processed > 0 || champProcessed > 0) ? 'success' : 'info',
+      message: `calculate-points: ${processed} rounds + ${champProcessed} championship rounds, ${updated} profiles`,
+      metadata: { rounds_processed: processed, championship_processed: champProcessed, profiles_updated: updated },
     })
 
-    res.json({ ok: true, processed, profiles_updated: updated })
+    res.json({ ok: true, processed, championship_processed: champProcessed, profiles_updated: updated })
   } catch (err) {
     console.error('[calculate-points]', err)
     res.status(500).json({ error: String(err) })

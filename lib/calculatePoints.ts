@@ -242,6 +242,151 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
 }
 
 /**
+ * Championship (Bodega Rounds) point-beregning.
+ *
+ * Forskellen fra calculateRoundPoints:
+ * - Kampe hentes via championship_round_matches junction (ikke matches.round_id)
+ * - Game_ids hentes fra championship_mode games (ikke game_seasons)
+ * - Ingen runde-status management (håndteres af /update-rounds cron)
+ */
+export async function calculateChampionshipRoundPoints(championshipRoundId: number): Promise<void> {
+  // 1. Hent match_ids via junction-tabellen
+  const { data: roundMatches } = await supabaseAdmin
+    .from('championship_round_matches')
+    .select('match_id')
+    .eq('championship_round_id', championshipRoundId)
+
+  if (!roundMatches?.length) return
+
+  const matchIds = roundMatches.map((rm) => rm.match_id as number)
+
+  // 2. Hent finished matches
+  const { data: matches } = await supabaseAdmin
+    .from('matches')
+    .select('id, home_score, away_score, home_score_ht, away_score_ht, status')
+    .in('id', matchIds)
+    .eq('status', 'finished')
+
+  if (!matches?.length) return
+
+  const finishedMatchIds = matches.map((m) => m.id)
+
+  // 3. Find alle game_ids der har bets i denne championship runde
+  const { data: betGameRows } = await supabaseAdmin
+    .from('bets')
+    .select('game_id')
+    .eq('round_id', championshipRoundId)
+    .in('match_id', finishedMatchIds)
+
+  const allGameIds = [...new Set((betGameRows ?? []).map((b) => b.game_id as number))]
+  if (allGameIds.length === 0) return
+
+  // 4. For hvert game: evaluer bets og beregn point
+  for (const gameId of allGameIds) {
+    // 4a. Evaluer alle bets
+    for (const match of matches) {
+      if (match.home_score === null || match.away_score === null) continue
+
+      const { data: bets } = await supabaseAdmin
+        .from('bets')
+        .select('id, user_id, prediction, stake, bet_type, odds')
+        .eq('match_id', match.id)
+        .eq('game_id', gameId)
+        .eq('round_id', championshipRoundId)
+
+      if (!bets?.length) continue
+
+      for (const bet of bets) {
+        const correct = isBetCorrect(
+          bet.bet_type,
+          bet.prediction,
+          match.home_score,
+          match.away_score,
+          match.home_score_ht,
+          match.away_score_ht
+        )
+
+        const stake = bet.stake ?? 0
+        let pointsEarned: number
+        if (!correct) {
+          pointsEarned = 0
+        } else if (bet.bet_type === 'match_result') {
+          const odds = (bet as { odds?: number | null }).odds ?? 1.0
+          pointsEarned = Math.round(stake * odds)
+        } else {
+          const odds = (bet as { odds?: number | null }).odds ?? 2.0
+          pointsEarned = Math.round(stake * odds)
+        }
+        const result = correct ? 'win' : 'loss'
+
+        await supabaseAdmin
+          .from('bets')
+          .update({ result, points_earned: pointsEarned })
+          .eq('id', bet.id)
+      }
+    }
+
+    // 4b. Beregn earnings_delta per bruger
+    const { data: roundBets } = await supabaseAdmin
+      .from('bets')
+      .select('user_id, stake, points_earned')
+      .eq('game_id', gameId)
+      .eq('round_id', championshipRoundId)
+      .in('match_id', finishedMatchIds)
+
+    if (!roundBets?.length) continue
+
+    const userStats = new Map<string, { totalStake: number; totalEarned: number }>()
+    for (const b of roundBets) {
+      const uid = b.user_id as string
+      const entry = userStats.get(uid) ?? { totalStake: 0, totalEarned: 0 }
+      entry.totalStake += b.stake ?? 0
+      entry.totalEarned += b.points_earned ?? 0
+      userStats.set(uid, entry)
+    }
+
+    // 4c. Upsert round_scores (round_id = championship_round_id)
+    for (const [userId, stats] of userStats) {
+      await supabaseAdmin.from('round_scores').upsert(
+        {
+          user_id: userId,
+          round_id: championshipRoundId,
+          game_id: gameId,
+          points_earned: stats.totalEarned,
+          earnings_delta: stats.totalEarned,
+        },
+        { onConflict: 'user_id,round_id,game_id' }
+      )
+    }
+
+    // 4d. Opdater game_members.earnings (absolut sum af alle round_scores)
+    const { data: members } = await supabaseAdmin
+      .from('game_members')
+      .select('user_id')
+      .eq('game_id', gameId)
+
+    for (const member of members ?? []) {
+      const { data: scores } = await supabaseAdmin
+        .from('round_scores')
+        .select('earnings_delta')
+        .eq('game_id', gameId)
+        .eq('user_id', member.user_id)
+
+      const totalEarnings = (scores ?? []).reduce(
+        (sum, s) => sum + ((s as { earnings_delta?: number }).earnings_delta ?? 0),
+        0
+      )
+
+      await supabaseAdmin
+        .from('game_members')
+        .update({ earnings: totalEarnings })
+        .eq('game_id', gameId)
+        .eq('user_id', member.user_id)
+    }
+  }
+}
+
+/**
  * Synkroniserer profiles.points med summen af game_members.earnings for hver bruger.
  */
 export async function syncProfilesPoints(): Promise<{ updated: number }> {
