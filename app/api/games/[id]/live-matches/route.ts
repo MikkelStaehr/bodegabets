@@ -93,9 +93,10 @@ export async function GET(req: NextRequest, { params }: Props) {
       }
     }
 
-    // Hent brugerens bets
+    // Hent brugerens bets + fordeling for championship kampe
     const champMatchIds = allChampMatches.map((m) => m.id)
     if (champMatchIds.length > 0) {
+      // Brugerens bets
       const { data: champBets } = await supabaseAdmin
         .from('bets')
         .select('match_id, prediction')
@@ -106,6 +107,36 @@ export async function GET(req: NextRequest, { params }: Props) {
       for (const b of champBets ?? []) {
         const match = allChampMatches.find((m) => m.id === b.match_id)
         if (match) match.userPrediction = b.prediction
+      }
+
+      // Fordeling for låste kampe
+      const lockedChampIds = allChampMatches.filter((m) => !m.bet_open).map((m) => m.id)
+      if (lockedChampIds.length > 0) {
+        const { data: champDistBets } = await supabaseAdmin
+          .from('bets')
+          .select('match_id, prediction, odds')
+          .eq('game_id', gameId)
+          .eq('bet_type', 'match_result')
+          .in('match_id', lockedChampIds)
+
+        const champDist: Record<number, { '1': number; 'X': number; '2': number; total: number; odds: { '1': number | null; 'X': number | null; '2': number | null } }> = {}
+        for (const b of champDistBets ?? []) {
+          if (!champDist[b.match_id]) champDist[b.match_id] = { '1': 0, 'X': 0, '2': 0, total: 0, odds: { '1': null, 'X': null, '2': null } }
+          const pred = b.prediction as '1' | 'X' | '2'
+          if (pred in champDist[b.match_id]) {
+            champDist[b.match_id][pred]++
+            champDist[b.match_id].total++
+            if (champDist[b.match_id].odds[pred] === null && b.odds != null) {
+              champDist[b.match_id].odds[pred] = b.odds as number
+            }
+          }
+        }
+
+        for (const match of allChampMatches) {
+          if (champDist[match.id]) {
+            (match as Record<string, unknown>).distribution = champDist[match.id]
+          }
+        }
       }
     }
 
