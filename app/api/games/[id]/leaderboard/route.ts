@@ -133,10 +133,18 @@ async function buildFootballLeaderboard(
   // Calculate round wins (only finished rounds)
   const roundWins = countWins(userData, 'roundPoints', finishedRoundIds)
 
-  // Calculate block wins
-  const blockIds = new Set<number>()
-  for (const r of rounds ?? []) { if (r.block_id) blockIds.add(r.block_id) }
-  const blockWins = countWins(userData, 'blockPoints', blockIds)
+  // Calculate block wins — KUN finished blocks
+  const allBlockIds = [...new Set((rounds ?? []).map((r) => r.block_id).filter((id): id is number => id != null))]
+  let finishedBlockIds = new Set<number>()
+  if (allBlockIds.length > 0) {
+    const { data: blocks } = await supabaseAdmin
+      .from('blocks')
+      .select('id, status')
+      .in('id', allBlockIds)
+      .eq('status', 'finished')
+    finishedBlockIds = new Set((blocks ?? []).map((b) => b.id as number))
+  }
+  const blockWins = countWins(userData, 'blockPoints', finishedBlockIds)
 
   return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
 }
@@ -189,7 +197,8 @@ async function buildChampionshipLeaderboard(
   }
 
   const roundWins = countWins(userData, 'roundPoints', finishedRoundIds)
-  const blockWins = countWins(userData, 'blockPoints', new Set([0]))
+  // Championship har ingen blocks — block win tælles ikke (sæsonen er løbende)
+  const blockWins = new Map<string, number>()
 
   return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
 }
@@ -251,13 +260,25 @@ async function buildCyclingLeaderboard(
   for (const ud of userData.values()) {
     for (const sid of ud.roundPoints.keys()) stageIds.add(sid)
   }
-  const blockIds = new Set<string>()
-  for (const ud of userData.values()) {
-    for (const bid of ud.blockPoints.keys()) blockIds.add(bid)
+  // Kun finished cycling blocks tæller for block-sejre
+  const allCyclingBlockIds = [...new Set([...userData.values()].flatMap((ud) => [...ud.blockPoints.keys()]))]
+  let finishedCyclingBlockIds = new Set<string>()
+  if (allCyclingBlockIds.length > 0) {
+    const { data: cyclingBlocks } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('id, status')
+      .in('id', allCyclingBlockIds)
+    // cycling_blocks har ikke nødvendigvis status — tjek om alle races i blokken er finished
+    // For nu: inkluder blocks der har status 'finished' (hvis kolonnen eksisterer)
+    finishedCyclingBlockIds = new Set(
+      (cyclingBlocks ?? [])
+        .filter((b) => (b as { status?: string }).status === 'finished')
+        .map((b) => b.id as string)
+    )
   }
 
   const roundWins = countWins(userData, 'roundPoints', stageIds)
-  const blockWins = countWins(userData, 'blockPoints', blockIds)
+  const blockWins = countWins(userData, 'blockPoints', finishedCyclingBlockIds)
 
   return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
 }
