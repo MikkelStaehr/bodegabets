@@ -36,6 +36,14 @@ const app = express()
 app.use(express.json())
 const PORT = parseInt(process.env.PORT ?? '3000', 10)
 
+// Fang unhandled errors så containeren ikke silent crasher
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err)
+})
+
 // ─── Supabase admin client ──────────────────────────────────────────────────
 
 const supabaseAdmin = createClient(
