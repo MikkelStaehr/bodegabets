@@ -15,6 +15,7 @@ type Props = {
   blockSquadMap: Record<string, string>
   races: CyclingRace[]
   stages: CyclingStage[]
+  startlists?: Record<string, string[]>  // race_id → rider_ids
   squadRiders: CyclingSquadRider[]
   blocks: CyclingBlock[]
   defaultBlockId?: string | null
@@ -110,7 +111,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, stages, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -678,14 +679,27 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
         const role = ROLES.find((r) => r.key === roleKey)!
         const usedIds = getUsedRiderIds(stageId)
 
-        const filteredRiders = squadRiders.filter((r) => {
-          if (role.catRule && !role.catRule.includes(r.category)) return false
-          if (modalSearch.trim()) {
-            const q = modalSearch.toLowerCase()
-            if (!r.first_name.toLowerCase().includes(q) && !r.last_name.toLowerCase().includes(q) && !r.team_name.toLowerCase().includes(q)) return false
-          }
-          return true
-        })
+        // Find race_id for den aktive stage, og hent startliste
+        const modalStage = stages.find((s) => s.id === stageId)
+        const startlistIds = modalStage && startlists?.[modalStage.race_id] ? new Set(startlists[modalStage.race_id]) : null
+        const hasStartlist = startlistIds !== null && startlistIds.size > 0
+
+        // Sort: startliste-ryttere først, så andre
+        const filteredRiders = squadRiders
+          .filter((r) => {
+            if (role.catRule && !role.catRule.includes(r.category)) return false
+            if (modalSearch.trim()) {
+              const q = modalSearch.toLowerCase()
+              if (!r.first_name.toLowerCase().includes(q) && !r.last_name.toLowerCase().includes(q) && !r.team_name.toLowerCase().includes(q)) return false
+            }
+            return true
+          })
+          .sort((a, b) => {
+            if (!hasStartlist) return 0
+            const aStarts = startlistIds!.has(a.id) ? 1 : 0
+            const bStarts = startlistIds!.has(b.id) ? 1 : 0
+            return bStarts - aStarts
+          })
 
         return (
           <div
@@ -706,13 +720,23 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
                 padding: '14px 16px', borderBottom: '1px solid #2B4F7A',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: '#F2EDE4' }}>
                     {role.label}
                   </span>
                   {role.catRule && (
                     <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: '#8FABC4' }}>
                       (kun Kat {role.catRule.join(', ')})
+                    </span>
+                  )}
+                  {hasStartlist && (
+                    <span style={{
+                      fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,
+                      padding: '2px 6px', borderRadius: 4,
+                      background: 'rgba(107,143,113,0.2)', color: '#8FBF8F',
+                      letterSpacing: '0.04em',
+                    }}>
+                      {squadRiders.filter((r) => startlistIds!.has(r.id)).length} starter
                     </span>
                   )}
                 </div>
@@ -747,10 +771,12 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
                 ) : (
                   filteredRiders.map((rider, idx) => {
                     const alreadyUsed = usedIds.has(rider.id) && lineups[stageId]?.[roleKey] !== rider.id
+                    const isOnStartlist = hasStartlist ? startlistIds!.has(rider.id) : null
+                    const dimmed = alreadyUsed || (hasStartlist && !isOnStartlist)
                     return (
                       <button
                         key={rider.id} type="button" disabled={alreadyUsed}
-                        title={alreadyUsed ? 'Allerede valgt i en anden rolle' : undefined}
+                        title={alreadyUsed ? 'Allerede valgt i en anden rolle' : (hasStartlist && !isOnStartlist ? 'Starter ikke i dette løb' : undefined)}
                         onClick={() => { setSlot(stageId, roleKey, rider.id); setModalOpen(null) }}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
@@ -758,7 +784,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
                           background: 'transparent', border: 'none',
                           borderBottom: idx < filteredRiders.length - 1 ? '1px solid #1E3A5F' : 'none',
                           cursor: alreadyUsed ? 'not-allowed' : 'pointer',
-                          opacity: alreadyUsed ? 0.35 : 1,
+                          opacity: alreadyUsed ? 0.35 : (hasStartlist && !isOnStartlist ? 0.5 : 1),
                           textAlign: 'left', transition: 'background 0.1s',
                         }}
                         onMouseEnter={(e) => { if (!alreadyUsed) e.currentTarget.style.background = '#1E3A5F' }}
@@ -778,6 +804,23 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, sq
                             {rider.team_name}
                           </div>
                         </div>
+                        {hasStartlist && (
+                          isOnStartlist ? (
+                            <span style={{
+                              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,
+                              padding: '2px 6px', borderRadius: 4,
+                              background: 'rgba(107,143,113,0.2)', color: '#8FBF8F',
+                              letterSpacing: '0.04em',
+                            }}>STARTER</span>
+                          ) : (
+                            <span style={{
+                              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,
+                              padding: '2px 6px', borderRadius: 4,
+                              background: 'rgba(220,120,120,0.15)', color: '#D89090',
+                              letterSpacing: '0.04em',
+                            }}>—</span>
+                          )
+                        )}
                         <CatBadge cat={rider.category} />
                       </button>
                     )
