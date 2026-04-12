@@ -231,23 +231,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     .eq('id', stage_id)
     .single()
 
-  if (stageData) {
-    // Check block lock_deadline first
-    const { data: gameRace } = await supabaseAdmin
-      .from('cycling_game_races')
-      .select('cycling_block_id, cycling_blocks(lock_deadline)')
-      .eq('race_id', stageData.race_id)
-      .eq('game_id', Number(gameId))
-      .maybeSingle()
-
-    const blockDeadline = (gameRace?.cycling_blocks as unknown as { lock_deadline: string } | null)?.lock_deadline
-    // Fallback: stage start_date - 30 min
-    const stageDeadline = stageData.start_date
-      ? new Date(new Date(stageData.start_date).getTime() - 30 * 60 * 1000).toISOString()
-      : null
-    const deadline = blockDeadline ?? stageDeadline
-
-    if (deadline && new Date(deadline) < new Date()) {
+  // Check deadline: stage start_date - 30 min (block deadline bruges IKKE, dækker for bredt)
+  if (stageData?.start_date) {
+    const deadline = new Date(new Date(stageData.start_date).getTime() - 30 * 60 * 1000)
+    if (deadline < new Date()) {
       return NextResponse.json({ error: 'Deadline er passeret — lineup kan ikke ændres' }, { status: 400 })
     }
   }
