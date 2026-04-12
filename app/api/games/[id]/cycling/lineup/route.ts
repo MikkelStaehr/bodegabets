@@ -287,12 +287,15 @@ export async function POST(req: NextRequest, { params }: Props) {
   })
 
   if (catRuleRiders.length > 0) {
-    const { data: riderDetails } = await supabaseAdmin
-      .from('cycling_riders')
-      .select('id, category')
-      .in('id', catRuleRiders.map((r) => r.rider_id))
+    // Brug category_slot fra squad (snapshot på udtagelsestidspunktet)
+    // — ikke live cycling_riders.category som ændres med UCI ranking
+    const { data: squadRiderRows } = await supabaseAdmin
+      .from('cycling_squad_riders')
+      .select('rider_id, category_slot')
+      .eq('squad_id', squad.id)
+      .in('rider_id', catRuleRiders.map((r) => r.rider_id))
 
-    const catById = new Map((riderDetails ?? []).map((r) => [r.id, r.category]))
+    const catById = new Map((squadRiderRows ?? []).map((r) => [r.rider_id, r.category_slot]))
 
     for (const r of catRuleRiders) {
       const baseRole = r.role.startsWith('equipier_') ? 'equipier' : r.role

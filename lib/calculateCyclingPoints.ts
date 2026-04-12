@@ -217,27 +217,49 @@ export async function calculateCyclingPoints(
 
   if (!lineups?.length) return
 
-  // 5. Fetch lineup riders with rider details
+  // 5. Fetch lineup riders + team_name from cycling_riders (team ændres ikke)
+  //    Kategori hentes fra cycling_squad_riders.category_slot (snapshot ved udtagelse)
   const lineupIds = lineups.map((l) => l.id)
   const { data: lineupRidersRaw } = await supabaseAdmin
     .from('cycling_lineup_riders')
     .select(`
       lineup_id, rider_id, role, is_active,
-      rider:cycling_riders!inner(id, category, team_name)
+      rider:cycling_riders!inner(id, team_name)
     `)
     .in('lineup_id', lineupIds)
+
+  // Hent category_slot fra squad (snapshot på udtagelsestidspunktet)
+  // Map: squad_id → rider_id → category
+  const categoryBySquadRider = new Map<string, number>()
+  {
+    const { data: squadCats } = await supabaseAdmin
+      .from('cycling_squad_riders')
+      .select('squad_id, rider_id, category_slot')
+      .in('squad_id', squadIds)
+
+    for (const sr of squadCats ?? []) {
+      categoryBySquadRider.set(`${sr.squad_id}:${sr.rider_id}`, sr.category_slot as number)
+    }
+  }
+
+  // Map: lineup_id → squad_id
+  const lineupToSquad = new Map<string, string>()
+  for (const l of lineups) lineupToSquad.set(l.id, l.squad_id as string)
 
   // Group by lineup
   const ridersByLineup = new Map<string, LineupRider[]>()
   for (const lr of lineupRidersRaw ?? []) {
-    const r = lr.rider as unknown as { id: string; category: number; team_name: string }
+    const r = lr.rider as unknown as { id: string; team_name: string }
     const key = String(lr.lineup_id)
+    const squadId = lineupToSquad.get(lr.lineup_id as string)
+    const snapshotCat = squadId ? categoryBySquadRider.get(`${squadId}:${r.id}`) : undefined
+
     if (!ridersByLineup.has(key)) ridersByLineup.set(key, [])
     ridersByLineup.get(key)!.push({
       rider_id: r.id,
       role: lr.role,
       is_active: lr.is_active ?? true,
-      category: r.category,
+      category: snapshotCat ?? 5, // fallback til kat 5 hvis snapshot mangler
       team_name: r.team_name,
     })
   }
@@ -423,8 +445,10 @@ export async function calculateCyclingPoints(
 
       if (position != null && !isDnf) {
         // Calculate what they would have scored (base × cat multiplier)
+        // Brug snapshot category fra squad (ikke live rating)
+        const snapshotCat = categoryBySquadRider.get(`${squad.id}:${riderId}`) ?? riderDetail?.category ?? 5
         const wouldBase = getBasePoints(position)
-        const catMul = CAT_MULTIPLIER[riderDetail?.category ?? 5] ?? 1.0
+        const catMul = CAT_MULTIPLIER[snapshotCat] ?? 1.0
         const wouldScore = Math.round(wouldBase * catMul * 10) / 10
 
         if (position === 1) {

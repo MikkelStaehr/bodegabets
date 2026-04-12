@@ -139,23 +139,25 @@ export default async function SquadPage({ params, searchParams }: Props) {
   const { data: existingSquad } = await existingSquadQuery.maybeSingle()
 
   if (existingSquad) {
+    // Brug category_slot fra squad (snapshot ved udtagelse), ikke live cycling_riders.category
     const { data: squadRiders } = await supabaseAdmin
       .from('cycling_squad_riders')
       .select(`
+        category_slot,
         rider:cycling_riders!inner(
-          id, first_name, last_name, team_name, category, team_logo_url, photo_url
+          id, first_name, last_name, team_name, team_logo_url, photo_url
         )
       `)
       .eq('squad_id', existingSquad.id)
 
     initialSquad = (squadRiders ?? []).map((row) => {
-      const r = row.rider as unknown as Rider
+      const r = row.rider as unknown as Omit<Rider, 'category'>
       return {
         id: r.id,
         first_name: r.first_name,
         last_name: r.last_name,
         team_name: r.team_name,
-        category: r.category,
+        category: ((row as { category_slot?: number }).category_slot ?? 5),
         team_logo_url: r.team_logo_url,
         photo_url: r.photo_url,
       }

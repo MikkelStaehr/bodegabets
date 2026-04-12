@@ -385,15 +385,21 @@ export default async function GamePage({ params }: Props) {
     if (allSquadIds.length > 0) {
       const { data: srData } = await supabaseAdmin
         .from('cycling_squad_riders')
-        .select('rider_id, cycling_riders!inner(id, first_name, last_name, team_name, category, team_logo_url, photo_url)')
+        .select('rider_id, category_slot, cycling_riders!inner(id, first_name, last_name, team_name, team_logo_url, photo_url)')
         .in('squad_id', allSquadIds)
 
-      // Deduplicate riders across squads
+      // Brug category_slot som snapshot (ikke live cycling_riders.category)
       const seen = new Set<string>()
       lineupSquadRiders = (srData ?? [])
-        .map((r) => r.cycling_riders as unknown as {
-          id: string; first_name: string; last_name: string; team_name: string
-          category: number; team_logo_url: string | null; photo_url: string | null
+        .map((r) => {
+          const rider = r.cycling_riders as unknown as {
+            id: string; first_name: string; last_name: string; team_name: string
+            team_logo_url: string | null; photo_url: string | null
+          }
+          return {
+            ...rider,
+            category: (r.category_slot as number) ?? 5,
+          }
         })
         .filter((r) => { if (seen.has(r.id)) return false; seen.add(r.id); return true })
     }
