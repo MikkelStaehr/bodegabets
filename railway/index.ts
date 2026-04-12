@@ -691,21 +691,18 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
 
 app.get('/cycling-points', async (_req, res) => {
   try {
-    // Find løb der er finished og opdateret inden for de seneste 10 minutter
-    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-
-    const { data: newlyFinishedRaces } = await supabaseAdmin
+    // Find alle finished cycling races — beregning er idempotent (upsert)
+    // så det er OK at køre den for alle finished races hver gang
+    const { data: finishedRaces } = await supabaseAdmin
       .from('cycling_races')
       .select('id, name')
       .eq('status', 'finished')
-      .gte('updated_at', tenMinAgo)
 
     const processed: string[] = []
 
-    for (const race of newlyFinishedRaces ?? []) {
+    for (const race of finishedRaces ?? []) {
       console.log(`[cycling-points] Beregner point for ${race.name}...`)
       await runCyclingPointsForAllGames(race.id)
-      console.log(`[cycling-points] Point beregnet for ${race.name}`)
       processed.push(race.name)
     }
 
