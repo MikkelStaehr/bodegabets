@@ -166,6 +166,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const [success, setSuccess] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState<{ stageId: string; roleKey: CyclingRoleKey } | null>(null)
   const [modalSearch, setModalSearch] = useState('')
+  const [showOnlyStarters, setShowOnlyStarters] = useState(false)
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
   // Scores & results per race (for finished races)
@@ -688,6 +689,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         const filteredRiders = squadRiders
           .filter((r) => {
             if (role.catRule && !role.catRule.includes(r.category)) return false
+            if (hasStartlist && showOnlyStarters && !startlistIds!.has(r.id)) return false
             if (modalSearch.trim()) {
               const q = modalSearch.toLowerCase()
               if (!r.first_name.toLowerCase().includes(q) && !r.last_name.toLowerCase().includes(q) && !r.team_name.toLowerCase().includes(q)) return false
@@ -748,8 +750,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 </button>
               </div>
 
-              {/* Search */}
-              <div style={{ padding: '10px 16px' }}>
+              {/* Search + filter */}
+              <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input
                   type="text" value={modalSearch} onChange={(e) => setModalSearch(e.target.value)}
                   placeholder="Søg rytter eller hold..." autoFocus
@@ -760,6 +762,32 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                     outline: 'none', background: '#1E3A5F', color: '#F2EDE4',
                   }}
                 />
+                {hasStartlist && (
+                  <button
+                    type="button"
+                    onClick={() => setShowOnlyStarters((v) => !v)}
+                    style={{
+                      padding: '6px 12px', border: `1px solid ${showOnlyStarters ? '#8FBF8F' : '#2B4F7A'}`,
+                      borderRadius: 2, cursor: 'pointer',
+                      background: showOnlyStarters ? 'rgba(107,143,113,0.2)' : 'transparent',
+                      color: showOnlyStarters ? '#8FBF8F' : '#8FABC4',
+                      fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700,
+                      letterSpacing: '0.06em', textAlign: 'left',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}
+                  >
+                    <span style={{
+                      width: 14, height: 14, borderRadius: 2,
+                      border: `1.5px solid ${showOnlyStarters ? '#8FBF8F' : '#5A7896'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: showOnlyStarters ? '#8FBF8F' : 'transparent',
+                      flexShrink: 0,
+                    }}>
+                      {showOnlyStarters && <span style={{ color: '#0F2137', fontSize: 10, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                    </span>
+                    Vis kun bekræftede startere
+                  </button>
+                )}
               </div>
 
               {/* Rider list */}
