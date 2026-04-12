@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { Lock, Radio, CheckCircle2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import LineupResults from './LineupResults'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
 import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey } from '@/types/cycling'
@@ -90,7 +91,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
   return (
     <div style={{ position: 'relative' }}>
       {canScrollLeft && (
-        <button type="button" onClick={() => scroll(-1)} style={btnStyle('left')}>←</button>
+        <button type="button" onClick={() => scroll(-1)} style={btnStyle('left')}><ChevronLeft size={14} /></button>
       )}
       <div
         ref={ref}
@@ -103,7 +104,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
         {children}
       </div>
       {canScrollRight && (
-        <button type="button" onClick={() => scroll(1)} style={btnStyle('right')}>→</button>
+        <button type="button" onClick={() => scroll(1)} style={btnStyle('right')}><ChevronRight size={14} /></button>
       )}
     </div>
   )
@@ -423,8 +424,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 fontWeight: isActive ? 700 : 500,
                 color: isActive ? '#F2EDE4' : isPast ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.55)',
                 letterSpacing: '0.01em',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
               }}>
-                {tabLabel}{isPast ? ' ✓' : ''}
+                {tabLabel}{isPast && <Check size={11} />}
               </span>
               {filled > 0 && (
                 <span style={{
@@ -546,7 +548,6 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 color: '#F2EDE4', lineHeight: 1.2,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
-                {isLocked ? '🔒 ' : ''}
                 {isStageRace ? `${activeStage.race_name} — Etape ${activeStage.stage_number}` : activeStage.race_name}
               </span>
             )}
@@ -557,12 +558,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                   fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 800,
                   padding: '3px 8px', borderRadius: 2, flexShrink: 0,
                   background: '#D83A3A', color: '#fff',
-                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4,
+                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5,
                 }}>
-                  <span style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: '#fff', animation: 'pulse 1.5s ease-in-out infinite',
-                  }} />
+                  <Radio size={10} style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
                   LIVE
                 </span>
               )}
@@ -571,8 +569,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                   fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 800,
                   padding: '3px 8px', borderRadius: 2, flexShrink: 0,
                   background: '#6B8F71', color: '#fff',
-                  letterSpacing: '0.06em',
+                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5,
                 }}>
+                  <CheckCircle2 size={10} />
                   AFSLUTTET
                 </span>
               )}
@@ -581,9 +580,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                   fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
                   padding: '3px 8px', borderRadius: 2, flexShrink: 0,
                   background: 'rgba(255,107,107,0.15)', color: '#ff6b6b',
-                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4,
+                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5,
                 }}>
-                  🔒 LÅST
+                  <Lock size={10} />
+                  LÅST
                 </span>
               )}
               <span style={{
@@ -697,9 +697,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             cursor: !changed || isLocked || isSaving ? 'not-allowed' : 'pointer',
             opacity: !changed || isLocked || isSaving ? 0.35 : 1,
             transition: 'opacity 0.15s',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}
         >
-          {isSaving ? 'Gemmer...' : isSuccess && !changed ? 'Gemt ✓' : 'Gem lineup'}
+          {isSaving ? 'Gemmer...' : isSuccess && !changed ? <>Gemt <Check size={14} /></> : 'Gem lineup'}
         </button>
       </div>
 
