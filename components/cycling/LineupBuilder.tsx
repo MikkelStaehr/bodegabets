@@ -395,7 +395,12 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           const isActive = stage.id === activeTab
           const stageRace = races.find((r) => r.id === stage.race_id)
           const isFinished = stageRace?.status === 'finished'
-          const isLive = stageRace?.status === 'active'
+          // Live: enten DB status 'active', eller start-tidspunkt er passeret og ikke finished
+          const startStr = /^\d{4}-\d{2}-\d{2}$/.test(stage.start_date)
+            ? `${stage.start_date}T09:00:00Z`
+            : stage.start_date
+          const hasStarted = new Date(startStr) <= new Date()
+          const isLive = stageRace?.status === 'active' || (hasStarted && !isFinished)
           const stageLocked = lockedStages.has(stage.id)
           const stageSlots = lineups[stage.id]
           const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
