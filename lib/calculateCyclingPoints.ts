@@ -146,8 +146,8 @@ type ScoreRow = {
   team_bonus: number
   bench_penalty: number
   dnf_penalty: number
-  total_points: number
   calculated_at: string
+  // total_points er generated i DB — må ikke insertes
 }
 
 // ── Main calculation ────────────────────────────────────────────────────────
@@ -397,8 +397,6 @@ export async function calculateCyclingPoints(
         dnfPen = Math.min(dnfPen, DNF_PENALTY_MIN)
       }
 
-      const total = rolePoints + jerseyPts + teamBonus + dnfPen
-
       allScores.push({
         lineup_id: lineup.id,
         rider_id: rider.rider_id,
@@ -414,7 +412,6 @@ export async function calculateCyclingPoints(
         team_bonus: teamBonus,
         bench_penalty: 0,
         dnf_penalty: dnfPen,
-        total_points: total,
         calculated_at: now,
       })
     }
@@ -486,7 +483,6 @@ export async function calculateCyclingPoints(
         team_bonus: 0,
         bench_penalty: benchPen,
         dnf_penalty: dnfPen,
-        total_points: total,
         calculated_at: now,
       })
     }
