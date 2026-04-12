@@ -388,7 +388,7 @@ def auto_update_race_statuses(supabase: Client) -> int:
         new_status = old_status
 
         if race["race_type"] == "one_day":
-            if start and start < today and old_status == "upcoming":
+            if start and start <= today and old_status == "upcoming":
                 new_status = "finished"
         else:
             # Stage race
