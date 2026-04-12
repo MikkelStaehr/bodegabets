@@ -52,7 +52,11 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-// ─── GET /health (public, no auth) ──────────────────────────────────────────
+// ─── Public endpoints (no auth) — health checks ────────────────────────────
+
+app.get('/', (_req, res) => {
+  res.json({ ok: true, service: 'bodegabets-cron' })
+})
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() })
