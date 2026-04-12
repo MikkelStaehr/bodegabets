@@ -314,12 +314,15 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const filledCount = Object.values(slots).filter((v) => v !== null).length
   const profileLabel = activeStage ? (PROFILE_LABELS[activeStage.profile ?? ''] ?? 'Endagsløb') : ''
 
-  // Lock deadline: active block deadline > prop > stage start_date - 30min
-  const deadlineStr = activeBlock?.lock_deadline ?? lockDeadline ?? (activeStage ? (() => {
-    const d = new Date(activeStage.start_date)
+  // Lock deadline: stage start_date - 30min (dato-only bliver tolket som 09:00 UTC)
+  const deadlineStr = activeStage ? (() => {
+    const startStr = /^\d{4}-\d{2}-\d{2}$/.test(activeStage.start_date)
+      ? `${activeStage.start_date}T09:00:00Z`
+      : activeStage.start_date
+    const d = new Date(startStr)
     d.setMinutes(d.getMinutes() - 30)
     return d.toISOString()
-  })() : null)
+  })() : (lockDeadline ?? null)
 
   return (
     <div style={{ background: theme.bg, borderRadius: 2, overflow: 'hidden', transition: 'background 0.3s' }}>
