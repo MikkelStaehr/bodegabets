@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Lock, Radio, CheckCircle2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Lock, Radio, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import LineupResults from './LineupResults'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
 import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey } from '@/types/cycling'
@@ -393,7 +393,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         }}>
         {blockStages.map((stage) => {
           const isActive = stage.id === activeTab
-          const isPast = new Date(stage.start_date) < new Date()
+          const stageRace = races.find((r) => r.id === stage.race_id)
+          const isFinished = stageRace?.status === 'finished'
+          const isLive = stageRace?.status === 'active'
+          const stageLocked = lockedStages.has(stage.id)
           const stageSlots = lineups[stage.id]
           const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
           // One-day races: show race short name. Stage races: show "Etape N"
@@ -422,11 +425,18 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 fontFamily: "'Barlow Condensed', sans-serif",
                 fontSize: 12,
                 fontWeight: isActive ? 700 : 500,
-                color: isActive ? '#F2EDE4' : isPast ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.55)',
+                color: isActive ? '#F2EDE4' : isFinished ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.55)',
                 letterSpacing: '0.01em',
-                display: 'inline-flex', alignItems: 'center', gap: 4,
+                display: 'inline-flex', alignItems: 'center', gap: 5,
               }}>
-                {tabLabel}{isPast && <Check size={11} />}
+                {tabLabel}
+                {isLive && (
+                  <Radio size={11} color="#D83A3A" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+                )}
+                {isFinished && <Check size={11} />}
+                {!isLive && !isFinished && stageLocked && (
+                  <Lock size={10} color="#ff6b6b" />
+                )}
               </span>
               {filled > 0 && (
                 <span style={{
@@ -551,50 +561,14 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 {isStageRace ? `${activeStage.race_name} — Etape ${activeStage.stage_number}` : activeStage.race_name}
               </span>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
-              {/* Race status badge */}
-              {activeRace?.status === 'active' && (
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 800,
-                  padding: '3px 8px', borderRadius: 2, flexShrink: 0,
-                  background: '#D83A3A', color: '#fff',
-                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  <Radio size={10} style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  LIVE
-                </span>
-              )}
-              {activeRace?.status === 'finished' && (
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 800,
-                  padding: '3px 8px', borderRadius: 2, flexShrink: 0,
-                  background: '#6B8F71', color: '#fff',
-                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  <CheckCircle2 size={10} />
-                  AFSLUTTET
-                </span>
-              )}
-              {isLocked && activeRace?.status !== 'finished' && (
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-                  padding: '3px 8px', borderRadius: 2, flexShrink: 0,
-                  background: 'rgba(255,107,107,0.15)', color: '#ff6b6b',
-                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  <Lock size={10} />
-                  LÅST
-                </span>
-              )}
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-                padding: '2px 6px', borderRadius: 2, flexShrink: 0,
-                background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
-                color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
-              }}>
-                {filledCount}/8
-              </span>
-            </div>
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+              padding: '2px 6px', borderRadius: 2, flexShrink: 0, marginLeft: 'auto',
+              background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
+              color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
+            }}>
+              {filledCount}/8
+            </span>
           </div>
           {/* ── Route line: departure → arrival ────────────── */}
           {(activeStage.departure || activeStage.arrival) && (
