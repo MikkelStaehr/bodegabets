@@ -26,8 +26,9 @@
     "../lib/calculatePoints.ts",
     "../lib/betUtils.ts",
     "../lib/betTypes.ts",
-    "../lib/boldApi.ts",
     "../lib/teamNameNormalizer.ts",
-    "../lib/calculateCyclingPoints.ts"
+    "../lib/calculateCyclingPoints.ts",
+    "../lib/evaluateBlocks.ts",
+    "../lib/evaluateAchievements.ts"
   ]
 }
