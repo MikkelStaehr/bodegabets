@@ -550,14 +550,51 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 {isStageRace ? `${activeStage.race_name} — Etape ${activeStage.stage_number}` : activeStage.race_name}
               </span>
             )}
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
-              padding: '2px 6px', borderRadius: 2, flexShrink: 0, marginLeft: 'auto',
-              background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
-              color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
-            }}>
-              {filledCount}/8
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+              {/* Race status badge */}
+              {activeRace?.status === 'active' && (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 800,
+                  padding: '3px 8px', borderRadius: 2, flexShrink: 0,
+                  background: '#D83A3A', color: '#fff',
+                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: '#fff', animation: 'pulse 1.5s ease-in-out infinite',
+                  }} />
+                  LIVE
+                </span>
+              )}
+              {activeRace?.status === 'finished' && (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 800,
+                  padding: '3px 8px', borderRadius: 2, flexShrink: 0,
+                  background: '#6B8F71', color: '#fff',
+                  letterSpacing: '0.06em',
+                }}>
+                  AFSLUTTET
+                </span>
+              )}
+              {isLocked && activeRace?.status !== 'finished' && (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                  padding: '3px 8px', borderRadius: 2, flexShrink: 0,
+                  background: 'rgba(255,107,107,0.15)', color: '#ff6b6b',
+                  letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  🔒 LÅST
+                </span>
+              )}
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                padding: '2px 6px', borderRadius: 2, flexShrink: 0,
+                background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
+                color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
+              }}>
+                {filledCount}/8
+              </span>
+            </div>
           </div>
           {/* ── Route line: departure → arrival ────────────── */}
           {(activeStage.departure || activeStage.arrival) && (
