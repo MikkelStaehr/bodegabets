@@ -49,12 +49,23 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent alle squads for dette spil
   const { data: squads } = await supabaseAdmin
     .from('cycling_squads')
-    .select('id, user_id, profiles!inner(username, avatar_url)')
+    .select('id, user_id')
     .eq('game_id', numericGameId)
 
   if (!squads?.length) return NextResponse.json({ lineups: [] })
 
   const squadIds = squads.map((s) => s.id)
+  const userIds = [...new Set(squads.map((s) => s.user_id as string))]
+
+  // Hent profiles separat
+  const { data: profiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', userIds)
+
+  const profileById = new Map(
+    (profiles ?? []).map((p) => [p.id as string, { username: p.username as string, avatar_url: p.avatar_url as string | null }])
+  )
 
   // Hent lineups for denne stage
   const { data: lineups } = await supabaseAdmin
@@ -94,7 +105,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const result = lineups.map((lineup) => {
     const squad = squads.find((s) => s.id === lineup.squad_id)
-    const profile = squad?.profiles as unknown as { username: string; avatar_url: string | null } | null
+    const profile = squad ? profileById.get(squad.user_id as string) ?? null : null
 
     const riders = (ridersByLineup.get(String(lineup.id)) ?? []).map((lr) => {
       const r = lr.rider as unknown as {
