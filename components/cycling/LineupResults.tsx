@@ -146,7 +146,7 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   if (score.team_bonus > 0) lines.push({ label: 'Hold-bonus', value: `+${score.team_bonus}` })
   if (score.dnf_penalty < 0) lines.push({ label: 'DNF-straf', value: `${score.dnf_penalty}` })
   if (score.bench_penalty < 0) lines.push({ label: 'Bænk-straf', value: `${score.bench_penalty}` })
-  lines.push({ label: 'Total', value: `${score.total_points}` })
+  lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}` })
 
   return (
     <div style={{
@@ -227,8 +227,9 @@ export default function LineupResults({ race, slots, scores, results, riders, on
     return map
   }, [results])
 
+  const fmt = (n: number) => Math.round(n * 10) / 10
   const benchScores = hasScores ? scores.filter((s) => s.is_bench) : []
-  const totalPoints = hasScores ? scores.reduce((sum, s) => sum + s.total_points, 0) : 0
+  const totalPoints = hasScores ? fmt(scores.reduce((sum, s) => sum + s.total_points, 0)) : 0
   const benchPenaltyTotal = benchScores.reduce((sum, s) => sum + s.bench_penalty, 0)
 
   const canEdit = !!onEditRole && race.status !== 'finished'
@@ -387,7 +388,7 @@ export default function LineupResults({ race, slots, scores, results, riders, on
                     fontWeight: 700,
                     color: isJokerDnf ? 'rgba(255,255,255,0.4)' : score.total_points > 0 ? '#6B8F71' : score.total_points < 0 ? '#ff6b6b' : 'rgba(255,255,255,0.4)',
                   }}>
-                    {isJokerDnf ? '0 pt (immun)' : `${score.total_points} pt`}
+                    {isJokerDnf ? '0 pt (immun)' : `${fmt(score.total_points)} pt`}
                   </span>
                   {hoveredRider === riderId && (
                     <PointsTooltip score={score} isJokerDnf={isJokerDnf} />
@@ -486,7 +487,7 @@ export default function LineupResults({ race, slots, scores, results, riders, on
               fontWeight: 700,
               color: benchPenaltyTotal < 0 ? '#ff6b6b' : 'rgba(255,255,255,0.35)',
             }}>
-              {benchPenaltyTotal < 0 ? `${benchPenaltyTotal} pt` : '0 pt'}
+              {benchPenaltyTotal < 0 ? `${Math.round(benchPenaltyTotal * 10) / 10} pt` : '0 pt'}
             </span>
             {hoveredBench && (
               <BenchTooltip benchScores={benchScores} riders={riderMap} />

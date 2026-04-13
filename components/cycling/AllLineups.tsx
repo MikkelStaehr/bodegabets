@@ -187,7 +187,7 @@ export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
                         fontFamily: "'Barlow Condensed', sans-serif",
                         fontSize: 14, fontWeight: 800, color: '#F2EDE4',
                       }}>
-                        {entry.total_points}
+                        {Math.round(entry.total_points * 10) / 10}
                       </span>
                     </div>
 
@@ -224,7 +224,10 @@ export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
                             color: r.points > 0 ? '#6B8F71' : r.points < 0 ? '#ff6b6b' : '#64748B',
                             minWidth: 28, textAlign: 'right',
                           }}>
-                            {r.points > 0 ? `+${r.points}` : r.points}
+                            {(() => {
+                              const p = Math.round((r.points ?? 0) * 10) / 10
+                              return p > 0 ? `+${p}` : `${p}`
+                            })()}
                           </span>
                         )}
                       </div>
