@@ -549,16 +549,24 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             {activeRace?.logo_url ? (
-              <img
-                src={activeRace.logo_url}
-                alt={activeStage.race_name}
-                style={{
-                  height: 64, width: 'auto', maxWidth: 160,
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))',
-                  flexShrink: 0,
-                }}
-              />
+              <div style={{
+                background: 'rgba(255,255,255,0.95)',
+                borderRadius: 8,
+                padding: '8px 12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+              }}>
+                <img
+                  src={activeRace.logo_url}
+                  alt={activeStage.race_name}
+                  style={{
+                    height: 48, width: 'auto', maxWidth: 140,
+                    objectFit: 'contain',
+                  }}
+                />
+              </div>
             ) : (
               <span style={{
                 fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 500,
