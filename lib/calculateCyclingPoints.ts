@@ -499,6 +499,46 @@ export async function calculateCyclingPoints(
         .throwOnError()
     }
   }
+
+  // 9. Opdater game_members.earnings — SUM af total_points for alle squads i spillet
+  const { data: gameMembers } = await supabaseAdmin
+    .from('game_members')
+    .select('user_id')
+    .eq('game_id', gameId)
+
+  for (const member of gameMembers ?? []) {
+    // Find user's squads in this game
+    const userSquads = squads.filter((s) => s.user_id === member.user_id)
+    const userSquadIds = userSquads.map((s) => s.id)
+
+    if (userSquadIds.length === 0) continue
+
+    // Find lineups for disse squads
+    const { data: userLineups } = await supabaseAdmin
+      .from('cycling_lineups')
+      .select('id')
+      .in('squad_id', userSquadIds)
+
+    const userLineupIds = (userLineups ?? []).map((l) => l.id as string)
+    if (userLineupIds.length === 0) continue
+
+    // Sum total_points fra cycling_scores
+    const { data: userScores } = await supabaseAdmin
+      .from('cycling_scores')
+      .select('total_points')
+      .in('lineup_id', userLineupIds)
+
+    const totalEarnings = (userScores ?? []).reduce(
+      (sum, s) => sum + (Number((s as { total_points?: number }).total_points) || 0),
+      0
+    )
+
+    await supabaseAdmin
+      .from('game_members')
+      .update({ earnings: Math.round(totalEarnings) })
+      .eq('game_id', gameId)
+      .eq('user_id', member.user_id)
+  }
 }
 
 // ── Run for a specific stage across all games ────────────────────────────────
