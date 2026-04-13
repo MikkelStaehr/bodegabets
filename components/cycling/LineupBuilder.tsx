@@ -525,10 +525,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         overflow: 'hidden',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
-        {(activeStage.race_profile_image_url || activeRace?.race_photo_url) && (
+        {(activeRace?.race_photo_url || activeStage.race_profile_image_url) && (
           <>
             <img
-              src={activeStage.race_profile_image_url ?? activeRace?.race_photo_url ?? ''}
+              src={activeRace?.race_photo_url ?? activeStage.race_profile_image_url ?? ''}
               alt=""
               style={{
                 position: 'absolute', inset: 0,
@@ -545,7 +545,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         <div style={{
           position: 'relative', zIndex: 1,
           padding: '12px 16px',
-          background: (activeStage.race_profile_image_url || activeRace?.race_photo_url) ? 'transparent' : theme.bg,
+          background: (activeRace?.race_photo_url || activeStage.race_profile_image_url) ? 'transparent' : theme.bg,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             {activeRace?.logo_url ? (
