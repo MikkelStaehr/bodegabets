@@ -4,6 +4,11 @@
   ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS jersey text;
   ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS abandon_type text;
 
+  -- Vigtig: UNIQUE constraint på cycling_results forhindrer duplicates
+  -- når sync_results.py kører upsert med on_conflict="race_id,rider_id,stage_number"
+  ALTER TABLE cycling_results
+    ADD CONSTRAINT cycling_results_unique UNIQUE (race_id, rider_id, stage_number);
+
   CREATE TABLE IF NOT EXISTS cycling_scores (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     lineup_id uuid NOT NULL REFERENCES cycling_lineups(id) ON DELETE CASCADE,
@@ -20,10 +25,21 @@
     team_bonus numeric NOT NULL DEFAULT 0,
     bench_penalty numeric NOT NULL DEFAULT 0,
     dnf_penalty numeric NOT NULL DEFAULT 0,
-    total_points numeric NOT NULL DEFAULT 0,
     calculated_at timestamptz DEFAULT now(),
-    UNIQUE (lineup_id, rider_id, stage_id)
+    UNIQUE (lineup_id, rider_id, stage_id),
+    -- total_points er en generated column (DB beregner automatisk)
+    total_points numeric GENERATED ALWAYS AS (
+      (base_points * role_multiplier) + role_bonus + jersey_points + team_bonus + bench_penalty + dnf_penalty
+    ) STORED
   );
+
+  -- Hvis tabellen allerede findes med forkert total_points formel, ret den:
+  --   ALTER TABLE cycling_scores DROP COLUMN total_points;
+  --   ALTER TABLE cycling_scores ADD COLUMN total_points NUMERIC GENERATED ALWAYS AS (
+  --     (base_points * role_multiplier) + role_bonus + jersey_points + team_bonus + bench_penalty + dnf_penalty
+  --   ) STORED;
+  --
+  -- NB: bench_penalty og dnf_penalty lagres som NEGATIVE tal af koden.
 
   ALTER TABLE cycling_scores ENABLE ROW LEVEL SECURITY;
   CREATE POLICY "Public read" ON cycling_scores FOR SELECT USING (true);
