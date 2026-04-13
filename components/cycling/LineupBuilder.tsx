@@ -555,7 +555,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 style={{
                   height: 64, width: 'auto', maxWidth: 160,
                   objectFit: 'contain',
-                  filter: 'brightness(0) invert(1)',
+                  filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))',
                   flexShrink: 0,
                 }}
               />
