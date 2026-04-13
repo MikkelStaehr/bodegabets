@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Lock, Radio, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import LineupResults from './LineupResults'
+import AllLineups from './AllLineups'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
 import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey } from '@/types/cycling'
 import { formatCyclingDate, formatCyclingDeadline, shortRaceName, shortBlockName, PROFILE_LABELS, PROFILE_ICONS, RACE_TYPE_LABELS, CAT_LABELS, CAT_COLORS } from '@/lib/cyclingUtils'
@@ -23,6 +24,7 @@ type Props = {
   lockDeadline?: string | null
   squadRiderCount?: number
   squadId?: string | null
+  currentUserId?: string
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -112,7 +114,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -693,6 +695,19 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         </div>
       )}
       </>)}
+
+      {/* ── Alle lineups (vises når lineup er låst / race er live/finished) ─── */}
+      {activeStage && currentUserId && (isLocked || isFinished || (() => {
+        const startStr = /^\d{4}-\d{2}-\d{2}$/.test(activeStage.start_date)
+          ? `${activeStage.start_date}T09:00:00Z`
+          : activeStage.start_date
+        const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
+        return deadline < new Date()
+      })()) && (
+        <div style={{ padding: '0 14px 14px' }}>
+          <AllLineups gameId={gameId} stageId={activeStage.id} currentUserId={currentUserId} />
+        </div>
+      )}
 
       {/* ── Modal ────────────────────────────────────────────── */}
       {modalOpen && (() => {

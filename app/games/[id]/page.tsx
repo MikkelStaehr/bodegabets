@@ -969,6 +969,7 @@ export default async function GamePage({ params }: Props) {
               lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
               squadRiderCount={lineupSquadRiders.length}
               squadId={userSquad?.id ?? null}
+              currentUserId={user.id}
             />
             <Leaderboard gameId={gameId} />
           </>
