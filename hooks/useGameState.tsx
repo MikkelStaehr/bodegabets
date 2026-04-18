@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, MatchEntry, MatchSummary, LeaderboardEntry } from '@/lib/gameState'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import type { GameState, MatchEntry, MatchSummary, LeaderboardEntry, ActiveBlockStandings, BlockStandingRow } from '@/lib/gameState'
 
-export type { GameState, MatchEntry, MatchSummary, LeaderboardEntry }
+export type { GameState, MatchEntry, MatchSummary, LeaderboardEntry, ActiveBlockStandings, BlockStandingRow }
 
 type UseGameStateOptions = {
   /** Initial server-rendered state (optional, undgår loading-flash) */
@@ -124,4 +124,31 @@ export function useGameState(
   }, [gameId, enabled, fetchState])
 
   return { state, isLoading, error, lastUpdate, refresh: fetchState }
+}
+
+// ─── Context — én polling-kilde delt mellem flere komponenter ───────────────
+
+type GameStateContextValue = UseGameStateResult
+
+const GameStateContext = createContext<GameStateContextValue | null>(null)
+
+export function GameStateProvider({
+  gameId,
+  initialState,
+  children,
+}: {
+  gameId: number
+  initialState?: GameState | null
+  children: ReactNode
+}) {
+  const value = useGameState(gameId, { initialState })
+  return <GameStateContext.Provider value={value}>{children}</GameStateContext.Provider>
+}
+
+export function useGameStateContext(): GameStateContextValue {
+  const ctx = useContext(GameStateContext)
+  if (!ctx) {
+    throw new Error('useGameStateContext skal bruges inden for en GameStateProvider')
+  }
+  return ctx
 }

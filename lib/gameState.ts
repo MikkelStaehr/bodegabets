@@ -73,6 +73,21 @@ export type LeaderboardEntry = {
   block_points: number
 }
 
+export type BlockStandingRow = {
+  user_id: string
+  username: string
+  total: number
+  rank: number
+}
+
+export type ActiveBlockStandings = {
+  block_id: number
+  block_name: string
+  block_number: number
+  rounds_remaining: number
+  rows: BlockStandingRow[]
+} | null
+
 export type GameState = {
   game: {
     id: number
@@ -83,6 +98,7 @@ export type GameState = {
   matches: MatchEntry[]
   summary: MatchSummary
   leaderboard: LeaderboardEntry[]
+  activeBlockStandings: ActiveBlockStandings
   updated_at: string
 }
 
@@ -665,6 +681,93 @@ async function buildCyclingLeaderboard(
   return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
 }
 
+// ─── getActiveBlockStandings ────────────────────────────────────────────────
+// Kun for fodbold (regular, ikke-championship). Returnerer stillingen i den
+// aktive blok baseret på runder med score — opdateres live efter hver kamp
+// da calculateRoundPoints upserter round_scores per finished match.
+
+export async function getActiveBlockStandings(
+  gameId: number,
+): Promise<ActiveBlockStandings> {
+  const { data: gameSeasons } = await supabaseAdmin
+    .from('game_seasons')
+    .select('season_id')
+    .eq('game_id', gameId)
+
+  const seasonIds = (gameSeasons ?? []).map((gs) => gs.season_id as number)
+  if (seasonIds.length === 0) return null
+
+  const { data: blocks } = await supabaseAdmin
+    .from('blocks')
+    .select('id, season_id, block_number, name, status')
+    .in('season_id', seasonIds)
+
+  const activeBlock = (blocks ?? []).find((b) => b.status === 'active') ?? null
+  if (!activeBlock) return null
+
+  const { data: rounds } = await supabaseAdmin
+    .from('rounds')
+    .select('id, block_id, status')
+    .eq('block_id', activeBlock.id)
+
+  const blockRoundIds = (rounds ?? []).map((r) => r.id as number)
+  if (blockRoundIds.length === 0) return null
+
+  const finishedRoundIds = new Set(
+    (rounds ?? []).filter((r) => r.status === 'finished').map((r) => r.id)
+  )
+
+  const { data: scores } = await supabaseAdmin
+    .from('round_scores')
+    .select('user_id, round_id, earnings_delta')
+    .eq('game_id', gameId)
+    .in('round_id', blockRoundIds)
+
+  const earningsByUser = new Map<string, number>()
+  for (const s of scores ?? []) {
+    if (!finishedRoundIds.has(s.round_id)) continue
+    earningsByUser.set(
+      s.user_id,
+      (earningsByUser.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0),
+    )
+  }
+
+  // Hent usernames
+  const userIds = [...earningsByUser.keys()]
+  const usernameMap = new Map<string, string>()
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username')
+      .in('id', userIds)
+    for (const p of profiles ?? []) {
+      usernameMap.set(p.id as string, p.username as string)
+    }
+  }
+
+  const raw = [...earningsByUser.entries()]
+    .map(([user_id, total]) => ({
+      user_id,
+      username: usernameMap.get(user_id) ?? 'Ukendt',
+      total,
+    }))
+    .sort((a, b) => b.total - a.total)
+
+  let rank = 1
+  const rows: BlockStandingRow[] = raw.map((row, i, arr) => {
+    if (i > 0 && row.total < arr[i - 1].total) rank = i + 1
+    return { ...row, rank }
+  })
+
+  return {
+    block_id: activeBlock.id as number,
+    block_name: (activeBlock.name as string) ?? '',
+    block_number: (activeBlock.block_number as number) ?? 0,
+    rounds_remaining: blockRoundIds.length - finishedRoundIds.size,
+    rows,
+  }
+}
+
 // ─── getGameState — kombineret state for /api/games/[id]/state ──────────────
 
 export async function getGameState(
@@ -679,9 +782,12 @@ export async function getGameState(
 
   if (!game) return null
 
-  const [matchesResult, leaderboardResult] = await Promise.all([
+  const isFootballRegular = (game.sport ?? 'football') === 'football' && game.championship_mode !== true
+
+  const [matchesResult, leaderboardResult, blockStandings] = await Promise.all([
     getGameMatches(gameId, userId),
     getGameLeaderboard(gameId),
+    isFootballRegular ? getActiveBlockStandings(gameId) : Promise.resolve(null),
   ])
 
   return {
@@ -694,6 +800,7 @@ export async function getGameState(
     matches: matchesResult.matches,
     summary: matchesResult.summary,
     leaderboard: leaderboardResult.leaderboard,
+    activeBlockStandings: blockStandings,
     updated_at: new Date().toISOString(),
   }
 }

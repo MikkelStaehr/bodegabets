@@ -1,32 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-
-type LeaderboardEntry = {
-  user_id: string
-  username: string
-  avatar_url: string | null
-  round_wins: number
-  round_points: number
-  block_wins: number
-  block_points: number
-}
+import type { LeaderboardEntry } from '@/lib/gameState'
 
 type Props = {
-  gameId: number
+  /** Hvis entries er givet, render dem direkte (ingen fetch). Ellers fetch én gang. */
+  entries?: LeaderboardEntry[]
+  /** Bruges kun hvis entries ikke er givet. */
+  gameId?: number
 }
 
-export default function Leaderboard({ gameId }: Props) {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([])
-  const [loading, setLoading] = useState(true)
+export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
+  const [fetchedEntries, setFetchedEntries] = useState<LeaderboardEntry[]>([])
+  const [loading, setLoading] = useState(entriesProp === undefined)
+
+  const entries = entriesProp ?? fetchedEntries
 
   useEffect(() => {
+    if (entriesProp !== undefined) return
+    if (!gameId) return
     fetch(`/api/games/${gameId}/leaderboard`)
       .then((r) => r.json())
-      .then((data) => setEntries(data.leaderboard ?? []))
+      .then((data) => setFetchedEntries(data.leaderboard ?? []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [gameId])
+  }, [gameId, entriesProp])
 
   if (loading) return null
   if (entries.length === 0) return null
