@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import UserMenu from '@/components/ui/UserMenu'
 import { useLiveMatches } from '@/hooks/useLiveMatches'
-import { useLiveMatchesContext } from '@/contexts/LiveMatchesContext'
+import { useGameStateContextOptional } from '@/hooks/useGameState'
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
 
 type Props = {
@@ -41,9 +41,9 @@ export default function Navbar({ username, isAdmin, backHref, backLabel, gameId,
     return () => subscription.unsubscribe()
   }, [])
 
-  const ctx = useLiveMatchesContext()
+  const ctx = useGameStateContextOptional()
   const hookData = useLiveMatches(activeRoundId ?? null, !!activeRoundId && !ctx)
-  const summary = ctx?.summary ?? hookData.summary
+  const summary = ctx?.state?.summary ?? hookData.summary
   const liveCount = summary.live + summary.halftime
 
   return (

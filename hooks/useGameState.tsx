@@ -152,3 +152,8 @@ export function useGameStateContext(): GameStateContextValue {
   }
   return ctx
 }
+
+/** Samme som useGameStateContext, men returnerer null hvis ikke inden for en provider. */
+export function useGameStateContextOptional(): GameStateContextValue | null {
+  return useContext(GameStateContext)
+}

@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import { LiveMatchesProvider } from '@/contexts/LiveMatchesContext'
+import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
@@ -827,7 +827,7 @@ export default async function GamePage({ params }: Props) {
   })
 
   return (
-    <LiveMatchesProvider gameId={gameId} enabled={true}>
+    <GameStateProvider gameId={gameId} initialState={initialGameState}>
     <div className="min-h-screen" style={{ background: '#F2EDE4', fontFamily: "'Barlow', sans-serif" }}>
       <NavbarSportTheme sport={typedGame.sport} />
       <GameTicker items={tickerItems} />
@@ -1102,7 +1102,7 @@ export default async function GamePage({ params }: Props) {
         </div>}
       </div>
     </div>
-    </LiveMatchesProvider>
+    </GameStateProvider>
   )
 }
 
