@@ -5,7 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { calculateRoundPoints } from '@/lib/calculatePoints'
+import { calculateRoundPoints, calculateChampionshipRoundPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
 
 const supabaseAdmin = createClient(
@@ -212,6 +212,18 @@ export async function syncMatchScores(options?: {
 
   const activeRoundIds = (activeRounds ?? []).map(r => r.id as number)
 
+  // Championship match IDs — via championship_round_matches for aktive,
+  // ikke-færdige championship rounds i aktive games
+  const { data: champMatchRows } = await supabaseAdmin
+    .from('championship_round_matches')
+    .select('match_id, championship_rounds!inner(status, game_id, games!inner(status))')
+    .neq('championship_rounds.status', 'finished')
+    .eq('championship_rounds.games.status', 'active')
+
+  const championshipMatchIds = [...new Set(
+    (champMatchRows ?? []).map((r) => r.match_id as number).filter(Boolean)
+  )]
+
   let activeMatches: Array<{ id: number; bold_match_id: number; season_id: number; round_id: number | null }> = []
 
   if (boldMatchId != null) {
@@ -225,11 +237,30 @@ export async function syncMatchScores(options?: {
     }
     activeMatches = (data ?? []).map((m) => ({ ...m, round_id: m.round_id ?? null }))
   } else {
+    type MatchRow = { id: number; bold_match_id: number; season_id: number; round_id: number | null }
+    const regularRoundFilter = activeRoundIds.length > 0 ? activeRoundIds : [0]
+    const seen = new Set<number>()
+
+    const addRows = (rows: MatchRow[] | null | undefined) => {
+      for (const m of rows ?? []) {
+        if (seen.has(m.id)) continue
+        seen.add(m.id)
+        activeMatches.push({
+          id: m.id,
+          bold_match_id: m.bold_match_id,
+          season_id: m.season_id,
+          round_id: m.round_id ?? null,
+        })
+      }
+    }
+
+    // Regular: live/halftime + snart-scheduled i aktive rounds
     const { data: liveData } = await supabaseAdmin
       .from('matches')
       .select('id, bold_match_id, season_id, round_id')
       .in('status', ['live', 'halftime'])
-      .in('round_id', activeRoundIds.length > 0 ? activeRoundIds : [0])
+      .in('round_id', regularRoundFilter)
+    addRows(liveData as MatchRow[] | null)
 
     const { data: scheduledData } = await supabaseAdmin
       .from('matches')
@@ -237,18 +268,26 @@ export async function syncMatchScores(options?: {
       .eq('status', 'scheduled')
       .gte('kickoff', eightHoursAgo.toISOString())
       .lte('kickoff', twentyFourHoursLater.toISOString())
-      .in('round_id', activeRoundIds.length > 0 ? activeRoundIds : [0])
+      .in('round_id', regularRoundFilter)
+    addRows(scheduledData as MatchRow[] | null)
 
-    const seen = new Set<number>()
-    for (const m of [...(liveData ?? []), ...(scheduledData ?? [])]) {
-      if (seen.has(m.id)) continue
-      seen.add(m.id)
-      activeMatches.push({
-        id: m.id,
-        bold_match_id: m.bold_match_id,
-        season_id: m.season_id,
-        round_id: m.round_id ?? null,
-      })
+    // Championship: samme status-filter, men via championshipMatchIds
+    if (championshipMatchIds.length > 0) {
+      const { data: champLive } = await supabaseAdmin
+        .from('matches')
+        .select('id, bold_match_id, season_id, round_id')
+        .in('status', ['live', 'halftime'])
+        .in('id', championshipMatchIds)
+      addRows(champLive as MatchRow[] | null)
+
+      const { data: champScheduled } = await supabaseAdmin
+        .from('matches')
+        .select('id, bold_match_id, season_id, round_id')
+        .eq('status', 'scheduled')
+        .gte('kickoff', eightHoursAgo.toISOString())
+        .lte('kickoff', twentyFourHoursLater.toISOString())
+        .in('id', championshipMatchIds)
+      addRows(champScheduled as MatchRow[] | null)
     }
   }
 
@@ -324,6 +363,7 @@ export async function syncMatchScores(options?: {
     s === 'finished' ? 'finished' : s === 'halftime' ? 'halftime' : 'live'
 
   const finishedRoundIds = new Set<number>()
+  const finishedMatchIds = new Set<number>()
 
   for (const match of activeMatches) {
     const boldData = boldMatchMap.get(match.bold_match_id)
@@ -383,9 +423,10 @@ export async function syncMatchScores(options?: {
       errors.push(`Opdatering fejlede for kamp ${match.id}: ${error.message}`)
     } else {
       updated++
-      // Kamp skiftet til finished → trigger pointberegning via round_id
+      // Kamp skiftet til finished → trigger pointberegning
       if (status === 'finished' && currentMatch?.status !== 'finished') {
         if (match.round_id) finishedRoundIds.add(match.round_id)
+        finishedMatchIds.add(match.id)
       }
     }
   }
@@ -396,6 +437,26 @@ export async function syncMatchScores(options?: {
       await calculateRoundPoints(roundId)
     } catch (e) {
       errors.push(`calculateRoundPoints fejl for runde ${roundId}: ${e}`)
+    }
+  }
+
+  // Trigger championship-pointberegning for championship rounds
+  // hvor mindst én kamp netop er flippet til finished
+  if (finishedMatchIds.size > 0) {
+    const { data: affectedChampRounds } = await supabaseAdmin
+      .from('championship_round_matches')
+      .select('championship_round_id')
+      .in('match_id', [...finishedMatchIds])
+
+    const champRoundIds = [...new Set(
+      (affectedChampRounds ?? []).map((r) => r.championship_round_id as number).filter(Boolean)
+    )]
+    for (const crId of champRoundIds) {
+      try {
+        await calculateChampionshipRoundPoints(crId)
+      } catch (e) {
+        errors.push(`calculateChampionshipRoundPoints fejl for round ${crId}: ${e}`)
+      }
     }
   }
 

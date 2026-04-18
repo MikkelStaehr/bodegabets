@@ -10,7 +10,7 @@
  *   GET /update-rounds     — dagligt 07:00 (opdater runde-status)
  *   GET /update-bet-open   — dagligt 07:05 (opret round_members for åbne runder)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
- *   GET /calculate-points  — manuel fallback (catch-up håndteres af sync-scores)
+ *   GET /calculate-points  — safety net (primær trigger er nu i syncMatchScores)
  *   GET /health            — health check
  *
  * Environment:
@@ -897,8 +897,9 @@ app.listen(PORT, () => {
   // Dagligt kl. 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
 
-  // Hvert 10. minut — beregn fodbold + championship point (kun 11:00–00:00 UTC)
-  cron.schedule('*/10 11-23 * * *', () => callEndpoint('/calculate-points'))
+  // Hvert 30. minut — safety net for point-beregning (primær trigger er i syncMatchScores
+  // når en kamp flipper til finished). Fanger edge-cases som manglende match-events.
+  cron.schedule('*/30 11-23 * * *', () => callEndpoint('/calculate-points'))
 
   // Hvert 15. minut — lås cycling lineups (kun 09:00–20:00 UTC / 10:00–21:00 DK)
   cron.schedule('*/15 9-20 * * *', () => callEndpoint('/cycling-lock-lineups'))
