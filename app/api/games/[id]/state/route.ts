@@ -1,12 +1,15 @@
-import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
-import { getGameMatches } from '@/lib/gameState'
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { getGameState } from '@/lib/gameState'
 
 type Props = { params: Promise<{ id: string }> }
 
 /**
- * Legacy endpoint — bruger nu den samme helper som /state.
- * Kan fjernes i fase 4 når alle klienter er migreret til useGameState.
+ * GET /api/games/[id]/state
+ *
+ * Samlet live-state for et fodbold gameroom. Erstatter /live-matches
+ * og /leaderboard for klienter der har brug for alt i én request.
+ * Polles af useGameState-hook i gamerummet.
  */
 export async function GET(_req: NextRequest, { params }: Props) {
   const supabase = await createServerSupabaseClient()
@@ -15,7 +18,9 @@ export async function GET(_req: NextRequest, { params }: Props) {
 
   const { id } = await params
   const gameId = parseInt(id)
-  if (isNaN(gameId)) return NextResponse.json({ error: 'Ugyldigt game_id' }, { status: 400 })
+  if (isNaN(gameId)) {
+    return NextResponse.json({ error: 'Ugyldigt game_id' }, { status: 400 })
+  }
 
   const { data: membership } = await supabaseAdmin
     .from('game_members')
@@ -26,6 +31,8 @@ export async function GET(_req: NextRequest, { params }: Props) {
 
   if (!membership) return NextResponse.json({ error: 'Ingen adgang' }, { status: 403 })
 
-  const { matches, summary } = await getGameMatches(gameId, user.id)
-  return NextResponse.json({ matches, summary })
+  const state = await getGameState(gameId, user.id)
+  if (!state) return NextResponse.json({ error: 'Spil ikke fundet' }, { status: 404 })
+
+  return NextResponse.json(state)
 }
