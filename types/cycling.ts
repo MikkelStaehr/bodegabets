@@ -10,6 +10,7 @@ export type CyclingRace = {
   profile_image_url: string | null
   logo_url: string | null
   race_photo_url: string | null
+  rest_days: string[] | null
   cycling_block_id: string | null
 }
 

@@ -287,7 +287,7 @@ export default async function GamePage({ params }: Props) {
 
   // Lineup builder data — brugerens squads + løb
   let userSquad: { id: string } | null = null
-  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null; cycling_block_id: string | null }[] = []
+  let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null; rest_days: string[] | null; cycling_block_id: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string }[] = []
@@ -339,12 +339,12 @@ export default async function GamePage({ params }: Props) {
     // Hent alle løb for gameroom (filtrering sker client-side via blok-tabs)
     const { data: gameRacesFull } = await supabaseAdmin
       .from('cycling_game_races')
-      .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type, profile, profile_image_url, logo_url, race_photo_url)')
+      .select('race_id, cycling_block_id, cycling_races!inner(id, name, start_date, status, race_type, profile, profile_image_url, logo_url, race_photo_url, rest_days)')
       .eq('game_id', gameId)
 
     lineupRaces = (gameRacesFull ?? [])
       .map((gr) => {
-        const race = gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null }
+        const race = gr.cycling_races as unknown as { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null; rest_days: string[] | null }
         return { ...race, cycling_block_id: gr.cycling_block_id as string | null }
       })
 

@@ -173,11 +173,28 @@ export default async function CyclingGuidePage() {
           </P>
 
           <SubHeading>Jersey-point (kun stage races)</SubHeading>
+          <P>
+            Farven på trøjen varierer per race (Tour: gul, Giro: rosa, Vuelta: rød osv.),
+            men pointene gælder uanset løb.
+          </P>
           <PointTable rows={[
-            ['🟡 Yellow jersey', '+8'],
-            ['🟢 Green jersey', '+5'],
-            ['🔴 Polka dot jersey', '+5'],
-            ['⚪ White jersey', '+3'],
+            ['Førertrøje (sammenlagt)', '+8'],
+            ['Pointtrøje (sprint)', '+5'],
+            ['Bjergtrøje', '+5'],
+            ['Ungdomstrøje', '+3'],
+          ]} />
+
+          <SubHeading>GC-multiplikator (kun stage races)</SubHeading>
+          <P>
+            Ryttere i top-10 sammenlagt efter etapen får et klassement-boost
+            på deres placerings-point for etapen.
+          </P>
+          <PointTable rows={[
+            ['Sammenlagt #1', '×1.4'],
+            ['Sammenlagt #2-3', '×1.3'],
+            ['Sammenlagt #4-5', '×1.2'],
+            ['Sammenlagt #6-10', '×1.1'],
+            ['Sammenlagt #11+', '×1.0 (ingen bonus)'],
           ]} />
 
           <SubHeading>DNF-straf</SubHeading>

@@ -43,6 +43,20 @@
 
   ALTER TABLE cycling_scores ENABLE ROW LEVEL SECURITY;
   CREATE POLICY "Public read" ON cycling_scores FOR SELECT USING (true);
+
+  -- Jersey rename (2026-04-17): migrér legacy color values til role-based keys
+  UPDATE cycling_results SET jersey = REPLACE(REPLACE(REPLACE(REPLACE(
+    jersey, 'yellow', 'leader'), 'green', 'points'), 'polka', 'mountain'), 'white', 'youth')
+    WHERE jersey IS NOT NULL;
+
+  -- GC multiplier (2026-04-17): bonus for ryttere i top-10 sammenlagt efter etape
+  ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS gc_position_after int;
+  ALTER TABLE cycling_scores ADD COLUMN IF NOT EXISTS gc_multiplier numeric NOT NULL DEFAULT 1.0;
+  -- Drop + gen-column er ikke idempotent — kør kun første gang:
+  ALTER TABLE cycling_scores DROP COLUMN IF EXISTS total_points;
+  ALTER TABLE cycling_scores ADD COLUMN total_points numeric GENERATED ALWAYS AS (
+    (base_points * role_multiplier * gc_multiplier) + role_bonus + jersey_points + team_bonus + bench_penalty + dnf_penalty
+  ) STORED;
 */
 
 import { supabaseAdmin } from '@/lib/supabase'
@@ -65,11 +79,21 @@ const CAT_MULTIPLIER: Record<number, number> = {
   5: 3.5,
 }
 
+// Jersey keys er race-agnostiske (leader/points/mountain/youth) — den faktiske
+// jersey-farve varierer per race (Tour=gul, Giro=pink, Vuelta=rød).
 const JERSEY_POINTS: Record<string, number> = {
-  yellow: 8,
-  green: 5,
-  polka: 5,
-  white: 3,
+  leader: 8,
+  points: 5,
+  mountain: 5,
+  youth: 3,
+}
+
+// GC-multiplier: bonus for ryttere i top-10 sammenlagt efter etape (kun stage races)
+const GC_MULTIPLIER: Record<number, number> = {
+  1: 1.4,
+  2: 1.3, 3: 1.3,
+  4: 1.2, 5: 1.2,
+  6: 1.1, 7: 1.1, 8: 1.1, 9: 1.1, 10: 1.1,
 }
 
 const DNF_PENALTY_PCT = 0.5   // 50% of would-be score
@@ -97,6 +121,11 @@ function getJerseyPoints(jerseyStr: string | null): number {
 function getJerseyList(jerseyStr: string | null): string[] {
   if (!jerseyStr) return []
   return jerseyStr.split(',').map((j) => j.trim()).filter(Boolean)
+}
+
+function getGcMultiplier(gcPosition: number | null): number {
+  if (gcPosition == null) return 1.0
+  return GC_MULTIPLIER[gcPosition] ?? 1.0
 }
 
 // ── Profile-based role multipliers ──────────────────────────────────────────
@@ -137,6 +166,7 @@ type RiderResult = {
   dnf: boolean
   abandon_type: string | null
   jersey: string | null
+  gc_position_after: number | null
 }
 
 type LineupRider = {
@@ -157,6 +187,7 @@ type ScoreRow = {
   is_bench: boolean
   base_points: number
   role_multiplier: number
+  gc_multiplier: number
   role_bonus: number
   jersey_points: number
   team_bonus: number
@@ -177,7 +208,7 @@ export async function calculateCyclingPoints(
   // 1. Fetch stage profile (falls back to race profile)
   const { data: stage } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, profile, won_how')
+    .select('id, profile, won_how, start_date')
     .eq('id', stageId)
     .single()
 
@@ -194,7 +225,7 @@ export async function calculateCyclingPoints(
   // 2. Fetch results for this stage
   const { data: resultsRaw } = await supabaseAdmin
     .from('cycling_results')
-    .select('rider_id, position, dnf, abandon_type, jersey')
+    .select('rider_id, position, dnf, abandon_type, jersey, gc_position_after')
     .eq('race_id', raceId)
     .eq('stage_number', stageNumber)
 
@@ -244,18 +275,43 @@ export async function calculateCyclingPoints(
     `)
     .in('lineup_id', lineupIds)
 
-  // Hent category_slot fra squad (snapshot på udtagelsestidspunktet)
-  // Map: squad_id → rider_id → category
-  const categoryBySquadRider = new Map<string, number>()
-  {
-    const { data: squadCats } = await supabaseAdmin
+  // Hent effektiv brutto-trup per squad (original + hviledag-transfers anvendt)
+  // Effektiv trup for scoring på denne etape = original - outs(før stage) + ins(før stage)
+  const stageStartDate = (stage as { start_date?: string } | null)?.start_date ?? '9999-12-31'
+
+  const [{ data: squadCats }, { data: allTransfers }] = await Promise.all([
+    supabaseAdmin
       .from('cycling_squad_riders')
       .select('squad_id, rider_id, category_slot')
+      .in('squad_id', squadIds),
+    supabaseAdmin
+      .from('cycling_squad_transfers')
+      .select('squad_id, rest_day_date, rider_out_id, rider_in_id, rider_in_category')
       .in('squad_id', squadIds)
+      .eq('race_id', raceId),
+  ])
 
-    for (const sr of squadCats ?? []) {
-      categoryBySquadRider.set(`${sr.squad_id}:${sr.rider_id}`, sr.category_slot as number)
-    }
+  // Map: squad_id → rider_id → category (effektiv efter anvendte transfers)
+  const categoryBySquadRider = new Map<string, number>()
+  // Map: squad_id → Set af aktive rider_ids i effektiv trup
+  const effectiveSquadRiders = new Map<string, Set<string>>()
+
+  for (const sr of squadCats ?? []) {
+    const squadId = sr.squad_id as string
+    categoryBySquadRider.set(`${squadId}:${sr.rider_id}`, sr.category_slot as number)
+    if (!effectiveSquadRiders.has(squadId)) effectiveSquadRiders.set(squadId, new Set())
+    effectiveSquadRiders.get(squadId)!.add(sr.rider_id as string)
+  }
+
+  for (const t of allTransfers ?? []) {
+    const restDay = t.rest_day_date as string
+    if (restDay >= stageStartDate) continue  // transfer skete EFTER denne etape
+    const squadId = t.squad_id as string
+    const outId = t.rider_out_id as string
+    const inId = t.rider_in_id as string
+    effectiveSquadRiders.get(squadId)?.delete(outId)
+    effectiveSquadRiders.get(squadId)?.add(inId)
+    categoryBySquadRider.set(`${squadId}:${inId}`, t.rider_in_category as number)
   }
 
   // Map: lineup_id → squad_id
@@ -280,19 +336,10 @@ export async function calculateCyclingPoints(
     })
   }
 
-  // 6. Batch-fetch all squad riders for bench penalty calculation
-  const squadRidersBySquad = new Map<string, Set<string>>()
-  const { data: allSquadRidersRaw } = await supabaseAdmin
-    .from('cycling_squad_riders')
-    .select('squad_id, rider_id')
-    .in('squad_id', squadIds)
+  // 6. Effektiv brutto-trup per squad (bruges til bench penalty)
+  const squadRidersBySquad = effectiveSquadRiders
 
-  for (const sr of allSquadRidersRaw ?? []) {
-    if (!squadRidersBySquad.has(sr.squad_id)) squadRidersBySquad.set(sr.squad_id, new Set())
-    squadRidersBySquad.get(sr.squad_id)!.add(sr.rider_id)
-  }
-
-  // Fetch all squad rider details (category, team) for bench riders
+  // Fetch rider details (team) for alle der har været i en effektiv trup
   const allSquadRiderIds = new Set<string>()
   for (const rids of squadRidersBySquad.values()) {
     for (const rid of rids) allSquadRiderIds.add(rid)
@@ -329,6 +376,7 @@ export async function calculateCyclingPoints(
 
       const catMul = CAT_MULTIPLIER[rider.category] ?? 1.0
       const base = getBasePoints(position)
+      const gcMul = getGcMultiplier(result?.gc_position_after ?? null)
       let roleMul = 1.0
       let roleBonus = 0
       let jerseyPts = getJerseyPoints(result?.jersey ?? null)
@@ -399,10 +447,11 @@ export async function calculateCyclingPoints(
         }
       }
 
-      // Total for active rider (before DNF)
+      // Total for active rider (before DNF) — gc_multiplier stacks oven på role_multiplier
+      // for placering-point. Role-bonus, jersey, team_bonus skaleres ikke af GC.
       const rolePoints = (rider.role === 'domestique' || rider.role === 'equipier' || rider.role === 'joker')
         ? base + roleBonus
-        : Math.round(base * roleMul * 10) / 10 + roleBonus
+        : Math.round(base * roleMul * gcMul * 10) / 10 + roleBonus
 
       // DNF penalty: -50% of would-be score, minimum -5
       if (isDnf && !isJoker) {
@@ -423,6 +472,7 @@ export async function calculateCyclingPoints(
         is_bench: false,
         base_points: base,
         role_multiplier: roleMul,
+        gc_multiplier: gcMul,
         role_bonus: roleBonus,
         jersey_points: jerseyPts,
         team_bonus: teamBonus,
@@ -494,6 +544,7 @@ export async function calculateCyclingPoints(
         is_bench: true,
         base_points: 0,
         role_multiplier: 0,
+        gc_multiplier: 1.0,
         role_bonus: 0,
         jersey_points: jerseyPen,
         team_bonus: 0,

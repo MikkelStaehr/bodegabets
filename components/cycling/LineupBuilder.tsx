@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Lock, Radio, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Lock, Radio, Check, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import LineupResults from './LineupResults'
 import AllLineups from './AllLineups'
+import TransferModal from './TransferModal'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
 import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey } from '@/types/cycling'
 import { formatCyclingDate, formatCyclingDeadline, shortRaceName, shortBlockName, PROFILE_LABELS, PROFILE_ICONS, RACE_TYPE_LABELS, CAT_LABELS, CAT_COLORS } from '@/lib/cyclingUtils'
@@ -164,6 +165,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   }, [activeBlockId]) // eslint-disable-line react-hooks/exhaustive-deps
   const [lineups, setLineups] = useState<LineupState>({})
   const [lockedStages, setLockedStages] = useState<Set<string>>(new Set())
+  const [transferModal, setTransferModal] = useState<{ raceId: string; raceName: string; restDay: string } | null>(null)
   const [savingStage, setSavingStage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -173,7 +175,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
   // Scores & results per race (for finished races)
-  type ScoreEntry = { rider_id: string; role: string; is_bench: boolean; base_points: number; role_bonus: number; role_multiplier: number; jersey_points: number; team_bonus: number; bench_penalty: number; dnf_penalty: number; total_points: number }
+  type ScoreEntry = { rider_id: string; role: string; is_bench: boolean; base_points: number; role_bonus: number; role_multiplier: number; gc_multiplier: number; jersey_points: number; team_bonus: number; bench_penalty: number; dnf_penalty: number; total_points: number }
   type ResultEntry = { rider_id: string; position: number | null; dnf: boolean; abandon_type: string | null; jersey: string | null }
   type LineupEntry = { rider_id: string; role: string; slot_index: number }
   const [raceScores, setRaceScores] = useState<Record<string, ScoreEntry[]>>({})
@@ -519,6 +521,66 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         )
       })()}
 
+      {/* ── Hviledag-transfers (kun stage races med rest_days) ─ */}
+      {activeRace?.race_type === 'stage_race' && activeRace.rest_days && activeRace.rest_days.length > 0 && (() => {
+        // Find rest days hvor deadline endnu ikke er passeret
+        const relevantRestDays = activeRace.rest_days.filter((rd) => {
+          const next = stages
+            .filter((s) => s.race_id === activeRace.id && s.start_date > rd)
+            .sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
+          if (!next) return false
+          const startStr = /^\d{4}-\d{2}-\d{2}$/.test(next.start_date)
+            ? `${next.start_date}T09:00:00Z`
+            : next.start_date
+          const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
+          return deadline > new Date()
+        })
+        if (relevantRestDays.length === 0) return null
+        return (
+          <div style={{
+            padding: '8px 16px',
+            background: theme.bgDark,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          }}>
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+              fontWeight: 600, color: '#8FABC4', textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+            }}>
+              Hviledag:
+            </span>
+            {relevantRestDays.map((rd) => {
+              const d = new Date(rd)
+              const label = d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+              return (
+                <button
+                  key={rd}
+                  type="button"
+                  onClick={() => setTransferModal({
+                    raceId: activeRace.id,
+                    raceName: activeRace.name,
+                    restDay: rd,
+                  })}
+                  style={{
+                    padding: '4px 10px',
+                    background: 'rgba(74,144,217,0.15)',
+                    border: '1px solid rgba(74,144,217,0.4)',
+                    borderRadius: 2, cursor: 'pointer',
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                    fontWeight: 700, color: '#4A90D9',
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  <ArrowLeftRight size={11} />
+                  Transfer {label}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })()}
+
       {/* ── Race/Stage header ──────────────────────────────── */}
       <div style={{
         position: 'relative',
@@ -715,6 +777,22 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         <div style={{ padding: '0 14px 14px' }}>
           <AllLineups gameId={gameId} stageId={activeStage.id} currentUserId={currentUserId} />
         </div>
+      )}
+
+      {/* ── Transfer modal (hviledag) ───────────────────────── */}
+      {transferModal && (
+        <TransferModal
+          gameId={gameId}
+          raceId={transferModal.raceId}
+          raceName={transferModal.raceName}
+          restDayDate={transferModal.restDay}
+          onClose={() => setTransferModal(null)}
+          onSaved={() => {
+            setTransferModal(null)
+            setSuccess('transfer')
+            setTimeout(() => setSuccess(null), 2000)
+          }}
+        />
       )}
 
       {/* ── Modal ────────────────────────────────────────────── */}

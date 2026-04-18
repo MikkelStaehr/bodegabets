@@ -11,6 +11,7 @@ type Score = {
   base_points: number
   role_bonus: number
   role_multiplier: number
+  gc_multiplier: number
   jersey_points: number
   team_bonus: number
   bench_penalty: number
@@ -85,6 +86,20 @@ const ALL_ROLES: { key: string; label: string }[] = [
   { key: 'joker', label: 'Joker' },
 ]
 
+const JERSEY_LABELS: Record<string, string> = {
+  leader: 'FØR',
+  points: 'PT',
+  mountain: 'BT',
+  youth: 'UT',
+}
+
+const JERSEY_COLORS: Record<string, { bg: string; color: string }> = {
+  leader:   { bg: '#FAC775', color: '#633806' },
+  points:   { bg: '#9FE1CB', color: '#085041' },
+  mountain: { bg: '#F5C4B3', color: '#712B13' },
+  youth:    { bg: '#F2EDE4', color: '#444441' },
+}
+
 const ROLE_TOOLTIPS: Record<string, string> = {
   leader: 'Point = placering × kat-multiplikator. +5 holdbonus hvis vinderhold. DNF: -50% af score (min -5)',
   lieutenant: 'Top 10 → ×1.8 (×2.8 hvis Leader DNF). +5 holdbonus. Kun Kat 2-3',
@@ -142,6 +157,7 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   ]
   if (score.role_bonus > 0) lines.push({ label: 'Rolle-bonus', value: `+${score.role_bonus}` })
   if (score.role_multiplier !== 1) lines.push({ label: 'Rolle-multiplikator', value: `×${score.role_multiplier}` })
+  if (score.gc_multiplier && score.gc_multiplier !== 1) lines.push({ label: 'GC-multiplikator', value: `×${score.gc_multiplier}` })
   if (score.jersey_points > 0) lines.push({ label: 'Jersey-point', value: `+${score.jersey_points}` })
   if (score.team_bonus > 0) lines.push({ label: 'Hold-bonus', value: `+${score.team_bonus}` })
   if (score.dnf_penalty < 0) lines.push({ label: 'DNF-straf', value: `${score.dnf_penalty}` })
@@ -343,11 +359,22 @@ export default function LineupResults({ race, slots, scores, results, riders, on
               }}>
                 <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
                 {' '}{rider.first_name}
-                {result?.jersey && (
-                  <span style={{ marginLeft: 4, color: '#FAC775', fontSize: 10, fontWeight: 700 }}>
-                    {result.jersey}
-                  </span>
-                )}
+                {result?.jersey && result.jersey.split(',').map((j) => j.trim()).filter(Boolean).map((j) => {
+                  const label = JERSEY_LABELS[j] ?? j.toUpperCase()
+                  const c = JERSEY_COLORS[j] ?? { bg: '#FAC775', color: '#633806' }
+                  return (
+                    <span
+                      key={j}
+                      style={{
+                        marginLeft: 4, padding: '1px 5px', borderRadius: 2,
+                        background: c.bg, color: c.color,
+                        fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
+                      }}
+                    >
+                      {label}
+                    </span>
+                  )
+                })}
               </span>
 
               <div style={{ position: 'relative' }}>

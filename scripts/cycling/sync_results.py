@@ -10,8 +10,9 @@ Step 1 — Find active/finished races and scrape results:
     - Fetches races with status=active or finished from Supabase
     - For one_day races: scrape ALL riders from /race/{slug}/{year}
     - For stage_race: scrape ALL riders per stage missing results
-    - Parses jersey holders (yellow/green/polka/white) per stage
+    - Parses jersey holders (leader/points/mountain/youth) per stage
     - Parses abandon_type (DNF/DNS/DSQ) separately
+    - Parses GC positions after stage (top ~20) for gc_multiplier
     - Saves per-race JSON to data/results_{slug}_{stage}.json
 
 Step 2 — Match riders and upload:
@@ -24,6 +25,7 @@ Step 2 — Match riders and upload:
 SQL migration (run once):
     ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS jersey text;
     ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS abandon_type text;
+    ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS gc_position_after int;
 
 Environment variables (loaded from .env.local or shell):
     NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -80,11 +82,11 @@ def scrape_race_results(slug: str, client: httpx.Client) -> tuple[list[dict], st
     return _parse_results_table(soup), _parse_won_how(soup)
 
 
-def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tuple[list[dict], dict[str, list[str]], str | None, str | None]:
+def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tuple[list[dict], dict[str, list[str]], str | None, str | None, dict[str, int]]:
     """Scrape ALL results from a specific stage.
     Uses /stage-{N} page for jerseys and profile, then fetches
     /stage-{N}/result for the full results table.
-    Returns (results, jersey_holders, stage_profile, won_how).
+    Returns (results, jersey_holders, stage_profile, won_how, gc_positions).
     """
     if stage_num == 0:
         base = f"{PCS_BASE}/race/{slug}/{YEAR}/prologue"
@@ -99,6 +101,7 @@ def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tup
     jerseys = _parse_jerseys(soup)
     profile = _parse_stage_profile(soup)
     won_how = _parse_won_how(soup)
+    gc_positions = _parse_gc_positions(soup)
 
     # Fetch full results from /result sub-page
     result_url = f"{base}/result"
@@ -118,7 +121,7 @@ def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tup
         _log(f"    Fallback: stage page had {len(stage_results)} vs /result {len(results)}")
         results = stage_results
 
-    return results, jerseys, profile, won_how
+    return results, jerseys, profile, won_how, gc_positions
 
 
 def parse_time_to_seconds(text: str) -> int | None:
@@ -245,24 +248,27 @@ def _parse_jerseys(soup: BeautifulSoup) -> dict[str, list[str]]:
     Parse jersey holders from PCS stage page.
     PCS shows jersey classifications in sections/tables after the stage result.
     Look for known classification keywords and map to jersey types.
-    Returns { rider_pcs_slug: ['yellow', 'green', ...] }
+    Returns { rider_pcs_slug: ['leader', 'points', ...] }
+
+    Jersey keys are race-agnostic (leader/points/mountain/youth) — actual
+    jersey color varies per race (Tour=yellow, Giro=pink, Vuelta=red).
     """
     rider_re = re.compile(r"^rider/([\w-]+)$")
     jerseys: dict[str, list[str]] = {}
 
-    # Map PCS classification keywords to jersey types
+    # Map PCS classification keywords to role-based jersey keys
     classification_map = {
-        "general": "yellow",
-        "gc": "yellow",
-        "leader": "yellow",
-        "points": "green",
-        "sprint": "green",
-        "mountain": "polka",
-        "kom": "polka",
-        "climber": "polka",
-        "young": "white",
-        "youth": "white",
-        "u25": "white",
+        "general": "leader",
+        "gc": "leader",
+        "leader": "leader",
+        "points": "points",
+        "sprint": "points",
+        "mountain": "mountain",
+        "kom": "mountain",
+        "climber": "mountain",
+        "young": "youth",
+        "youth": "youth",
+        "u25": "youth",
     }
 
     # Look for classification sections — PCS uses <h3> or <div> headers
@@ -296,6 +302,48 @@ def _parse_jerseys(soup: BeautifulSoup) -> dict[str, list[str]]:
                     jerseys[slug].append(jersey_type)
 
     return jerseys
+
+
+def _parse_gc_positions(soup: BeautifulSoup) -> dict[str, int]:
+    """
+    Parse GC (general classification) positions after a stage from PCS.
+    Returns { pcs_slug: gc_position }. Typically only top ~20 riders listed.
+    Riders not in this map are not in top-20 GC (get gc_multiplier = 1.0).
+    """
+    rider_re = re.compile(r"^rider/([\w-]+)$")
+    gc: dict[str, int] = {}
+
+    for header in soup.find_all(["h3", "h4", "div"], class_=re.compile(r"(sub)?head")):
+        text = header.get_text(strip=True).lower()
+
+        # Only match the general/GC/leader classification — not points/mountain/youth
+        is_gc = any(kw in text for kw in ["general", "gc", "leader"])
+        is_other = any(kw in text for kw in [
+            "points", "sprint", "mountain", "kom", "climber",
+            "young", "youth", "u25", "team", "combativ",
+        ])
+        if not is_gc or is_other:
+            continue
+
+        table = header.find_next("table")
+        if not table:
+            continue
+
+        # Enumerate riders in order — first = GC leader, second = GC 2, etc.
+        position = 0
+        for a in table.find_all("a", href=rider_re):
+            m = rider_re.match(a["href"])
+            if not m:
+                continue
+            slug = m.group(1)
+            if slug in gc:
+                continue  # skip duplicate links within same row
+            position += 1
+            gc[slug] = position
+        if gc:
+            break  # found GC, stop looking
+
+    return gc
 
 
 def _parse_stage_profile(soup: BeautifulSoup) -> str | None:
@@ -563,6 +611,7 @@ def upload_results(
     rider_index: dict[str, int],
     supabase: Client,
     jersey_holders: dict[str, list[str]] | None = None,
+    gc_positions: dict[str, int] | None = None,
 ) -> tuple[int, int]:
     """Match and upsert results. Returns (upserted, unmatched).
     stage_number=1 for one-day races, sequential for stage races."""
@@ -581,6 +630,8 @@ def upload_results(
         if jersey_holders and r["pcs_slug"] in jersey_holders:
             jersey = ",".join(jersey_holders[r["pcs_slug"]])
 
+        gc_pos = gc_positions.get(r["pcs_slug"]) if gc_positions else None
+
         row: dict = {
             "race_id": race_id,
             "rider_id": rider_id,
@@ -589,6 +640,7 @@ def upload_results(
             "time_gap_seconds": r["time_gap_seconds"],
             "dnf": r["dnf"],
             "abandon_type": r.get("abandon_type"),
+            "gc_position_after": gc_pos,
         }
         if jersey:
             row["jersey"] = jersey
@@ -886,7 +938,7 @@ def main() -> None:
                     stage_num = stage["stage_number"]
                     _log(f"  Stage {stage_num}:")
 
-                    results, jerseys, stage_profile, won_how = scrape_stage_results(
+                    results, jerseys, stage_profile, won_how, gc_positions = scrape_stage_results(
                         race["pcs_slug"], stage_num, client,
                     )
                     if not results:
@@ -899,10 +951,13 @@ def main() -> None:
 
                     if jerseys:
                         _log(f"    Jerseys: {jerseys}")
+                    if gc_positions:
+                        _log(f"    GC top: {sorted(gc_positions.items(), key=lambda x: x[1])[:5]}")
 
                     upserted, unmatched = upload_results(
                         results, race["id"], stage_num, rider_index, supabase,
                         jersey_holders=jerseys,
+                        gc_positions=gc_positions,
                     )
                     total_upserted += upserted
                     total_unmatched += unmatched
