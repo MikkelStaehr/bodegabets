@@ -802,6 +802,68 @@ export default async function GamePage({ params }: Props) {
     tickerItems.push(`✅ Alle runder afsluttet i ${typedGame.name}`)
   }
 
+  // ── Cycling-specifikke ticker-items ─────────────────────────────────────
+  if (typedGame.sport === 'cycling' && lineupRaces.length > 0) {
+    const dayMs = 24 * 60 * 60 * 1000
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const sortedByDate = [...lineupRaces].sort((a, b) =>
+      a.start_date.localeCompare(b.start_date)
+    )
+    const upcoming = sortedByDate.filter((r) => r.status !== 'finished')
+    const allFinished = upcoming.length === 0
+
+    if (allFinished) {
+      // Find seneste end_date (eller start_date for one_day)
+      const lastDateStr = sortedByDate
+        .map((r) => r.start_date)
+        .sort()
+        .pop()
+      if (lastDateStr) {
+        const lastEnd = new Date(lastDateStr)
+        const daysSince = Math.floor((today.getTime() - lastEnd.getTime()) / dayMs)
+        const daysUntilArchive = Math.max(0, 14 - daysSince)
+        if (typedGame.status === 'finished') {
+          tickerItems.push(`🏁 ${typedGame.name} er arkiveret — historik er stadig tilgængelig`)
+        } else if (daysUntilArchive === 0) {
+          tickerItems.push(`⏳ Sidste løb er kørt — ${typedGame.name} arkiveres i dag`)
+        } else {
+          tickerItems.push(
+            `⏳ Sidste løb er kørt — ${typedGame.name} arkiveres om ${daysUntilArchive} ${daysUntilArchive === 1 ? 'dag' : 'dage'}`
+          )
+          if (typedGame.host_id === user.id) {
+            tickerItems.push(`💡 Du er host — tilføj nye løb for at fortsætte spilrummet`)
+          }
+        }
+      }
+    } else {
+      const next = upcoming[0]
+      const last = upcoming[upcoming.length - 1]
+      const daysToNext = Math.floor((new Date(next.start_date).getTime() - today.getTime()) / dayMs)
+      const daysToLast = Math.floor((new Date(last.start_date).getTime() - today.getTime()) / dayMs)
+
+      if (upcoming.length === 1) {
+        if (daysToNext === 0) {
+          tickerItems.push(`🚨 Sidste løb i ${typedGame.name} kører i dag: ${next.name}`)
+        } else if (daysToNext === 1) {
+          tickerItems.push(`🚴 Kun ét løb tilbage i ${typedGame.name} — ${next.name} (i morgen)`)
+        } else if (daysToNext > 0) {
+          tickerItems.push(
+            `🚴 Kun ét løb tilbage i ${typedGame.name} — ${next.name} om ${daysToNext} dage`
+          )
+        }
+      } else if (upcoming.length <= 3) {
+        tickerItems.push(`🚴 Kun ${upcoming.length} løb tilbage i ${typedGame.name}`)
+      }
+
+      if (daysToLast >= 0 && daysToLast <= 14 && upcoming.length <= 3) {
+        const lastDate = new Date(last.start_date).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
+        tickerItems.push(`🏁 Sidste løb i sæsonen: ${last.name} · ${lastDate}`)
+      }
+    }
+  }
+
   // ── Per-bruger statistik til leaderboard ───────────────────────────────────
   const placedBetIds = usersWithBets
 
