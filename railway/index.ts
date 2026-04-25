@@ -593,6 +593,187 @@ app.get('/send-reminders', async (_req, res) => {
   }
 })
 
+// ─── GET /cycling-archive-check ─────────────────────────────────────────────
+// Auto-arkivér cycling gamerooms hvor sidste løb sluttede for 14+ dage siden.
+// Sender også 7-dages varsel via push før arkivering.
+//
+// SQL migration (kør én gang i Supabase):
+//   ALTER TABLE games ADD COLUMN IF NOT EXISTS archive_warning_sent_at timestamptz;
+
+app.get('/cycling-archive-check', async (_req, res) => {
+  try {
+    const now = new Date()
+    const ARCHIVE_DAYS = 14
+    const WARNING_DAYS = 7
+    const dayMs = 24 * 60 * 60 * 1000
+    const archiveCutoff = new Date(now.getTime() - ARCHIVE_DAYS * dayMs)
+    const warningCutoff = new Date(now.getTime() - WARNING_DAYS * dayMs)
+
+    // 1) Find aktive cycling gamerooms
+    const { data: activeGames } = await supabaseAdmin
+      .from('games')
+      .select('id, name, host_id, archive_warning_sent_at')
+      .eq('sport', 'cycling')
+      .eq('status', 'active')
+
+    if (!activeGames?.length) {
+      res.json({ ok: true, archived: 0, warned: 0 })
+      return
+    }
+
+    let archived = 0
+    let warned = 0
+
+    // VAPID setup (genbruges)
+    const vapidPublic = process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    const vapidPrivate = process.env.VAPID_PRIVATE_KEY
+    const pushReady = !!(vapidPublic && vapidPrivate)
+    if (pushReady) webpush.setVapidDetails('mailto:admin@bodegabets.dk', vapidPublic!, vapidPrivate!)
+
+    for (const game of activeGames) {
+      // 2) Find alle races tilknyttet dette gameroom
+      const { data: gameRaces } = await supabaseAdmin
+        .from('cycling_game_races')
+        .select('race_id')
+        .eq('game_id', game.id)
+
+      const raceIds = (gameRaces ?? []).map((gr) => gr.race_id as string)
+      if (raceIds.length === 0) continue
+
+      const { data: races } = await supabaseAdmin
+        .from('cycling_races')
+        .select('id, status, end_date, start_date')
+        .in('id', raceIds)
+
+      const allRaces = races ?? []
+      const allFinished = allRaces.length > 0 && allRaces.every((r) => r.status === 'finished')
+      if (!allFinished) continue
+
+      // 3) Find seneste end_date (fallback til start_date for one_day races)
+      const lastEndDate = allRaces
+        .map((r) => (r.end_date as string | null) ?? (r.start_date as string | null))
+        .filter((d): d is string => d != null)
+        .sort()
+        .pop()
+      if (!lastEndDate) continue
+
+      const lastEnd = new Date(lastEndDate)
+
+      // 4) Auto-arkivér hvis 14+ dage er gået
+      if (lastEnd <= archiveCutoff) {
+        await supabaseAdmin
+          .from('games')
+          .update({ status: 'finished' })
+          .eq('id', game.id)
+        archived++
+
+        // Notifikation til alle medlemmer
+        if (pushReady) {
+          const { data: members } = await supabaseAdmin
+            .from('game_members')
+            .select('user_id')
+            .eq('game_id', game.id)
+
+          const memberIds = (members ?? []).map((m) => m.user_id as string)
+          if (memberIds.length > 0) {
+            const { data: subs } = await supabaseAdmin
+              .from('push_subscriptions')
+              .select('subscription, endpoint')
+              .in('user_id', memberIds)
+
+            const payload = JSON.stringify({
+              title: '🏁 Spilrum afsluttet',
+              body: `${game.name} er arkiveret. Du kan stadig se historik og slut-placering.`,
+              url: `/games/${game.id}`,
+            })
+            for (const s of subs ?? []) {
+              try {
+                await webpush.sendNotification(s.subscription as webpush.PushSubscription, payload)
+              } catch (e: unknown) {
+                if (e && typeof e === 'object' && 'statusCode' in e && (e as { statusCode: number }).statusCode === 410) {
+                  await supabaseAdmin
+                    .from('push_subscriptions')
+                    .delete()
+                    .eq('endpoint', (s.subscription as { endpoint: string }).endpoint)
+                }
+              }
+            }
+          }
+        }
+        continue
+      }
+
+      // 5) 7-dages varsel hvis vi ikke har sendt det endnu
+      if (
+        lastEnd <= warningCutoff &&
+        !game.archive_warning_sent_at &&
+        pushReady
+      ) {
+        const daysUntilArchive = Math.max(
+          1,
+          Math.ceil((lastEnd.getTime() + ARCHIVE_DAYS * dayMs - now.getTime()) / dayMs),
+        )
+
+        const { data: members } = await supabaseAdmin
+          .from('game_members')
+          .select('user_id')
+          .eq('game_id', game.id)
+
+        const memberIds = (members ?? []).map((m) => m.user_id as string)
+        if (memberIds.length > 0) {
+          const { data: subs } = await supabaseAdmin
+            .from('push_subscriptions')
+            .select('user_id, subscription')
+            .in('user_id', memberIds)
+
+          for (const s of subs ?? []) {
+            const targetIsHost = (s.user_id as string) === game.host_id
+            const body = targetIsHost
+              ? `Sidste løb i ${game.name} er kørt. Vil du tilføje flere løb? Ellers arkiveres spilrummet om ${daysUntilArchive} dage.`
+              : `${game.name} arkiveres om ${daysUntilArchive} dage med mindre der tilføjes flere løb.`
+
+            try {
+              await webpush.sendNotification(
+                s.subscription as webpush.PushSubscription,
+                JSON.stringify({
+                  title: '⏳ Spilrum afsluttes snart',
+                  body,
+                  url: `/games/${game.id}`,
+                }),
+              )
+            } catch (e: unknown) {
+              if (e && typeof e === 'object' && 'statusCode' in e && (e as { statusCode: number }).statusCode === 410) {
+                await supabaseAdmin
+                  .from('push_subscriptions')
+                  .delete()
+                  .eq('endpoint', (s.subscription as { endpoint: string }).endpoint)
+              }
+            }
+          }
+        }
+
+        await supabaseAdmin
+          .from('games')
+          .update({ archive_warning_sent_at: now.toISOString() })
+          .eq('id', game.id)
+        warned++
+      }
+    }
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_archive',
+      status: archived > 0 || warned > 0 ? 'success' : 'info',
+      message: `cycling-archive-check: ${archived} arkiveret, ${warned} varslet`,
+      metadata: { archived, warned },
+    })
+
+    res.json({ ok: true, archived, warned })
+  } catch (err) {
+    console.error('[cycling-archive-check]', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── POST /api/cycling/calculate-points ─────────────────────────────────────
 
 app.post('/api/cycling/calculate-points', async (req, res) => {
@@ -906,6 +1087,9 @@ app.listen(PORT, () => {
 
   // Hvert 30. minut — beregn cykling-point (kun 09:00–20:00 UTC)
   cron.schedule('*/30 9-20 * * *', () => callEndpoint('/cycling-points'))
+
+  // Dagligt kl. 08:00 UTC — auto-arkivér cycling gamerooms efter sidste løb
+  cron.schedule('0 8 * * *', () => callEndpoint('/cycling-archive-check'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')
 })
