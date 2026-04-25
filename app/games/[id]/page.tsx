@@ -946,6 +946,21 @@ export default async function GamePage({ params }: Props) {
               currentUserId={user.id}
             />
             <Leaderboard gameId={gameId} />
+            {typedGame.host_id === user.id && (
+              <Link
+                href={`/games/${gameId}/cycling/add-races`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 6, padding: '10px 16px', marginTop: 12,
+                  background: theme.primary, color: '#F2EDE4',
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+                  fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                  borderRadius: 2, textDecoration: 'none', cursor: 'pointer',
+                }}
+              >
+                + Tilføj løb til spilrum
+              </Link>
+            )}
           </>
         )}
 

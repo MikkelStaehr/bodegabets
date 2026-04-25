@@ -51,16 +51,35 @@ export async function generateCyclingBlocks(
   gameId: number,
   raceSelections: { race_id: string }[]
 ): Promise<void> {
-  // Idempotent: tjek om blokke allerede eksisterer for dette game
-  const { count } = await supabaseAdmin
-    .from('cycling_blocks')
-    .select('id', { count: 'exact', head: true })
+  // Find race_ids der ALLEREDE har cycling_block_id (skal ikke have nye blokke)
+  const { data: existingLinks } = await supabaseAdmin
+    .from('cycling_game_races')
+    .select('race_id, cycling_block_id')
     .eq('game_id', gameId)
 
-  if (count && count > 0) return
+  const racesWithBlock = new Set(
+    (existingLinks ?? [])
+      .filter((l) => l.cycling_block_id != null)
+      .map((l) => l.race_id as string)
+  )
 
-  // Hent alle valgte løb
-  const raceIds = raceSelections.map((r) => r.race_id)
+  // Find næste block_order baseret på eksisterende blokke
+  const { data: existingBlocks } = await supabaseAdmin
+    .from('cycling_blocks')
+    .select('block_order')
+    .eq('game_id', gameId)
+    .order('block_order', { ascending: false })
+    .limit(1)
+
+  let blockOrder = ((existingBlocks?.[0]?.block_order as number | undefined) ?? 0) + 1
+
+  // Hent alle valgte løb (filtrer dem der allerede har en blok fra)
+  const raceIds = raceSelections
+    .map((r) => r.race_id)
+    .filter((id) => !racesWithBlock.has(id))
+
+  if (raceIds.length === 0) return
+
   const { data: races } = await supabaseAdmin
     .from('cycling_races')
     .select('id, name, pcs_slug, race_type, start_date')
@@ -71,7 +90,7 @@ export async function generateCyclingBlocks(
   const raceMap = new Map<string, RaceRow>()
   for (const r of races) raceMap.set(r.pcs_slug, r)
 
-  // Gruppér løb
+  // Gruppér løb (kun nye, ikke-blok-tildelte)
   const flandern = FLANDERN_SLUGS
     .map((s) => raceMap.get(s))
     .filter((r): r is RaceRow => !!r)
@@ -81,8 +100,6 @@ export async function generateCyclingBlocks(
     .filter((r): r is RaceRow => !!r)
 
   const stageRaces = races.filter((r) => r.race_type === 'stage_race')
-
-  let blockOrder = 1
 
   // ── Flandern-blok ─────────────────────────────────────────────────────
 
