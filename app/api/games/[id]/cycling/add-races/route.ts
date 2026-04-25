@@ -57,6 +57,21 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Alle valgte løb er allerede tilknyttet' }, { status: 400 })
   }
 
+  // Afvis allerede-færdige løb (kan ikke spilles på)
+  const { data: raceStatuses } = await supabaseAdmin
+    .from('cycling_races')
+    .select('id, status')
+    .in('id', newSelections.map((s) => s.race_id))
+
+  const finishedIds = new Set(
+    (raceStatuses ?? []).filter((r) => r.status === 'finished').map((r) => r.id as string)
+  )
+  if (finishedIds.size > 0) {
+    return NextResponse.json({
+      error: 'Allerede kørte løb kan ikke tilføjes',
+    }, { status: 400 })
+  }
+
   // Indsæt nye cycling_game_races
   const raceRows = newSelections.map((sel) => ({
     game_id: gameId,

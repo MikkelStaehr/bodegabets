@@ -115,10 +115,11 @@ export default function AddRacesForm({ gameId, races }: Props) {
       {finishedRaces.length > 0 && (
         <RaceList
           title="Allerede kørte løb"
-          subtitle="Resultater bliver beregnet ved næste cron-kørsel."
+          subtitle="Disse kan ikke tilføjes — vises kun for at give overblik over sæsonen."
           races={finishedRaces}
           selected={selected}
           onToggle={toggle}
+          disabled
         />
       )}
 
@@ -146,13 +147,14 @@ export default function AddRacesForm({ gameId, races }: Props) {
 }
 
 function RaceList({
-  title, subtitle, races, selected, onToggle,
+  title, subtitle, races, selected, onToggle, disabled = false,
 }: {
   title: string
   subtitle?: string
   races: Race[]
   selected: Set<string>
   onToggle: (id: string) => void
+  disabled?: boolean
 }) {
   if (races.length === 0) return null
   return (
@@ -163,21 +165,21 @@ function RaceList({
       {subtitle && (
         <p className="font-body text-xs text-text-warm/70 mb-3">{subtitle}</p>
       )}
-      <div className="rounded-sm border border-black/10 bg-white overflow-hidden">
+      <div className={`rounded-sm border border-black/10 bg-white overflow-hidden ${disabled ? 'opacity-60' : ''}`}>
         {races.map((race, idx) => {
-          const isSelected = selected.has(race.id)
+          const isSelected = !disabled && selected.has(race.id)
           const isFinished = race.status === 'finished'
+          const Wrapper: React.ElementType = disabled ? 'div' : 'button'
           return (
-            <button
+            <Wrapper
               key={race.id}
-              type="button"
-              onClick={() => onToggle(race.id)}
+              {...(disabled ? {} : { type: 'button' as const, onClick: () => onToggle(race.id) })}
               className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                 idx > 0 ? 'border-t border-black/5' : ''
-              } ${isSelected ? 'bg-forest/5' : 'hover:bg-black/2'}`}
+              } ${disabled ? 'cursor-not-allowed' : isSelected ? 'bg-forest/5' : 'hover:bg-black/2'}`}
             >
               <div className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center flex-shrink-0 ${
-                isSelected ? 'bg-forest border-forest' : 'border-black/30'
+                disabled ? 'border-black/15 bg-black/5' : isSelected ? 'bg-forest border-forest' : 'border-black/30'
               }`}>
                 {isSelected && (
                   <svg className="w-3 h-3 text-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -198,7 +200,7 @@ function RaceList({
                   {isFinished && <> · <span className="text-text-warm/60">færdigt</span></>}
                 </div>
               </div>
-            </button>
+            </Wrapper>
           )
         })}
       </div>
