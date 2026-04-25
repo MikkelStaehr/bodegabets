@@ -870,6 +870,57 @@ export default async function GamePage({ params }: Props) {
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 80px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* Kalender-slider */}
+        {/* Arkiveret-banner */}
+        {typedGame.status === 'finished' && (
+          <div style={{
+            background: '#F8F5ED',
+            border: '1px solid #C8BEA8',
+            borderRadius: 2,
+            padding: '14px 16px',
+            margin: '0 0 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}>
+            <div>
+              <div style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 11, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.12em',
+                color: '#7a7060', marginBottom: 4,
+              }}>
+                Spilrum afsluttet
+              </div>
+              <div style={{
+                fontFamily: "'Barlow', sans-serif",
+                fontSize: 13, color: '#1a1a1a',
+              }}>
+                Resultater og historik er låst.
+                {typedGame.host_id === user.id && typedGame.sport === 'cycling' && (
+                  <> Du kan reaktivere ved at tilføje nye løb.</>
+                )}
+              </div>
+            </div>
+            {typedGame.host_id === user.id && typedGame.sport === 'cycling' && (
+              <Link
+                href={`/games/${gameId}/cycling/add-races`}
+                style={{
+                  padding: '8px 14px',
+                  background: theme.primary, color: '#F2EDE4',
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                  fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+                  borderRadius: 2, textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Tilføj løb
+              </Link>
+            )}
+          </div>
+        )}
+
         <section className="border-t border-b border-[#d4cec4] py-0">
           {typedGame.sport === 'cycling' ? (
             <CyclingCalendarSlider events={cyclingEvents} sportColor={theme.primary} />
