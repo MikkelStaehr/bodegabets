@@ -142,9 +142,14 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   [stages])
 
   // Default-blok: først ikke-finished (= aktiv blok). Hvis alle er finished,
-  // fald tilbage til seneste (højeste block_order). Tilsidesættes af defaultBlockId hvis givet.
+  // fald tilbage til seneste (højeste block_order).
+  // defaultBlockId tilsidesætter KUN hvis den blok ikke er finished — ellers
+  // ender brugeren på en gammel blok bare fordi de havde en squad der.
   const initialBlockId = useMemo(() => {
-    if (defaultBlockId && sortedBlocks.find((b) => b.id === defaultBlockId)) return defaultBlockId
+    if (defaultBlockId) {
+      const dflt = sortedBlocks.find((b) => b.id === defaultBlockId)
+      if (dflt && dflt.status !== 'finished') return defaultBlockId
+    }
     const firstActive = sortedBlocks.find((b) => b.status !== 'finished')
     if (firstActive) return firstActive.id
     return sortedBlocks[sortedBlocks.length - 1]?.id ?? null
@@ -425,7 +430,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           // One-day races: show race short name. Stage races: show "Etape N"
           const tabLabel = stage.race_type === 'one_day'
             ? shortRaceName(stage.race_name)
-            : `Etape ${stage.stage_number}`
+            : stage.stage_number === 0
+              ? 'Prolog'
+              : `Etape ${stage.stage_number}`
           return (
             <button
               key={stage.id}
