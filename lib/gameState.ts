@@ -529,50 +529,126 @@ async function buildFootballLeaderboard(
   const roundIds = (rounds ?? []).map((r) => r.id as number)
   if (roundIds.length === 0) return { leaderboard: [] }
 
+  // Hent ALLE blocks så vi kan vælge "nuværende" (lavest block_order, ikke-finished)
+  const allBlockIds = [...new Set((rounds ?? []).map((r) => r.block_id).filter((id): id is number => id != null))]
+  let allBlocks: { id: number; block_number: number; status: string }[] = []
+  if (allBlockIds.length > 0) {
+    const { data } = await supabaseAdmin
+      .from('blocks')
+      .select('id, block_number, status')
+      .in('id', allBlockIds)
+      .order('block_number', { ascending: true })
+    allBlocks = (data ?? []) as typeof allBlocks
+  }
+
+  const finishedBlockIds = new Set(
+    allBlocks.filter((b) => b.status === 'finished').map((b) => b.id),
+  )
+
+  // "Nuværende" blok = laveste block_number der ikke er finished.
+  // Hvis alle er finished → seneste (højeste block_number).
+  const currentBlock =
+    allBlocks.find((b) => b.status !== 'finished') ??
+    [...allBlocks].reverse()[0] ??
+    null
+  const currentBlockId = currentBlock?.id ?? null
+
+  // Filtrér runder til kun den nuværende blok
+  const currentBlockRoundIds = new Set(
+    (rounds ?? []).filter((r) => r.block_id === currentBlockId).map((r) => r.id as number),
+  )
+
   const { data: scores } = await supabaseAdmin
     .from('round_scores')
     .select('user_id, round_id, earnings_delta')
     .eq('game_id', gameId)
     .in('round_id', roundIds)
 
-  const roundToBlock = new Map<number, number>()
-  for (const r of rounds ?? []) {
-    if (r.block_id) roundToBlock.set(r.id, r.block_id)
-  }
-
   const finishedRoundIds = new Set(
-    (rounds ?? []).filter((r) => r.status === 'finished').map((r) => r.id)
+    (rounds ?? []).filter((r) => r.status === 'finished').map((r) => r.id),
+  )
+  const finishedRoundsInCurrent = new Set(
+    [...finishedRoundIds].filter((rid) => currentBlockRoundIds.has(rid as number)),
   )
 
+  // userData.roundPoints/blockPoints rummer KUN nuværende blok-data
   const userData = new Map<string, { roundPoints: Map<number, number>; blockPoints: Map<number, number> }>()
   for (const m of members) {
     userData.set(m.user_id, { roundPoints: new Map(), blockPoints: new Map() })
   }
-
   for (const s of scores ?? []) {
+    if (!currentBlockRoundIds.has(s.round_id as number)) continue
     const ud = userData.get(s.user_id)
     if (!ud) continue
     const pts = Number(s.earnings_delta) || 0
     ud.roundPoints.set(s.round_id, (ud.roundPoints.get(s.round_id) ?? 0) + pts)
-    const blockId = roundToBlock.get(s.round_id)
-    if (blockId) ud.blockPoints.set(blockId, (ud.blockPoints.get(blockId) ?? 0) + pts)
+    if (currentBlockId) ud.blockPoints.set(currentBlockId, (ud.blockPoints.get(currentBlockId) ?? 0) + pts)
   }
 
-  const roundWins = countWins(userData, 'roundPoints', finishedRoundIds)
-
-  const allBlockIds = [...new Set((rounds ?? []).map((r) => r.block_id).filter((id): id is number => id != null))]
-  let finishedBlockIds = new Set<number>()
-  if (allBlockIds.length > 0) {
-    const { data: blocks } = await supabaseAdmin
-      .from('blocks')
-      .select('id, status')
-      .in('id', allBlockIds)
-      .eq('status', 'finished')
-    finishedBlockIds = new Set((blocks ?? []).map((b) => b.id as number))
-  }
-  const blockWins = countWins(userData, 'blockPoints', finishedBlockIds)
+  // R. SEJR = wins i nuværende bloks finished rounds.
+  // B. SEJR = historiske vundne blokke (alle finished blocks samlet — kræver at vi
+  // ser scores for tidligere blokke separat).
+  const roundWins = countWins(userData, 'roundPoints', finishedRoundsInCurrent)
+  const blockWins = await countHistoricalBlockWins(
+    gameId,
+    members,
+    rounds ?? [],
+    finishedBlockIds,
+  )
 
   return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
+}
+
+// Tæl historiske blok-vindere ved at aggregere alle finished blocks separat.
+async function countHistoricalBlockWins(
+  gameId: number,
+  members: { user_id: string }[],
+  rounds: { id: number; block_id?: number | null; status: string }[],
+  finishedBlockIds: Set<number>,
+): Promise<Map<string, number>> {
+  if (finishedBlockIds.size === 0) return new Map()
+
+  const finishedBlockRoundIds = (rounds ?? [])
+    .filter((r) => r.block_id != null && finishedBlockIds.has(r.block_id))
+    .map((r) => r.id)
+
+  if (finishedBlockRoundIds.length === 0) return new Map()
+
+  const { data: scores } = await supabaseAdmin
+    .from('round_scores')
+    .select('user_id, round_id, earnings_delta')
+    .eq('game_id', gameId)
+    .in('round_id', finishedBlockRoundIds)
+
+  // pointsPerBlockPerUser[block_id][user_id] = total
+  const blockPoints = new Map<number, Map<string, number>>()
+  for (const m of members) {
+    for (const bid of finishedBlockIds) {
+      if (!blockPoints.has(bid)) blockPoints.set(bid, new Map())
+      blockPoints.get(bid)!.set(m.user_id, 0)
+    }
+  }
+
+  const roundToBlock = new Map<number, number>()
+  for (const r of rounds) if (r.block_id != null) roundToBlock.set(r.id, r.block_id)
+
+  for (const s of scores ?? []) {
+    const bid = roundToBlock.get(s.round_id as number)
+    if (!bid || !finishedBlockIds.has(bid)) continue
+    const userMap = blockPoints.get(bid)!
+    userMap.set(s.user_id, (userMap.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
+  }
+
+  const wins = new Map<string, number>()
+  for (const [, userMap] of blockPoints) {
+    let topUid: string | null = null
+    let topPts = -Infinity
+    for (const [uid, pts] of userMap) {
+      if (pts > topPts) { topPts = pts; topUid = uid }
+    }
+    if (topUid && topPts > 0) wins.set(topUid, (wins.get(topUid) ?? 0) + 1)
+  }
+  return wins
 }
 
 async function buildChampionshipLeaderboard(
@@ -622,11 +698,30 @@ async function buildCyclingLeaderboard(
   gameId: number,
   members: { user_id: string; profiles: unknown }[],
 ): Promise<{ leaderboard: LeaderboardEntry[] }> {
-  const { data: scores } = await supabaseAdmin
-    .from('cycling_scores')
-    .select('stage_id, race_id, total_points, cycling_lineups!inner(squad_id, cycling_squads!inner(user_id, game_id))')
-    .eq('cycling_lineups.cycling_squads.game_id', gameId)
+  // Hent alle top-level blocks for spilrummet (sub-blocks tæller ikke som
+  // egne 'blokke' i leaderboard-konteksten — de er konceptuelle inddelinger
+  // af et stage race)
+  const { data: cyclingBlocks } = await supabaseAdmin
+    .from('cycling_blocks')
+    .select('id, block_order, status, parent_block_id')
+    .eq('game_id', gameId)
+    .is('parent_block_id', null)
+    .order('block_order', { ascending: true })
 
+  const topBlocks = (cyclingBlocks ?? []) as { id: string; block_order: number; status: string; parent_block_id: string | null }[]
+  const finishedBlockIds = new Set(
+    topBlocks.filter((b) => b.status === 'finished').map((b) => b.id),
+  )
+
+  // "Nuværende" blok = laveste block_order der ikke er finished.
+  // Hvis alle er finished → seneste (højeste block_order).
+  const currentBlock =
+    topBlocks.find((b) => b.status !== 'finished') ??
+    [...topBlocks].reverse()[0] ??
+    null
+  const currentBlockId = currentBlock?.id ?? null
+
+  // Hent race → block mapping for nuværende blok
   const { data: gameRaces } = await supabaseAdmin
     .from('cycling_game_races')
     .select('race_id, cycling_block_id')
@@ -637,12 +732,26 @@ async function buildCyclingLeaderboard(
     if (gr.cycling_block_id) raceToBlock.set(gr.race_id, gr.cycling_block_id)
   }
 
+  const currentBlockRaceIds = new Set(
+    (gameRaces ?? [])
+      .filter((gr) => gr.cycling_block_id === currentBlockId)
+      .map((gr) => gr.race_id as string),
+  )
+
+  // Hent alle scores for spilrummet
+  const { data: scores } = await supabaseAdmin
+    .from('cycling_scores')
+    .select('stage_id, race_id, total_points, cycling_lineups!inner(squad_id, cycling_squads!inner(user_id, game_id))')
+    .eq('cycling_lineups.cycling_squads.game_id', gameId)
+
+  // userData rummer KUN nuværende blok-data
   const userData = new Map<string, { roundPoints: Map<string, number>; blockPoints: Map<string, number> }>()
   for (const m of members) {
     userData.set(m.user_id, { roundPoints: new Map(), blockPoints: new Map() })
   }
 
   for (const s of scores ?? []) {
+    if (!currentBlockRaceIds.has(s.race_id as string)) continue
     const lineup = s.cycling_lineups as unknown as { squad_id: string; cycling_squads: { user_id: string } }
     const userId = lineup?.cycling_squads?.user_id
     if (!userId) continue
@@ -653,32 +762,64 @@ async function buildCyclingLeaderboard(
     const pts = Number(s.total_points) || 0
     const stageId = s.stage_id as string
     ud.roundPoints.set(stageId, (ud.roundPoints.get(stageId) ?? 0) + pts)
-
-    const blockId = raceToBlock.get(s.race_id as string)
-    if (blockId) ud.blockPoints.set(blockId, (ud.blockPoints.get(blockId) ?? 0) + pts)
+    if (currentBlockId) ud.blockPoints.set(currentBlockId, (ud.blockPoints.get(currentBlockId) ?? 0) + pts)
   }
 
-  const stageIds = new Set<string>()
-  for (const ud of userData.values()) for (const sid of ud.roundPoints.keys()) stageIds.add(sid)
+  // R. SEJR = stage-vindere i nuværende blok (alle scorede stages tæller)
+  const stageIdsInCurrent = new Set<string>()
+  for (const ud of userData.values()) for (const sid of ud.roundPoints.keys()) stageIdsInCurrent.add(sid)
 
-  const allCyclingBlockIds = [...new Set([...userData.values()].flatMap((ud) => [...ud.blockPoints.keys()]))]
-  let finishedCyclingBlockIds = new Set<string>()
-  if (allCyclingBlockIds.length > 0) {
-    const { data: cyclingBlocks } = await supabaseAdmin
-      .from('cycling_blocks')
-      .select('id, status')
-      .in('id', allCyclingBlockIds)
-    finishedCyclingBlockIds = new Set(
-      (cyclingBlocks ?? [])
-        .filter((b) => (b as { status?: string }).status === 'finished')
-        .map((b) => b.id as string)
-    )
-  }
+  const roundWins = countWins(userData, 'roundPoints', stageIdsInCurrent)
 
-  const roundWins = countWins(userData, 'roundPoints', stageIds)
-  const blockWins = countWins(userData, 'blockPoints', finishedCyclingBlockIds)
+  // B. SEJR = historiske vundne blokke (aggregeret separat per finished block)
+  const blockWins = await countHistoricalCyclingBlockWins(
+    gameId,
+    members,
+    raceToBlock,
+    finishedBlockIds,
+    scores ?? [],
+  )
 
   return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
+}
+
+async function countHistoricalCyclingBlockWins(
+  gameId: number,
+  members: { user_id: string }[],
+  raceToBlock: Map<string, string>,
+  finishedBlockIds: Set<string>,
+  scores: unknown[],
+): Promise<Map<string, number>> {
+  if (finishedBlockIds.size === 0) return new Map()
+
+  // pointsPerBlockPerUser[block_id][user_id] = total
+  const blockPoints = new Map<string, Map<string, number>>()
+  for (const bid of finishedBlockIds) {
+    blockPoints.set(bid, new Map())
+    for (const m of members) blockPoints.get(bid)!.set(m.user_id, 0)
+  }
+
+  for (const s of scores) {
+    const score = s as { race_id: string; total_points: number; cycling_lineups: { cycling_squads: { user_id: string; game_id: number } } }
+    if (score.cycling_lineups?.cycling_squads?.game_id !== gameId) continue
+    const userId = score.cycling_lineups?.cycling_squads?.user_id
+    if (!userId) continue
+    const bid = raceToBlock.get(score.race_id)
+    if (!bid || !finishedBlockIds.has(bid)) continue
+    const userMap = blockPoints.get(bid)!
+    userMap.set(userId, (userMap.get(userId) ?? 0) + (Number(score.total_points) || 0))
+  }
+
+  const wins = new Map<string, number>()
+  for (const [, userMap] of blockPoints) {
+    let topUid: string | null = null
+    let topPts = -Infinity
+    for (const [uid, pts] of userMap) {
+      if (pts > topPts) { topPts = pts; topUid = uid }
+    }
+    if (topUid && topPts > 0) wins.set(topUid, (wins.get(topUid) ?? 0) + 1)
+  }
+  return wins
 }
 
 // ─── getActiveBlockStandings ────────────────────────────────────────────────
@@ -868,6 +1009,11 @@ function buildEntries(
       block_points: Math.round(totalBlockPoints * 10) / 10,
     }
   })
-  entries.sort((a, b) => b.block_points - a.block_points || b.round_points - a.round_points)
+  // Sortér: B. SEJR (historiske trofæer) → B. PT i nuværende blok → R. PT
+  entries.sort((a, b) =>
+    b.block_wins - a.block_wins ||
+    b.block_points - a.block_points ||
+    b.round_points - a.round_points,
+  )
   return entries
 }
