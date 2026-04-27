@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { getCurrentEffectiveSquad } from '@/lib/cyclingTransfers'
-
-const CAT_LIMITS: Record<number, number> = { 1: 3, 2: 5, 3: 5, 4: 5, 5: 7 }
-const MAX_TOTAL = 25
-const MAX_PER_TEAM = 3
+import { computeBlockSquadLimits, DEFAULT_MAX_TOTAL, MAX_PER_TEAM } from '@/lib/cyclingSquadLimits'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -87,8 +84,8 @@ export async function POST(req: NextRequest, { params }: Props) {
   if (!Array.isArray(riderIds) || riderIds.length === 0) {
     return NextResponse.json({ error: 'Vælg mindst én rytter' }, { status: 400 })
   }
-  if (riderIds.length > MAX_TOTAL) {
-    return NextResponse.json({ error: `Max ${MAX_TOTAL} ryttere` }, { status: 400 })
+  if (riderIds.length > DEFAULT_MAX_TOTAL) {
+    return NextResponse.json({ error: `Max ${DEFAULT_MAX_TOTAL} ryttere` }, { status: 400 })
   }
 
   // Verify membership
@@ -110,12 +107,30 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Ugyldige ryttere' }, { status: 400 })
   }
 
-  // Validate category limits
+  // Compute dynamic limits baseret på blokkens startlister
+  let blockRaceIdsForLimits: string[] = []
+  if (bodyBlockId) {
+    const { data: blockRaces } = await supabaseAdmin
+      .from('cycling_game_races')
+      .select('race_id')
+      .eq('game_id', Number(gameId))
+      .eq('cycling_block_id', bodyBlockId)
+    blockRaceIdsForLimits = (blockRaces ?? []).map((r) => r.race_id as string)
+  }
+  const limits = await computeBlockSquadLimits(blockRaceIdsForLimits)
+
+  if (riderIds.length > limits.maxTotal) {
+    return NextResponse.json({
+      error: `Max ${limits.maxTotal} ryttere for denne blok (du har ${riderIds.length})`,
+    }, { status: 400 })
+  }
+
+  // Validate category limits (dynamiske)
   const catCount: Record<number, number> = {}
   for (const r of riders) {
     catCount[r.category] = (catCount[r.category] ?? 0) + 1
   }
-  for (const [cat, limit] of Object.entries(CAT_LIMITS)) {
+  for (const [cat, limit] of Object.entries(limits.catLimits)) {
     const count = catCount[Number(cat)] ?? 0
     if (count > limit) {
       return NextResponse.json({

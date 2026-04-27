@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import SquadBuilder from '@/components/cycling/SquadBuilder'
 import type { Rider, RaceStartlist } from '@/components/cycling/SquadBuilder'
+import { computeBlockSquadLimits } from '@/lib/cyclingSquadLimits'
 
 export const dynamic = 'force-dynamic'
 
@@ -123,6 +124,9 @@ export default async function SquadPage({ params, searchParams }: Props) {
     blockRaceIds = (blockRaces ?? []).map((r) => r.race_id)
   }
 
+  // Compute dynamic squad limits baseret på blokkens startlister
+  const squadLimits = await computeBlockSquadLimits(blockRaceIds)
+
   // Fetch existing squad (per block if blockId is provided)
   let initialSquad: Rider[] = []
 
@@ -205,6 +209,7 @@ export default async function SquadPage({ params, searchParams }: Props) {
           initialSquad={initialSquad}
           blockId={blockId ?? null}
           blockRaceIds={blockRaceIds}
+          squadLimits={squadLimits}
         />
       </div>
     </div>

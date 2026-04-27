@@ -22,6 +22,13 @@ export type RaceStartlist = {
   riderIds: string[]
 }
 
+export type SquadLimits = {
+  catLimits: Record<number, number>
+  maxTotal: number
+  maxPerTeam: number
+  constrained: boolean
+}
+
 type Props = {
   gameId: number
   availableRiders: Rider[]
@@ -29,6 +36,7 @@ type Props = {
   initialSquad: Rider[]
   blockId: string | null
   blockRaceIds: string[]
+  squadLimits: SquadLimits
 }
 
 // Short race name aliases
@@ -68,11 +76,9 @@ function shortRaceName(name: string): string {
   return RACE_SHORT_NAMES[name] ?? (name.length > 10 ? name.slice(0, 8) + '...' : name)
 }
 
-// ── Constants ───────────────────────────────────────────────────────────────
+// CAT_LIMITS, MAX_TOTAL, MAX_PER_TEAM kommer nu fra props (squadLimits)
+// — de er beregnet pr. blok baseret på startlistens kapacitet.
 
-const CAT_LIMITS: Record<number, number> = { 1: 3, 2: 5, 3: 5, 4: 5, 5: 7 }
-const MAX_TOTAL = 25
-const MAX_PER_TEAM = 3
 // ── Shared components ──────────────────────────────────────────────────────
 
 import CatBadge from './CatBadge'
@@ -89,7 +95,10 @@ function Spinner() {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId, blockRaceIds }: Props) {
+export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId, blockRaceIds, squadLimits }: Props) {
+  const CAT_LIMITS = squadLimits.catLimits
+  const MAX_TOTAL = squadLimits.maxTotal
+  const MAX_PER_TEAM = squadLimits.maxPerTeam
   const router = useRouter()
   const [squad, setSquad] = useState<Rider[]>(initialSquad)
   const [search, setSearch] = useState('')
@@ -218,13 +227,28 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
           color: '#6B6560',
         }}
       >
-        <span>Max 3 × Kat 1</span>
-        <span>Max 5 × Kat 2</span>
-        <span>Max 5 × Kat 3</span>
-        <span>Max 5 × Kat 4</span>
-        <span>Max 7 × Kat 5</span>
-        <span>Max 3 fra samme hold</span>
+        {[1, 2, 3, 4, 5].map((cat) => (
+          <span key={cat}>Max {CAT_LIMITS[cat] ?? 0} × Kat {cat}</span>
+        ))}
+        <span>Max {MAX_PER_TEAM} fra samme hold</span>
       </div>
+
+      {squadLimits.constrained && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '8px 12px',
+            background: '#FFF8E5',
+            border: '1px solid #E8D9A8',
+            borderRadius: 2,
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 12,
+            color: '#7A5A1A',
+          }}
+        >
+          Bemærk: Denne bloks startliste har færre topryttere end normalt — max {MAX_TOTAL} ryttere i trup (i stedet for 25).
+        </div>
+      )}
 
       {/* ── Category counter ──────────────────────────────────────── */}
       <div
