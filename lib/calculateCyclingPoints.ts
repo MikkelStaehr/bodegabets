@@ -49,6 +49,9 @@
     jersey, 'yellow', 'leader'), 'green', 'points'), 'polka', 'mountain'), 'white', 'youth')
     WHERE jersey IS NOT NULL;
 
+  -- Block status (2026-04-27): tilføj status til cycling_blocks så B. SEJR kan tildeles
+  ALTER TABLE cycling_blocks ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+
   -- GC multiplier (2026-04-17): bonus for ryttere i top-10 sammenlagt efter etape
   ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS gc_position_after int;
   ALTER TABLE cycling_scores ADD COLUMN IF NOT EXISTS gc_multiplier numeric NOT NULL DEFAULT 1.0;
@@ -608,6 +611,65 @@ export async function calculateCyclingPoints(
   }
 }
 
+// ── Block status — flip 'active'/'upcoming' → 'finished' når alle løb er kørt
+// Idempotent: kalder den fra de samme cron-jobs der beregner points,
+// så block_wins begynder at tælle med så snart sidste race er finished.
+
+export async function updateCyclingBlockStatuses(gameId?: number): Promise<number> {
+  // Hent kandidat-blocks (ikke allerede finished). Hvis gameId er givet,
+  // begræns til det spilrum.
+  const blockQuery = supabaseAdmin
+    .from('cycling_blocks')
+    .select('id, game_id, status')
+    .neq('status', 'finished')
+  if (gameId != null) blockQuery.eq('game_id', gameId)
+  const { data: blocks } = await blockQuery
+
+  if (!blocks?.length) return 0
+
+  const blockIds = blocks.map((b) => b.id as string)
+
+  // Hent alle race-tilknytninger for disse blocks
+  const { data: links } = await supabaseAdmin
+    .from('cycling_game_races')
+    .select('cycling_block_id, race_id')
+    .in('cycling_block_id', blockIds)
+
+  const racesByBlock = new Map<string, string[]>()
+  for (const l of links ?? []) {
+    const bid = l.cycling_block_id as string
+    if (!racesByBlock.has(bid)) racesByBlock.set(bid, [])
+    racesByBlock.get(bid)!.push(l.race_id as string)
+  }
+
+  // Hent status for alle relevante races i ét hug
+  const allRaceIds = [...new Set([...racesByBlock.values()].flat())]
+  if (allRaceIds.length === 0) return 0
+
+  const { data: races } = await supabaseAdmin
+    .from('cycling_races')
+    .select('id, status')
+    .in('id', allRaceIds)
+
+  const raceStatusMap = new Map<string, string>()
+  for (const r of races ?? []) raceStatusMap.set(r.id as string, r.status as string)
+
+  let flipped = 0
+  for (const block of blocks) {
+    const raceIds = racesByBlock.get(block.id as string) ?? []
+    if (raceIds.length === 0) continue
+    const allFinished = raceIds.every((rid) => raceStatusMap.get(rid) === 'finished')
+    if (!allFinished) continue
+
+    await supabaseAdmin
+      .from('cycling_blocks')
+      .update({ status: 'finished' })
+      .eq('id', block.id)
+    flipped++
+  }
+  return flipped
+}
+
 // ── Run for a specific stage across all games ────────────────────────────────
 
 export async function runCyclingPointsForStage(
@@ -630,6 +692,7 @@ export async function runCyclingPointsForStage(
 
   for (const gameId of gameIds) {
     await calculateCyclingPoints(stage.race_id, stageId, stage.stage_number, gameId)
+    await updateCyclingBlockStatuses(gameId as number)
   }
 }
 
