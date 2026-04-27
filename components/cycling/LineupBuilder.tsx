@@ -141,9 +141,16 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
     [...stages].sort((a, b) => a.start_date.localeCompare(b.start_date) || a.stage_number - b.stage_number),
   [stages])
 
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(
-    defaultBlockId ?? sortedBlocks[0]?.id ?? null
-  )
+  // Default-blok: først ikke-finished (= aktiv blok). Hvis alle er finished,
+  // fald tilbage til seneste (højeste block_order). Tilsidesættes af defaultBlockId hvis givet.
+  const initialBlockId = useMemo(() => {
+    if (defaultBlockId && sortedBlocks.find((b) => b.id === defaultBlockId)) return defaultBlockId
+    const firstActive = sortedBlocks.find((b) => b.status !== 'finished')
+    if (firstActive) return firstActive.id
+    return sortedBlocks[sortedBlocks.length - 1]?.id ?? null
+  }, [defaultBlockId, sortedBlocks])
+
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(initialBlockId)
 
   const blockStages = useMemo(() =>
     activeBlockId ? sortedStages.filter((s) => s.cycling_block_id === activeBlockId) : sortedStages,
@@ -346,6 +353,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           <div style={{ display: 'flex', padding: '8px 12px 0', gap: 0 }}>
           {sortedBlocks.map((block) => {
             const isActive = block.id === activeBlockId
+            const isFinished = block.status === 'finished'
+            const winner = block.winner_username
             return (
               <button
                 key={block.id}
@@ -368,18 +377,23 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontSize: 11,
                   fontWeight: isActive ? 700 : 500,
-                  color: isActive ? '#F2EDE4' : 'rgba(255,255,255,0.45)',
+                  color: isActive ? '#F2EDE4' : isFinished ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.55)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
                   {shortBlockName(block.name)}
+                  {isFinished && winner && (
+                    <span style={{ color: '#FAC775' }} title={`Vinder: ${winner}`}>🏆</span>
+                  )}
                 </span>
                 <span style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontSize: 9,
-                  color: 'rgba(255,255,255,0.3)',
+                  color: isFinished && winner ? '#FAC775' : 'rgba(255,255,255,0.3)',
+                  fontWeight: isFinished && winner ? 600 : 400,
                 }}>
-                  {blockDateRange(block.id)}
+                  {isFinished && winner ? winner : blockDateRange(block.id)}
                 </span>
               </button>
             )

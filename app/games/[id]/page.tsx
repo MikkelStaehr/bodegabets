@@ -292,7 +292,7 @@ export default async function GamePage({ params }: Props) {
   let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null; rest_days: string[] | null; cycling_block_id: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
-  let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string }[] = []
+  let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null }[] = []
   let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupStartlists: Record<string, string[]> = {}
   let blockSquadMap: Record<string, string> = {}
@@ -329,14 +329,75 @@ export default async function GamePage({ params }: Props) {
       }
     }
 
-    // Hent alle blokke for gameroom
+    // Hent alle blokke for gameroom (inkl. status for tab-rendering)
     const { data: blocksData } = await supabaseAdmin
       .from('cycling_blocks')
-      .select('id, name, block_order, parent_block_id, lock_deadline')
+      .select('id, name, block_order, parent_block_id, lock_deadline, status')
       .eq('game_id', gameId)
       .order('block_order', { ascending: true })
 
     cyclingBlocks = (blocksData ?? []) as typeof cyclingBlocks
+
+    // Beregn vinder for hver finished block (top point summe på tværs af blokkens stages)
+    const finishedBlockIds = cyclingBlocks
+      .filter((b) => b.status === 'finished' && b.parent_block_id === null)
+      .map((b) => b.id)
+    if (finishedBlockIds.length > 0) {
+      const { data: finishedRaceLinks } = await supabaseAdmin
+        .from('cycling_game_races')
+        .select('race_id, cycling_block_id')
+        .eq('game_id', gameId)
+        .in('cycling_block_id', finishedBlockIds)
+
+      const raceToBlock = new Map<string, string>()
+      for (const l of finishedRaceLinks ?? []) {
+        if (l.cycling_block_id) raceToBlock.set(l.race_id as string, l.cycling_block_id as string)
+      }
+
+      const { data: scoresData } = await supabaseAdmin
+        .from('cycling_scores')
+        .select('race_id, total_points, cycling_lineups!inner(cycling_squads!inner(user_id, game_id))')
+        .eq('cycling_lineups.cycling_squads.game_id', gameId)
+        .in('race_id', [...raceToBlock.keys()])
+
+      // Aggregér points per (block, user)
+      const blockUserPoints = new Map<string, Map<string, number>>()
+      for (const s of scoresData ?? []) {
+        const userId = ((s.cycling_lineups as unknown as { cycling_squads: { user_id: string } })?.cycling_squads?.user_id) as string
+        const bid = raceToBlock.get(s.race_id as string)
+        if (!userId || !bid) continue
+        if (!blockUserPoints.has(bid)) blockUserPoints.set(bid, new Map())
+        const userMap = blockUserPoints.get(bid)!
+        userMap.set(userId, (userMap.get(userId) ?? 0) + (Number(s.total_points) || 0))
+      }
+
+      // Hent usernames for de unikke user_ids
+      const allUserIds = [...new Set(
+        [...blockUserPoints.values()].flatMap((m) => [...m.keys()])
+      )]
+      const userNameMap = new Map<string, string>()
+      if (allUserIds.length > 0) {
+        const { data: profiles } = await supabaseAdmin
+          .from('profiles')
+          .select('id, username')
+          .in('id', allUserIds)
+        for (const p of profiles ?? []) userNameMap.set(p.id as string, p.username as string)
+      }
+
+      for (const block of cyclingBlocks) {
+        const userMap = blockUserPoints.get(block.id)
+        if (!userMap || userMap.size === 0) continue
+        let topUid: string | null = null
+        let topPts = -Infinity
+        for (const [uid, pts] of userMap) {
+          if (pts > topPts) { topPts = pts; topUid = uid }
+        }
+        if (topUid && topPts > 0) {
+          block.winner_user_id = topUid
+          block.winner_username = userNameMap.get(topUid) ?? null
+        }
+      }
+    }
 
     // Hent alle løb for gameroom (filtrering sker client-side via blok-tabs)
     const { data: gameRacesFull } = await supabaseAdmin

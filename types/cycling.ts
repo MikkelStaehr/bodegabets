@@ -20,6 +20,9 @@ export type CyclingBlock = {
   block_order: number
   parent_block_id: string | null
   lock_deadline: string
+  status?: string
+  winner_username?: string | null
+  winner_user_id?: string | null
 }
 
 export type CyclingStage = {
