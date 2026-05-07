@@ -209,8 +209,33 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
     }
   }
 
+  // Tæl ghost-ryttere (i squad men ikke på nogen startliste i blokken)
+  const ghostCount = useMemo(() => {
+    if (confirmedSet.size === 0) return 0
+    return squad.filter((r) => !confirmedSet.has(r.id)).length
+  }, [squad, confirmedSet])
+
   return (
     <div>
+      {/* ── Ghost-rytter advarsel ───────────────────────────────────── */}
+      {ghostCount > 0 && (
+        <div
+          style={{
+            marginBottom: 8,
+            padding: '10px 14px',
+            background: 'rgba(200,57,43,0.08)',
+            border: '1px solid rgba(200,57,43,0.3)',
+            borderRadius: 4,
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 12,
+            color: '#8C2A1F',
+            lineHeight: 1.4,
+          }}
+        >
+          <strong>⚠️ {ghostCount} rytter{ghostCount === 1 ? '' : 'e'}</strong> i din trup er ikke på startlisten for denne blok og scorer 0 point. Fjern eller erstat dem.
+        </div>
+      )}
+
       {/* ── Regler ──────────────────────────────────────────────────── */}
       <div
         style={{
@@ -350,7 +375,9 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                 Ingen ryttere valgt endnu
               </div>
             ) : (
-              squad.map((rider, idx) => (
+              squad.map((rider, idx) => {
+                const isGhost = confirmedSet.size > 0 && !confirmedSet.has(rider.id)
+                return (
                 <button
                   key={rider.id}
                   type="button"
@@ -362,7 +389,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     width: '100%',
                     padding: '8px 12px',
                     borderBottom: idx < squad.length - 1 ? '1px solid #E8E0D3' : 'none',
-                    background: 'transparent',
+                    background: isGhost ? 'rgba(200,57,43,0.06)' : 'transparent',
                     border: 'none',
                     borderBottomStyle: idx < squad.length - 1 ? 'solid' : 'none',
                     borderBottomWidth: idx < squad.length - 1 ? 1 : 0,
@@ -371,8 +398,9 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     textAlign: 'left',
                     transition: 'background 0.1s',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#f5ece0' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = isGhost ? 'rgba(200,57,43,0.12)' : '#f5ece0' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = isGhost ? 'rgba(200,57,43,0.06)' : 'transparent' }}
+                  title={isGhost ? 'Ikke på startlisten — kører ikke i denne blok' : undefined}
                 >
                   <TeamLogo url={rider.team_logo_url} team={rider.team_name} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -390,6 +418,22 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     >
                       {rider.last_name}
                       <span style={{ fontWeight: 400, color: '#6b6b6b' }}> {rider.first_name}</span>
+                      {isGhost && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            padding: '1px 5px',
+                            background: '#C8392B',
+                            color: '#fff',
+                            fontSize: 9,
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          IKKE STARTER
+                        </span>
+                      )}
                     </div>
                     <div
                       style={{
@@ -416,7 +460,8 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     ×
                   </span>
                 </button>
-              ))
+                )
+              })
             )}
           </div>
         </div>
