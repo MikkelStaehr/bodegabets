@@ -565,14 +565,19 @@ def sync_startlists(
             })
 
         if rows:
+            # Replace-all semantik: slet eksisterende entries for racen før insert,
+            # ellers ophobes ryttere der ikke længere er på startlisten.
             try:
-                supabase.table("cycling_startlists").upsert(
-                    rows, on_conflict="race_id,rider_id"
-                ).execute()
-                total_upserted += len(rows)
-                _log(f"    → {len(rows)} entries upserted")
+                supabase.table("cycling_startlists").delete().eq("race_id", race["id"]).execute()
             except APIError as e:
-                _warn(f"    Startlist upsert failed: {e}")
+                _warn(f"    Startlist delete failed: {e}")
+
+            try:
+                supabase.table("cycling_startlists").insert(rows).execute()
+                total_upserted += len(rows)
+                _log(f"    → {len(rows)} entries inserted (replaced)")
+            except APIError as e:
+                _warn(f"    Startlist insert failed: {e}")
 
         if unmatched:
             _log(f"    {unmatched} riders not found in cycling_riders")
