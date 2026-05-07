@@ -15,11 +15,10 @@ type User = {
 }
 
 type Props = {
-  adminSecret: string
 }
 
 
-export function AdminUsersTab({ adminSecret }: Props) {
+export function AdminUsersTab() {
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [search, setSearch] = useState('')
@@ -27,7 +26,7 @@ export function AdminUsersTab({ adminSecret }: Props) {
   const [suspendLoading, setSuspendLoading] = useState<Set<string>>(new Set())
   const [messages, setMessages] = useState<Record<string, { type: 'ok' | 'err'; text: string }>>({})
 
-  const authHeader = { Authorization: `Bearer ${adminSecret}` }
+  const authHeader = { }
 
   useEffect(() => {
     fetch('/api/admin/users', { headers: authHeader })

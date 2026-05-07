@@ -25,7 +25,6 @@ type ModalState =
   | null
 
 type Props = {
-  adminSecret: string
 }
 
 
@@ -33,12 +32,10 @@ function Modal({
   state,
   onClose,
   onSaved,
-  adminSecret,
-}: {
+  }: {
   state: ModalState
   onClose: () => void
   onSaved: (season: Season) => void
-  adminSecret: string
 }) {
   const [boldPhaseId, setBoldPhaseId] = useState('')
   const [isActive, setIsActive] = useState(false)
@@ -79,8 +76,7 @@ function Modal({
     setError(null)
     const headers = {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${adminSecret}`,
-    }
+          }
 
     try {
       let res: Response
@@ -247,20 +243,19 @@ function Modal({
   )
 }
 
-export function AdminSeasonsTab({ adminSecret }: Props) {
+export function AdminSeasonsTab() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalState>(null)
 
   useEffect(() => {
     fetch('/api/admin/seasons', {
-      headers: { Authorization: `Bearer ${adminSecret}` },
-    })
+          })
       .then((r) => r.json())
       .then((d) => setTournaments(d.tournaments ?? []))
       .catch(() => setTournaments([]))
       .finally(() => setLoading(false))
-  }, [adminSecret])
+  }, [])
 
   function handleSaved(saved: Season) {
     setTournaments((prev) =>
@@ -292,7 +287,6 @@ export function AdminSeasonsTab({ adminSecret }: Props) {
         state={modal}
         onClose={() => setModal(null)}
         onSaved={handleSaved}
-        adminSecret={adminSecret}
       />
 
       <div className="space-y-6">

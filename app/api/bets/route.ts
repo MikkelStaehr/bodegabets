@@ -62,6 +62,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
   }
 
+  // Validér stake range pr. bet (forhindrer overflow / negative tricks)
+  const STAKE_MIN = 10
+  const STAKE_MAX = 1000
+  for (const b of bets) {
+    if (typeof b.stake !== 'number' || !Number.isFinite(b.stake) || !Number.isInteger(b.stake)) {
+      return NextResponse.json({ error: 'Stake skal være et heltal' }, { status: 400 })
+    }
+    if (b.stake < STAKE_MIN || b.stake > STAKE_MAX) {
+      return NextResponse.json({
+        error: `Stake skal være mellem ${STAKE_MIN} og ${STAKE_MAX}`
+      }, { status: 400 })
+    }
+  }
+
   // Upsert alle bets
   const rows = bets.map((b) => ({
     user_id: user.id,

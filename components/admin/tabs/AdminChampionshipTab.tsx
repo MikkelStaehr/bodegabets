@@ -36,8 +36,7 @@ type ChampionshipRound = {
 
 type Season = '2025/26' | '2026/27'
 
-type Props = { adminSecret: string }
-
+type Props = Record<string, never>
 function formatWeekRange(bettingCloses: string | null): string {
   if (!bettingCloses) return ''
   // betting_closes_at = mandag 23:59 UTC → start = tirsdag (6 dage før)
@@ -49,9 +48,9 @@ function formatWeekRange(bettingCloses: string | null): string {
   return `${fStr} – ${lStr}`
 }
 
-export function AdminChampionshipTab({ adminSecret }: Props) {
+export function AdminChampionshipTab() {
   const router = useRouter()
-  const authHeader = { Authorization: `Bearer ${adminSecret}` }
+  const authHeader = { }
 
   // State — sæson
   const [season, setSeason] = useState<Season>('2025/26')

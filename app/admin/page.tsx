@@ -56,7 +56,7 @@ export default async function AdminPage() {
   })
 
   const lastSync = lastSyncData?.[0]?.created_at ?? null
-  const adminSecret = process.env.ADMIN_SECRET ?? ''
+
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
@@ -71,7 +71,6 @@ export default async function AdminPage() {
         <AdminTabClient
           tournaments={tournaments}
           lastSync={lastSync}
-          adminSecret={adminSecret}
         />
       </div>
     </div>

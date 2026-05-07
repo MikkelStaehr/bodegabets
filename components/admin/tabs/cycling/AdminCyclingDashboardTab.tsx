@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { formatDateTime } from '@/lib/dateUtils'
 
-type Props = { adminSecret: string }
-
+type Props = Record<string, never>
 type SyncLog = {
   id: string
   created_at: string
@@ -22,7 +21,7 @@ function StatusDot({ status }: { status: string }) {
   return <span className="w-2 h-2 rounded-full bg-warm-gray shrink-0" />
 }
 
-export function AdminCyclingDashboardTab({ adminSecret }: Props) {
+export function AdminCyclingDashboardTab() {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([])
   const [riderCount, setRiderCount] = useState<number>(0)
   const [raceCount, setRaceCount] = useState<number>(0)
@@ -38,8 +37,7 @@ export function AdminCyclingDashboardTab({ adminSecret }: Props) {
 
   const authHeader = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${adminSecret}`,
-  }
+      }
 
   useEffect(() => {
     fetch('/api/admin/cycling/overview', { headers: authHeader })

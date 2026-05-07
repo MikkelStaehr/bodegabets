@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { formatDateTime } from '@/lib/dateUtils'
 
-type Props = { adminSecret: string }
-
+type Props = Record<string, never>
 type RiderStats = {
   total: number
   byCategory: Record<number, number>
@@ -22,7 +21,7 @@ type Rider = {
   pcs_slug: string
 }
 
-export function AdminCyclingRidersTab({ adminSecret }: Props) {
+export function AdminCyclingRidersTab() {
   const [riderStats, setRiderStats] = useState<RiderStats | null>(null)
   const [riders, setRiders] = useState<Rider[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,8 +33,7 @@ export function AdminCyclingRidersTab({ adminSecret }: Props) {
 
   const authHeader = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${adminSecret}`,
-  }
+      }
 
   useEffect(() => {
     Promise.all([

@@ -14,12 +14,11 @@ type GameSummary = {
 }
 
 type Props = {
-  adminSecret: string
   sport?: string
 }
 
 
-export function AdminGamesTab({ adminSecret, sport }: Props) {
+export function AdminGamesTab({ sport }: Props) {
   const router = useRouter()
   const [games, setGames] = useState<GameSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,7 +26,7 @@ export function AdminGamesTab({ adminSecret, sport }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<Set<number>>(new Set())
 
-  const authHeader = { Authorization: `Bearer ${adminSecret}` }
+  const authHeader = { }
 
   useEffect(() => {
     fetchGames()

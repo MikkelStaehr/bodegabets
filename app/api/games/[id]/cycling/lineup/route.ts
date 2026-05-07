@@ -232,16 +232,19 @@ export async function POST(req: NextRequest, { params }: Props) {
     .eq('id', stage_id)
     .single()
 
-  // Check deadline: stage start_date - 30 min (block deadline bruges IKKE, dækker for bredt)
-  // Hvis start_date kun er en dato (uden tidspunkt), antag 09:00 UTC som start.
-  if (stageData?.start_date) {
-    const startStr = /^\d{4}-\d{2}-\d{2}$/.test(stageData.start_date)
-      ? `${stageData.start_date}T09:00:00Z`
-      : stageData.start_date
-    const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
-    if (deadline < new Date()) {
-      return NextResponse.json({ error: 'Deadline er passeret — lineup kan ikke ændres' }, { status: 400 })
-    }
+  // Check deadline: stage start_date - 30 min. Fail-closed: hvis vi mangler
+  // start_date kan vi ikke verificere deadline → afvis.
+  if (!stageData?.start_date) {
+    return NextResponse.json({
+      error: 'Etape-data mangler — kontakt admin'
+    }, { status: 500 })
+  }
+  const startStr = /^\d{4}-\d{2}-\d{2}$/.test(stageData.start_date)
+    ? `${stageData.start_date}T09:00:00Z`
+    : stageData.start_date
+  const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
+  if (deadline < new Date()) {
+    return NextResponse.json({ error: 'Deadline er passeret — lineup kan ikke ændres' }, { status: 400 })
   }
 
   // Valider antal per rolle

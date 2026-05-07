@@ -45,14 +45,12 @@ type CyclingTabId = (typeof CYCLING_TABS)[number]['id']
 type Props = {
   tournaments: TournamentRow[]
   lastSync: string | null
-  adminSecret: string
 }
 
 export default function AdminTabClient({
   tournaments,
   lastSync,
-  adminSecret,
-}: Props) {
+  }: Props) {
   const searchParams = useSearchParams()
   const sport = (searchParams.get('sport') ?? 'football') as SportId
   const validSport = SPORTS.some((s) => s.id === sport) ? sport : 'football'
@@ -107,7 +105,7 @@ export default function AdminTabClient({
       {validSport === 'football' && (
         <>
           {validTab === 'overview' && (
-            <AdminOverviewTab adminSecret={adminSecret} />
+            <AdminOverviewTab />
           )}
           {validTab === 'fixtures' && (
             <LeagueHubClient
@@ -116,14 +114,14 @@ export default function AdminTabClient({
             />
           )}
           {validTab === 'seasons' && (
-            <AdminSeasonsTab adminSecret={adminSecret} />
+            <AdminSeasonsTab />
           )}
           {validTab === 'games' && (
-            <AdminGamesTab adminSecret={adminSecret} sport="football" />
+            <AdminGamesTab sport="football" />
           )}
-          {validTab === 'users' && <AdminUsersTab adminSecret={adminSecret} />}
-          {validTab === 'logs' && <AdminLogsTab adminSecret={adminSecret} />}
-          {validTab === 'championship' && <AdminChampionshipTab adminSecret={adminSecret} />}
+          {validTab === 'users' && <AdminUsersTab />}
+          {validTab === 'logs' && <AdminLogsTab />}
+          {validTab === 'championship' && <AdminChampionshipTab />}
           {validTab === 'live-test' && <LiveTestTab />}
         </>
       )}
@@ -132,16 +130,16 @@ export default function AdminTabClient({
       {validSport === 'cycling' && (
         <>
           {validTab === 'cycling-overview' && (
-            <AdminCyclingDashboardTab adminSecret={adminSecret} />
+            <AdminCyclingDashboardTab />
           )}
           {validTab === 'cycling-riders' && (
-            <AdminCyclingRidersTab adminSecret={adminSecret} />
+            <AdminCyclingRidersTab />
           )}
           {validTab === 'cycling-races' && (
-            <AdminCyclingRacesTab adminSecret={adminSecret} />
+            <AdminCyclingRacesTab />
           )}
           {validTab === 'cycling-games' && (
-            <AdminGamesTab adminSecret={adminSecret} sport="cycling" />
+            <AdminGamesTab sport="cycling" />
           )}
         </>
       )}

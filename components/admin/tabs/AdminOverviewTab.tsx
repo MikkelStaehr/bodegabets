@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { formatDateTime } from '@/lib/dateUtils'
 
 type Props = {
-  adminSecret: string
 }
 
 type StatusData = {
@@ -113,10 +112,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function MatchList({
   roundId,
-  adminSecret,
-}: {
+  }: {
   roundId: number
-  adminSecret: string
   onExcludeChange?: () => void
 }) {
   const [matches, setMatches] = useState<MatchRow[]>([])
@@ -124,14 +121,13 @@ function MatchList({
 
   useEffect(() => {
     fetch(`/api/admin/rounds/${roundId}/matches`, {
-      headers: { Authorization: `Bearer ${adminSecret}` },
-      credentials: 'same-origin',
+            credentials: 'same-origin',
     })
       .then((r) => r.json())
       .then((d) => setMatches(d.matches ?? []))
       .catch(() => setMatches([]))
       .finally(() => setLoading(false))
-  }, [roundId, adminSecret])
+  }, [roundId])
 
   if (loading) {
     return (
@@ -193,10 +189,8 @@ function MatchList({
 
 function LeagueOverblikCard({
   league,
-  adminSecret,
-}: {
+  }: {
   league: LeagueOverview
-  adminSecret: string
 }) {
   const [expandedRoundId, setExpandedRoundId] = useState<number | null>(null)
 
@@ -263,7 +257,6 @@ function LeagueOverblikCard({
       {expandedRoundId && (
         <MatchList
           roundId={expandedRoundId}
-          adminSecret={adminSecret}
           onExcludeChange={() => {}}
         />
       )}
@@ -271,7 +264,7 @@ function LeagueOverblikCard({
   )
 }
 
-export function AdminOverviewTab({ adminSecret }: Props) {
+export function AdminOverviewTab() {
   const router = useRouter()
   const [status, setStatus] = useState<StatusData | null>(null)
   const [leagues, setLeagues] = useState<LeagueOverview[]>([])
@@ -279,7 +272,7 @@ export function AdminOverviewTab({ adminSecret }: Props) {
   const [cronLoading, setCronLoading] = useState<Set<string>>(new Set())
   const [cronMessages, setCronMessages] = useState<Record<string, { type: 'ok' | 'err'; text: string }>>({})
 
-  const authHeader = { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSecret}` }
+  const authHeader = { 'Content-Type': 'application/json', }
 
   function setCronMsg(key: string, type: 'ok' | 'err', text: string) {
     setCronMessages((prev) => ({ ...prev, [key]: { type, text } }))
@@ -403,7 +396,7 @@ export function AdminOverviewTab({ adminSecret }: Props) {
           </div>
         ) : (
           leagues.map((league) => (
-            <LeagueOverblikCard key={league.id} league={league} adminSecret={adminSecret} />
+            <LeagueOverblikCard key={league.id} league={league} />
           ))
         )}
       </div>

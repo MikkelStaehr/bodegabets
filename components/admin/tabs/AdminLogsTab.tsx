@@ -13,7 +13,6 @@ type Log = {
 }
 
 type Props = {
-  adminSecret: string
 }
 
 const FILTERS = ['Alle', 'Cron', 'Bold API', 'Point', 'Brugere'] as const
@@ -40,13 +39,13 @@ function StatusIcon({ status }: { status: string }) {
   return <span className="w-2 h-2 rounded-full bg-warm-gray shrink-0" />
 }
 
-export function AdminLogsTab({ adminSecret }: Props) {
+export function AdminLogsTab() {
   const [logs, setLogs] = useState<Log[]>([])
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Alle')
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
-  const authHeader = { Authorization: `Bearer ${adminSecret}` }
+  const authHeader = { }
   const typeParam = TYPE_MAP[filter]
 
   useEffect(() => {

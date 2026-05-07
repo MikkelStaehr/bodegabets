@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { formatDateTime } from '@/lib/dateUtils'
 
-type Props = { adminSecret: string }
-
+type Props = Record<string, never>
 type Race = {
   id: string
   name: string
@@ -65,7 +64,7 @@ function InfoDot({ has }: { has: boolean }) {
     : <span className="w-1.5 h-1.5 rounded-full bg-vintage-red/40 shrink-0 inline-block" />
 }
 
-export function AdminCyclingRacesTab({ adminSecret }: Props) {
+export function AdminCyclingRacesTab() {
   const [races, setRaces] = useState<Race[]>([])
   const [loading, setLoading] = useState(true)
   const [statusUpdating, setStatusUpdating] = useState<Set<string>>(new Set())
@@ -78,8 +77,7 @@ export function AdminCyclingRacesTab({ adminSecret }: Props) {
 
   const authHeader = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${adminSecret}`,
-  }
+      }
 
   useEffect(() => {
     fetch('/api/admin/cycling/overview', { headers: authHeader })
