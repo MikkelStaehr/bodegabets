@@ -42,8 +42,17 @@ export default function Footer() {
 
         </div>
 
-        {/* Juridiske links */}
+        {/* Links */}
         <div className="flex flex-wrap items-center justify-center gap-4 mt-2">
+          <Link href="/om" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
+            Om
+          </Link>
+          <Link href="/faq" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
+            FAQ
+          </Link>
+          <a href="mailto:hej@bodega-bets.com" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
+            Kontakt
+          </a>
           <Link href="/privatlivspolitik" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
             Privatlivspolitik
           </Link>
@@ -51,7 +60,7 @@ export default function Footer() {
             Cookie politik
           </Link>
           <Link href="/vilkaar" className="text-[11px] text-warm-gray hover:text-ink transition-colors">
-            Vilkår og betingelser
+            Vilkår
           </Link>
         </div>
       </div>

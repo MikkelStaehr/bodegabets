@@ -3,6 +3,7 @@ import { Playfair_Display, Barlow_Condensed, Barlow } from 'next/font/google'
 import { ToastProvider } from '@/components/ui/Toast'
 import Navbar from '@/components/ui/Navbar'
 import Footer from '@/components/layout/Footer'
+import CookieBanner from '@/components/layout/CookieBanner'
 import NavbarScrollHandler from '@/components/layout/NavbarScrollHandler'
 import OnboardingProvider from '@/components/layout/OnboardingProvider'
 import { createServerSupabaseClient } from '@/lib/supabase'
@@ -118,6 +119,7 @@ export default async function RootLayout({
               )}
             </main>
             <Footer />
+            <CookieBanner />
           </div>
         </ToastProvider>
       </body>

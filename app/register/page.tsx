@@ -40,6 +40,9 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
 
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -128,6 +131,8 @@ export default function RegisterPage() {
     if (trimmedUsername.length < 3) return setError('Brugernavn skal være mindst 3 tegn')
     if (password.length < 6) return setError('Adgangskode skal være mindst 6 tegn')
     if (usernameStatus === 'taken') return setError('Brugernavnet er allerede taget')
+    if (!ageConfirmed) return setError('Du skal bekræfte at du er fyldt 18 år')
+    if (!termsAccepted) return setError('Du skal acceptere vilkår og privatlivspolitik')
 
     setLoading(true)
 
@@ -138,6 +143,7 @@ export default function RegisterPage() {
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
           username: trimmedUsername,
           ...(fullName ? { full_name: fullName } : {}),
@@ -167,7 +173,18 @@ export default function RegisterPage() {
       }
     }
 
-    // Join game if valid invite code
+    // Hvis Supabase kræver email-bekræftelse er signUpData.session null
+    // → vis verify-email skærm i stedet for at sende til dashboard
+    if (signUpData.user && !signUpData.session) {
+      const params = new URLSearchParams({ email })
+      if (inviteStatus === 'valid' && inviteGame) {
+        params.set('invite', String(inviteGame.id))
+      }
+      router.push(`/verify-email?${params.toString()}`)
+      return
+    }
+
+    // Join game if valid invite code (kun hvis session er klar)
     router.refresh()
     if (inviteStatus === 'valid' && inviteGame && signUpData.user) {
       await supabase.from('game_members').insert({ game_id: inviteGame.id, user_id: signUpData.user.id })
@@ -409,6 +426,39 @@ export default function RegisterPage() {
                   ✗ Ugyldig kode — tjek at du har skrevet den rigtigt
                 </p>
               )}
+            </div>
+
+            {/* ── Compliance checkboxes ──────────────────────── */}
+            <div className="space-y-2.5">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ageConfirmed}
+                  onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  className="mt-0.5 w-5 h-5 cursor-pointer accent-[#1a3329]"
+                />
+                <span className="font-body text-sm" style={{ color: '#1A1A1A' }}>
+                  Jeg er fyldt 18 år
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 w-5 h-5 cursor-pointer accent-[#1a3329]"
+                />
+                <span className="font-body text-sm leading-snug" style={{ color: '#1A1A1A' }}>
+                  Jeg accepterer{' '}
+                  <Link href="/vilkaar" target="_blank" className="underline font-semibold" style={{ color: '#1a3329' }}>
+                    vilkår
+                  </Link>
+                  {' '}og{' '}
+                  <Link href="/privatlivspolitik" target="_blank" className="underline font-semibold" style={{ color: '#1a3329' }}>
+                    privatlivspolitik
+                  </Link>
+                </span>
+              </label>
             </div>
 
             {/* ── Error ──────────────────────────────────────── */}

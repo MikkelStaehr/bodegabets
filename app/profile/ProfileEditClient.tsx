@@ -424,7 +424,96 @@ export default function ProfileEditClient({ userId, userEmail, initialUsername }
             ← Tilbage til dashboard
           </Link>
         </p>
+
+        {/* ── Danger zone: slet konto ────────────────────────── */}
+        <DeleteAccountSection />
       </div>
+    </div>
+  )
+}
+
+function DeleteAccountSection() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [confirming, setConfirming] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/users/me/delete', { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Kunne ikke slette konto')
+      // Clear local session uanset hvad
+      await supabase.auth.signOut()
+      router.push('/?deleted=1')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Fejl', 'error')
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="mt-12 pt-8 border-t" style={{ borderColor: '#E5DFD2' }}>
+      <p
+        className="font-condensed text-xs uppercase tracking-[0.14em] mb-2"
+        style={{ color: '#C8392B' }}
+      >
+        Farezone
+      </p>
+      <h3 className="font-display text-xl font-bold mb-2" style={{ color: '#1a3329' }}>
+        Slet din konto
+      </h3>
+      <p className="font-body text-sm mb-4" style={{ color: '#5C5C4A' }}>
+        Sletter din profil, alle dine bets, lineups og spilrum-medlemskaber.
+        Handlingen kan ikke fortrydes.
+      </p>
+
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="px-5 py-2.5 rounded-sm border font-condensed uppercase tracking-[0.08em] text-xs font-bold transition-colors"
+          style={{ borderColor: '#C8392B', color: '#C8392B', background: 'transparent' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(200,57,43,0.06)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        >
+          Slet konto
+        </button>
+      ) : (
+        <div className="p-4 rounded-sm border" style={{ borderColor: '#C8392B', background: 'rgba(200,57,43,0.04)' }}>
+          <p className="font-body text-sm mb-3" style={{ color: '#1a1a1a' }}>
+            Skriv <strong>SLET</strong> for at bekræfte:
+          </p>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className="w-full px-3 py-2 rounded-sm border font-body text-sm mb-3"
+            style={{ borderColor: '#D4CEC4', background: '#fff' }}
+            placeholder="SLET"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={confirmText !== 'SLET' || deleting}
+              className="px-4 py-2 rounded-sm bg-[#C8392B] text-white font-condensed font-bold text-xs uppercase tracking-[0.08em] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {deleting ? 'Sletter...' : 'Slet permanent'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setConfirming(false); setConfirmText('') }}
+              disabled={deleting}
+              className="px-4 py-2 rounded-sm border border-[#5C5C4A] text-[#5C5C4A] font-condensed font-bold text-xs uppercase tracking-[0.08em]"
+            >
+              Annullér
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
