@@ -30,8 +30,58 @@ const barlow = Barlow({
 })
 
 export const metadata: Metadata = {
-  title: 'Bodega Bets',
-  description: 'Spil mod vennerne. Ingen rigtige penge.',
+  metadataBase: new URL('https://bodega-bets.com'),
+  title: {
+    default: 'Bodega Bets',
+    template: '%s — Bodega Bets',
+  },
+  description: 'Spil mod vennerne i sport-fantasy spilrum. Fodbold-bets, cykling-fantasy og mesterskaber. Ingen rigtige penge.',
+  keywords: ['fantasy', 'fodbold', 'cykling', 'sport', 'venner', 'spilrum', 'Tour de France', 'Premier League'],
+  authors: [{ name: 'Bodega Bets' }],
+  applicationName: 'Bodega Bets',
+  appleWebApp: {
+    title: 'Bodega Bets',
+    capable: true,
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'da_DK',
+    url: 'https://bodega-bets.com',
+    siteName: 'Bodega Bets',
+    title: 'Bodega Bets',
+    description: 'Spil mod vennerne i sport-fantasy spilrum. Fodbold-bets, cykling-fantasy og mesterskaber. Ingen rigtige penge.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Bodega Bets',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Bodega Bets',
+    description: 'Spil mod vennerne i sport-fantasy spilrum. Ingen rigtige penge.',
+    images: ['/og-image.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+    },
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
 }
 
 export default async function RootLayout({

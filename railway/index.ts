@@ -480,7 +480,7 @@ app.get('/send-reminders', async (_req, res) => {
       return
     }
 
-    webpush.setVapidDetails('mailto:admin@bodegabets.dk', vapidPublic, vapidPrivate)
+    webpush.setVapidDetails('mailto:admin@bodega-bets.com', vapidPublic, vapidPrivate)
 
     const now = new Date()
     const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000)
@@ -628,7 +628,7 @@ app.get('/cycling-archive-check', async (_req, res) => {
     const vapidPublic = process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     const vapidPrivate = process.env.VAPID_PRIVATE_KEY
     const pushReady = !!(vapidPublic && vapidPrivate)
-    if (pushReady) webpush.setVapidDetails('mailto:admin@bodegabets.dk', vapidPublic!, vapidPrivate!)
+    if (pushReady) webpush.setVapidDetails('mailto:admin@bodega-bets.com', vapidPublic!, vapidPrivate!)
 
     for (const game of activeGames) {
       // 2) Find alle races tilknyttet dette gameroom
