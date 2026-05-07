@@ -702,6 +702,49 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
               </span>
             ))}
           </div>
+          {/* ── Profil-bonus til lineup-planlægning ────────── */}
+          {(() => {
+            const p = activeStage.profile
+            const bonuses: { role: string; mul: string; color: string }[] = []
+            if (p === 'mountain') {
+              bonuses.push({ role: 'Grimpeur', mul: '×1.8', color: '#9FE1CB' })
+            } else if (p === 'hilly') {
+              bonuses.push({ role: 'Grimpeur', mul: '×1.2', color: '#9FE1CB' })
+              bonuses.push({ role: 'Sprinter', mul: '×1.2', color: '#F5C4B3' })
+            } else if (p === 'flat' || p === 'mixed' || p === 'cobbled') {
+              bonuses.push({ role: 'Sprinter', mul: '×1.8', color: '#F5C4B3' })
+            }
+            if (bonuses.length === 0) return null
+            return (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: 5,
+                alignItems: 'center', marginTop: 6,
+              }}>
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9,
+                  color: 'rgba(255,255,255,0.5)', fontWeight: 600,
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                }}>
+                  Bonus
+                </span>
+                {bonuses.map((b, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 10, fontWeight: 700,
+                      padding: '2px 7px', borderRadius: 2,
+                      background: `${b.color}30`, color: b.color,
+                      border: `1px solid ${b.color}50`,
+                    }}
+                  >
+                    {b.role} {b.mul}
+                  </span>
+                ))}
+              </div>
+            )
+          })()}
+
           {deadlineStr && (
             <div style={{
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
