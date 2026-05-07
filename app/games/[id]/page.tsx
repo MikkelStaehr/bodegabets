@@ -15,6 +15,7 @@ import type { ActiveRoundRow } from '@/components/games/ActiveRounds'
 import type { Game, Round, RoundScore } from '@/types'
 import LineupBuilder from '@/components/cycling/LineupBuilder'
 import CyclingGameroom from '@/components/cycling/CyclingGameroom'
+import RolesGuide from '@/components/cycling/RolesGuide'
 import Leaderboard from '@/components/games/Leaderboard'
 import FootballLiveSection from '@/components/games/FootballLiveSection'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
@@ -1135,6 +1136,7 @@ export default async function GamePage({ params }: Props) {
                 + Tilføj løb til spilrum
               </Link>
             )}
+            <RolesGuide />
           </>
         )}
 
