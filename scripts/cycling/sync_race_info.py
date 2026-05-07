@@ -94,16 +94,19 @@ def parse_race_info(soup: BeautifulSoup) -> dict:
                     if m:
                         info["distance_km"] = float(m.group(1))
 
-    # Strategy 3: parse profile from span classes (same as sync_results.py)
-    if "profile" not in info:
-        for span in soup.find_all("span", class_=re.compile(r"profile")):
-            classes = " ".join(span.get("class", []))
-            for pclass, pname in PROFILE_MAP.items():
-                if pclass in classes:
-                    info["profile"] = pname
-                    break
-            if "profile" in info:
-                break
+    # Strategy 3: udled profile fra profile_score (mere robust end PCS span-klasser
+    # som de har ændret semantik på flere gange).
+    #   < 25  → flat
+    #   25-99 → hilly
+    #   ≥ 100 → mountain
+    ps = info.get("profile_score")
+    if ps is not None:
+        if ps < 25:
+            info["profile"] = "flat"
+        elif ps < 100:
+            info["profile"] = "hilly"
+        else:
+            info["profile"] = "mountain"
 
     return info
 
