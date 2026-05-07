@@ -84,13 +84,14 @@ export async function generateCyclingBlocks(
     .from('cycling_races')
     .select('id, name, pcs_slug, race_type, start_date')
     .in('id', raceIds)
+    .order('start_date', { ascending: true })
 
   if (!races?.length) return
 
   const raceMap = new Map<string, RaceRow>()
   for (const r of races) raceMap.set(r.pcs_slug, r)
 
-  // Gruppér løb (kun nye, ikke-blok-tildelte)
+  // Gruppér løb (kun nye, ikke-blok-tildelte) — sortér stage races kronologisk
   const flandern = FLANDERN_SLUGS
     .map((s) => raceMap.get(s))
     .filter((r): r is RaceRow => !!r)
@@ -99,7 +100,9 @@ export async function generateCyclingBlocks(
     .map((s) => raceMap.get(s))
     .filter((r): r is RaceRow => !!r)
 
-  const stageRaces = races.filter((r) => r.race_type === 'stage_race')
+  const stageRaces = races
+    .filter((r) => r.race_type === 'stage_race')
+    .sort((a, b) => a.start_date.localeCompare(b.start_date))
 
   // ── Flandern-blok ─────────────────────────────────────────────────────
 
