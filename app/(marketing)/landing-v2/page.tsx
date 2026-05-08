@@ -120,14 +120,6 @@ function ProductsSection() {
               key={card.number}
               className="relative bg-cream-dark border border-warm-border rounded-sm p-8 hover:border-gold transition-colors overflow-hidden"
             >
-              {/* Watermark number */}
-              <span
-                className="absolute top-3 right-5 font-display font-black text-gold/15 pointer-events-none select-none"
-                style={{ fontSize: '80px', lineHeight: 1 }}
-              >
-                {card.number}
-              </span>
-
               <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold-dark">
                 {card.tag}
               </span>
