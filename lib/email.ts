@@ -18,7 +18,7 @@
 import { Resend } from 'resend'
 import { captureException } from '@/lib/sentry'
 
-const FROM_DEFAULT = 'Bodega Bets <hej@bodega-bets.com>'
+const FROM_DEFAULT = 'Bodega Bets <no-reply@bodega-bets.com>'
 
 let resendClient: Resend | null = null
 
