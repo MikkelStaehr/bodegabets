@@ -13,10 +13,44 @@ type Match = {
   away: string
   homeShort: string
   awayShort: string
+  homeLogo: string
+  awayLogo: string
   kickoff: string
   derby?: string // for Bodega Championship rivalries
   multiplier?: string // e.g. "1.5×"
 }
+
+// Same CDN som produktet bruger (bold.dk).
+const LOGO = (id: number) => `https://bold.dk/img/tag/64x64/${id}.png`
+const LOGOS = {
+  liverpool: LOGO(175),
+  arsenal: LOGO(9),
+  manUtd: LOGO(71),
+  chelsea: LOGO(27),
+  tottenham: LOGO(118),
+  newcastle: LOGO(176),
+  villa: LOGO(10),
+  brighton: LOGO(185),
+  realMadrid: LOGO(96),
+  atletico: LOGO(7416),
+  barcelona: LOGO(2),
+  sevilla: LOGO(212),
+  valencia: LOGO(217),
+  villarreal: LOGO(3613),
+  sociedad: LOGO(98),
+  bilbao: LOGO(12),
+  inter: LOGO(60),
+  juventus: LOGO(7763),
+  milan: LOGO(72),
+  roma: LOGO(153),
+  napoli: LOGO(226),
+  lazio: LOGO(64),
+  fiorentina: LOGO(224),
+  bologna: LOGO(8184),
+  manCity: LOGO(5347),
+  dortmund: LOGO(161),
+  bayern: LOGO(16),
+} as const
 
 type League = {
   id: LeagueId
@@ -39,28 +73,28 @@ const LEAGUES: readonly League[] = [
 
 const MATCHES: Record<LeagueId, readonly Match[]> = {
   pl: [
-    { home: 'Liverpool', away: 'Arsenal', homeShort: 'Liverpool', awayShort: 'Arsenal', kickoff: 'Lør 17:30' },
-    { home: 'Manchester United', away: 'Chelsea', homeShort: 'Man Utd', awayShort: 'Chelsea', kickoff: 'Søn 14:00' },
-    { home: 'Tottenham', away: 'Newcastle', homeShort: 'Tottenham', awayShort: 'Newcastle', kickoff: 'Søn 16:30' },
-    { home: 'Aston Villa', away: 'Brighton', homeShort: 'Villa', awayShort: 'Brighton', kickoff: 'Man 21:00' },
+    { home: 'Liverpool', away: 'Arsenal', homeShort: 'Liverpool', awayShort: 'Arsenal', homeLogo: LOGOS.liverpool, awayLogo: LOGOS.arsenal, kickoff: 'Lør 17:30' },
+    { home: 'Manchester United', away: 'Chelsea', homeShort: 'Man Utd', awayShort: 'Chelsea', homeLogo: LOGOS.manUtd, awayLogo: LOGOS.chelsea, kickoff: 'Søn 14:00' },
+    { home: 'Tottenham', away: 'Newcastle', homeShort: 'Tottenham', awayShort: 'Newcastle', homeLogo: LOGOS.tottenham, awayLogo: LOGOS.newcastle, kickoff: 'Søn 16:30' },
+    { home: 'Aston Villa', away: 'Brighton', homeShort: 'Villa', awayShort: 'Brighton', homeLogo: LOGOS.villa, awayLogo: LOGOS.brighton, kickoff: 'Man 21:00' },
   ],
   'la-liga': [
-    { home: 'Real Madrid', away: 'Atlético', homeShort: 'Real Madrid', awayShort: 'Atlético', kickoff: 'Lør 21:00' },
-    { home: 'Barcelona', away: 'Sevilla', homeShort: 'Barcelona', awayShort: 'Sevilla', kickoff: 'Søn 18:30' },
-    { home: 'Valencia', away: 'Villarreal', homeShort: 'Valencia', awayShort: 'Villarreal', kickoff: 'Søn 16:15' },
-    { home: 'Real Sociedad', away: 'Athletic Bilbao', homeShort: 'R. Sociedad', awayShort: 'A. Bilbao', kickoff: 'Man 21:00' },
+    { home: 'Real Madrid', away: 'Atlético', homeShort: 'Real Madrid', awayShort: 'Atlético', homeLogo: LOGOS.realMadrid, awayLogo: LOGOS.atletico, kickoff: 'Lør 21:00' },
+    { home: 'Barcelona', away: 'Sevilla', homeShort: 'Barcelona', awayShort: 'Sevilla', homeLogo: LOGOS.barcelona, awayLogo: LOGOS.sevilla, kickoff: 'Søn 18:30' },
+    { home: 'Valencia', away: 'Villarreal', homeShort: 'Valencia', awayShort: 'Villarreal', homeLogo: LOGOS.valencia, awayLogo: LOGOS.villarreal, kickoff: 'Søn 16:15' },
+    { home: 'Real Sociedad', away: 'Athletic Bilbao', homeShort: 'R. Sociedad', awayShort: 'A. Bilbao', homeLogo: LOGOS.sociedad, awayLogo: LOGOS.bilbao, kickoff: 'Man 21:00' },
   ],
   'serie-a': [
-    { home: 'Inter', away: 'Juventus', homeShort: 'Inter', awayShort: 'Juventus', kickoff: 'Lør 20:45' },
-    { home: 'AC Milan', away: 'Roma', homeShort: 'Milan', awayShort: 'Roma', kickoff: 'Søn 18:00' },
-    { home: 'Napoli', away: 'Lazio', homeShort: 'Napoli', awayShort: 'Lazio', kickoff: 'Søn 20:45' },
-    { home: 'Fiorentina', away: 'Bologna', homeShort: 'Fiorentina', awayShort: 'Bologna', kickoff: 'Man 20:45' },
+    { home: 'Inter', away: 'Juventus', homeShort: 'Inter', awayShort: 'Juventus', homeLogo: LOGOS.inter, awayLogo: LOGOS.juventus, kickoff: 'Lør 20:45' },
+    { home: 'AC Milan', away: 'Roma', homeShort: 'Milan', awayShort: 'Roma', homeLogo: LOGOS.milan, awayLogo: LOGOS.roma, kickoff: 'Søn 18:00' },
+    { home: 'Napoli', away: 'Lazio', homeShort: 'Napoli', awayShort: 'Lazio', homeLogo: LOGOS.napoli, awayLogo: LOGOS.lazio, kickoff: 'Søn 20:45' },
+    { home: 'Fiorentina', away: 'Bologna', homeShort: 'Fiorentina', awayShort: 'Bologna', homeLogo: LOGOS.fiorentina, awayLogo: LOGOS.bologna, kickoff: 'Man 20:45' },
   ],
   bodega: [
-    { home: 'Real Madrid', away: 'Barcelona', homeShort: 'Real Madrid', awayShort: 'Barcelona', kickoff: 'Lør 21:00', derby: 'El Clásico', multiplier: '1.5×' },
-    { home: 'Manchester Utd', away: 'Manchester City', homeShort: 'Man Utd', awayShort: 'Man City', kickoff: 'Søn 17:30', derby: 'Manchester Derby', multiplier: '1.3×' },
-    { home: 'Dortmund', away: 'Bayern', homeShort: 'Dortmund', awayShort: 'Bayern', kickoff: 'Lør 18:30', derby: 'Der Klassiker', multiplier: '1.4×' },
-    { home: 'Inter', away: 'Milan', homeShort: 'Inter', awayShort: 'Milan', kickoff: 'Søn 20:45', derby: 'Derby della Madonnina', multiplier: '1.4×' },
+    { home: 'Real Madrid', away: 'Barcelona', homeShort: 'Real Madrid', awayShort: 'Barcelona', homeLogo: LOGOS.realMadrid, awayLogo: LOGOS.barcelona, kickoff: 'Lør 21:00', derby: 'El Clásico', multiplier: '1.5×' },
+    { home: 'Manchester Utd', away: 'Manchester City', homeShort: 'Man Utd', awayShort: 'Man City', homeLogo: LOGOS.manUtd, awayLogo: LOGOS.manCity, kickoff: 'Søn 17:30', derby: 'Manchester Derby', multiplier: '1.3×' },
+    { home: 'Dortmund', away: 'Bayern', homeShort: 'Dortmund', awayShort: 'Bayern', homeLogo: LOGOS.dortmund, awayLogo: LOGOS.bayern, kickoff: 'Lør 18:30', derby: 'Der Klassiker', multiplier: '1.4×' },
+    { home: 'Inter', away: 'Milan', homeShort: 'Inter', awayShort: 'Milan', homeLogo: LOGOS.inter, awayLogo: LOGOS.milan, kickoff: 'Søn 20:45', derby: 'Derby della Madonnina', multiplier: '1.4×' },
   ],
 } as const
 
@@ -661,18 +695,6 @@ function MatchCard({
       : 'border-warm-border'
   const textPrimary = isRivalry ? 'text-cream' : 'text-forest'
   const textSecondary = isRivalry ? 'text-cream/50' : 'text-warm-taupe'
-  const teamLogo = (label: string, dark: boolean) => (
-    <div
-      className={
-        'flex items-center justify-center font-condensed font-bold text-[11px] flex-shrink-0 ' +
-        (dark ? 'bg-cream/15 text-cream' : 'bg-warm-border/40 text-warm-gray')
-      }
-      style={{ width: 24, height: 24, borderRadius: 2 }}
-      aria-hidden
-    >
-      {label.charAt(0)}
-    </div>
-  )
 
   return (
     <div
@@ -705,7 +727,13 @@ function MatchCard({
             >
               {match.homeShort}
             </span>
-            {teamLogo(match.homeShort, isRivalry)}
+            <img
+              src={match.homeLogo}
+              alt=""
+              className="shrink-0"
+              style={{ width: 24, height: 24, objectFit: 'contain' }}
+              loading="lazy"
+            />
           </div>
 
           {/* Score / vs */}
@@ -719,7 +747,13 @@ function MatchCard({
 
           {/* Away (logo, then label) */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            {teamLogo(match.awayShort, isRivalry)}
+            <img
+              src={match.awayLogo}
+              alt=""
+              className="shrink-0"
+              style={{ width: 24, height: 24, objectFit: 'contain' }}
+              loading="lazy"
+            />
             <span
               className={`font-condensed font-bold text-[14px] sm:text-[15px] ${textPrimary} truncate`}
               style={{ maxWidth: 110 }}
