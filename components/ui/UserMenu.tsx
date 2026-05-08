@@ -28,9 +28,19 @@ export default function UserMenu({ username, isAdmin }: Props) {
   }, [])
 
   async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/')
-    router.refresh()
+    // Forsøg server-signOut, men fail-safe: bare ryd lokal state hvis det hænger
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+      ])
+    } catch {
+      // server-call hang/fejlede — tving lokal sign-out
+      try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
+    }
+    // Force fuld page reload så al state er ren (router.push virker ikke altid pålideligt
+    // ved auth-state-skift hvis middleware lige har redirected)
+    window.location.href = '/'
   }
 
   return (
