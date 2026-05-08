@@ -371,17 +371,17 @@ function Step1({
         subtitle="Spil på din yndlingsliga, eller lad Bodega Championship samle ugens største kampe fra hele Europa."
       />
 
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 auto-rows-fr">
         {LEAGUES.map((league) => {
           const isSelected = selectedLeague === league.id
           return (
-            <li key={league.id}>
+            <li key={league.id} className="h-full">
               <button
                 type="button"
                 onClick={() => onSelect(league.id)}
                 aria-pressed={isSelected}
                 className={
-                  'w-full text-left p-4 sm:p-5 rounded-sm transition-colors min-h-[88px] relative bg-white ' +
+                  'w-full h-full text-left p-4 sm:p-5 rounded-sm transition-colors min-h-[88px] relative bg-white ' +
                   (isSelected
                     ? 'border-2 border-forest shadow-[0_0_0_1px_#1a3329] '
                     : league.isFlagship
