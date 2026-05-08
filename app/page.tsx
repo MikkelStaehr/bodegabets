@@ -22,7 +22,7 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: profiles } = await supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id, username, points')
     .order('points', { ascending: false })
     .limit(10)

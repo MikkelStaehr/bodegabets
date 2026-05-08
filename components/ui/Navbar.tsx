@@ -32,9 +32,15 @@ export default function Navbar({ username, isAdmin, backHref, backLabel, gameId,
             .single()
           setClientUsername(profile?.username)
           setClientIsAdmin(profile?.is_admin === true)
+
+          // Sentry: tag fremtidige fejl med user-id (privacy: kun id + email-domain)
+          import('@/lib/sentry').then(({ setUser }) => {
+            setUser(session.user.id, session.user.email)
+          })
         } else {
           setClientUsername(undefined)
           setClientIsAdmin(false)
+          import('@/lib/sentry').then(({ clearUser }) => clearUser())
         }
       }
     )
