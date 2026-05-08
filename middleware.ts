@@ -49,26 +49,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/suspended', req.url))
   }
 
-  // Protect /admin — kræv også AAL2 (2FA verificeret i denne session)
-  // /admin/verify er undtaget for at tillade step-up flow
+  // Protect /admin — kræv login + admin-rolle. AAL2-enforcement er midlertidigt
+  // fjernet da step-up flowet ikke virkede pålideligt. 2FA er stadig
+  // tilgængelig på /profile/security som frivillig konto-beskyttelse.
   if (path.startsWith('/admin') && !path.startsWith('/admin/verify')) {
     if (!user) return NextResponse.redirect(new URL('/login', req.url))
     if (!profile?.is_admin) return NextResponse.redirect(new URL('/dashboard', req.url))
-
-    // AAL-check: admin skal have logget ind med 2FA i denne session
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (aal?.currentLevel !== 'aal2') {
-      if (aal?.nextLevel === 'aal2') {
-        // Har MFA enrolled men session er AAL1 → step up
-        const url = new URL('/admin/verify', req.url)
-        url.searchParams.set('redirect', path)
-        return NextResponse.redirect(url)
-      }
-      // Ingen MFA enrolled → kræv enrollment først
-      const url = new URL('/profile/security', req.url)
-      url.searchParams.set('reason', 'admin-required')
-      return NextResponse.redirect(url)
-    }
   }
 
   // Protect /dashboard and /games
