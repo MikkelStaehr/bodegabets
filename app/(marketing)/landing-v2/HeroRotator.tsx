@@ -7,6 +7,9 @@ type Slide = {
   id: 'fodbold' | 'cykling'
   pillLabel: string
   image: string
+  /** CSS filter brightness multiplier — bruges hvis råbillede er for lyst i forhold til
+   *  hero-mood'en. Default 1 (uændret). */
+  brightness?: number
   headlinePrimary: string
   headlineSecondary: string
   subtitle: string
@@ -29,7 +32,8 @@ const SLIDES: readonly Slide[] = [
   {
     id: 'cykling',
     pillLabel: 'Cykling',
-    image: '/landing/herocyclingsprint.jpg',
+    image: '/landing/herobannercycling2.jpg',
+    brightness: 0.7,
     headlinePrimary: 'Saml drømmeholdet.',
     headlineSecondary: 'Følg hele sæsonen.',
     subtitle:
@@ -97,6 +101,7 @@ export default function HeroRotator({ activeUserCount }: Props) {
               src={slide.image}
               alt=""
               className="absolute inset-0 w-full h-full object-cover object-center animate-kenburns"
+              style={slide.brightness ? { filter: `brightness(${slide.brightness})` } : undefined}
               loading={i === 0 ? 'eager' : 'lazy'}
               fetchPriority={i === 0 ? 'high' : 'auto'}
             />
