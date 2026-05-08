@@ -231,9 +231,29 @@ export default function DemoModal({ open, onClose }: Props) {
     setStakes({})
   }
   function setTip(idx: number, t: Tip) {
-    setTips((prev) => ({ ...prev, [idx]: t }))
+    // Hvis brugeren klikker samme tip igen → fjern det (toggle off)
+    setTips((prev) => {
+      if (prev[idx] === t) {
+        const next = { ...prev }
+        delete next[idx]
+        return next
+      }
+      return { ...prev, [idx]: t }
+    })
     // Tildel default-stake (100) første gang en match får et tip
     setStakes((prev) => (prev[idx] !== undefined ? prev : { ...prev, [idx]: DEFAULT_STAKE }))
+  }
+  function removeTip(idx: number) {
+    setTips((prev) => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
+    setStakes((prev) => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
   }
   function adjustStake(idx: number, delta: number) {
     setStakes((prev) => {
@@ -317,6 +337,7 @@ export default function DemoModal({ open, onClose }: Props) {
                 tips={tips}
                 stakes={stakes}
                 onTip={setTip}
+                onRemoveTip={removeTip}
                 onAdjustStake={adjustStake}
               />
             )}
@@ -417,6 +438,7 @@ function Step2({
   tips,
   stakes,
   onTip,
+  onRemoveTip,
   onAdjustStake,
 }: {
   league: League
@@ -424,78 +446,208 @@ function Step2({
   tips: Record<number, Tip>
   stakes: Record<number, number>
   onTip: (idx: number, t: Tip) => void
+  onRemoveTip: (idx: number) => void
   onAdjustStake: (idx: number, delta: number) => void
 }) {
-  const tippedCount = Object.keys(tips).length
   const used = Object.values(stakes).reduce((sum, s) => sum + s, 0)
   const remaining = TOTAL_BUDGET - used
 
   return (
-    <div className="px-4 sm:px-6 pt-4 pb-8">
-      <StepHeader
-        tag="Trin 2 af 4"
-        title="Tip ugens kampe."
-        subtitle="Du har 500 credits at fordele. Vælg dit bud, og brug + / − til at sætte stake pr. kamp."
-      />
-
-      {/* League + budget strip */}
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-forest text-cream rounded-sm">
-          <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.12em]">
-            {league.name} · Runde 27
-          </span>
-        </div>
-        <div
-          className={
-            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border ' +
-            (remaining < 0
-              ? 'border-vintage-red/50 bg-vintage-red/10 text-vintage-red'
-              : 'border-warm-border bg-white text-forest')
-          }
-        >
-          <span
-            className="font-condensed font-bold text-[10px] uppercase tracking-[0.12em] text-warm-taupe"
-          >
-            Brugt
-          </span>
-          <span
-            className="font-condensed font-bold text-[12px] tabular-nums"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-          >
-            {used}
-          </span>
-          <span className="text-[10px] text-warm-taupe">/</span>
-          <span
-            className="font-condensed text-[11px] text-warm-taupe tabular-nums"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-          >
-            {TOTAL_BUDGET}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {matches.map((match, idx) => (
-          <MatchCard
-            key={`${league.id}-${idx}`}
-            match={match}
-            selected={tips[idx]}
-            mode="open"
-            onTip={(t) => onTip(idx, t)}
-            stake={stakes[idx]}
-            onAdjustStake={(delta) => onAdjustStake(idx, delta)}
-            remainingBudget={remaining}
-          />
-        ))}
-      </div>
-
-      <div className="mt-5 text-center">
-        <span
-          className="text-[12px] sm:text-[14px] text-warm-taupe"
-          style={{ fontFamily: "'Courier New', monospace" }}
-        >
-          {tippedCount} af {matches.length} tippet
+    <div className="px-4 sm:px-6 pt-3 pb-6">
+      {/* Kompakt header — kun tag + title, ingen subtitle */}
+      <div>
+        <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
+          Trin 2 af 4
         </span>
+        <h2
+          id="demo-step-heading"
+          className="mt-1 font-display font-black text-forest text-[24px] sm:text-[30px] leading-tight"
+        >
+          Tip ugens kampe.
+        </h2>
+      </div>
+
+      {/* Liga-strip */}
+      <div className="mt-3 inline-flex items-center gap-2 px-2.5 py-1 bg-forest text-cream rounded-sm">
+        <span className="font-condensed font-bold text-[10px] uppercase tracking-[0.12em]">
+          {league.name} · Runde 27
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-3">
+        {/* Match cards — ingen stake-row, lever i kuponen */}
+        <div className="space-y-1.5">
+          {matches.map((match, idx) => (
+            <MatchCard
+              key={`${league.id}-${idx}`}
+              match={match}
+              selected={tips[idx]}
+              mode="open"
+              onTip={(t) => onTip(idx, t)}
+              compact
+            />
+          ))}
+        </div>
+
+        {/* Kupon panel — sticky til højre på lg, naturligt under på mobil */}
+        <div className="lg:sticky lg:top-2 self-start">
+          <KuponPanel
+            matches={matches}
+            tips={tips}
+            stakes={stakes}
+            used={used}
+            remaining={remaining}
+            onAdjustStake={onAdjustStake}
+            onRemoveTip={onRemoveTip}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Kupon panel — mirror af AfgivBets sidebar ─────────────────────────────
+
+function KuponPanel({
+  matches,
+  tips,
+  stakes,
+  used,
+  remaining,
+  onAdjustStake,
+  onRemoveTip,
+}: {
+  matches: readonly Match[]
+  tips: Record<number, Tip>
+  stakes: Record<number, number>
+  used: number
+  remaining: number
+  onAdjustStake: (idx: number, delta: number) => void
+  onRemoveTip: (idx: number) => void
+}) {
+  const entries = Object.keys(tips)
+    .map((k) => Number(k))
+    .sort((a, b) => a - b)
+    .map((idx) => ({ idx, tip: tips[idx], stake: stakes[idx] ?? DEFAULT_STAKE, match: matches[idx] }))
+
+  const overBudget = remaining < 0
+
+  return (
+    <div className="bg-white border border-warm-border rounded-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-warm-border">
+        <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.14em] text-forest">
+          Din kupon
+        </span>
+        <span
+          className="font-condensed font-bold text-[18px] text-gold-dark leading-none tabular-nums"
+          style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+        >
+          {entries.length}
+        </span>
+      </div>
+
+      {/* Credits bar */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-warm-border bg-cream">
+        <span className="font-condensed font-bold text-[9px] uppercase tracking-[0.14em] text-warm-taupe">
+          Credits tilbage
+        </span>
+        <span
+          className={
+            'font-condensed font-bold text-[16px] leading-none tabular-nums ' +
+            (overBudget ? 'text-vintage-red' : 'text-forest')
+          }
+          style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+        >
+          {remaining} pt
+        </span>
+      </div>
+
+      {/* Selections list */}
+      <div className="divide-y divide-warm-border max-h-[360px] overflow-y-auto">
+        {entries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center text-warm-taupe gap-1.5">
+            <span className="text-2xl opacity-30" aria-hidden>🎯</span>
+            <p className="text-[12px] leading-relaxed">
+              Vælg et udfald
+              <br />
+              for at tilføje til kuponen
+            </p>
+          </div>
+        ) : (
+          entries.map(({ idx, tip, stake, match }) => (
+            <div key={idx} className="px-3 py-2">
+              {/* Match + outcome + remove */}
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="text-[11px] font-semibold flex-1 truncate text-forest">
+                  {match.homeShort} vs {match.awayShort}
+                </span>
+                <span className="font-condensed text-[12px] font-bold text-forest bg-gold/15 rounded px-1.5 leading-tight py-0.5">
+                  {tip}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveTip(idx)}
+                  aria-label="Fjern valg"
+                  className="text-[12px] text-warm-taupe opacity-50 hover:opacity-100 hover:text-vintage-red w-5 h-5 inline-flex items-center justify-center"
+                >
+                  ✕
+                </button>
+              </div>
+              {/* Stake controls */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onAdjustStake(idx, -STAKE_STEP)}
+                  disabled={stake <= MIN_STAKE}
+                  aria-label="Mindre stake"
+                  className="w-6 h-6 border border-warm-border rounded bg-cream text-forest font-bold text-sm flex items-center justify-center disabled:opacity-30 hover:border-forest"
+                >
+                  −
+                </button>
+                <div className="flex-1 text-center font-condensed text-[14px] font-bold text-forest border border-warm-border rounded bg-cream h-6 leading-6 tabular-nums">
+                  {stake}
+                </div>
+                <span className="text-[10px] text-warm-taupe font-semibold">pt</span>
+                <button
+                  type="button"
+                  onClick={() => onAdjustStake(idx, STAKE_STEP)}
+                  disabled={remaining < STAKE_STEP}
+                  aria-label="Større stake"
+                  className="w-6 h-6 border border-warm-border rounded bg-cream text-forest font-bold text-sm flex items-center justify-center disabled:opacity-30 hover:border-forest"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-warm-border px-3 py-2.5 bg-white">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="text-[10px] text-warm-taupe font-semibold uppercase tracking-wider">
+            Antal valg
+          </span>
+          <span
+            className="font-condensed text-[14px] font-bold text-forest tabular-nums"
+            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+          >
+            {entries.length} / {matches.length}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-warm-taupe font-semibold uppercase tracking-wider">
+            Samlet stake
+          </span>
+          <span
+            className="font-condensed text-[14px] font-bold text-gold-dark tabular-nums"
+            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+          >
+            {used} / {TOTAL_BUDGET} pt
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -757,6 +909,7 @@ function MatchCard({
   stake,
   onAdjustStake,
   remainingBudget,
+  compact,
 }: {
   match: Match
   selected?: Tip
@@ -770,6 +923,8 @@ function MatchCard({
   stake?: number
   onAdjustStake?: (delta: number) => void
   remainingBudget?: number
+  /** Skip inline stake-row (når kuponen håndterer stakes separat) */
+  compact?: boolean
 }) {
   const isRivalry = !!match.derby
   const isFinished = mode === 'finished' && revealed
@@ -794,12 +949,12 @@ function MatchCard({
     >
       {/* Rivalry badge */}
       {isRivalry && (
-        <div className="flex items-center gap-2 px-3 pt-2.5 pb-0.5">
-          <span className="text-[12px]" aria-hidden>
+        <div className="flex items-center gap-1.5 px-2.5 pt-1.5 pb-0">
+          <span className="text-[10px]" aria-hidden>
             🔥
           </span>
           <span
-            className="font-condensed text-[11px] font-bold uppercase tracking-widest"
+            className="font-condensed text-[10px] font-bold uppercase tracking-widest"
             style={{ color: '#B8963E' }}
           >
             {match.derby} {match.multiplier && `· ${match.multiplier}`}
@@ -808,12 +963,11 @@ function MatchCard({
       )}
 
       {/* Teams + kickoff/score */}
-      <div className="px-3 pt-2">
-        <div className="flex items-center justify-between gap-2 h-10">
-          {/* Home (right-aligned label, then logo) */}
+      <div className="px-2.5 pt-1.5">
+        <div className="flex items-center justify-between gap-2 h-8">
           <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
             <span
-              className={`font-condensed font-bold text-[14px] sm:text-[15px] ${textPrimary} truncate`}
+              className={`font-condensed font-bold text-[13px] sm:text-[14px] ${textPrimary} truncate`}
               style={{ maxWidth: 110 }}
             >
               {match.homeShort}
@@ -822,46 +976,44 @@ function MatchCard({
               src={match.homeLogo}
               alt=""
               className="shrink-0"
-              style={{ width: 24, height: 24, objectFit: 'contain' }}
+              style={{ width: 20, height: 20, objectFit: 'contain' }}
               loading="lazy"
             />
           </div>
 
-          {/* Score / vs */}
           {isFinished && score ? (
-            <span className={`font-condensed font-bold text-[13px] ${textSecondary} flex-shrink-0`}>
+            <span className={`font-condensed font-bold text-[12px] ${textSecondary} flex-shrink-0`}>
               {score.home} – {score.away}
             </span>
           ) : (
             <span className={`text-[9px] ${textSecondary} font-semibold flex-shrink-0`}>vs</span>
           )}
 
-          {/* Away (logo, then label) */}
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <img
               src={match.awayLogo}
               alt=""
               className="shrink-0"
-              style={{ width: 24, height: 24, objectFit: 'contain' }}
+              style={{ width: 20, height: 20, objectFit: 'contain' }}
               loading="lazy"
             />
             <span
-              className={`font-condensed font-bold text-[14px] sm:text-[15px] ${textPrimary} truncate`}
+              className={`font-condensed font-bold text-[13px] sm:text-[14px] ${textPrimary} truncate`}
               style={{ maxWidth: 110 }}
             >
               {match.awayShort}
             </span>
           </div>
         </div>
-        <div className="text-center pb-1">
-          <span className={`text-[10px] ${textSecondary}`}>
+        <div className="text-center">
+          <span className={`text-[9px] ${textSecondary}`}>
             {isFinished ? 'Færdig' : match.kickoff}
           </span>
         </div>
       </div>
 
       {/* 1/X/2 buttons */}
-      <div className="flex gap-1 px-3 pb-2">
+      <div className="flex gap-1 px-2.5 pt-1 pb-1.5">
         {(['1', 'X', '2'] as Tip[]).map((o) => {
           const active = mode === 'open' ? selected === o : userPick === o
           const isUserPick = isFinished && userPick === o
@@ -914,14 +1066,14 @@ function MatchCard({
               disabled={mode === 'finished' || !onTip}
               onClick={() => onTip?.(o)}
               aria-pressed={active}
-              className={`flex-1 py-1.5 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${btnClass} ${
+              className={`flex-1 py-1 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${btnClass} ${
                 mode === 'finished' ? 'cursor-default' : 'cursor-pointer'
               }`}
             >
-              <span className={`font-condensed text-[16px] sm:text-[17px] font-bold leading-none ${labelColor}`}>
+              <span className={`font-condensed text-[15px] sm:text-[16px] font-bold leading-none ${labelColor}`}>
                 {o}
               </span>
-              <span className={`text-[8px] sm:text-[9px] font-medium truncate max-w-full ${subColor}`}>
+              <span className={`text-[8px] font-medium truncate max-w-full ${subColor}`}>
                 {sub}
               </span>
             </button>
@@ -929,8 +1081,8 @@ function MatchCard({
         })}
       </div>
 
-      {/* Stake-row — vises kun når der er valgt et tip */}
-      {mode === 'open' && selected && stake !== undefined && onAdjustStake && (
+      {/* Stake-row — vises kun når der er valgt et tip og card ikke er kompakt */}
+      {!compact && mode === 'open' && selected && stake !== undefined && onAdjustStake && (
         <div
           className={
             'flex items-center gap-2 px-3 py-1.5 border-t ' +
