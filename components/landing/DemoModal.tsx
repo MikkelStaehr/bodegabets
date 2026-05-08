@@ -101,6 +101,12 @@ const MATCHES: Record<LeagueId, readonly Match[]> = {
 // 3 first matches "correct", last "incorrect" — uanset user's faktiske tips.
 const CORRECT_FLAGS: readonly boolean[] = [true, true, true, false]
 
+// Credits-system — bruger har 500 at fordele over 4 kampe.
+const TOTAL_BUDGET = 500
+const DEFAULT_STAKE = 100
+const STAKE_STEP = 50
+const MIN_STAKE = 50
+
 // "Correct" outcome per match index — bruges til at vise resultat-tegnet
 const CORRECT_OUTCOMES: readonly Tip[] = ['1', '1', 'X', '1']
 // Faked scores i step 3 så det ligner finished matches i AfgivBets
@@ -143,6 +149,7 @@ export default function DemoModal({ open, onClose }: Props) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [selectedLeague, setSelectedLeague] = useState<LeagueId | null>(null)
   const [tips, setTips] = useState<Record<number, Tip>>({})
+  const [stakes, setStakes] = useState<Record<number, number>>({})
   const [reducedMotion, setReducedMotion] = useState(false)
   const [exiting, setExiting] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -168,6 +175,7 @@ export default function DemoModal({ open, onClose }: Props) {
         setStep(1)
         setSelectedLeague(null)
         setTips({})
+        setStakes({})
       }, reducedMotion ? 0 : 200)
       return () => window.clearTimeout(t)
     }
@@ -220,9 +228,24 @@ export default function DemoModal({ open, onClose }: Props) {
   function selectLeague(id: LeagueId) {
     setSelectedLeague(id)
     setTips({})
+    setStakes({})
   }
   function setTip(idx: number, t: Tip) {
     setTips((prev) => ({ ...prev, [idx]: t }))
+    // Tildel default-stake (100) første gang en match får et tip
+    setStakes((prev) => (prev[idx] !== undefined ? prev : { ...prev, [idx]: DEFAULT_STAKE }))
+  }
+  function adjustStake(idx: number, delta: number) {
+    setStakes((prev) => {
+      const current = prev[idx] ?? DEFAULT_STAKE
+      const otherUsed = Object.entries(prev).reduce(
+        (sum, [k, v]) => (Number(k) === idx ? sum : sum + v),
+        0,
+      )
+      const remainingForThis = TOTAL_BUDGET - otherUsed
+      const next = Math.max(MIN_STAKE, Math.min(remainingForThis, current + delta))
+      return { ...prev, [idx]: next }
+    })
   }
 
   return (
@@ -288,10 +311,23 @@ export default function DemoModal({ open, onClose }: Props) {
           <div key={step} className="demo-step-anim" aria-live="polite">
             {step === 1 && <Step1 selectedLeague={selectedLeague} onSelect={selectLeague} />}
             {step === 2 && currentLeague && (
-              <Step2 league={currentLeague} matches={currentLeagueMatches} tips={tips} onTip={setTip} />
+              <Step2
+                league={currentLeague}
+                matches={currentLeagueMatches}
+                tips={tips}
+                stakes={stakes}
+                onTip={setTip}
+                onAdjustStake={adjustStake}
+              />
             )}
             {step === 3 && currentLeague && (
-              <Step3 league={currentLeague} matches={currentLeagueMatches} tips={tips} reducedMotion={reducedMotion} />
+              <Step3
+                league={currentLeague}
+                matches={currentLeagueMatches}
+                tips={tips}
+                stakes={stakes}
+                reducedMotion={reducedMotion}
+              />
             )}
             {step === 4 && currentLeague && <Step4 league={currentLeague} onClose={onClose} />}
             {step === 4 && !currentLeague && (
@@ -379,27 +415,63 @@ function Step2({
   league,
   matches,
   tips,
+  stakes,
   onTip,
+  onAdjustStake,
 }: {
   league: League
   matches: readonly Match[]
   tips: Record<number, Tip>
+  stakes: Record<number, number>
   onTip: (idx: number, t: Tip) => void
+  onAdjustStake: (idx: number, delta: number) => void
 }) {
   const tippedCount = Object.keys(tips).length
+  const used = Object.values(stakes).reduce((sum, s) => sum + s, 0)
+  const remaining = TOTAL_BUDGET - used
+
   return (
     <div className="px-4 sm:px-6 pt-4 pb-8">
       <StepHeader
         tag="Trin 2 af 4"
         title="Tip ugens kampe."
-        subtitle="Klik på dit bud for hver kamp. Det her er hvad spillerne ser inden kickoff."
+        subtitle="Du har 500 credits at fordele. Vælg dit bud, og brug + / − til at sætte stake pr. kamp."
       />
 
-      {/* League header strip — matches gameroom style */}
-      <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 bg-forest text-cream rounded-sm">
-        <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.12em]">
-          {league.name} · Runde 27
-        </span>
+      {/* League + budget strip */}
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-forest text-cream rounded-sm">
+          <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.12em]">
+            {league.name} · Runde 27
+          </span>
+        </div>
+        <div
+          className={
+            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border ' +
+            (remaining < 0
+              ? 'border-vintage-red/50 bg-vintage-red/10 text-vintage-red'
+              : 'border-warm-border bg-white text-forest')
+          }
+        >
+          <span
+            className="font-condensed font-bold text-[10px] uppercase tracking-[0.12em] text-warm-taupe"
+          >
+            Brugt
+          </span>
+          <span
+            className="font-condensed font-bold text-[12px] tabular-nums"
+            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+          >
+            {used}
+          </span>
+          <span className="text-[10px] text-warm-taupe">/</span>
+          <span
+            className="font-condensed text-[11px] text-warm-taupe tabular-nums"
+            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+          >
+            {TOTAL_BUDGET}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 space-y-2">
@@ -410,6 +482,9 @@ function Step2({
             selected={tips[idx]}
             mode="open"
             onTip={(t) => onTip(idx, t)}
+            stake={stakes[idx]}
+            onAdjustStake={(delta) => onAdjustStake(idx, delta)}
+            remainingBudget={remaining}
           />
         ))}
       </div>
@@ -432,11 +507,13 @@ function Step3({
   league,
   matches,
   tips,
+  stakes,
   reducedMotion,
 }: {
   league: League
   matches: readonly Match[]
   tips: Record<number, Tip>
+  stakes: Record<number, number>
   reducedMotion: boolean
 }) {
   const [revealedCount, setRevealedCount] = useState(0)
@@ -454,9 +531,11 @@ function Step3({
     return () => timeouts.forEach((t) => window.clearTimeout(t))
   }, [matches.length, reducedMotion])
 
+  // Points: korrekt → +stake, forkert → −stake (real betting-mekanik)
   let points = 0
   for (let i = 0; i < revealedCount; i++) {
-    if (CORRECT_FLAGS[i]) points += 3
+    const stake = stakes[i] ?? DEFAULT_STAKE
+    points += CORRECT_FLAGS[i] ? stake : -stake
   }
   const correctCount = Math.min(revealedCount, 3)
 
@@ -465,7 +544,7 @@ function Step3({
       <StepHeader
         tag="Trin 3 af 4"
         title="Kickoff. Point i realtid."
-        subtitle="Resultaterne ruller ind. Korrekte tip giver point — du kan se status live."
+        subtitle="Resultaterne ruller ind. Korrekt tip = stake tilbage som point. Forkert = stake tabt."
       />
 
       <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 bg-forest text-cream rounded-sm">
@@ -488,6 +567,7 @@ function Step3({
               correctOutcome={CORRECT_OUTCOMES[idx]}
               isCorrect={CORRECT_FLAGS[idx]}
               score={FAKE_SCORES[idx]}
+              stake={stakes[idx] ?? DEFAULT_STAKE}
             />
           )
         })}
@@ -495,9 +575,14 @@ function Step3({
 
       <div className="mt-8 text-center">
         <div
-          className="font-condensed font-bold text-gold-dark text-[44px] sm:text-[64px] leading-none tabular-nums"
+          className={
+            'font-condensed font-bold text-[44px] sm:text-[64px] leading-none tabular-nums ' +
+            (points >= 0 ? 'text-gold-dark' : 'text-vintage-red')
+          }
         >
-          {points} <span className="text-[20px] sm:text-[24px] font-condensed">PTS</span>
+          {points >= 0 ? '+' : ''}
+          {points}{' '}
+          <span className="text-[20px] sm:text-[24px] font-condensed">PTS</span>
         </div>
         <div className="mt-2 font-body text-[13px] sm:text-[14px] text-warm-gray">
           {correctCount} af {matches.length} rigtige tip
@@ -669,6 +754,9 @@ function MatchCard({
   correctOutcome,
   isCorrect,
   score,
+  stake,
+  onAdjustStake,
+  remainingBudget,
 }: {
   match: Match
   selected?: Tip
@@ -679,6 +767,9 @@ function MatchCard({
   correctOutcome?: Tip
   isCorrect?: boolean
   score?: { home: number; away: number }
+  stake?: number
+  onAdjustStake?: (delta: number) => void
+  remainingBudget?: number
 }) {
   const isRivalry = !!match.derby
   const isFinished = mode === 'finished' && revealed
@@ -823,7 +914,7 @@ function MatchCard({
               disabled={mode === 'finished' || !onTip}
               onClick={() => onTip?.(o)}
               aria-pressed={active}
-              className={`flex-1 py-2 border-[1.5px] rounded-sm flex flex-col items-center gap-0.5 transition-all min-h-[52px] ${btnClass} ${
+              className={`flex-1 py-1.5 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${btnClass} ${
                 mode === 'finished' ? 'cursor-default' : 'cursor-pointer'
               }`}
             >
@@ -837,6 +928,101 @@ function MatchCard({
           )
         })}
       </div>
+
+      {/* Stake-row — vises kun når der er valgt et tip */}
+      {mode === 'open' && selected && stake !== undefined && onAdjustStake && (
+        <div
+          className={
+            'flex items-center gap-2 px-3 py-1.5 border-t ' +
+            (isRivalry ? 'border-gold/20' : 'border-black/[0.06]')
+          }
+        >
+          <span
+            className={
+              'text-[10px] font-bold uppercase tracking-wider ' +
+              (isRivalry ? 'text-gold/70' : 'text-warm-taupe')
+            }
+          >
+            Stake
+          </span>
+          <div className="flex items-center gap-1 ml-auto">
+            <button
+              type="button"
+              onClick={() => onAdjustStake(-STAKE_STEP)}
+              disabled={stake <= MIN_STAKE}
+              aria-label="Mindre stake"
+              className={
+                'w-7 h-7 border rounded font-bold text-sm flex items-center justify-center disabled:opacity-30 ' +
+                (isRivalry
+                  ? 'border-gold/30 bg-forest-light text-cream'
+                  : 'border-warm-border bg-cream text-forest hover:border-forest')
+              }
+            >
+              −
+            </button>
+            <div
+              className={
+                'w-14 text-center font-condensed text-[14px] font-bold border rounded h-7 leading-7 tabular-nums ' +
+                (isRivalry
+                  ? 'border-gold/30 bg-forest-light text-cream'
+                  : 'border-warm-border bg-cream text-forest')
+              }
+            >
+              {stake}
+            </div>
+            <span
+              className={
+                'text-[10px] font-semibold ' +
+                (isRivalry ? 'text-cream/50' : 'text-warm-taupe')
+              }
+            >
+              pt
+            </span>
+            <button
+              type="button"
+              onClick={() => onAdjustStake(STAKE_STEP)}
+              disabled={remainingBudget !== undefined && remainingBudget < STAKE_STEP}
+              aria-label="Større stake"
+              className={
+                'w-7 h-7 border rounded font-bold text-sm flex items-center justify-center disabled:opacity-30 ' +
+                (isRivalry
+                  ? 'border-gold/30 bg-forest-light text-cream'
+                  : 'border-warm-border bg-cream text-forest hover:border-forest')
+              }
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Stake-row read-only på færdige kampe */}
+      {mode === 'finished' && revealed && stake !== undefined && (
+        <div
+          className={
+            'flex items-center justify-between px-3 py-1.5 border-t ' +
+            (isRivalry ? 'border-gold/20' : 'border-black/[0.06]')
+          }
+        >
+          <span
+            className={
+              'text-[10px] font-bold uppercase tracking-wider ' +
+              (isRivalry ? 'text-gold/70' : 'text-warm-taupe')
+            }
+          >
+            Stake
+          </span>
+          <span
+            className={
+              'font-condensed font-bold text-[13px] tabular-nums ' +
+              (isCorrect ? 'text-gold-dark' : 'text-vintage-red')
+            }
+          >
+            {isCorrect ? '+' : '−'}
+            {stake} pt
+          </span>
+        </div>
+      )}
     </div>
   )
 }
