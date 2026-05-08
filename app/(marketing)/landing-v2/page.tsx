@@ -34,10 +34,6 @@ export default async function LandingV2() {
 
       <ProductsSection />
       <ChampionshipSection />
-
-      {/* Thin divider */}
-      <div className="h-px bg-gold/25 max-w-6xl mx-auto" />
-
       <PriceSection />
     </div>
   )
@@ -104,16 +100,16 @@ const PRODUCT_CARDS = [
 
 function ProductsSection() {
   return (
-    <section id="products" className="bg-forest py-12 lg:py-24">
+    <section id="products" className="bg-cream py-12 lg:py-24">
       <div className="max-w-6xl mx-auto px-6 lg:px-8">
         <div className="text-center mb-10 lg:mb-16">
-          <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold">
+          <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold-dark">
             De to spil
           </span>
-          <h2 className="mt-3 font-display font-black text-cream text-[36px] lg:text-[56px] leading-none">
+          <h2 className="mt-3 font-display font-black text-forest text-[36px] lg:text-[56px] leading-none">
             Vælg din disciplin.
           </h2>
-          <p className="mt-4 font-body text-[16px] text-cream/70 max-w-[560px] mx-auto">
+          <p className="mt-4 font-body text-[16px] text-warm-taupe max-w-[560px] mx-auto">
             Spil ét. Spil begge. Inkluderet i din månedlige adgang.
           </p>
         </div>
@@ -122,23 +118,23 @@ function ProductsSection() {
           {PRODUCT_CARDS.map((card) => (
             <article
               key={card.number}
-              className="relative bg-cream/[0.04] border border-gold/25 rounded-sm p-8 hover:border-gold/60 transition-colors overflow-hidden"
+              className="relative bg-cream-dark border border-warm-border rounded-sm p-8 hover:border-gold transition-colors overflow-hidden"
             >
               {/* Watermark number */}
               <span
-                className="absolute top-3 right-5 font-display font-black text-gold/[0.12] pointer-events-none select-none"
+                className="absolute top-3 right-5 font-display font-black text-gold/15 pointer-events-none select-none"
                 style={{ fontSize: '80px', lineHeight: 1 }}
               >
                 {card.number}
               </span>
 
-              <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold">
+              <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold-dark">
                 {card.tag}
               </span>
-              <h3 className="mt-2 font-display font-bold text-cream text-[28px] leading-tight">
+              <h3 className="mt-2 font-display font-bold text-forest text-[28px] leading-tight">
                 {card.title}
               </h3>
-              <p className="mt-3 font-body text-[14px] text-cream/75 leading-relaxed">
+              <p className="mt-3 font-body text-[14px] text-warm-taupe leading-relaxed">
                 {card.description}
               </p>
 
@@ -148,11 +144,11 @@ function ProductsSection() {
                     key={feature}
                     className={
                       'flex items-center gap-3 py-3 ' +
-                      (i < card.features.length - 1 ? 'border-b border-gold/15' : '')
+                      (i < card.features.length - 1 ? 'border-b border-warm-border' : '')
                     }
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
-                    <span className="font-body text-[13px] text-cream/85">
+                    <span className="font-body text-[13px] text-ink">
                       {feature}
                     </span>
                   </li>
@@ -265,26 +261,26 @@ function ChampionshipSection() {
 
 function PriceSection() {
   return (
-    <section className="bg-forest py-12 lg:py-24">
+    <section className="bg-cream py-12 lg:py-24">
       <div className="max-w-6xl mx-auto px-6 lg:px-8">
-        <div className="bg-gold/[0.04] rounded-sm p-8 lg:p-14 text-center">
-          <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold">
+        <div className="bg-cream-dark border border-warm-border rounded-sm p-8 lg:p-14 text-center">
+          <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold-dark">
             Én pris. Alt indeholdt.
           </span>
 
           <div className="mt-4 flex items-baseline justify-center gap-2">
             <span
-              className="font-display font-black text-gold leading-none"
+              className="font-display font-black text-forest leading-none"
               style={{ fontSize: '96px' }}
             >
               1€
             </span>
-            <span className="font-condensed text-[16px] text-cream/60">
+            <span className="font-condensed text-[16px] text-warm-taupe">
               /måned
             </span>
           </div>
 
-          <p className="mt-6 font-body text-[16px] text-cream/75 max-w-[520px] mx-auto leading-relaxed">
+          <p className="mt-6 font-body text-[16px] text-warm-gray max-w-[520px] mx-auto leading-relaxed">
             Begge spil. Ubegrænsede ligaer. Hele sæsonen. Ingen indskud,
             ingen gevinster, ingen reklamer.
           </p>
