@@ -50,30 +50,45 @@ type Props = { activeUserCount: number | null }
 export default function HeroRotator({ activeUserCount }: Props) {
   const [active, setActive] = useState(0)
   const [autoRotate, setAutoRotate] = useState(true)
-  const hoverRef = useRef(false)
+  const [hovered, setHovered] = useState(false)
+  const [reducedMotion, setReducedMotion] = useState(false)
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  // Hent fallback-image-paths som peger på offentligt /img-mappen i tilfælde af
-  // at /landing/-stien ikke findes endnu (placeholders kan mangle i build).
-  // Pollerer ikke — svg fallback skjules bare hvis billedet er gyldigt.
-
-  // Auto-rotate hver 6s indtil bruger interagerer — respekterer prefers-reduced-motion
+  // Detect prefers-reduced-motion
   useEffect(() => {
-    if (!autoRotate) return
     if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
+    mq.addEventListener?.('change', handler)
+    return () => mq.removeEventListener?.('change', handler)
+  }, [])
 
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (reduced) return
-
+  // Auto-rotate hver 6s indtil bruger interagerer eller hover'er
+  // Disabled helt hvis prefers-reduced-motion
+  useEffect(() => {
+    if (!autoRotate || reducedMotion || hovered) return
     const interval = setInterval(() => {
-      if (hoverRef.current) return
       setActive((v) => (v + 1) % SLIDES.length)
     }, ROTATE_MS)
     return () => clearInterval(interval)
-  }, [autoRotate])
+  }, [autoRotate, reducedMotion, hovered, active])
 
   function selectSlide(i: number) {
     setActive(i)
     setAutoRotate(false)
+  }
+
+  function handleTabKeyDown(e: React.KeyboardEvent, i: number) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault()
+      const next =
+        e.key === 'ArrowRight'
+          ? (i + 1) % SLIDES.length
+          : (i - 1 + SLIDES.length) % SLIDES.length
+      selectSlide(next)
+      tabRefs.current[next]?.focus()
+    }
   }
 
   const current = SLIDES[active]
@@ -81,9 +96,21 @@ export default function HeroRotator({ activeUserCount }: Props) {
   return (
     <section
       className="relative w-full h-[480px] lg:h-[620px] overflow-hidden bg-forest"
-      onMouseEnter={() => { hoverRef.current = true }}
-      onMouseLeave={() => { hoverRef.current = false }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
+      {/* Local keyframes for tab underline animations */}
+      <style>{`
+        @keyframes heroTabProgress {
+          from { transform: scaleX(0); }
+          to   { transform: scaleX(1); }
+        }
+        @keyframes heroTabSnap {
+          from { transform: scaleX(0); }
+          to   { transform: scaleX(1); }
+        }
+      `}</style>
+
       {/* Background slides — crossfade with continuous Ken Burns */}
       {SLIDES.map((slide, i) => {
         const isActive = i === active
@@ -121,34 +148,11 @@ export default function HeroRotator({ activeUserCount }: Props) {
 
       {/* Content */}
       <div className="relative h-full max-w-6xl mx-auto px-6 lg:px-8 flex flex-col">
-        {/* Sport pills (top-left) */}
-        <div className="flex flex-wrap gap-2 pt-8">
-          {SLIDES.map((slide, i) => {
-            const isActive = i === active
-            return (
-              <button
-                key={slide.id}
-                type="button"
-                onClick={() => selectSlide(i)}
-                aria-pressed={isActive}
-                className={
-                  'px-4 py-1.5 rounded-full font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] transition-colors duration-300 cursor-pointer ' +
-                  (isActive
-                    ? 'bg-gold text-forest'
-                    : 'bg-transparent border border-cream/40 text-cream/70 hover:text-cream hover:border-cream/70')
-                }
-              >
-                {slide.pillLabel}
-              </button>
-            )
-          })}
-        </div>
+        {/* Top spacer */}
+        <div className="flex-1 min-h-8" />
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Headline */}
-        <div className="pb-12 lg:pb-16 max-w-3xl">
+        {/* Headline + subtitle + CTAs — pb generøs så der er plads til tabs nedenfor */}
+        <div className="pb-28 lg:pb-36 max-w-3xl">
           <h1
             className="font-display font-black text-cream text-[44px] lg:text-[80px] drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
             style={{ lineHeight: 0.95 }}
@@ -208,6 +212,84 @@ export default function HeroRotator({ activeUserCount }: Props) {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Bottom-center underline tab bar — full-width hairline divider above */}
+      <div className="absolute left-0 right-0 bottom-0 pointer-events-none">
+        <div aria-hidden className="w-full border-t border-gold/25" />
+        <div
+          role="tablist"
+          aria-label="Vælg spil"
+          className="pointer-events-auto flex justify-center gap-8 lg:gap-12 mt-6 pb-6 lg:pb-10"
+        >
+          {SLIDES.map((slide, i) => {
+            const isActive = i === active
+            return (
+              <button
+                key={slide.id}
+                ref={(el) => { tabRefs.current[i] = el }}
+                role="tab"
+                type="button"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => selectSlide(i)}
+                onKeyDown={(e) => handleTabKeyDown(e, i)}
+                className="group relative py-3 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 rounded-sm"
+              >
+                <span
+                  className={
+                    'block font-condensed font-bold text-[13px] uppercase tracking-widest transition-colors duration-200 ' +
+                    (isActive
+                      ? 'text-cream'
+                      : 'text-cream/55 group-hover:text-cream/80')
+                  }
+                >
+                  {slide.pillLabel}
+                </span>
+
+                {/* Underline track */}
+                <div className="relative h-[2px] mt-2 w-full overflow-hidden">
+                  {/* Inactive hover line (cream/30) */}
+                  {!isActive && (
+                    <div
+                      aria-hidden
+                      className="absolute inset-0 bg-cream/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    />
+                  )}
+
+                  {/* Active line — auto-progress eller manual snap */}
+                  {isActive &&
+                    (reducedMotion ? (
+                      <div
+                        aria-hidden
+                        className="absolute inset-0 bg-gold origin-left"
+                        style={{ transform: 'scaleX(1)' }}
+                      />
+                    ) : autoRotate ? (
+                      <div
+                        aria-hidden
+                        key={'auto-' + active}
+                        className="absolute inset-0 bg-gold origin-left"
+                        style={{
+                          animation: `heroTabProgress ${ROTATE_MS}ms linear forwards`,
+                          animationPlayState: hovered ? 'paused' : 'running',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        aria-hidden
+                        key={'manual-' + active}
+                        className="absolute inset-0 bg-gold origin-left"
+                        style={{
+                          animation: 'heroTabSnap 400ms ease-out forwards',
+                        }}
+                      />
+                    ))}
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
     </section>
