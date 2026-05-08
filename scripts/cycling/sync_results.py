@@ -916,6 +916,7 @@ def main() -> None:
     total_upserted = 0
     total_unmatched = 0
     errors: list[str] = []
+    synced_stage_ids: list[str] = []  # Stages med nye results — bruges til auto points-trigger
 
     with httpx.Client(headers=PCS_HEADERS) as client:
         for race in races:
@@ -939,16 +940,34 @@ def main() -> None:
                 total_unmatched += unmatched
                 _log(f"  Upserted {upserted}, unmatched {unmatched}")
 
-                # Update won_how on stage (stage_number=1 for one-day)
-                if won_how:
+                # Update won_how on stage (stage_number=1 for one-day) and
+                # remember stage id for points-calc trigger.
+                try:
+                    stage_resp = (
+                        supabase.table("cycling_stages")
+                        .select("id")
+                        .eq("race_id", race["id"])
+                        .eq("stage_number", 1)
+                        .limit(1)
+                        .execute()
+                    )
+                    stage_id = (stage_resp.data or [{}])[0].get("id")
+                except APIError as e:
+                    _warn(f"  Failed to fetch one-day stage id: {e}")
+                    stage_id = None
+
+                if won_how and stage_id:
                     try:
                         supabase.table("cycling_stages").update(
                             {"won_how": won_how}
-                        ).eq("race_id", race["id"]).eq("stage_number", 1).execute()
+                        ).eq("id", stage_id).execute()
                         _log(f"  Won how: {won_how}")
                     except APIError as e:
                         _warn(f"  Failed to update won_how: {e}")
 
+                if stage_id:
+                    update_results_timestamp(supabase, "cycling_stages", stage_id)
+                    synced_stage_ids.append(stage_id)
                 update_results_timestamp(supabase, "cycling_races", race["id"])
 
             elif race["race_type"] == "stage_race":
@@ -1007,6 +1026,31 @@ def main() -> None:
                             _warn(f"    Failed to update stage info: {e}")
 
                     update_results_timestamp(supabase, "cycling_stages", stage["id"])
+                    synced_stage_ids.append(stage["id"])
+
+    # Trigg points-beregning for nyligt synkede stages.
+    # Kalder admin-endpoint per stage; springer over hvis ADMIN_SECRET +
+    # APP_BASE_URL ikke er konfigureret (lokal kørsel uden env).
+    admin_secret = os.environ.get("ADMIN_SECRET")
+    app_base = os.environ.get("APP_BASE_URL") or os.environ.get("NEXT_PUBLIC_APP_URL")
+    if synced_stage_ids and admin_secret and app_base:
+        _log(f"\n→ Triggering points calculation for {len(synced_stage_ids)} stages...")
+        url = f"{app_base.rstrip('/')}/api/admin/cycling/calculate-points"
+        with httpx.Client(headers={"Authorization": f"Bearer {admin_secret}"}, timeout=120) as c:
+            for sid in synced_stage_ids:
+                try:
+                    resp = c.post(url, json={"stage_id": sid})
+                    if resp.status_code == 200:
+                        _log(f"  ✓ {sid}")
+                    else:
+                        _warn(f"  ✗ {sid}: HTTP {resp.status_code} {resp.text[:120]}")
+                except httpx.HTTPError as e:
+                    _warn(f"  ✗ {sid}: {e}")
+    elif synced_stage_ids:
+        _log(
+            f"\n  (Skipping points-calc trigger: ADMIN_SECRET/APP_BASE_URL not set. "
+            f"Run manually for {len(synced_stage_ids)} stages.)"
+        )
 
     # Log
     log_sync(supabase, total_upserted, total_unmatched, total_startlists, errors)

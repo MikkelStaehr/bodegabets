@@ -242,7 +242,7 @@ export default async function GamePage({ params }: Props) {
           .in('id', raceIds),
         supabaseAdmin
           .from('cycling_stages')
-          .select('id, race_id, stage_number, name, profile, start_date')
+          .select('id, race_id, stage_number, name, profile, start_date, results_uploaded_at')
           .in('race_id', raceIds.filter((id) => {
             // We'll filter stage_race ids after we have races, but fetch all stages for now
             return true
@@ -294,7 +294,7 @@ export default async function GamePage({ params }: Props) {
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null }[] = []
-  let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
+  let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; results_uploaded_at: string | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupStartlists: Record<string, string[]> = {}
   let blockSquadMap: Record<string, string> = {}
 
@@ -417,7 +417,7 @@ export default async function GamePage({ params }: Props) {
     if (raceIdsForStages.length > 0) {
       const { data: stagesData } = await supabaseAdmin
         .from('cycling_stages')
-        .select('id, race_id, stage_number, name, profile, profile_image_url, start_date, distance_km, departure, arrival, profile_score, vertical_meters')
+        .select('id, race_id, stage_number, name, profile, profile_image_url, start_date, distance_km, departure, arrival, profile_score, vertical_meters, results_uploaded_at')
         .in('race_id', raceIdsForStages)
         .order('start_date', { ascending: true })
 

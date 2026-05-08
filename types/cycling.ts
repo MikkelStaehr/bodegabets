@@ -38,6 +38,7 @@ export type CyclingStage = {
   arrival: string | null
   profile_score: number | null
   vertical_meters: number | null
+  results_uploaded_at: string | null
   race_name: string
   race_type: string
   race_profile_image_url: string | null
