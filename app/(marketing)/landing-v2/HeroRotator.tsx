@@ -18,7 +18,7 @@ const SLIDES: readonly Slide[] = [
   {
     id: 'fodbold',
     pillLabel: 'Fodbold',
-    image: '/landing/herobannerfootball.jpg',
+    image: '/landing/walkoutpitchfootball.jpg',
     headlinePrimary: 'Tip kampene.',
     headlineSecondary: 'Følg hele Europa.',
     subtitle:
