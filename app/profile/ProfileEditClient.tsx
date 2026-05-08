@@ -300,6 +300,23 @@ export default function ProfileEditClient({ userId, userEmail, initialUsername }
             <p className="font-body text-warm-gray text-xs mt-1.5">E-mail kan ikke ændres herfra</p>
           </div>
 
+          {/* ── To-faktor sikkerhed link ─────────────────── */}
+          <Link
+            href="/profile/security"
+            className="flex items-center justify-between p-4 rounded-sm border bg-[#F8F5ED] hover:bg-[#F2EDE4] transition-colors"
+            style={{ borderColor: '#E5DFD2', color: '#1a1a1a' }}
+          >
+            <div>
+              <p className="font-condensed text-sm font-bold" style={{ color: '#1a3329' }}>
+                🔒 To-faktor godkendelse
+              </p>
+              <p className="font-body text-xs mt-0.5" style={{ color: '#5C5C4A' }}>
+                Beskyt din konto med en authenticator-app
+              </p>
+            </div>
+            <span className="font-condensed text-xs font-bold" style={{ color: '#1a3329' }}>→</span>
+          </Link>
+
           {/* ── Divider — Skift adgangskode ─────────────────── */}
           <div className="flex items-center gap-3 py-2">
             <div className="flex-1 h-[1px] bg-[#D4CFC4]" />

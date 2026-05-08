@@ -15,6 +15,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // 2FA challenge state — vises efter korrekt password hvis MFA er enrolled
+  const [mfaChallenge, setMfaChallenge] = useState<{ factorId: string; challengeId: string } | null>(null)
+  const [mfaCode, setMfaCode] = useState('')
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -31,6 +35,48 @@ export default function LoginPage() {
         return setError('Forkert email eller adgangskode')
       }
       return setError(signInError.message)
+    }
+
+    // Tjek om bruger har MFA enrolled — i så fald kræv challenge før vi sender til dashboard
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    if (aalData?.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
+      // MFA påkrævet — start challenge
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const totp = factors?.totp?.find((f) => f.status === 'verified')
+      if (totp) {
+        const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: totp.id })
+        if (challengeErr || !challenge) {
+          setError(challengeErr?.message ?? 'Kunne ikke starte 2FA-challenge')
+          setLoading(false)
+          return
+        }
+        setMfaChallenge({ factorId: totp.id, challengeId: challenge.id })
+        setLoading(false)
+        return
+      }
+    }
+
+    router.refresh()
+    router.push('/dashboard')
+  }
+
+  async function handleMfaSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!mfaChallenge || mfaCode.length !== 6) return
+    setError(null)
+    setLoading(true)
+
+    const { error: verifyErr } = await supabase.auth.mfa.verify({
+      factorId: mfaChallenge.factorId,
+      challengeId: mfaChallenge.challengeId,
+      code: mfaCode,
+    })
+
+    if (verifyErr) {
+      setError('Forkert kode — prøv igen')
+      setLoading(false)
+      setMfaCode('')
+      return
     }
 
     router.refresh()
@@ -72,6 +118,54 @@ export default function LoginPage() {
           Log ind for at se dine spil og afgive bets
         </p>
 
+        {mfaChallenge ? (
+          <form onSubmit={handleMfaSubmit} className="space-y-5">
+            <div className="text-center mb-2">
+              <p className="font-condensed text-xs uppercase tracking-[0.14em] text-[#7a7060] mb-2">
+                To-faktor godkendelse
+              </p>
+              <p className="font-body text-sm" style={{ color: '#5C5C4A' }}>
+                Indtast den 6-cifrede kode fra din authenticator-app
+              </p>
+            </div>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              autoFocus
+              className="w-full bg-white border-[1.5px] border-[#D4CFC4] text-[#1A1A1A] rounded-sm px-4 py-3 font-mono text-2xl text-center tracking-[0.5em] outline-none focus:border-[#1a3329] transition-colors"
+            />
+
+            {error && (
+              <div className="bg-[#C8392B]/10 border border-[#C8392B]/30 text-[#C8392B] font-body text-sm rounded-sm px-4 py-3">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || mfaCode.length !== 6}
+              className="w-full font-condensed uppercase tracking-[0.08em] text-sm px-8 py-4 rounded-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
+              style={{ fontWeight: 700, background: '#2C4A3E', color: '#F2EDE4' }}
+            >
+              {loading ? 'Bekræfter...' : 'Bekræft og log ind'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setMfaChallenge(null); setMfaCode(''); supabase.auth.signOut() }}
+              className="w-full font-body text-sm hover:opacity-70 transition-opacity"
+              style={{ color: '#5C5C4A' }}
+            >
+              ← Tilbage
+            </button>
+          </form>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
 
           {/* E-mail */}
@@ -150,6 +244,7 @@ export default function LoginPage() {
             {loading ? 'Logger ind...' : 'Log ind →'}
           </button>
         </form>
+        )}
 
         {/* Footer link */}
         <p className="text-center font-body text-sm mt-6" style={{ color: '#5C5C4A' }}>
