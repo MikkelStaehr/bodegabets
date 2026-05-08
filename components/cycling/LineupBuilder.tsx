@@ -323,7 +323,12 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const noSquadForBlock = !currentSquadId
 
   const isStageRace = activeStage?.race_type === 'stage_race'
-  const isFinished = activeRace?.status === 'finished'
+  // Stage er færdig når DENS resultater er uploadet — ikke baseret på race-status
+  // (en active Grand Tour har færdige etaper undervejs). Race-finished bruges som
+  // fallback for one-day løb der ikke skulle have results_uploaded_at men i praksis
+  // har det efter sync.
+  const isFinished =
+    activeStage?.results_uploaded_at != null || activeRace?.status === 'finished'
   const isLocked = activeStage ? lockedStages.has(activeStage.id) : false
   const slots = activeStage ? (lineups[activeStage.id] ?? { ...EMPTY_SLOTS }) : { ...EMPTY_SLOTS }
   const changed = activeStage ? hasChanges(activeStage.id) : false
@@ -781,6 +786,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
       {!noSquadForBlock && activeStage && activeRace && (
         <LineupResults
           race={activeRace}
+          stageFinished={isFinished}
           slots={slots}
           scores={raceScores[activeStage.id] ?? []}
           results={raceResults[activeStage.id] ?? []}

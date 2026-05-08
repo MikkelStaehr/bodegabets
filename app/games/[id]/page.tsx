@@ -268,9 +268,17 @@ export default async function GamePage({ params }: Props) {
         }
       }
 
+      const cyclingNow = new Date()
       for (const stage of cStages ?? []) {
         const race = raceById.get(stage.race_id)
         if (!race || race.race_type !== 'stage_race') continue
+        // Per-stage status — race.status alene gjorde alle 21 etaper i en
+        // active Grand Tour til 'Aktiv'. Tjek results_uploaded_at + start_date.
+        const stageStart = new Date(stage.start_date)
+        let stageStatus: string
+        if (stage.results_uploaded_at) stageStatus = 'finished'
+        else if (stageStart > cyclingNow) stageStatus = 'upcoming'
+        else stageStatus = 'active'
         cyclingEvents.push({
           date: stage.start_date,
           race_name: race.name,
@@ -279,7 +287,7 @@ export default async function GamePage({ params }: Props) {
           stage_number: stage.stage_number,
           stage_name: stage.name,
           profile: stage.profile || race.profile,
-          status: race.status,
+          status: stageStatus,
           block_number: blockByRace.get(race.id) ?? 0,
         })
       }

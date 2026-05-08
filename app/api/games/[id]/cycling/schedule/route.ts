@@ -44,10 +44,10 @@ export async function GET(
   const { data: stages } = stageRaceIds.length > 0
     ? await supabase
         .from('cycling_stages')
-        .select('id, race_id, stage_number, name, profile, start_date')
+        .select('id, race_id, stage_number, name, profile, start_date, results_uploaded_at')
         .in('race_id', stageRaceIds)
         .order('stage_number', { ascending: true })
-    : { data: [] as { id: string; race_id: string; stage_number: number; name: string; profile: string; start_date: string }[] }
+    : { data: [] as { id: string; race_id: string; stage_number: number; name: string; profile: string; start_date: string; results_uploaded_at: string | null }[] }
 
   const raceById = new Map(races.map((r) => [r.id, r]))
   const blockByRace = new Map(gameRaces.map((gr) => [gr.race_id, gr.block_number]))
@@ -83,10 +83,22 @@ export async function GET(
     }
   }
 
-  // Stage races → one event per stage
+  // Stage races → one event per stage. Status er per-stage (results_uploaded_at +
+  // start_date) — IKKE race-status, ellers viser slideren 'Aktiv' for alle 21
+  // etaper i et igangværende Grand Tour.
+  const now = new Date()
   for (const stage of stages ?? []) {
     const race = raceById.get(stage.race_id)
     if (!race) continue
+    const stageStart = new Date(stage.start_date)
+    let stageStatus: 'finished' | 'active' | 'upcoming'
+    if (stage.results_uploaded_at) {
+      stageStatus = 'finished'
+    } else if (stageStart > now) {
+      stageStatus = 'upcoming'
+    } else {
+      stageStatus = 'active' // startet, ingen results endnu
+    }
     events.push({
       date: stage.start_date,
       race_name: race.name,
@@ -95,7 +107,7 @@ export async function GET(
       stage_number: stage.stage_number,
       stage_name: stage.name,
       profile: stage.profile || race.profile,
-      status: race.status,
+      status: stageStatus,
       block_number: blockByRace.get(race.id) ?? 0,
     })
   }

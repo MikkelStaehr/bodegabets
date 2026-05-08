@@ -45,6 +45,9 @@ type Props = {
     status: string
     profile: string | null
   }
+  /** Sætter editor-tilstand på stage-niveau. Hvis ikke angivet falder vi tilbage
+   *  til race.status (bagudkompatibel for one-day løb der ikke har en stage-prop). */
+  stageFinished?: boolean
   slots: Record<string, string | null>
   scores: Score[]
   results: Result[]
@@ -218,7 +221,7 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupResults({ race, slots, scores, results, riders, onEditRole }: Props) {
+export default function LineupResults({ race, stageFinished, slots, scores, results, riders, onEditRole }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
@@ -248,7 +251,10 @@ export default function LineupResults({ race, slots, scores, results, riders, on
   const totalPoints = hasScores ? fmt(scores.reduce((sum, s) => sum + s.total_points, 0)) : 0
   const benchPenaltyTotal = benchScores.reduce((sum, s) => sum + s.bench_penalty, 0)
 
-  const canEdit = !!onEditRole && race.status !== 'finished'
+  // canEdit baseret på stage-status (med race som fallback) — NÆG at lade en
+  // user redigere et færdigt stages lineup bare fordi race'et stadig er active.
+  const stageDone = stageFinished ?? (race.status === 'finished')
+  const canEdit = !!onEditRole && !stageDone
 
   return (
     <div>
