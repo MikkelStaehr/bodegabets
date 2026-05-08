@@ -74,6 +74,8 @@ const PRODUCT_CARDS = [
     number: '01',
     tag: 'Fantasy',
     title: 'Cycling Manager',
+    image: '/img/boxcycling.jpg',
+    imagePosition: 'object-center',
     description:
       'Saml dit drømmehold af ryttere, fordel rolle og bonus, og følg dem gennem Grand Tours og monumenter.',
     features: [
@@ -86,7 +88,9 @@ const PRODUCT_CARDS = [
   {
     number: '02',
     tag: 'Sports betting',
-    title: 'Football',
+    title: 'Fodbold',
+    image: '/img/emilio-garcia-AWdCgDDedH0-unsplash.jpg',
+    imagePosition: 'object-center',
     description:
       'Forudsig kampe på tværs af 20 europæiske ligaer. Bet i åbent vindue, lås ved kickoff, scor live.',
     features: [
@@ -118,34 +122,57 @@ function ProductsSection() {
           {PRODUCT_CARDS.map((card) => (
             <article
               key={card.number}
-              className="relative bg-cream-dark border border-warm-border rounded-sm p-8 hover:border-gold transition-colors overflow-hidden"
+              className="group relative bg-cream-dark border border-warm-border rounded-sm hover:border-gold transition-colors overflow-hidden flex flex-col"
             >
-              <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold-dark">
-                {card.tag}
-              </span>
-              <h3 className="mt-2 font-display font-bold text-forest text-[28px] leading-tight">
-                {card.title}
-              </h3>
-              <p className="mt-3 font-body text-[14px] text-warm-taupe leading-relaxed">
-                {card.description}
-              </p>
+              {/* Image header with Ken Burns + hover zoom + gradient blend */}
+              <div className="relative h-56 lg:h-64 overflow-hidden bg-forest">
+                <img
+                  src={card.image}
+                  alt={card.title}
+                  className={
+                    'absolute inset-0 w-full h-full object-cover ' +
+                    card.imagePosition +
+                    ' animate-kenburns-slow transition-transform duration-[1200ms] ease-out group-hover:scale-110'
+                  }
+                  loading="lazy"
+                />
+                {/* Subtle dark vignette for legibility */}
+                <div className="absolute inset-0 bg-gradient-to-t from-forest/40 via-transparent to-forest/20 pointer-events-none" />
+                {/* Bottom blend into card body */}
+                <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-cream-dark pointer-events-none" />
+                {/* Tag chip overlay (top-left) */}
+                <span className="absolute top-4 left-4 bg-forest/85 backdrop-blur-sm px-3 py-1 rounded-sm font-condensed text-[10px] uppercase tracking-[0.14em] text-gold">
+                  {card.tag}
+                </span>
+                {/* Title overlaid bottom-left for editorial feel */}
+                <h3 className="absolute bottom-4 left-6 right-6 font-display font-bold text-cream text-[28px] lg:text-[32px] leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                  {card.title}
+                </h3>
+              </div>
 
-              <ul className="mt-6 space-y-0">
-                {card.features.map((feature, i) => (
-                  <li
-                    key={feature}
-                    className={
-                      'flex items-center gap-3 py-3 ' +
-                      (i < card.features.length - 1 ? 'border-b border-warm-border' : '')
-                    }
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
-                    <span className="font-body text-[13px] text-ink">
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {/* Body */}
+              <div className="p-8 pt-6 flex-1 flex flex-col">
+                <p className="font-body text-[14px] text-warm-taupe leading-relaxed">
+                  {card.description}
+                </p>
+
+                <ul className="mt-6 space-y-0">
+                  {card.features.map((feature, i) => (
+                    <li
+                      key={feature}
+                      className={
+                        'flex items-center gap-3 py-3 ' +
+                        (i < card.features.length - 1 ? 'border-b border-warm-border' : '')
+                      }
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
+                      <span className="font-body text-[13px] text-ink">
+                        {feature}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </article>
           ))}
         </div>
