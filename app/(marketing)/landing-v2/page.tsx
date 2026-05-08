@@ -282,31 +282,109 @@ function ChampionshipSection() {
 
 // ─── Price callout ──────────────────────────────────────────────────────────
 
+const RECEIPT_LINES = [
+  { label: 'Cykling live-data', value: 'inkluderet' },
+  { label: 'Fodbold live-data · 20 ligaer', value: 'inkluderet' },
+  { label: 'Bodega Championship', value: 'inkluderet' },
+  { label: 'Drift & vedligehold', value: 'inkluderet' },
+] as const
+
 function PriceSection() {
   return (
-    <section className="bg-cream py-12 lg:py-24">
-      <div className="max-w-6xl mx-auto px-6 lg:px-8">
-        <div className="bg-cream-dark border border-warm-border rounded-sm p-8 lg:p-14 text-center">
-          <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold-dark">
-            Én pris. Alt indeholdt.
-          </span>
+    <section className="bg-cream py-16 lg:py-32">
+      <div className="max-w-5xl mx-auto px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-12 lg:gap-20 items-center">
+          {/* Left: editorial statement */}
+          <div>
+            <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
+              Én pris · ingen profit
+            </span>
 
-          <div className="mt-4 flex items-baseline justify-center gap-2">
-            <span
-              className="font-display font-black text-forest leading-none"
-              style={{ fontSize: '96px' }}
+            <h2 className="mt-4 font-display font-black text-forest text-[40px] lg:text-[56px] leading-[0.95]">
+              Du betaler til{' '}
+              <span className="italic text-gold-dark">oplevelsen</span>
+              <span className="text-forest">.</span>
+              <br />
+              Ikke til udvikleren.
+            </h2>
+
+            <p className="mt-6 font-body text-[16px] text-warm-gray leading-relaxed max-w-[460px]">
+              Din krone går direkte til licenser på live etape-resultater,
+              kamp-data og statistik fra 20 europæiske ligaer. Det er
+              infrastrukturen der gør spillet levende — og uden den, intet
+              Bodega Bets.
+            </p>
+
+            <Link
+              href="/register"
+              className="mt-10 inline-flex items-center justify-center px-8 py-4 bg-forest text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity"
             >
-              1€
-            </span>
-            <span className="font-condensed text-[16px] text-warm-taupe">
-              /måned
-            </span>
+              Kom i gang →
+            </Link>
           </div>
 
-          <p className="mt-6 font-body text-[16px] text-warm-gray max-w-[520px] mx-auto leading-relaxed">
-            Begge spil. Ubegrænsede ligaer. Hele sæsonen. Ingen indskud,
-            ingen gevinster, ingen reklamer.
-          </p>
+          {/* Right: vintage receipt */}
+          <div
+            className="relative bg-cream-dark border border-warm-border rounded-sm p-7 lg:p-8 shadow-[0_1px_0_rgba(0,0,0,0.04)]"
+            style={{ fontFamily: "'Courier New', monospace" }}
+          >
+            {/* Receipt header */}
+            <div className="text-center">
+              <div className="font-condensed font-semibold text-[10px] uppercase tracking-[0.2em] text-warm-taupe">
+                Bodega Bets · Sæson 25/26
+              </div>
+              <div className="mt-1 font-condensed text-[10px] uppercase tracking-[0.14em] text-warm-taupe/70">
+                medlemskab · månedlig
+              </div>
+            </div>
+
+            {/* Dotted divider */}
+            <div className="my-5 border-t border-dashed border-warm-border" />
+
+            {/* Line items */}
+            <ul className="space-y-2.5 text-[12px] text-ink">
+              {RECEIPT_LINES.map((line) => (
+                <li
+                  key={line.label}
+                  className="flex items-baseline justify-between gap-3"
+                >
+                  <span className="truncate">{line.label}</span>
+                  <span
+                    className="flex-shrink-0 text-warm-taupe text-[11px] uppercase tracking-[0.08em]"
+                    style={{ fontFamily: 'inherit' }}
+                  >
+                    {line.value}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Dotted divider */}
+            <div className="my-5 border-t border-dashed border-warm-border" />
+
+            {/* Total */}
+            <div className="flex items-baseline justify-between">
+              <span className="font-condensed font-bold text-[12px] uppercase tracking-[0.14em] text-forest">
+                Total
+              </span>
+              <span className="flex items-baseline gap-1">
+                <span className="font-display font-black text-forest text-[34px] leading-none">
+                  €1.00
+                </span>
+                <span className="text-[11px] text-warm-taupe uppercase tracking-[0.08em]">
+                  /måned
+                </span>
+              </span>
+            </div>
+
+            {/* Dotted divider */}
+            <div className="my-5 border-t border-dashed border-warm-border" />
+
+            {/* Footer note */}
+            <p className="text-center text-[10px] uppercase tracking-[0.14em] text-warm-taupe/80">
+              tak fordi du spiller med
+            </p>
+          </div>
         </div>
       </div>
     </section>
