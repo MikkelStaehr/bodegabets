@@ -8,6 +8,7 @@ import TransferModal from './TransferModal'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
 import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey } from '@/types/cycling'
 import { formatCyclingDate, formatCyclingDeadline, shortRaceName, shortBlockName, PROFILE_LABELS, PROFILE_ICONS, RACE_TYPE_LABELS, CAT_LABELS, CAT_COLORS } from '@/lib/cyclingUtils'
+import { getStageDeadline, getStageStartTime, isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -331,15 +332,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const filledCount = Object.values(slots).filter((v) => v !== null).length
   const profileLabel = activeStage ? (PROFILE_LABELS[activeStage.profile ?? ''] ?? 'Endagsløb') : ''
 
-  // Lock deadline: stage start_date - 30min (dato-only bliver tolket som 09:00 UTC)
-  const deadlineStr = activeStage ? (() => {
-    const startStr = /^\d{4}-\d{2}-\d{2}$/.test(activeStage.start_date)
-      ? `${activeStage.start_date}T09:00:00Z`
-      : activeStage.start_date
-    const d = new Date(startStr)
-    d.setMinutes(d.getMinutes() - 30)
-    return d.toISOString()
-  })() : (lockDeadline ?? null)
+  // Lock deadline: stage start_date - 30min (helper håndterer dato-only / midnat UTC)
+  const deadlineStr = activeStage ? (getStageDeadline(activeStage.start_date)?.toISOString() ?? null) : (lockDeadline ?? null)
 
   return (
     <div style={{ background: theme.bg, borderRadius: 2, overflow: 'hidden', transition: 'background 0.3s' }}>
@@ -419,10 +413,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           const stageRace = races.find((r) => r.id === stage.race_id)
           const isFinished = stageRace?.status === 'finished'
           // Live: enten DB status 'active', eller start-tidspunkt er passeret og ikke finished
-          const startStr = /^\d{4}-\d{2}-\d{2}$/.test(stage.start_date)
-            ? `${stage.start_date}T09:00:00Z`
-            : stage.start_date
-          const hasStarted = new Date(startStr) <= new Date()
+          const stageStart = getStageStartTime(stage.start_date)
+          const hasStarted = stageStart != null && stageStart <= new Date()
           const isLive = stageRace?.status === 'active' || (hasStarted && !isFinished)
           const stageLocked = lockedStages.has(stage.id)
           const stageSlots = lineups[stage.id]
@@ -550,11 +542,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             .filter((s) => s.race_id === activeRace.id && s.start_date > rd)
             .sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
           if (!next) return false
-          const startStr = /^\d{4}-\d{2}-\d{2}$/.test(next.start_date)
-            ? `${next.start_date}T09:00:00Z`
-            : next.start_date
-          const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
-          return deadline > new Date()
+          const deadline = getStageDeadline(next.start_date)
+          return deadline != null && deadline > new Date()
         })
         if (relevantRestDays.length === 0) return null
         return (
@@ -831,13 +820,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
       </>)}
 
       {/* ── Alle lineups (vises når lineup er låst / race er live/finished) ─── */}
-      {activeStage && currentUserId && (isLocked || isFinished || (() => {
-        const startStr = /^\d{4}-\d{2}-\d{2}$/.test(activeStage.start_date)
-          ? `${activeStage.start_date}T09:00:00Z`
-          : activeStage.start_date
-        const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
-        return deadline < new Date()
-      })()) && (
+      {activeStage && currentUserId && (isLocked || isFinished || isStageDeadlinePassed(activeStage.start_date)) && (
         <div style={{ padding: '0 14px 14px' }}>
           <AllLineups gameId={gameId} stageId={activeStage.id} currentUserId={currentUserId} />
         </div>

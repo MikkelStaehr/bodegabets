@@ -29,6 +29,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -232,18 +233,13 @@ export async function POST(req: NextRequest, { params }: Props) {
     .eq('id', stage_id)
     .single()
 
-  // Check deadline: stage start_date - 30 min. Fail-closed: hvis vi mangler
-  // start_date kan vi ikke verificere deadline → afvis.
+  // Check deadline. Fail-closed: hvis start_date mangler kan vi ikke verificere.
   if (!stageData?.start_date) {
     return NextResponse.json({
       error: 'Etape-data mangler — kontakt admin'
     }, { status: 500 })
   }
-  const startStr = /^\d{4}-\d{2}-\d{2}$/.test(stageData.start_date)
-    ? `${stageData.start_date}T09:00:00Z`
-    : stageData.start_date
-  const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
-  if (deadline < new Date()) {
+  if (isStageDeadlinePassed(stageData.start_date)) {
     return NextResponse.json({ error: 'Deadline er passeret — lineup kan ikke ændres' }, { status: 400 })
   }
 

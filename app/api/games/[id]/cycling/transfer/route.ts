@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 import {
   getCurrentEffectiveSquad,
   MAX_TRANSFERS_PER_REST_DAY,
@@ -101,14 +102,8 @@ export async function POST(req: NextRequest, { params }: Props) {
     .limit(1)
 
   const nextStart = nextStages?.[0]?.start_date as string | undefined
-  if (nextStart) {
-    const startStr = /^\d{4}-\d{2}-\d{2}$/.test(nextStart)
-      ? `${nextStart}T09:00:00Z`
-      : nextStart
-    const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
-    if (new Date() > deadline) {
-      return NextResponse.json({ error: 'Transfer deadline er passeret' }, { status: 403 })
-    }
+  if (nextStart && isStageDeadlinePassed(nextStart)) {
+    return NextResponse.json({ error: 'Transfer deadline er passeret' }, { status: 403 })
   }
 
   // Find squad

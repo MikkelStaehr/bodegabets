@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -38,11 +39,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   if (!stage?.start_date) return NextResponse.json({ error: 'Stage ikke fundet' }, { status: 404 })
 
-  const startStr = /^\d{4}-\d{2}-\d{2}$/.test(stage.start_date)
-    ? `${stage.start_date}T09:00:00Z`
-    : stage.start_date
-  const deadline = new Date(new Date(startStr).getTime() - 30 * 60 * 1000)
-  if (deadline > new Date()) {
+  if (!isStageDeadlinePassed(stage.start_date)) {
     return NextResponse.json({ error: 'Deadline er ikke passeret endnu', locked: false }, { status: 403 })
   }
 

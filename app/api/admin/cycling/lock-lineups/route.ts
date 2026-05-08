@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req)
@@ -33,10 +34,7 @@ export async function POST(req: NextRequest) {
           .in('race_id', raceIds)
 
         const expiredStageIds = (stages ?? [])
-          .filter((s) => {
-            if (!s.start_date) return false
-            return new Date(new Date(s.start_date).getTime() - 30 * 60 * 1000) < now
-          })
+          .filter((s) => isStageDeadlinePassed(s.start_date, now))
           .map((s) => s.id)
 
         if (expiredStageIds.length > 0) {
@@ -60,9 +58,7 @@ export async function POST(req: NextRequest) {
 
     for (const lineup of allUnlocked ?? []) {
       const stage = lineup.cycling_stages as unknown as { start_date: string }
-      if (!stage?.start_date) continue
-      const deadline = new Date(new Date(stage.start_date).getTime() - 30 * 60 * 1000)
-      if (deadline < now) {
+      if (isStageDeadlinePassed(stage?.start_date, now)) {
         await supabaseAdmin.from('cycling_lineups').update({ is_locked: true }).eq('id', lineup.id)
         lockedCount++
       }

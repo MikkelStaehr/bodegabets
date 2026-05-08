@@ -829,7 +829,17 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
     for (const lineup of allUnlocked ?? []) {
       const stage = lineup.cycling_stages as unknown as { start_date: string }
       if (!stage?.start_date) continue
-      const deadline = new Date(new Date(stage.start_date).getTime() - 30 * 60 * 1000)
+      // Smart default: hvis tiden er præcis 00:00:00 UTC (PCS gemte kun datoen),
+      // brug 13:00 UTC (~15:00 CEST) som typisk cykel-start-tid.
+      const startRaw = new Date(stage.start_date)
+      if (
+        startRaw.getUTCHours() === 0 &&
+        startRaw.getUTCMinutes() === 0 &&
+        startRaw.getUTCSeconds() === 0
+      ) {
+        startRaw.setUTCHours(13, 0, 0, 0)
+      }
+      const deadline = new Date(startRaw.getTime() - 30 * 60 * 1000)
       if (deadline < now) {
         await supabaseAdmin.from('cycling_lineups').update({ is_locked: true }).eq('id', lineup.id)
         lockedCount++
