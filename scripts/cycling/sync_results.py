@@ -37,7 +37,7 @@ import re
 import json
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, date
 
 import httpx
 from bs4 import BeautifulSoup
@@ -194,26 +194,31 @@ def _parse_results_table(soup: BeautifulSoup) -> list[dict]:
         seen_slugs.add(pcs_slug)
 
         row = a.find_parent("tr")
+        # Guard: rider-links der IKKE sidder i en <tr> tilhører "Main favourites"
+        # eller lignende widgets på fremtidige/tomme stage-sider — ikke ægte results.
+        # Ignorér dem så vi ikke skaber syntetiske positions 1-12.
+        if not row:
+            continue
+
         position = len(results) + 1
         team = ""
         time_gap_seconds: int | None = None
         dnf = False
         abandon_type: str | None = None
 
-        if row:
-            cells = row.find_all("td")
-            if cells:
-                pos_text = cells[0].get_text(strip=True).lower()
-                if pos_text in ("dnf", "dns", "otl", "dsq"):
-                    dnf = True
-                    abandon_type = pos_text.upper()
-                    if pos_text == "otl":
-                        abandon_type = "OTL"  # outside time limit
-                    position = None  # type: ignore[assignment]
-                else:
-                    pos_num = re.sub(r"[^\d]", "", pos_text)
-                    if pos_num.isdigit():
-                        position = int(pos_num)
+        cells = row.find_all("td")
+        if cells:
+            pos_text = cells[0].get_text(strip=True).lower()
+            if pos_text in ("dnf", "dns", "otl", "dsq"):
+                dnf = True
+                abandon_type = pos_text.upper()
+                if pos_text == "otl":
+                    abandon_type = "OTL"  # outside time limit
+                position = None  # type: ignore[assignment]
+            else:
+                pos_num = re.sub(r"[^\d]", "", pos_text)
+                if pos_num.isdigit():
+                    position = int(pos_num)
 
             # Team link
             team_link = row.find("a", href=re.compile(r"^team/"))
@@ -843,7 +848,7 @@ def main() -> None:
             # Get all stages for these races
             resp = (
                 supabase.table("cycling_stages")
-                .select("id, race_id, stage_number")
+                .select("id, race_id, stage_number, start_date")
                 .in_("race_id", stage_races_ids)
                 .order("stage_number", desc=False)
                 .execute()
@@ -861,13 +866,28 @@ def main() -> None:
             for r in resp2.data or []:
                 has_results.add((r["race_id"], r["stage_number"]))
 
-            # Only keep stages without results
+            # Only keep stages der mangler results OG hvis start_date er passeret.
+            # Et fremtidigt stage's PCS-side har stadig rider-links (favourites,
+            # startlist) der parser'en ellers vil tolke som syntetiske resultater.
+            today = date.today()
+            skipped_future = 0
             for s in all_stages:
-                if (s["race_id"], s["stage_number"]) not in has_results:
-                    stages_by_race.setdefault(s["race_id"], []).append(s)
+                if (s["race_id"], s["stage_number"]) in has_results:
+                    continue
+                stage_date_raw = s.get("start_date")
+                if stage_date_raw:
+                    try:
+                        stage_date = date.fromisoformat(str(stage_date_raw)[:10])
+                        if stage_date > today:
+                            skipped_future += 1
+                            continue
+                    except ValueError:
+                        pass  # Hvis dato er ulæselig, lad scriptet forsøge alligevel
+                stages_by_race.setdefault(s["race_id"], []).append(s)
 
             total_stages = sum(len(v) for v in stages_by_race.values())
-            _log(f"  {len(all_stages)} total stages, {total_stages} pending (no results)")
+            extra = f", {skipped_future} skippet (fremtidige)" if skipped_future else ""
+            _log(f"  {len(all_stages)} total stages, {total_stages} pending (no results){extra}")
         except APIError as e:
             _warn(f"Failed to fetch stages: {e}")
 
