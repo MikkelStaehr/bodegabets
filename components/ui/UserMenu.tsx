@@ -2,20 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
-import { useRouter } from 'next/navigation'
 
 type Props = {
   username: string
   isAdmin?: boolean
 }
 
-const supabase = createBrowserSupabaseClient()
-
 export default function UserMenu({ username, isAdmin }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const router = useRouter()
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -26,22 +21,6 @@ export default function UserMenu({ username, isAdmin }: Props) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  async function handleLogout() {
-    // Forsøg server-signOut, men fail-safe: bare ryd lokal state hvis det hænger
-    try {
-      await Promise.race([
-        supabase.auth.signOut(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
-      ])
-    } catch {
-      // server-call hang/fejlede — tving lokal sign-out
-      try { await supabase.auth.signOut({ scope: 'local' }) } catch {}
-    }
-    // Force fuld page reload så al state er ren (router.push virker ikke altid pålideligt
-    // ved auth-state-skift hvis middleware lige har redirected)
-    window.location.href = '/'
-  }
 
   return (
     <div ref={ref} className="relative flex items-center gap-3">
@@ -93,12 +72,13 @@ export default function UserMenu({ username, isAdmin }: Props) {
               Admin
             </Link>
           )}
-          <button
-            onClick={handleLogout}
-            className="w-full text-left flex items-center gap-2 px-4 py-3 font-condensed text-xs uppercase tracking-[0.08em] text-vintage-red hover:bg-cream transition-colors"
+          <a
+            href="/logout"
+            onClick={() => setOpen(false)}
+            className="block w-full text-left flex items-center gap-2 px-4 py-3 font-condensed text-xs uppercase tracking-[0.08em] text-vintage-red hover:bg-cream transition-colors"
           >
             Log ud
-          </button>
+          </a>
         </div>
       )}
     </div>
