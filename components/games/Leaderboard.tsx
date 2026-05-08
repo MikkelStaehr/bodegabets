@@ -27,7 +27,40 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
   }, [gameId, entriesProp])
 
   if (loading) return null
-  if (entries.length === 0) return null
+
+  // Tjek om alle har 0 point — viser empty state hvis konkurrencen ikke er startet
+  const hasAnyScore = entries.some((e) => e.block_points > 0 || e.round_points > 0)
+
+  if (entries.length === 0 || !hasAnyScore) {
+    return (
+      <div>
+        <div style={{ marginBottom: 10 }}>
+          <span style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 11, letterSpacing: '0.14em',
+            textTransform: 'uppercase', color: '#6b6b6b',
+          }}>
+            Leaderboard
+          </span>
+        </div>
+        <div
+          style={{
+            background: '#FDFAF5', border: '1px dashed #C8BEA8',
+            borderRadius: 2, padding: '32px 16px', textAlign: 'center',
+          }}
+        >
+          <p style={{
+            fontFamily: "'Barlow', sans-serif", fontSize: 13,
+            color: '#9E9486', lineHeight: 1.5, margin: 0,
+          }}>
+            {entries.length === 0
+              ? 'Ingen spillere endnu'
+              : 'Konkurrencen starter når første kamp/etape er færdig'}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
