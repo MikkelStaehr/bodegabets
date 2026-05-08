@@ -15,13 +15,19 @@
   --font-body:      var(--ff-body,      'Barlow', sans-serif);
 
   /* ── Farver ─────────────────────────────────────────────── */
-  --color-cream:          #F5F0E8;
+  /* Værdier alignet med faktisk-brugte inline hex i komponenter
+     (cream brugt 92×, forest 126×, forest-light 65×) — sikrer at
+     bg-forest og bg-cream giver præcis samme farve som inline hex. */
+  --color-cream:          #F2EDE4;
   --color-cream-dark:     #EDE8DF;
-  --color-forest:         #1B3A2D;
-  --color-forest-light:   #2E5040;
+  --color-forest:         #1a3329;
+  --color-forest-light:   #2C4A3E;
+  --color-forest-dark:    #1C3829;
   --color-vintage-red:    #C8392B;
   --color-gold:           #C9A84C;
+  --color-gold-dark:      #B8963E;
   --color-warm-gray:      #5C5C4A;
+  --color-warm-taupe:     #7a7060;
   --color-warm-border:    #D4CFC4;
   --color-ink:            #1A1A1A;
 
@@ -37,26 +43,27 @@
 }
 
 /* ── CSS custom properties (tilgængelige overalt) ──────────── */
+/* Note: --color-* navne i @theme propagerer som CSS-vars automatisk.
+   :root her dækker legacy-aliaser (--bg-primary osv) som ældre kode
+   refererer via inline style{{ background: 'var(--bg-primary)' }}. */
 :root {
-  --bg-primary:    #F5F0E8;
+  --bg-primary:    #F2EDE4;
   --bg-secondary:  #EDE8DF;
-  --bg-dark:       #1B3A2D;
+  --bg-dark:       #1a3329;
   --text-primary:  #1A1A1A;
   --text-secondary:#5C5C4A;
-  --text-inverted: #F5F0E8;
+  --text-inverted: #F2EDE4;
   --accent-red:    #C8392B;
-  --accent-green:  #1B3A2D;
+  --accent-green:  #1a3329;
   --accent-gold:   #C9A84C;
   --border:        #D4CFC4;
-  --border-dark:   #2E5040;
-  --color-cream:      #F2EDE4;
+  --border-dark:   #2C4A3E;
   --color-dark-green: #1C3829;
   --color-card-green: #2C4A3E;
   --color-gold-muted: #C8B89A;
   --color-muted:      #9E9486;
   --color-success:    #4CAF50;
   --color-error:      #E53935;
-  --color-warm-taupe: #7a7060;
   --color-green-dark: #27ae60;
   --color-red-dark:   #c0392b;
 
