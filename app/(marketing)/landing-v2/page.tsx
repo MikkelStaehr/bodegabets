@@ -303,50 +303,52 @@ const EXAMPLE_ROUND = [
 
 function ChampionshipSection() {
   return (
-    <section className="bg-forest py-12 lg:py-24">
+    <section className="bg-forest py-16 lg:py-28">
       <div className="max-w-6xl mx-auto px-6 lg:px-8">
-        <div className="relative bg-gradient-to-br from-gold/15 to-gold/5 border border-gold/40 rounded-sm p-6 lg:p-10 overflow-hidden">
-          {/* Decorative rotated CHAMPIONSHIP */}
+        <div className="relative bg-gradient-to-br from-gold/15 to-gold/5 border border-gold/40 rounded-sm p-6 lg:p-12 overflow-hidden">
+          {/* Static BODEGA wordmark bottom-right (replaces rotated CHAMPIONSHIP) */}
           <span
             aria-hidden
-            className="absolute font-display font-black text-gold/[0.05] pointer-events-none select-none whitespace-nowrap"
+            className="absolute font-display font-black text-gold/[0.08] pointer-events-none select-none whitespace-nowrap leading-none"
             style={{
-              fontSize: '96px',
-              lineHeight: 1,
-              right: '-40px',
-              top: '50%',
-              transform: 'translateY(-50%) rotate(-90deg)',
-              transformOrigin: 'center',
+              fontSize: '120px',
+              right: '-12px',
+              bottom: '-32px',
             }}
           >
-            CHAMPIONSHIP
+            BODEGA
           </span>
 
-          <div className="relative grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-8 lg:gap-12">
+          <div className="relative grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-10 lg:gap-12">
+            {/* Left column */}
             <div>
-              <span className="inline-block font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold border border-gold/40 bg-gold/10 px-2 py-0.5 rounded-sm">
+              <span className="inline-block font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold mb-4">
                 Vores eget format
               </span>
-              <h3 className="mt-3 font-display font-bold text-cream text-[28px] lg:text-[38px] leading-tight">
+              <h3 className="font-display font-black text-cream text-[40px] lg:text-[64px] leading-[0.95]">
                 Bodega Championship
               </h3>
-              <p className="mt-4 font-body text-[15px] text-cream/80 leading-relaxed max-w-[520px]">
+
+              <p className="mt-6 font-display italic text-cream/95 text-[20px] lg:text-[22px] leading-snug max-w-[560px]">
+                Du behøver ikke følge én liga — du følger Europa.
+              </p>
+              <p className="mt-3 font-body text-[15px] text-cream/75 leading-relaxed max-w-[520px]">
                 Hver spillerunde samler vi automatisk rivalopgør, lokale derbys
-                og storkampe fra 20 af Europas største ligaer. Du behøver ikke
-                følge én liga — du følger Europa.
+                og storkampe fra 20 af Europas største ligaer.
               </p>
 
-              <div className="mt-8 grid grid-cols-3 gap-4 max-w-md">
+              {/* Stats — dramatic increase, vertical dividers between */}
+              <div className="mt-10 py-8 grid grid-cols-3 max-w-lg divide-x divide-gold/30">
                 {[
                   { value: '20', label: 'Ligaer' },
                   { value: '~130', label: 'Derbyer' },
                   { value: 'Auto', label: 'Spilrunder' },
-                ].map((stat) => (
-                  <div key={stat.label}>
-                    <div className="font-display font-bold text-gold text-[32px] lg:text-[36px] leading-none">
+                ].map((stat, i) => (
+                  <div key={stat.label} className={i === 0 ? 'pr-4' : 'px-4'}>
+                    <div className="font-display font-black text-gold text-[48px] lg:text-[72px] leading-none">
                       {stat.value}
                     </div>
-                    <div className="mt-1 font-condensed text-[10px] uppercase tracking-[0.14em] text-cream/55">
+                    <div className="mt-2 font-condensed font-semibold text-[10px] uppercase tracking-[0.14em] text-cream/55">
                       {stat.label}
                     </div>
                   </div>
@@ -354,28 +356,56 @@ function ChampionshipSection() {
               </div>
             </div>
 
-            <div className="bg-forest-dark/60 border border-gold/30 rounded-sm p-5">
-              <div className="font-condensed font-semibold text-[10px] uppercase tracking-[0.14em] text-gold/90 mb-4">
+            {/* Right column — example round, stronger contrast */}
+            <div className="bg-forest-dark border border-gold/50 rounded-sm p-6">
+              <div className="font-condensed font-bold text-[12px] uppercase tracking-[0.14em] text-gold mb-4">
                 Runde 27 · Auto-genereret
               </div>
               <ul
-                className="space-y-2.5 text-[12px] text-cream/85"
+                className="space-y-3 text-[12px] text-cream/85 leading-relaxed"
                 style={{ fontFamily: "'Courier New', monospace" }}
               >
-                {EXAMPLE_ROUND.map((match) => (
-                  <li
-                    key={match.name}
-                    className={
-                      'flex items-center justify-between gap-4 ' +
-                      (match.dim ? 'opacity-50' : '')
-                    }
-                  >
-                    <span>{match.name}</span>
-                    {match.code && <span className="text-gold/80">{match.code}</span>}
-                  </li>
-                ))}
+                {EXAMPLE_ROUND.map((match) => {
+                  if (match.dim) {
+                    return (
+                      <li
+                        key={match.name}
+                        className="flex items-center gap-2 text-gold/60 pt-1"
+                      >
+                        <span>{match.name}</span>
+                        <span aria-hidden>→</span>
+                      </li>
+                    )
+                  }
+                  return (
+                    <li
+                      key={match.name}
+                      className="flex items-center justify-between gap-4"
+                    >
+                      <span>{match.name}</span>
+                      {match.code && <span className="text-gold/80">{match.code}</span>}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
+          </div>
+
+          {/* CTA at bottom */}
+          <div className="relative mt-12 flex flex-col items-center gap-3">
+            <p className="font-body text-[13px] text-cream/60">
+              Inviteret til en allerede?{' '}
+              <Link href="/games" className="text-gold hover:text-cream transition-colors">
+                Find den her
+              </Link>
+              .
+            </p>
+            <Link
+              href="/games/new?sport=championship"
+              className="inline-flex items-center justify-center px-8 py-4 bg-gold text-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+            >
+              Start en championship-liga →
+            </Link>
           </div>
         </div>
       </div>
@@ -393,7 +423,7 @@ const HOW_STEPS = [
 
 function HowItWorksSection() {
   return (
-    <section className="bg-cream py-16 lg:py-28">
+    <section id="how-it-works" className="bg-cream py-16 lg:py-28">
       <div className="max-w-5xl mx-auto px-6 lg:px-8">
         <div className="text-center mb-12 lg:mb-16">
           <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
@@ -401,15 +431,46 @@ function HowItWorksSection() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 lg:gap-12">
-          {HOW_STEPS.map((step) => (
-            <div key={step.num} className="text-center sm:text-left">
-              <div className="font-display font-black text-gold leading-none text-[72px] lg:text-[96px]">
-                {step.num}
+        {/* Desktop horizontal timeline */}
+        <div className="hidden lg:flex items-center">
+          {HOW_STEPS.map((step, i) => (
+            <div key={step.num} className="contents">
+              <div className="flex-1 bg-cream/50 border border-forest/10 rounded-sm p-6 text-center">
+                <div className="font-display font-black text-gold leading-none text-[48px]">
+                  {step.num}
+                </div>
+                <div className="mt-2 font-condensed font-bold text-forest-dark text-[12px] uppercase tracking-widest">
+                  {step.label}
+                </div>
               </div>
-              <div className="mt-3 font-condensed font-bold text-forest text-[14px] uppercase tracking-[0.14em]">
-                {step.label}
+              {i < HOW_STEPS.length - 1 && (
+                <div
+                  aria-hidden
+                  className="flex-1 h-0 mx-3 border-t border-dotted border-gold/40"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Mobile vertical timeline */}
+        <div className="lg:hidden flex flex-col">
+          {HOW_STEPS.map((step, i) => (
+            <div key={step.num} className="contents">
+              <div className="bg-cream/50 border border-forest/10 rounded-sm p-6 text-center">
+                <div className="font-display font-black text-gold leading-none text-[48px]">
+                  {step.num}
+                </div>
+                <div className="mt-2 font-condensed font-bold text-forest-dark text-[12px] uppercase tracking-widest">
+                  {step.label}
+                </div>
               </div>
+              {i < HOW_STEPS.length - 1 && (
+                <div
+                  aria-hidden
+                  className="w-0 h-8 mx-auto border-l border-dotted border-gold/40"
+                />
+              )}
             </div>
           ))}
         </div>
@@ -423,18 +484,37 @@ function HowItWorksSection() {
 function SocialProofSection() {
   return (
     <section className="bg-cream pb-16 lg:pb-28">
-      <div className="max-w-2xl mx-auto px-6 lg:px-8 text-center">
-        <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
-          Hvor vi er
-        </span>
+      <div className="max-w-[600px] mx-auto px-6 lg:px-8">
+        {/* Hairline gold divider connects visually with How it works */}
+        <div aria-hidden className="h-px bg-gold/30 mb-12 lg:mb-16" />
 
-        <blockquote className="mt-5 font-display font-bold text-forest text-[26px] lg:text-[32px] leading-tight">
-          “Vi er lige startet. Fire vennegrupper bruger det allerede. Når VM
-          kicker af i sommer er treholdsskiftet på fabrikken med.”
+        <div className="text-center mb-5">
+          <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
+            Hvor vi er
+          </span>
+        </div>
+
+        <blockquote className="relative font-display text-forest text-[18px] lg:text-[22px] leading-snug">
+          {/* Hanging open-quote glyph in gold, overflows left margin */}
+          <span
+            aria-hidden
+            className="absolute font-display text-gold/70 select-none pointer-events-none leading-none"
+            style={{
+              left: '-0.4em',
+              top: '-0.25em',
+              fontSize: '3em',
+            }}
+          >
+            “
+          </span>
+          <span className="relative">
+            Vi er lige startet. Fire vennegrupper bruger det allerede. Når VM
+            kicker af i sommer er treholdsskiftet på fabrikken med.”
+          </span>
         </blockquote>
 
         <div
-          className="mt-6 text-[13px] text-gold-dark"
+          className="mt-3 text-[13px] text-gold-dark/80"
           style={{ fontFamily: "'Courier New', monospace" }}
         >
           — Mikkel &amp; Louise, grundlæggere
@@ -457,11 +537,11 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Kan jeg prøve det gratis først?',
-    a: '[Mikkel — fyld svar ind. Lad placeholder stå hvis ubesluttet.]',
+    a: 'Nej, og det er et bevidst valg. 1€ om måneden er allerede så lavt at en prøveperiode ville skabe friktion uden reel værdi. Hver krone går direkte til de licenser og data der driver platformen — uden dem, intet spil. Du forpligter dig ikke til mere end én måned ad gangen.',
   },
   {
     q: 'Hvor mange kan være med i en liga?',
-    a: '[Mikkel — fyld svar ind.]',
+    a: 'Op til 100 medlemmer per spil. Det er rigeligt til vennegruppen, kontoret, klubben eller hele treholdsskiftet på fabrikken.',
   },
   {
     q: 'Kan jeg spille begge spil samtidig?',

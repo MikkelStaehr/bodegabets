@@ -3,43 +3,43 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
-type Sport = {
-  id: 'fodbold' | 'cykling' | 'championship'
-  label: string
+type Slide = {
+  id: 'fodbold' | 'cykling'
+  pillLabel: string
   image: string
-  secondaryHeadline: string
+  headlinePrimary: string
+  headlineSecondary: string
+  subtitle: string
   ctaText: string
   ctaHref: string
 }
 
-const SPORTS: readonly Sport[] = [
+const SLIDES: readonly Slide[] = [
   {
     id: 'fodbold',
-    label: 'Fodbold',
-    image: '/img/herobannerfootball.jpg',
-    secondaryHeadline: 'Tip kampene.',
+    pillLabel: 'Fodbold',
+    image: '/landing/herobannerfootball.jpg',
+    headlinePrimary: 'Tip kampene.',
+    headlineSecondary: 'Følg hele Europa.',
+    subtitle:
+      'Forudsig kampe på tværs af 20 europæiske ligaer. Bet-vinduet låser 30 minutter før kickoff, point opdateres i realtid. Og hver runde samler vores Bodega Championship automatisk de største derbys og rivalopgør på tværs af Europa.',
     ctaText: 'Start en fodbold-liga →',
     ctaHref: '/games/new?sport=football',
   },
   {
     id: 'cykling',
-    label: 'Cykling',
-    image: '/img/herocyclingsprint.jpg',
-    secondaryHeadline: 'Følg hele sæsonen.',
+    pillLabel: 'Cykling',
+    image: '/landing/herocyclingsprint.jpg',
+    headlinePrimary: 'Saml drømmeholdet.',
+    headlineSecondary: 'Følg hele sæsonen.',
+    subtitle:
+      'Byg dit fantasy-hold til Grand Tours og monumenter. Otte roller per rytter, joker når det gælder, hold-bonusser og DNF-straffe. Point efter hver etape, ligaer hele sæsonen igennem.',
     ctaText: 'Start en cykel-liga →',
     ctaHref: '/games/new?sport=cycling',
   },
-  {
-    id: 'championship',
-    label: 'Bodega Championship',
-    image: '/img/walkoutpitchfootball.jpg',
-    secondaryHeadline: 'Følg Europa.',
-    ctaText: 'Start en championship-liga →',
-    ctaHref: '/games/new?sport=championship',
-  },
 ] as const
 
-const ROTATE_MS = 5000
+const ROTATE_MS = 6000
 
 type Props = { activeUserCount: number | null }
 
@@ -48,22 +48,31 @@ export default function HeroRotator({ activeUserCount }: Props) {
   const [autoRotate, setAutoRotate] = useState(true)
   const hoverRef = useRef(false)
 
-  // Auto-rotate hver 5s indtil bruger interagerer (klik eller hover)
+  // Hent fallback-image-paths som peger på offentligt /img-mappen i tilfælde af
+  // at /landing/-stien ikke findes endnu (placeholders kan mangle i build).
+  // Pollerer ikke — svg fallback skjules bare hvis billedet er gyldigt.
+
+  // Auto-rotate hver 6s indtil bruger interagerer — respekterer prefers-reduced-motion
   useEffect(() => {
     if (!autoRotate) return
+    if (typeof window === 'undefined') return
+
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduced) return
+
     const interval = setInterval(() => {
       if (hoverRef.current) return
-      setActive((v) => (v + 1) % SPORTS.length)
+      setActive((v) => (v + 1) % SLIDES.length)
     }, ROTATE_MS)
     return () => clearInterval(interval)
   }, [autoRotate])
 
-  function selectSport(i: number) {
+  function selectSlide(i: number) {
     setActive(i)
     setAutoRotate(false)
   }
 
-  const current = SPORTS[active]
+  const current = SLIDES[active]
 
   return (
     <section
@@ -72,7 +81,7 @@ export default function HeroRotator({ activeUserCount }: Props) {
       onMouseLeave={() => { hoverRef.current = false }}
     >
       {/* Background slides — crossfade with continuous Ken Burns */}
-      {SPORTS.map((slide, i) => {
+      {SLIDES.map((slide, i) => {
         const isActive = i === active
         return (
           <div
@@ -107,24 +116,24 @@ export default function HeroRotator({ activeUserCount }: Props) {
 
       {/* Content */}
       <div className="relative h-full max-w-6xl mx-auto px-6 lg:px-8 flex flex-col">
-        {/* Sport pills */}
+        {/* Sport pills (top-left) */}
         <div className="flex flex-wrap gap-2 pt-8">
-          {SPORTS.map((sport, i) => {
+          {SLIDES.map((slide, i) => {
             const isActive = i === active
             return (
               <button
-                key={sport.id}
+                key={slide.id}
                 type="button"
-                onClick={() => selectSport(i)}
+                onClick={() => selectSlide(i)}
                 aria-pressed={isActive}
                 className={
                   'px-4 py-1.5 rounded-full font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] transition-colors duration-300 cursor-pointer ' +
                   (isActive
-                    ? 'bg-gold text-forest border border-gold'
-                    : 'border border-cream/40 text-cream/60 hover:text-cream hover:border-cream/70')
+                    ? 'bg-gold text-forest'
+                    : 'bg-transparent border border-cream/40 text-cream/70 hover:text-cream hover:border-cream/70')
                 }
               >
-                {sport.label}
+                {slide.pillLabel}
               </button>
             )
           })}
@@ -138,21 +147,28 @@ export default function HeroRotator({ activeUserCount }: Props) {
           <h1
             className="font-display font-black text-cream text-[44px] lg:text-[80px] drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
             style={{ lineHeight: 0.95 }}
+            key={current.id + '-h'}
           >
-            <span className="block">To spil. Én pris.</span>
             <span
-              key={current.id}
-              className="block text-gold"
+              className="block"
               style={{ animation: 'fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both' }}
             >
-              {current.secondaryHeadline}
+              {current.headlinePrimary}
+            </span>
+            <span
+              className="block text-gold"
+              style={{ animation: 'fadeUp 0.6s 0.05s cubic-bezier(0.22,1,0.36,1) both' }}
+            >
+              {current.headlineSecondary}
             </span>
           </h1>
 
-          <p className="mt-6 font-body text-[18px] text-cream/85 max-w-[540px] leading-relaxed drop-shadow-[0_1px_6px_rgba(0,0,0,0.4)]">
-            Cykel-fantasy. Fodbold-tipping. Og vores eget Bodega Championship
-            med automatisk genererede spilrunder fra 20 af Europas største
-            ligaer.
+          <p
+            className="mt-6 font-body text-[18px] text-cream/85 max-w-[560px] leading-relaxed drop-shadow-[0_1px_6px_rgba(0,0,0,0.4)]"
+            key={current.id + '-p'}
+            style={{ animation: 'fadeUp 0.6s 0.1s cubic-bezier(0.22,1,0.36,1) both' }}
+          >
+            {current.subtitle}
           </p>
 
           {/* CTA row */}
@@ -161,15 +177,15 @@ export default function HeroRotator({ activeUserCount }: Props) {
               href={current.ctaHref}
               key={current.id + '-cta'}
               className="inline-flex items-center justify-center px-8 py-4 bg-gold text-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity"
-              style={{ animation: 'fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both' }}
+              style={{ animation: 'fadeUp 0.5s 0.15s cubic-bezier(0.22,1,0.36,1) both' }}
             >
               {current.ctaText}
             </Link>
             <Link
-              href="#products"
+              href="#how-it-works"
               className="inline-flex items-center justify-center px-8 py-4 bg-transparent border border-cream/50 text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/80 transition-colors backdrop-blur-sm"
             >
-              Se de to spil
+              Se hvordan det virker
             </Link>
 
             {activeUserCount !== null && activeUserCount >= 10 && (
