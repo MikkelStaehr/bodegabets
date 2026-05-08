@@ -112,33 +112,49 @@ export async function GET(req: NextRequest, { params }: Props) {
     scoresByLineup.get(key)!.push(s)
   }
 
-  // Fetch race results — kun for løb med status 'finished'
+  // Fetch race results for lineup riders. Resultater er per (race, stage,
+  // rider) i cycling_results, så vi mapper på den sammensatte nøgle —
+  // ellers ville alle stage-races dele én lookup per race og overskrive
+  // hinanden. Bemærk: før filtrerede vi på status='finished' her, hvilket
+  // skjulte stage 1-resultater i en active Grand Tour — drop'et bevidst.
   const allRiderIds = [...new Set((lineupRiders ?? []).map((lr) => lr.rider_id))]
+  const allRaceIds = [...new Set(lineups.map((l) => l.race_id))]
 
-  // Find finished race IDs only
-  const { data: finishedRaces } = await supabaseAdmin
-    .from('cycling_races')
-    .select('id')
-    .in('id', lineups.map((l) => l.race_id))
-    .eq('status', 'finished')
+  // Map nøglet på (race_id, stage_number) → Map<rider_id, result>.
+  // For stages-races: hver stage får sin egen entry. For one-day races:
+  // stage_number = 1 (PCS-konvention).
+  const resultsByStage = new Map<
+    string,
+    Map<string, { position: number | null; dnf: boolean; abandon_type: string | null; jersey: string | null }>
+  >()
 
-  const finishedRaceIds = (finishedRaces ?? []).map((r) => r.id)
-
-  let resultsByRace = new Map<string, Map<string, { position: number | null; dnf: boolean; abandon_type: string | null; jersey: string | null }>>()
-  if (allRiderIds.length > 0 && finishedRaceIds.length > 0) {
+  if (allRiderIds.length > 0 && allRaceIds.length > 0) {
     const { data: raceResults } = await supabaseAdmin
       .from('cycling_results')
-      .select('race_id, rider_id, position, dnf, abandon_type, jersey')
-      .in('race_id', finishedRaceIds)
+      .select('race_id, stage_number, rider_id, position, dnf, abandon_type, jersey')
+      .in('race_id', allRaceIds)
       .in('rider_id', allRiderIds)
 
     for (const rr of raceResults ?? []) {
-      const raceKey = String(rr.race_id)
-      if (!resultsByRace.has(raceKey)) resultsByRace.set(raceKey, new Map())
-      resultsByRace.get(raceKey)!.set(String(rr.rider_id), {
+      const stageKey = `${rr.race_id}::${rr.stage_number}`
+      if (!resultsByStage.has(stageKey)) resultsByStage.set(stageKey, new Map())
+      resultsByStage.get(stageKey)!.set(String(rr.rider_id), {
         position: rr.position, dnf: rr.dnf ?? false,
         abandon_type: rr.abandon_type ?? null, jersey: rr.jersey ?? null,
       })
+    }
+  }
+
+  // Vi skal kunne mappe lineup.stage_id → stage_number for at slå op i resultsByStage.
+  const stageIds = [...new Set(lineups.map((l) => l.stage_id).filter((s): s is string => !!s))]
+  const stageNumberById = new Map<string, number>()
+  if (stageIds.length > 0) {
+    const { data: stageRows } = await supabaseAdmin
+      .from('cycling_stages')
+      .select('id, stage_number')
+      .in('id', stageIds)
+    for (const s of stageRows ?? []) {
+      stageNumberById.set(String(s.id), s.stage_number)
     }
   }
 
@@ -174,10 +190,18 @@ export async function GET(req: NextRequest, { params }: Props) {
       total_points: Number(s.total_points),
     }))
 
-    const raceResults = resultsByRace.get(String(lineup.race_id))
+    // For stage-races: brug lineup.stage_id → stage_number. For one-day
+    // (ingen stage_id): default til 1 (PCS-konvention).
+    const lineupStageNumber = lineup.stage_id
+      ? stageNumberById.get(String(lineup.stage_id)) ?? null
+      : 1
+    const stageResults =
+      lineupStageNumber != null
+        ? resultsByStage.get(`${lineup.race_id}::${lineupStageNumber}`)
+        : undefined
     const resultsArr = riders
       .map((r) => {
-        const rr = raceResults?.get(String(r.rider_id))
+        const rr = stageResults?.get(String(r.rider_id))
         return rr ? { rider_id: r.rider_id, ...rr } : null
       })
       .filter((r): r is NonNullable<typeof r> => r !== null)
