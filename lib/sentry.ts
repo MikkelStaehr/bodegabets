@@ -1,39 +1,33 @@
 /**
- * Sentry skeleton — aktiveres når NEXT_PUBLIC_SENTRY_DSN sættes.
- *
- * Setup-vejledning når du er klar:
- *   1. Sign up på sentry.io → New Project → Next.js → kopiér DSN
- *   2. Tilføj til .env.local + Vercel:
- *        NEXT_PUBLIC_SENTRY_DSN=https://...@sentry.io/...
- *        SENTRY_AUTH_TOKEN=...   (til source maps upload)
- *        SENTRY_ORG=din-org
- *        SENTRY_PROJECT=bodega-bets
- *   3. Installer pakker:
- *        npm install @sentry/nextjs
- *   4. Kør Sentry's CLI-wizard (anbefalet):
- *        npx @sentry/wizard@latest -i nextjs
- *      Den opretter sentry.client.config.ts, sentry.server.config.ts og
- *      sentry.edge.config.ts automatisk.
- *   5. Bygget kommer auto til at uploade source maps + tunnel /monitoring
- *      route bypasser ad-blockers.
- *
- * Indtil DSN er sat returnerer denne helper bare null/no-op så koden
- * kan kalde captureException(err) trygt uden at crashe.
+ * Sentry helpers — wrapper rundt om @sentry/nextjs med graceful fallback
+ * når DSN ikke er sat (lokal dev uden Sentry).
  */
 
-export function captureException(_err: unknown, _context?: Record<string, unknown>): void {
-  // No-op indtil Sentry er installeret.
-  // Når @sentry/nextjs er på plads, importér og brug:
-  //   import * as Sentry from '@sentry/nextjs'
-  //   Sentry.captureException(_err, { extra: _context })
+import * as Sentry from '@sentry/nextjs'
+
+export function captureException(err: unknown, context?: Record<string, unknown>): void {
   if (process.env.NODE_ENV !== 'production') {
-    console.error('[captureException]', _err, _context)
+    console.error('[captureException]', err, context)
   }
+  Sentry.captureException(err, context ? { extra: context } : undefined)
 }
 
-export function captureMessage(_msg: string, _level: 'info' | 'warning' | 'error' = 'info'): void {
-  // No-op indtil Sentry er installeret.
+export function captureMessage(msg: string, level: 'info' | 'warning' | 'error' = 'info'): void {
   if (process.env.NODE_ENV !== 'production') {
-    console.log(`[${_level}]`, _msg)
+    console.log(`[${level}]`, msg)
   }
+  Sentry.captureMessage(msg, level)
+}
+
+/** Tilføj user-context så fejl tagges per bruger (overhold privacy: kun id + email-domain). */
+export function setUser(userId: string, email?: string): void {
+  Sentry.setUser({
+    id: userId,
+    // Kun email-domæne, ikke fuld adresse — privacy first
+    email_domain: email?.split('@')[1],
+  })
+}
+
+export function clearUser(): void {
+  Sentry.setUser(null)
 }
