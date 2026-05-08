@@ -7,6 +7,7 @@ import CookieBanner from '@/components/layout/CookieBanner'
 import NavbarScrollHandler from '@/components/layout/NavbarScrollHandler'
 import OnboardingProvider from '@/components/layout/OnboardingProvider'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { headers } from 'next/headers'
 import './globals.css'
 
 const playfair = Playfair_Display({
@@ -96,19 +97,27 @@ export default async function RootLayout({
     ? await supabase.from('profiles').select('username, points, is_admin, onboarding_completed').eq('id', user.id).single()
     : { data: null }
 
+  // Marketing-ruter (fx /landing-v2) renderer deres egen top bar + footer og
+  // skal ikke have global Navbar/Footer ovenpå. Pathname kommer fra middleware.
+  const headersList = await headers()
+  const pathname = headersList.get('x-pathname') ?? ''
+  const isMarketing = pathname.startsWith('/landing-v2')
+
   return (
     <html
       lang="da"
       className={`${playfair.variable} ${barlowCondensed.variable} ${barlow.variable}`}
     >
       <body className="antialiased">
-        <NavbarScrollHandler />
+        {!isMarketing && <NavbarScrollHandler />}
         <ToastProvider>
-          <div className="min-h-screen bg-cream flex flex-col">
-            <Navbar
-              username={profile?.username}
-              isAdmin={(profile as { is_admin?: boolean } | null)?.is_admin === true}
-            />
+          <div className={`min-h-screen flex flex-col ${isMarketing ? 'bg-forest' : 'bg-cream'}`}>
+            {!isMarketing && (
+              <Navbar
+                username={profile?.username}
+                isAdmin={(profile as { is_admin?: boolean } | null)?.is_admin === true}
+              />
+            )}
             <main className="flex-1">
               {user ? (
                 <OnboardingProvider onboardingCompleted={profile?.onboarding_completed ?? true}>
@@ -118,7 +127,7 @@ export default async function RootLayout({
                 children
               )}
             </main>
-            <Footer />
+            {!isMarketing && <Footer />}
             <CookieBanner />
           </div>
         </ToastProvider>

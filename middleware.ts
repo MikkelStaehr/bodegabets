@@ -2,7 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  let res = NextResponse.next({ request: req })
+  // Eksponér pathname til server components (root layout læser denne for at
+  // skjule global Navbar/Footer på marketing-ruter som /landing-v2). Sættes
+  // på request-headers så den overlever Supabase' cookie-callback der
+  // reassigner res.
+  const forwardedHeaders = new Headers(req.headers)
+  forwardedHeaders.set('x-pathname', req.nextUrl.pathname)
+
+  let res = NextResponse.next({ request: { headers: forwardedHeaders } })
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -13,7 +20,7 @@ export async function middleware(req: NextRequest) {
       getAll: () => req.cookies.getAll(),
       setAll: (cookiesToSet) => {
         cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
-        res = NextResponse.next({ request: req })
+        res = NextResponse.next({ request: { headers: forwardedHeaders } })
         cookiesToSet.forEach(({ name, value, options }) =>
           res.cookies.set(name, value, options)
         )
