@@ -8,7 +8,15 @@ import Link from 'next/link'
 type LeagueId = 'pl' | 'la-liga' | 'serie-a' | 'bodega'
 type Tip = '1' | 'X' | '2'
 
-type Match = { home: string; away: string; derby?: string }
+type Match = {
+  home: string
+  away: string
+  homeShort: string
+  awayShort: string
+  kickoff: string
+  derby?: string // for Bodega Championship rivalries
+  multiplier?: string // e.g. "1.5×"
+}
 
 type League = {
   id: LeagueId
@@ -18,21 +26,9 @@ type League = {
 }
 
 const LEAGUES: readonly League[] = [
-  {
-    id: 'pl',
-    name: 'Premier League',
-    description: 'Engelsk topfodbold. 20 hold, 38 spillerunder.',
-  },
-  {
-    id: 'la-liga',
-    name: 'La Liga',
-    description: 'Spansk topfodbold. El Clásico, Sevilla-derby og mere.',
-  },
-  {
-    id: 'serie-a',
-    name: 'Serie A',
-    description: "Italiensk topfodbold. Derby della Madonnina, Derby d'Italia.",
-  },
+  { id: 'pl', name: 'Premier League', description: 'Engelsk topfodbold. 20 hold, 38 spillerunder.' },
+  { id: 'la-liga', name: 'La Liga', description: 'Spansk topfodbold. El Clásico, Sevilla-derby og mere.' },
+  { id: 'serie-a', name: 'Serie A', description: "Italiensk topfodbold. Derby della Madonnina, Derby d'Italia." },
   {
     id: 'bodega',
     name: 'Bodega Championship',
@@ -43,70 +39,67 @@ const LEAGUES: readonly League[] = [
 
 const MATCHES: Record<LeagueId, readonly Match[]> = {
   pl: [
-    { home: 'Liverpool', away: 'Arsenal' },
-    { home: 'Manchester United', away: 'Chelsea' },
-    { home: 'Tottenham', away: 'Newcastle' },
-    { home: 'Aston Villa', away: 'Brighton' },
+    { home: 'Liverpool', away: 'Arsenal', homeShort: 'Liverpool', awayShort: 'Arsenal', kickoff: 'Lør 17:30' },
+    { home: 'Manchester United', away: 'Chelsea', homeShort: 'Man Utd', awayShort: 'Chelsea', kickoff: 'Søn 14:00' },
+    { home: 'Tottenham', away: 'Newcastle', homeShort: 'Tottenham', awayShort: 'Newcastle', kickoff: 'Søn 16:30' },
+    { home: 'Aston Villa', away: 'Brighton', homeShort: 'Villa', awayShort: 'Brighton', kickoff: 'Man 21:00' },
   ],
   'la-liga': [
-    { home: 'Real Madrid', away: 'Atlético' },
-    { home: 'Barcelona', away: 'Sevilla' },
-    { home: 'Valencia', away: 'Villarreal' },
-    { home: 'Real Sociedad', away: 'Athletic Bilbao' },
+    { home: 'Real Madrid', away: 'Atlético', homeShort: 'Real Madrid', awayShort: 'Atlético', kickoff: 'Lør 21:00' },
+    { home: 'Barcelona', away: 'Sevilla', homeShort: 'Barcelona', awayShort: 'Sevilla', kickoff: 'Søn 18:30' },
+    { home: 'Valencia', away: 'Villarreal', homeShort: 'Valencia', awayShort: 'Villarreal', kickoff: 'Søn 16:15' },
+    { home: 'Real Sociedad', away: 'Athletic Bilbao', homeShort: 'R. Sociedad', awayShort: 'A. Bilbao', kickoff: 'Man 21:00' },
   ],
   'serie-a': [
-    { home: 'Inter', away: 'Juventus' },
-    { home: 'AC Milan', away: 'Roma' },
-    { home: 'Napoli', away: 'Lazio' },
-    { home: 'Fiorentina', away: 'Bologna' },
+    { home: 'Inter', away: 'Juventus', homeShort: 'Inter', awayShort: 'Juventus', kickoff: 'Lør 20:45' },
+    { home: 'AC Milan', away: 'Roma', homeShort: 'Milan', awayShort: 'Roma', kickoff: 'Søn 18:00' },
+    { home: 'Napoli', away: 'Lazio', homeShort: 'Napoli', awayShort: 'Lazio', kickoff: 'Søn 20:45' },
+    { home: 'Fiorentina', away: 'Bologna', homeShort: 'Fiorentina', awayShort: 'Bologna', kickoff: 'Man 20:45' },
   ],
   bodega: [
-    { home: 'Real Madrid', away: 'Barcelona', derby: 'El Clásico' },
-    { home: 'Manchester Utd', away: 'Manchester City', derby: 'Manchester Derby' },
-    { home: 'Dortmund', away: 'Bayern', derby: 'Der Klassiker' },
-    { home: 'Inter', away: 'Milan', derby: 'Derby della Madonnina' },
+    { home: 'Real Madrid', away: 'Barcelona', homeShort: 'Real Madrid', awayShort: 'Barcelona', kickoff: 'Lør 21:00', derby: 'El Clásico', multiplier: '1.5×' },
+    { home: 'Manchester Utd', away: 'Manchester City', homeShort: 'Man Utd', awayShort: 'Man City', kickoff: 'Søn 17:30', derby: 'Manchester Derby', multiplier: '1.3×' },
+    { home: 'Dortmund', away: 'Bayern', homeShort: 'Dortmund', awayShort: 'Bayern', kickoff: 'Lør 18:30', derby: 'Der Klassiker', multiplier: '1.4×' },
+    { home: 'Inter', away: 'Milan', homeShort: 'Inter', awayShort: 'Milan', kickoff: 'Søn 20:45', derby: 'Derby della Madonnina', multiplier: '1.4×' },
   ],
 } as const
 
-const ODDS: Record<Tip, string> = { '1': '48%', X: '22%', '2': '30%' }
+// 3 first matches "correct", last "incorrect" — uanset user's faktiske tips.
+const CORRECT_FLAGS: readonly boolean[] = [true, true, true, false]
+
+// "Correct" outcome per match index — bruges til at vise resultat-tegnet
+const CORRECT_OUTCOMES: readonly Tip[] = ['1', '1', 'X', '1']
+// Faked scores i step 3 så det ligner finished matches i AfgivBets
+const FAKE_SCORES: readonly { home: number; away: number }[] = [
+  { home: 2, away: 0 },
+  { home: 3, away: 1 },
+  { home: 1, away: 1 },
+  { home: 0, away: 2 },
+]
 
 type LeaderRow = {
   pos: number
   name: string
-  pts: number
-  change: 'up' | 'down' | 'same' | 'new'
-  delta?: number
+  roundWins: number
+  roundPoints: number
+  blockWins: number
+  blockPoints: number
   isUser?: boolean
 }
 
 const LEADERBOARD: readonly LeaderRow[] = [
-  { pos: 1, name: 'Zidane', pts: 47, change: 'up', delta: 2 },
-  { pos: 2, name: 'Dig', pts: 43, change: 'new', isUser: true },
-  { pos: 3, name: 'Beckham', pts: 39, change: 'same' },
-  { pos: 4, name: 'Maldini', pts: 38, change: 'down', delta: 1 },
-  { pos: 5, name: 'Henry', pts: 35, change: 'same' },
-  { pos: 6, name: 'Ronaldinho "DNF"', pts: 28, change: 'down', delta: 3 },
+  { pos: 1, name: 'Zidane', roundWins: 3, roundPoints: 14, blockWins: 2, blockPoints: 47 },
+  { pos: 2, name: 'Dig', roundWins: 2, roundPoints: 9, blockWins: 1, blockPoints: 43, isUser: true },
+  { pos: 3, name: 'Beckham', roundWins: 1, roundPoints: 7, blockWins: 1, blockPoints: 39 },
+  { pos: 4, name: 'Maldini', roundWins: 1, roundPoints: 6, blockWins: 0, blockPoints: 38 },
+  { pos: 5, name: 'Henry', roundWins: 0, roundPoints: 5, blockWins: 0, blockPoints: 35 },
+  { pos: 6, name: 'Ronaldinho', roundWins: 0, roundPoints: 3, blockWins: 0, blockPoints: 28 },
 ] as const
 
 const CHAT_MESSAGES = [
-  {
-    avatar: 'Z',
-    avatarBg: 'bg-gold/20 text-gold',
-    name: 'Zidane',
-    time: 'for 12 min siden',
-    body: 'haha Beckham tippede igen Spurs hjemme 😅',
-  },
-  {
-    avatar: 'B',
-    avatarBg: 'bg-cream/20 text-cream',
-    name: 'Beckham',
-    time: 'for 8 min siden',
-    body: 'hold kæft jeg holder fast i mit system',
-  },
+  { avatar: 'Z', avatarBg: '#B8963E', avatarFg: '#F2EDE4', name: 'Zidane', time: 'for 12 min siden', body: 'haha Beckham tippede igen Spurs hjemme 😅' },
+  { avatar: 'B', avatarBg: '#2C4A3E', avatarFg: '#F2EDE4', name: 'Beckham', time: 'for 8 min siden', body: 'hold kæft jeg holder fast i mit system' },
 ] as const
-
-// 3 first matches "correct", last "incorrect" — regardless of user's tips.
-const CORRECT_FLAGS: readonly boolean[] = [true, true, true, false]
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
@@ -124,13 +117,11 @@ export default function DemoModal({ open, onClose }: Props) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const previousActiveRef = useRef<HTMLElement | null>(null)
 
-  // Detect prefers-reduced-motion once
   useEffect(() => {
     if (typeof window === 'undefined') return
     setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   }, [])
 
-  // Mount/unmount with exit animation
   useEffect(() => {
     if (open) {
       setMounted(true)
@@ -140,7 +131,6 @@ export default function DemoModal({ open, onClose }: Props) {
       const t = window.setTimeout(() => {
         setMounted(false)
         setExiting(false)
-        // Reset state when fully closed
         setStep(1)
         setSelectedLeague(null)
         setTips({})
@@ -149,10 +139,8 @@ export default function DemoModal({ open, onClose }: Props) {
     }
   }, [open, mounted, reducedMotion])
 
-  // Body scroll lock + ESC + initial focus
   useEffect(() => {
     if (!mounted) return
-
     previousActiveRef.current = document.activeElement as HTMLElement | null
     const original = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -162,10 +150,9 @@ export default function DemoModal({ open, onClose }: Props) {
         e.preventDefault()
         onClose()
       } else if (e.key === 'Tab') {
-        // Focus trap inside dialog
         if (!dialogRef.current) return
         const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         )
         if (focusables.length === 0) return
         const first = focusables[0]
@@ -180,20 +167,13 @@ export default function DemoModal({ open, onClose }: Props) {
       }
     }
     document.addEventListener('keydown', handleKey)
-
-    // Initial focus on close button
-    const focusTimer = window.setTimeout(() => {
-      closeBtnRef.current?.focus()
-    }, reducedMotion ? 0 : 50)
+    const focusTimer = window.setTimeout(() => closeBtnRef.current?.focus(), reducedMotion ? 0 : 50)
 
     return () => {
       document.body.style.overflow = original
       document.removeEventListener('keydown', handleKey)
       window.clearTimeout(focusTimer)
-      // Restore focus to triggering element on close
-      if (previousActiveRef.current && typeof previousActiveRef.current.focus === 'function') {
-        previousActiveRef.current.focus()
-      }
+      if (previousActiveRef.current?.focus) previousActiveRef.current.focus()
     }
   }, [mounted, onClose, reducedMotion])
 
@@ -201,12 +181,12 @@ export default function DemoModal({ open, onClose }: Props) {
 
   const currentLeagueMatches = selectedLeague ? MATCHES[selectedLeague] : []
   const tipsCount = Object.keys(tips).length
+  const currentLeague = selectedLeague ? LEAGUES.find((l) => l.id === selectedLeague)! : null
 
   function selectLeague(id: LeagueId) {
     setSelectedLeague(id)
     setTips({})
   }
-
   function setTip(idx: number, t: Tip) {
     setTips((prev) => ({ ...prev, [idx]: t }))
   }
@@ -217,105 +197,89 @@ export default function DemoModal({ open, onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="demo-step-heading"
-      className={`fixed inset-0 z-[100] flex flex-col bg-forest/95 backdrop-blur-md ${
+      className={`fixed inset-0 z-[100] flex items-stretch sm:items-center sm:justify-center bg-forest/80 backdrop-blur-md ${
         exiting ? 'demo-modal-exiting' : 'demo-modal-entering'
       }`}
       onClick={(e) => {
-        // Close when clicking on the backdrop (the dialog root itself)
         if (e.target === e.currentTarget) onClose()
       }}
     >
       <DemoStyles reducedMotion={reducedMotion} />
 
-      {/* Top bar: skip + close */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => setStep(4)}
-          className="font-condensed font-semibold text-[11px] sm:text-[12px] uppercase tracking-widest text-gold/80 hover:text-gold transition-colors min-h-[44px] inline-flex items-center"
-        >
-          Spring til slutningen →
-        </button>
-
-        <button
-          ref={closeBtnRef}
-          type="button"
-          onClick={onClose}
-          aria-label="Luk demo"
-          className="w-11 h-11 inline-flex items-center justify-center rounded-sm text-cream/70 hover:text-cream hover:bg-cream/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" d="M6 6l12 12M6 18L18 6" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Step indicator */}
-      <div className="flex items-center justify-center gap-2 pb-4 flex-shrink-0">
-        {[1, 2, 3, 4].map((n) => (
-          <span
-            key={n}
-            aria-hidden
-            className={
-              'rounded-full transition-all duration-300 ' +
-              (n === step
-                ? 'w-2.5 h-2.5 bg-gold'
-                : 'w-1.5 h-1.5 bg-cream/30')
-            }
-          />
-        ))}
-      </div>
-
-      {/* Step content — scrollable area */}
+      {/* Modal content frame — full-screen on mobile, contained on sm+ */}
       <div
-        className="flex-1 overflow-y-auto overscroll-contain"
+        className="relative bg-cream w-full sm:max-w-3xl sm:max-h-[92vh] sm:rounded-sm flex flex-col overflow-hidden"
+        style={{ fontFamily: "'Barlow', sans-serif" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-32 sm:pb-24">
-          <div
-            key={step}
-            className="demo-step-anim"
-            aria-live="polite"
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 flex-shrink-0 border-b border-warm-border bg-cream">
+          <button
+            type="button"
+            onClick={() => setStep(4)}
+            className="font-condensed font-semibold text-[11px] sm:text-[12px] uppercase tracking-widest text-gold-dark hover:text-forest transition-colors min-h-[44px] inline-flex items-center"
           >
-            {step === 1 && (
-              <Step1
-                selectedLeague={selectedLeague}
-                onSelect={selectLeague}
-              />
+            Spring til slutningen →
+          </button>
+
+          <button
+            ref={closeBtnRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Luk demo"
+            className="w-11 h-11 inline-flex items-center justify-center rounded-sm text-warm-gray hover:text-ink hover:bg-warm-border/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" d="M6 6l12 12M6 18L18 6" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-2 py-3 flex-shrink-0 bg-cream">
+          {[1, 2, 3, 4].map((n) => (
+            <span
+              key={n}
+              aria-hidden
+              className={
+                'rounded-full transition-all duration-300 ' +
+                (n === step ? 'w-2.5 h-2.5 bg-gold-dark' : 'w-1.5 h-1.5 bg-warm-border')
+              }
+            />
+          ))}
+        </div>
+
+        {/* Step content — scrollable */}
+        <div className="flex-1 overflow-y-auto overscroll-contain bg-cream">
+          <div key={step} className="demo-step-anim" aria-live="polite">
+            {step === 1 && <Step1 selectedLeague={selectedLeague} onSelect={selectLeague} />}
+            {step === 2 && currentLeague && (
+              <Step2 league={currentLeague} matches={currentLeagueMatches} tips={tips} onTip={setTip} />
             )}
-            {step === 2 && selectedLeague && (
-              <Step2
-                league={LEAGUES.find((l) => l.id === selectedLeague)!}
-                matches={currentLeagueMatches}
-                tips={tips}
-                onTip={setTip}
-              />
+            {step === 3 && currentLeague && (
+              <Step3 league={currentLeague} matches={currentLeagueMatches} tips={tips} reducedMotion={reducedMotion} />
             )}
-            {step === 3 && selectedLeague && (
-              <Step3
-                matches={currentLeagueMatches}
-                reducedMotion={reducedMotion}
-              />
-            )}
-            {step === 4 && (
-              <Step4 onClose={onClose} />
+            {step === 4 && currentLeague && <Step4 league={currentLeague} onClose={onClose} />}
+            {step === 4 && !currentLeague && (
+              // Skip-link case: ingen liga valgt — vis Bodega som default
+              <Step4 league={LEAGUES[3]} onClose={onClose} />
             )}
           </div>
         </div>
-      </div>
 
-      {/* Sticky footer nav */}
-      <FooterNav
-        step={step}
-        canAdvance={
-          (step === 1 && selectedLeague !== null) ||
-          (step === 2 && tipsCount === 4) ||
-          step === 3
-        }
-        onBack={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3 | 4) : s))}
-        onNext={() => setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : s))}
-        onClose={onClose}
-      />
+        {/* Sticky footer nav */}
+        <FooterNav
+          step={step}
+          canAdvance={
+            (step === 1 && selectedLeague !== null) ||
+            (step === 2 && tipsCount === 4) ||
+            step === 3
+          }
+          onBack={() => setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3 | 4) : s))}
+          onNext={() => setStep((s) => (s < 4 ? ((s + 1) as 1 | 2 | 3 | 4) : s))}
+          onClose={onClose}
+        />
+      </div>
     </div>
   )
 }
@@ -330,14 +294,14 @@ function Step1({
   onSelect: (id: LeagueId) => void
 }) {
   return (
-    <>
+    <div className="px-4 sm:px-6 pt-4 pb-8">
       <StepHeader
         tag="Trin 1 af 4"
         title="Vælg din liga."
         subtitle="Spil på din yndlingsliga, eller lad Bodega Championship samle ugens største kampe fra hele Europa."
       />
 
-      <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-6 lg:mt-10">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
         {LEAGUES.map((league) => {
           const isSelected = selectedLeague === league.id
           return (
@@ -347,25 +311,23 @@ function Step1({
                 onClick={() => onSelect(league.id)}
                 aria-pressed={isSelected}
                 className={
-                  'w-full text-left p-4 lg:p-6 rounded-sm transition-all min-h-[88px] relative ' +
-                  (league.isFlagship && !isSelected
-                    ? 'bg-cream/5 border-2 border-gold/60 hover:border-gold/80 '
-                    : '') +
-                  (!league.isFlagship && !isSelected
-                    ? 'bg-cream/5 border border-cream/20 hover:border-gold/60 '
-                    : '') +
-                  (isSelected ? 'bg-gold/10 border-2 border-gold ' : '')
+                  'w-full text-left p-4 sm:p-5 rounded-sm transition-colors min-h-[88px] relative bg-white ' +
+                  (isSelected
+                    ? 'border-2 border-forest shadow-[0_0_0_1px_#1a3329] '
+                    : league.isFlagship
+                      ? 'border-2 border-gold-dark/60 hover:border-gold-dark '
+                      : 'border border-warm-border hover:border-forest ')
                 }
               >
                 {league.isFlagship && (
-                  <span className="absolute top-3 right-3 font-condensed font-semibold text-[9px] uppercase tracking-widest text-gold">
+                  <span className="absolute top-3 right-3 font-condensed font-bold text-[9px] uppercase tracking-[0.12em] text-gold-dark">
                     Vores format
                   </span>
                 )}
-                <div className="font-display font-bold text-cream text-[20px] lg:text-[22px] leading-tight pr-20">
+                <div className="font-condensed font-bold text-forest text-[18px] sm:text-[20px] leading-tight pr-20">
                   {league.name}
                 </div>
-                <div className="mt-2 font-body text-[13px] text-cream/70 leading-relaxed">
+                <div className="mt-2 font-body text-[13px] text-warm-gray leading-relaxed">
                   {league.description}
                 </div>
               </button>
@@ -373,7 +335,7 @@ function Step1({
           )
         })}
       </ul>
-    </>
+    </div>
   )
 }
 
@@ -391,84 +353,56 @@ function Step2({
   onTip: (idx: number, t: Tip) => void
 }) {
   const tippedCount = Object.keys(tips).length
-
   return (
-    <>
+    <div className="px-4 sm:px-6 pt-4 pb-8">
       <StepHeader
         tag="Trin 2 af 4"
         title="Tip ugens kampe."
         subtitle="Klik på dit bud for hver kamp. Det her er hvad spillerne ser inden kickoff."
       />
 
-      <div className="mt-6 lg:mt-10 space-y-3">
+      {/* League header strip — matches gameroom style */}
+      <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 bg-forest text-cream rounded-sm">
+        <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.12em]">
+          {league.name} · Runde 27
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-2">
         {matches.map((match, idx) => (
-          <div
+          <MatchCard
             key={`${league.id}-${idx}`}
-            className="border-b border-cream/10 last:border-b-0 pb-4 last:pb-0"
-          >
-            {match.derby && (
-              <div className="font-condensed font-semibold text-[10px] uppercase tracking-[0.14em] text-gold/80 mb-2">
-                {match.derby}
-              </div>
-            )}
-
-            <div className="font-body text-[15px] text-cream/95">
-              {match.home} <span className="text-cream/50">—</span> {match.away}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              {(['1', 'X', '2'] as Tip[]).map((t) => {
-                const isSelected = tips[idx] === t
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => onTip(idx, t)}
-                    aria-pressed={isSelected}
-                    className={
-                      'flex flex-col items-center justify-center min-h-[52px] py-2 rounded-sm border transition-colors ' +
-                      (isSelected
-                        ? 'bg-gold border-gold text-forest'
-                        : 'bg-transparent border-cream/30 text-cream hover:border-gold/60')
-                    }
-                  >
-                    <span className="font-condensed font-bold text-[14px] uppercase">
-                      {t}
-                    </span>
-                    <span
-                      className={
-                        'mt-0.5 text-[10px] tracking-[0.05em] ' +
-                        (isSelected ? 'text-forest/70' : 'text-cream/40')
-                      }
-                      style={{ fontFamily: "'Courier New', monospace" }}
-                    >
-                      {ODDS[t]}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+            match={match}
+            selected={tips[idx]}
+            mode="open"
+            onTip={(t) => onTip(idx, t)}
+          />
         ))}
       </div>
 
-      <div
-        className="mt-6 text-center text-[14px] text-cream/60"
-        style={{ fontFamily: "'Courier New', monospace" }}
-      >
-        {tippedCount} af {matches.length} tippet
+      <div className="mt-5 text-center">
+        <span
+          className="text-[12px] sm:text-[14px] text-warm-taupe"
+          style={{ fontFamily: "'Courier New', monospace" }}
+        >
+          {tippedCount} af {matches.length} tippet
+        </span>
       </div>
-    </>
+    </div>
   )
 }
 
 // ─── Step 3: Kickoff. Point i realtid. ──────────────────────────────────────
 
 function Step3({
+  league,
   matches,
+  tips,
   reducedMotion,
 }: {
+  league: League
   matches: readonly Match[]
+  tips: Record<number, Tip>
   reducedMotion: boolean
 }) {
   const [revealedCount, setRevealedCount] = useState(0)
@@ -478,225 +412,210 @@ function Step3({
       setRevealedCount(matches.length)
       return
     }
-
     setRevealedCount(0)
     const timeouts: number[] = []
     for (let i = 0; i < matches.length; i++) {
-      timeouts.push(
-        window.setTimeout(() => setRevealedCount(i + 1), 800 + i * 600),
-      )
+      timeouts.push(window.setTimeout(() => setRevealedCount(i + 1), 800 + i * 600))
     }
     return () => timeouts.forEach((t) => window.clearTimeout(t))
   }, [matches.length, reducedMotion])
 
-  // points = correct count revealed so far × 3
   let points = 0
   for (let i = 0; i < revealedCount; i++) {
     if (CORRECT_FLAGS[i]) points += 3
   }
+  const correctCount = Math.min(revealedCount, 3)
 
   return (
-    <>
+    <div className="px-4 sm:px-6 pt-4 pb-8">
       <StepHeader
         tag="Trin 3 af 4"
         title="Kickoff. Point i realtid."
         subtitle="Resultaterne ruller ind. Korrekte tip giver point — du kan se status live."
       />
 
-      <ul className="mt-6 lg:mt-10 space-y-3">
+      <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 bg-forest text-cream rounded-sm">
+        <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.12em]">
+          {league.name} · Runde 27 · Live
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-2">
         {matches.map((match, idx) => {
           const revealed = idx < revealedCount
-          const isCorrect = CORRECT_FLAGS[idx]
-
           return (
-            <li
+            <MatchCard
               key={`step3-${idx}`}
-              className={
-                'rounded-sm border transition-all duration-500 px-4 py-3 ' +
-                (revealed
-                  ? isCorrect
-                    ? 'bg-gold/15 border-gold/40'
-                    : 'border-cream/15 bg-transparent opacity-50'
-                  : 'border-cream/10 bg-transparent opacity-50')
-              }
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="font-body text-[14px] sm:text-[15px] text-cream/95 min-w-0 flex-1">
-                  {match.derby && (
-                    <div className="font-condensed text-[10px] uppercase tracking-[0.14em] text-gold/80 mb-1">
-                      {match.derby}
-                    </div>
-                  )}
-                  <div className="truncate">
-                    {match.home} <span className="text-cream/50">—</span> {match.away}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {revealed && (
-                    <div className="demo-result-reveal flex items-center gap-2">
-                      {isCorrect ? (
-                        <span className="text-green-500">
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                      ) : (
-                        <span className="text-cream/40">
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6" />
-                          </svg>
-                        </span>
-                      )}
-                      <span
-                        className={
-                          'font-condensed font-bold text-[12px] uppercase tracking-widest ' +
-                          (isCorrect ? 'text-green-500' : 'text-cream/40')
-                        }
-                      >
-                        {isCorrect ? '+3 PTS' : '0 PTS'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </li>
+              match={match}
+              selected={tips[idx]}
+              mode="finished"
+              revealed={revealed}
+              userPick={tips[idx] ?? null}
+              correctOutcome={CORRECT_OUTCOMES[idx]}
+              isCorrect={CORRECT_FLAGS[idx]}
+              score={FAKE_SCORES[idx]}
+            />
           )
         })}
-      </ul>
+      </div>
 
-      <div className="mt-10 text-center">
-        <div className="font-display font-black text-gold text-[48px] lg:text-[64px] leading-none tabular-nums">
-          {points} PTS
+      <div className="mt-8 text-center">
+        <div
+          className="font-condensed font-bold text-gold-dark text-[44px] sm:text-[64px] leading-none tabular-nums"
+        >
+          {points} <span className="text-[20px] sm:text-[24px] font-condensed">PTS</span>
         </div>
-        <div className="mt-3 font-body text-[14px] text-cream/70">
-          {Math.min(revealedCount, 3)} af {matches.length} rigtige tip
+        <div className="mt-2 font-body text-[13px] sm:text-[14px] text-warm-gray">
+          {correctCount} af {matches.length} rigtige tip
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
 // ─── Step 4: Spilrummet ─────────────────────────────────────────────────────
 
-function Step4({ onClose }: { onClose: () => void }) {
+function Step4({ league, onClose }: { league: League; onClose: () => void }) {
   return (
     <>
-      <StepHeader
-        tag="Trin 4 af 4"
-        title="Spilrummet."
-        subtitle="Sådan ser din liga ud efter en spilrunde. Point, rangering, og tråden hvor det hele foregår."
-      />
-
-      <div className="mt-6 lg:mt-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Leaderboard */}
-        <div>
-          <div className="font-condensed font-semibold text-[11px] uppercase tracking-widest text-gold mb-3">
-            Rangliste · Runde 27
-          </div>
-          <div className="bg-forest/40 border border-gold/20 rounded-sm p-4 sm:p-5">
-            <div className="grid grid-cols-[28px_1fr_60px_40px] gap-2 pb-2 border-b border-cream/10 font-condensed font-semibold text-[11px] uppercase tracking-widest text-cream/50">
-              <span>#</span>
-              <span>Spiller</span>
-              <span className="text-right">Point</span>
-              <span></span>
+      {/* Hero strip — mirrors gameroom */}
+      <div
+        className="px-5 pt-6 pb-7 text-cream"
+        style={{ background: '#1a3329', fontFamily: "'Barlow', sans-serif" }}
+      >
+        <div className="max-w-[680px] mx-auto">
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="min-w-0 flex-1">
+              <h1
+                id="demo-step-heading"
+                className="font-condensed font-bold leading-tight"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, letterSpacing: '-0.01em' }}
+              >
+                {league.name} 25/26
+              </h1>
+              <span
+                className="inline-block mt-1.5 px-2 py-0.5 rounded-sm border"
+                style={{
+                  background: 'rgba(242,237,228,0.15)',
+                  borderColor: 'rgba(242,237,228,0.3)',
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 10,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Aktiv
+              </span>
             </div>
-            <ul>
-              {LEADERBOARD.map((row) => (
-                <li
-                  key={row.pos}
-                  className={
-                    'grid grid-cols-[28px_1fr_60px_40px] gap-2 items-center py-2.5 border-b border-cream/10 last:border-b-0 text-[13px] ' +
-                    (row.isUser ? 'bg-gold/10 border-l-2 border-l-gold pl-2 -ml-2' : '')
-                  }
-                >
-                  <span
-                    className="text-cream/60"
-                    style={{ fontFamily: "'Courier New', monospace" }}
-                  >
-                    {row.pos}
-                  </span>
-                  <span
-                    className={
-                      'font-body truncate ' +
-                      (row.isUser ? 'text-gold font-semibold' : 'text-cream/90')
-                    }
-                  >
-                    {row.name}
-                  </span>
-                  <span
-                    className="text-right text-cream/95 tabular-nums"
-                    style={{ fontFamily: "'Courier New', monospace" }}
-                  >
-                    {row.pts} pts
-                  </span>
-                  <ChangeIndicator change={row.change} delta={row.delta} />
-                </li>
-              ))}
-            </ul>
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-sm flex-shrink-0"
+              style={{ background: 'rgba(242,237,228,0.1)', border: '1px solid rgba(242,237,228,0.2)' }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 9,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(242,237,228,0.6)',
+                }}
+              >
+                Invitér
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#B8963E',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                BDG-7K2A
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Chat */}
-        <div>
-          <div className="font-condensed font-semibold text-[11px] uppercase tracking-widest text-gold mb-3">
-            Tråden
-          </div>
-          <div className="bg-forest/40 border border-gold/20 rounded-sm p-4 sm:p-5 space-y-4">
-            {CHAT_MESSAGES.map((msg) => (
-              <div key={msg.name} className="flex items-start gap-3">
-                <div
-                  className={
-                    'flex-shrink-0 rounded-full flex items-center justify-center font-condensed font-bold text-[12px] sm:text-[14px] w-8 h-8 sm:w-10 sm:h-10 ' +
-                    msg.avatarBg
-                  }
-                  aria-hidden
+          {/* Stats strip — matches gameroom 4-col grid */}
+          <div
+            className="grid grid-cols-4 pt-3.5"
+            style={{ borderTop: '1px solid rgba(242,237,228,0.15)' }}
+          >
+            {[
+              { label: 'Deltagere', value: '6', gold: false },
+              { label: 'Runder', value: '27', gold: false },
+              { label: 'Placering', value: '#2', gold: false },
+              { label: 'Dine point', value: '43', gold: true },
+            ].map((stat, i) => (
+              <div
+                key={stat.label}
+                style={{
+                  paddingLeft: i > 0 ? 10 : 0,
+                  paddingRight: i < 3 ? 10 : 0,
+                  borderRight: i < 3 ? '1px solid rgba(242,237,228,0.15)' : 'none',
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontSize: 9,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(242,237,228,0.5)',
+                    marginBottom: 4,
+                  }}
                 >
-                  {msg.avatar}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="font-body font-semibold text-[13px] text-cream/95">
-                      {msg.name}
-                    </span>
-                    <span
-                      className="text-[11px] text-cream/40"
-                      style={{ fontFamily: "'Courier New', monospace" }}
-                    >
-                      {msg.time}
-                    </span>
-                  </div>
-                  <p className="mt-1 font-body text-[14px] text-cream/85 leading-relaxed break-words">
-                    {msg.body}
-                  </p>
-                </div>
+                  {stat.label}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: stat.gold ? '#B8963E' : '#F2EDE4',
+                    lineHeight: 1,
+                  }}
+                >
+                  {stat.value}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Final CTA — hidden on small (handled by sticky footer), shown on lg */}
-      <div className="hidden lg:block mt-12">
-        <div className="h-px bg-gold/30 mb-8" />
-        <div className="text-center">
-          <p className="font-display italic text-cream/95 text-[20px] lg:text-[22px]">
-            Sådan kunne din liga se ud.
-          </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link
-              href="/register"
-              className="inline-flex items-center justify-center px-8 py-4 bg-gold text-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity"
-            >
-              Start din egen liga →
-            </Link>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center justify-center px-8 py-4 bg-transparent border border-cream/40 text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/70 transition-colors"
-            >
-              Luk demo
-            </button>
+      {/* Content area — leaderboard + chat */}
+      <div className="px-4 sm:px-6 py-6">
+        <div className="max-w-[680px] mx-auto space-y-5">
+          {/* Leaderboard */}
+          <Leaderboard />
+
+          {/* Chat */}
+          <Thread />
+
+          {/* Final CTA */}
+          <div className="pt-4">
+            <div className="h-px bg-gold-dark/30 mb-6" />
+            <div className="text-center">
+              <p className="font-display italic text-forest text-[18px] sm:text-[22px]">
+                Sådan kunne din liga se ud.
+              </p>
+              <div className="mt-5 hidden sm:flex flex-wrap justify-center gap-3">
+                <Link
+                  href="/register"
+                  className="inline-flex items-center justify-center px-8 py-4 bg-gold text-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+                >
+                  Start din egen liga →
+                </Link>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center justify-center px-8 py-4 bg-transparent border border-warm-border text-warm-gray hover:text-forest hover:border-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm transition-colors"
+                >
+                  Luk demo
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -704,7 +623,361 @@ function Step4({ onClose }: { onClose: () => void }) {
   )
 }
 
-// ─── Shared components ──────────────────────────────────────────────────────
+// ─── Production-mirror MatchCard ───────────────────────────────────────────
+
+function MatchCard({
+  match,
+  selected,
+  mode,
+  onTip,
+  revealed,
+  userPick,
+  correctOutcome,
+  isCorrect,
+  score,
+}: {
+  match: Match
+  selected?: Tip
+  mode: 'open' | 'finished'
+  onTip?: (t: Tip) => void
+  revealed?: boolean
+  userPick?: Tip | null
+  correctOutcome?: Tip
+  isCorrect?: boolean
+  score?: { home: number; away: number }
+}) {
+  const isRivalry = !!match.derby
+  const isFinished = mode === 'finished' && revealed
+
+  // Card surface follows AfgivBets:
+  //   - Rivalry → dark green surface, gold border
+  //   - Regular → white surface, subtle border (forest if user has selected)
+  const cardBg = isRivalry ? 'bg-forest' : 'bg-white'
+  const hasSelection = !!selected
+  const cardBorder = isRivalry
+    ? 'border-gold'
+    : hasSelection
+      ? 'border-forest shadow-[0_0_0_1px_#1a3329]'
+      : 'border-warm-border'
+  const textPrimary = isRivalry ? 'text-cream' : 'text-forest'
+  const textSecondary = isRivalry ? 'text-cream/50' : 'text-warm-taupe'
+  const teamLogo = (label: string, dark: boolean) => (
+    <div
+      className={
+        'flex items-center justify-center font-condensed font-bold text-[11px] flex-shrink-0 ' +
+        (dark ? 'bg-cream/15 text-cream' : 'bg-warm-border/40 text-warm-gray')
+      }
+      style={{ width: 24, height: 24, borderRadius: 2 }}
+      aria-hidden
+    >
+      {label.charAt(0)}
+    </div>
+  )
+
+  return (
+    <div
+      className={`${cardBg} border rounded-sm overflow-hidden transition-colors ${cardBorder}`}
+      style={{ fontFamily: "'Barlow', sans-serif" }}
+    >
+      {/* Rivalry badge */}
+      {isRivalry && (
+        <div className="flex items-center gap-2 px-3 pt-2.5 pb-0.5">
+          <span className="text-[12px]" aria-hidden>
+            🔥
+          </span>
+          <span
+            className="font-condensed text-[11px] font-bold uppercase tracking-widest"
+            style={{ color: '#B8963E' }}
+          >
+            {match.derby} {match.multiplier && `· ${match.multiplier}`}
+          </span>
+        </div>
+      )}
+
+      {/* Teams + kickoff/score */}
+      <div className="px-3 pt-2">
+        <div className="flex items-center justify-between gap-2 h-10">
+          {/* Home (right-aligned label, then logo) */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+            <span
+              className={`font-condensed font-bold text-[14px] sm:text-[15px] ${textPrimary} truncate`}
+              style={{ maxWidth: 110 }}
+            >
+              {match.homeShort}
+            </span>
+            {teamLogo(match.homeShort, isRivalry)}
+          </div>
+
+          {/* Score / vs */}
+          {isFinished && score ? (
+            <span className={`font-condensed font-bold text-[13px] ${textSecondary} flex-shrink-0`}>
+              {score.home} – {score.away}
+            </span>
+          ) : (
+            <span className={`text-[9px] ${textSecondary} font-semibold flex-shrink-0`}>vs</span>
+          )}
+
+          {/* Away (logo, then label) */}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            {teamLogo(match.awayShort, isRivalry)}
+            <span
+              className={`font-condensed font-bold text-[14px] sm:text-[15px] ${textPrimary} truncate`}
+              style={{ maxWidth: 110 }}
+            >
+              {match.awayShort}
+            </span>
+          </div>
+        </div>
+        <div className="text-center pb-1">
+          <span className={`text-[10px] ${textSecondary}`}>
+            {isFinished ? 'Færdig' : match.kickoff}
+          </span>
+        </div>
+      </div>
+
+      {/* 1/X/2 buttons */}
+      <div className="flex gap-1 px-3 pb-2">
+        {(['1', 'X', '2'] as Tip[]).map((o) => {
+          const active = mode === 'open' ? selected === o : userPick === o
+          const isUserPick = isFinished && userPick === o
+          const isCorrectOutcome = isFinished && correctOutcome === o
+          const isUserCorrect = isUserPick && !!isCorrect
+
+          let btnClass = ''
+          if (isFinished && (isUserPick || isCorrectOutcome)) {
+            if (isUserCorrect) {
+              // Bruger valgte rigtigt → forest fyldt + gold dobbelt-ramme
+              btnClass = 'bg-forest border-gold border-[2.5px] shadow-[0_0_0_1px_#B8963E]'
+            } else if (isUserPick) {
+              // Bruger valgte forkert → forest fyldt, ingen gold
+              btnClass = 'bg-forest border-forest opacity-60'
+            } else if (isCorrectOutcome) {
+              // Det rigtige svar (men brugeren tog det ikke) → cream + gold ramme
+              btnClass = isRivalry
+                ? 'bg-forest-light border-gold border-[2.5px]'
+                : 'bg-cream border-gold border-[2.5px]'
+            }
+          } else if (active) {
+            btnClass = isRivalry ? 'bg-gold border-gold' : 'bg-forest border-forest'
+          } else {
+            btnClass = isRivalry
+              ? 'bg-forest-light border-gold/30 hover:border-gold'
+              : 'bg-cream border-warm-border hover:border-forest'
+          }
+
+          const sub = o === '1' ? match.homeShort.split(' ')[0] : o === '2' ? match.awayShort.split(' ')[0] : 'Uafgjort'
+          const textLight = active || isUserPick || (isFinished && isCorrectOutcome && isRivalry)
+          const labelColor = textLight
+            ? isRivalry && active
+              ? 'text-forest'
+              : 'text-cream'
+            : isRivalry
+              ? 'text-cream/70'
+              : 'text-warm-taupe'
+          const subColor = textLight
+            ? isRivalry && active
+              ? 'text-forest/60'
+              : 'text-cream/60'
+            : isRivalry
+              ? 'text-cream/40'
+              : 'text-warm-taupe'
+
+          return (
+            <button
+              key={o}
+              type="button"
+              disabled={mode === 'finished' || !onTip}
+              onClick={() => onTip?.(o)}
+              aria-pressed={active}
+              className={`flex-1 py-2 border-[1.5px] rounded-sm flex flex-col items-center gap-0.5 transition-all min-h-[52px] ${btnClass} ${
+                mode === 'finished' ? 'cursor-default' : 'cursor-pointer'
+              }`}
+            >
+              <span className={`font-condensed text-[16px] sm:text-[17px] font-bold leading-none ${labelColor}`}>
+                {o}
+              </span>
+              <span className={`text-[8px] sm:text-[9px] font-medium truncate max-w-full ${subColor}`}>
+                {sub}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Production-mirror Leaderboard ─────────────────────────────────────────
+
+function Leaderboard() {
+  return (
+    <div>
+      <span
+        className="font-condensed"
+        style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#9E9486' }}
+      >
+        Leaderboard
+      </span>
+      <div
+        className="mt-2 rounded-sm overflow-hidden"
+        style={{ background: '#FDFAF5', border: '1px solid #E8E0D3' }}
+      >
+        {/* Header */}
+        <div
+          className="grid items-center"
+          style={{
+            gridTemplateColumns: '28px 1fr 44px 52px 44px 52px',
+            padding: '8px 10px',
+            borderBottom: '1px solid #E8E0D3',
+            gap: 4,
+          }}
+        >
+          {['#', '', 'R. sejr', 'R. point', 'B. sejr', 'B. point'].map((h, i) => (
+            <span
+              key={i}
+              style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 9,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#9E9486',
+                textAlign: i >= 2 ? 'right' : 'left',
+              }}
+            >
+              {h}
+            </span>
+          ))}
+        </div>
+
+        {/* Rows */}
+        {LEADERBOARD.map((row, idx) => {
+          const rankColor =
+            idx === 0 ? '#B8963E' : idx === 1 ? '#7A7A7A' : idx === 2 ? '#A0785A' : '#9E9486'
+          const isUser = row.isUser
+          return (
+            <div
+              key={row.pos}
+              className="grid items-center"
+              style={{
+                gridTemplateColumns: '28px 1fr 44px 52px 44px 52px',
+                padding: '10px 10px',
+                borderBottom: idx < LEADERBOARD.length - 1 ? '1px solid #E8E0D3' : 'none',
+                borderLeft: isUser ? '2px solid #B8963E' : '2px solid transparent',
+                gap: 4,
+                background: isUser ? '#F8F5ED' : idx === 0 ? '#FBF7EE' : 'transparent',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: rankColor,
+                }}
+              >
+                {row.pos}
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 13,
+                  fontWeight: isUser ? 700 : 600,
+                  color: isUser ? '#1a3329' : '#1a1a1a',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {row.name}
+              </span>
+              <NumCell value={row.roundWins} highlight />
+              <NumCell value={row.roundPoints} />
+              <NumCell value={row.blockWins} highlight />
+              <NumCell value={row.blockPoints} bold />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function NumCell({ value, highlight, bold }: { value: number; highlight?: boolean; bold?: boolean }) {
+  const isZero = value === 0
+  return (
+    <span
+      style={{
+        fontFamily: "'Barlow Condensed', sans-serif",
+        fontSize: bold ? 13 : 12,
+        fontWeight: bold ? 700 : 600,
+        color: isZero ? '#ccc' : highlight && value > 0 ? '#B8963E' : '#1a1a1a',
+        textAlign: 'right',
+      }}
+    >
+      {isZero ? '-' : value}
+    </span>
+  )
+}
+
+// ─── Production-mirror Thread ──────────────────────────────────────────────
+
+function Thread() {
+  return (
+    <div>
+      <span
+        style={{
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.12em',
+          color: '#9E9486',
+        }}
+      >
+        Tråden
+      </span>
+      <div
+        className="mt-2 rounded-sm p-4 sm:p-5 space-y-4"
+        style={{ background: '#FDFAF5', border: '1px solid #E8E0D3' }}
+      >
+        {CHAT_MESSAGES.map((msg) => (
+          <div key={msg.name} className="flex items-start gap-3">
+            <div
+              className="flex-shrink-0 rounded-full flex items-center justify-center font-condensed font-bold text-[12px] sm:text-[14px]"
+              style={{
+                width: 32,
+                height: 32,
+                background: msg.avatarBg,
+                color: msg.avatarFg,
+                fontFamily: "'Barlow Condensed', sans-serif",
+              }}
+              aria-hidden
+            >
+              {msg.avatar}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="font-body font-semibold text-[13px] text-ink">{msg.name}</span>
+                <span
+                  className="text-[11px] text-warm-taupe"
+                  style={{ fontFamily: "'Courier New', monospace" }}
+                >
+                  {msg.time}
+                </span>
+              </div>
+              <p className="mt-1 font-body text-[14px] text-ink leading-relaxed break-words">
+                {msg.body}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Shared bits ───────────────────────────────────────────────────────────
 
 function StepHeader({
   tag,
@@ -716,60 +989,20 @@ function StepHeader({
   subtitle: string
 }) {
   return (
-    <div className="mt-2">
-      <span className="font-condensed font-semibold text-[11px] uppercase tracking-widest text-gold">
+    <div>
+      <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
         {tag}
       </span>
       <h2
         id="demo-step-heading"
-        className="mt-2 font-display font-black text-cream text-[28px] lg:text-[36px] leading-tight"
+        className="mt-2 font-display font-black text-forest text-[26px] sm:text-[36px] leading-tight"
       >
         {title}
       </h2>
-      <p className="mt-3 font-body text-[14px] lg:text-[16px] text-cream/75 leading-relaxed max-w-[520px]">
+      <p className="mt-2 font-body text-[14px] sm:text-[16px] text-warm-gray leading-relaxed max-w-[520px]">
         {subtitle}
       </p>
     </div>
-  )
-}
-
-function ChangeIndicator({
-  change,
-  delta,
-}: {
-  change: LeaderRow['change']
-  delta?: number
-}) {
-  const arrowClass = 'font-mono text-[12px] tabular-nums text-right'
-  const fontFamily = "'Courier New', monospace"
-
-  if (change === 'new') {
-    return (
-      <span
-        className="font-condensed font-bold text-[10px] uppercase tracking-widest text-gold text-right"
-      >
-        NY
-      </span>
-    )
-  }
-  if (change === 'up') {
-    return (
-      <span className={arrowClass + ' text-green-500'} style={{ fontFamily }}>
-        ↑{delta ?? ''}
-      </span>
-    )
-  }
-  if (change === 'down') {
-    return (
-      <span className={arrowClass + ' text-vintage-red'} style={{ fontFamily }}>
-        ↓{delta ?? ''}
-      </span>
-    )
-  }
-  return (
-    <span className={arrowClass + ' text-cream/50'} style={{ fontFamily }}>
-      →
-    </span>
   )
 }
 
@@ -788,23 +1021,20 @@ function FooterNav({
 }) {
   const isLast = step === 4
   const showBack = step > 1 && step <= 3
-  const nextLabel =
-    step === 1 ? 'Næste →' : step === 2 ? 'Næste →' : 'Se spilrummet →'
+  const nextLabel = step === 1 ? 'Næste →' : step === 2 ? 'Næste →' : 'Se spilrummet →'
 
   return (
     <div
-      className="flex-shrink-0 border-t border-cream/10 bg-forest/95 backdrop-blur-md"
+      className="flex-shrink-0 border-t border-warm-border bg-cream"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      onClick={(e) => e.stopPropagation()}
     >
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
+      <div className="px-4 sm:px-6 py-4">
         {isLast ? (
-          // Step 4 — primary + secondary CTA, stacks on mobile
           <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-center">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-transparent border border-cream/40 text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/70 transition-colors min-h-[52px]"
+              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-transparent border border-warm-border text-warm-gray hover:text-forest hover:border-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm transition-colors min-h-[52px]"
             >
               Luk demo
             </button>
@@ -816,13 +1046,12 @@ function FooterNav({
             </Link>
           </div>
         ) : (
-          // Steps 1-3 — back + next, stacks reverse on mobile (next on top)
           <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3">
             {showBack ? (
               <button
                 type="button"
                 onClick={onBack}
-                className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-4 bg-transparent text-cream/70 hover:text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm transition-colors min-h-[52px]"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-4 bg-transparent text-warm-gray hover:text-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm transition-colors min-h-[52px]"
               >
                 ← Tilbage
               </button>
@@ -834,7 +1063,7 @@ function FooterNav({
               type="button"
               onClick={onNext}
               disabled={!canAdvance}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-gold text-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed min-h-[52px]"
+              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-forest text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed min-h-[52px]"
             >
               {nextLabel}
             </button>
@@ -852,7 +1081,7 @@ function DemoStyles({ reducedMotion }: { reducedMotion: boolean }) {
     return (
       <style>{`
         .demo-modal-entering, .demo-modal-exiting,
-        .demo-step-anim, .demo-result-reveal { animation: none !important; }
+        .demo-step-anim { animation: none !important; }
       `}</style>
     )
   }
@@ -870,14 +1099,9 @@ function DemoStyles({ reducedMotion }: { reducedMotion: boolean }) {
         from { opacity: 0; transform: translateY(8px); }
         to   { opacity: 1; transform: translateY(0); }
       }
-      @keyframes demoResultIn {
-        from { opacity: 0; transform: scale(0.92); }
-        to   { opacity: 1; transform: scale(1); }
-      }
       .demo-modal-entering { animation: demoModalIn 250ms ease-out both; }
       .demo-modal-exiting  { animation: demoModalOut 200ms ease-in both; }
       .demo-step-anim       { animation: demoStepIn 200ms ease-out both; }
-      .demo-result-reveal   { animation: demoResultIn 400ms ease-out both; }
     `}</style>
   )
 }
