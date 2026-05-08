@@ -61,6 +61,28 @@ export async function requireAdmin(req: NextRequest): Promise<AdminAuthResult> {
     }
   }
 
+  // 3. AAL2-check: admin-API endpoints kræver 2FA verificeret i denne session
+  //    (bypasses for Bearer-token requests — cron/scripts har ikke MFA)
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (aal?.currentLevel !== 'aal2') {
+    if (aal?.nextLevel === 'aal2') {
+      return {
+        ok: false,
+        response: NextResponse.json({
+          error: '2FA verifikation påkrævet',
+          code: 'mfa_required',
+        }, { status: 403 }),
+      }
+    }
+    return {
+      ok: false,
+      response: NextResponse.json({
+        error: '2FA skal aktiveres for admin-handlinger',
+        code: 'mfa_enrollment_required',
+      }, { status: 403 }),
+    }
+  }
+
   return {
     ok: true,
     response: NextResponse.json({ ok: true }),
