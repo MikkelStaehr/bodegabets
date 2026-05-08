@@ -167,14 +167,26 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
     activeBlockId ? sortedRaces.filter((r) => r.cycling_block_id === activeBlockId) : sortedRaces,
   [sortedRaces, activeBlockId])
 
-  const defaultTabId = blockStages.find((s) => new Date(s.start_date) > new Date())?.id ?? blockStages[0]?.id ?? null
+  // Find første etape hvor deadline endnu ikke er passeret. Brug den smart-deadline-
+  // helper i stedet for naive new Date(start_date) — date-only midnight UTC ville
+  // ellers betragte dagens etape som 'allerede startet' og hoppe direkte til
+  // morgendagens (Nikolaj-buggen 8. maj 2026 hvor han udfyldte etape 2 i stedet
+  // for etape 1).
+  const findFirstActionable = (stages: typeof blockStages) => {
+    const now = new Date()
+    return (
+      stages.find((s) => !isStageDeadlinePassed(s.start_date, now))?.id ??
+      stages[0]?.id ??
+      null
+    )
+  }
+  const defaultTabId = findFirstActionable(blockStages)
 
   const [activeTab, setActiveTab] = useState<string | null>(defaultTabId)
 
   // Reset stage tab when block changes
   useEffect(() => {
-    const firstUpcoming = blockStages.find((s) => new Date(s.start_date) > new Date())?.id ?? blockStages[0]?.id ?? null
-    setActiveTab(firstUpcoming)
+    setActiveTab(findFirstActionable(blockStages))
   }, [activeBlockId]) // eslint-disable-line react-hooks/exhaustive-deps
   const [lineups, setLineups] = useState<LineupState>({})
   const [lockedStages, setLockedStages] = useState<Set<string>>(new Set())
@@ -800,10 +812,78 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
 
       {/* ── Save button ──────────────────────────────────────── */}
       {!noSquadForBlock && !isFinished && activeStage && (<>
+      {/* Tidligere-etape advarsel: vis hvis der findes en lavere-nummereret
+          etape i samme blok hvor deadline ikke er passeret og slots er tomme.
+          Forhindrer 'Nikolaj-buggen' hvor man fylder etape N+1 og glemmer N. */}
+      {(() => {
+        const earlierEmpty = blockStages.filter((s) => {
+          if (s.stage_number >= activeStage.stage_number) return false
+          if (isStageDeadlinePassed(s.start_date)) return false
+          const slots = lineups[s.id]
+          const filled = slots ? Object.values(slots).some((v) => v !== null) : false
+          return !filled
+        })
+        if (earlierEmpty.length === 0) return null
+        const labels = earlierEmpty
+          .map((s) => (s.stage_number === 0 ? 'Prolog' : `Etape ${s.stage_number}`))
+          .join(', ')
+        return (
+          <div
+            style={{
+              margin: '0 14px 12px',
+              padding: '10px 12px',
+              background: 'rgba(218, 165, 32, 0.12)',
+              border: '1px solid rgba(218, 165, 32, 0.4)',
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+            }}
+          >
+            <span style={{ color: '#FAC775', fontSize: 13, lineHeight: 1.2 }} aria-hidden>⚠</span>
+            <span
+              style={{
+                fontFamily: "'Barlow', sans-serif",
+                fontSize: 12,
+                lineHeight: 1.4,
+                color: 'rgba(255,255,255,0.85)',
+              }}
+            >
+              {labels} har {earlierEmpty.length === 1 ? 'intet lineup endnu' : 'ingen lineups endnu'}
+              {' '}— du gemmer til{' '}
+              <strong>
+                {activeStage.stage_number === 0 ? 'Prolog' : `Etape ${activeStage.stage_number}`}
+              </strong>
+              .
+            </span>
+          </div>
+        )
+      })()}
       <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <button
           type="button"
-          onClick={() => handleSave(activeStage.id)}
+          onClick={() => {
+            // Ekstra confirm hvis der er en tidligere etape uden lineup
+            const earlierEmpty = blockStages.filter((s) => {
+              if (s.stage_number >= activeStage.stage_number) return false
+              if (isStageDeadlinePassed(s.start_date)) return false
+              const slots = lineups[s.id]
+              const filled = slots ? Object.values(slots).some((v) => v !== null) : false
+              return !filled
+            })
+            if (earlierEmpty.length > 0) {
+              const labels = earlierEmpty
+                .map((s) => (s.stage_number === 0 ? 'Prolog' : `Etape ${s.stage_number}`))
+                .join(', ')
+              const stageLabel =
+                activeStage.stage_number === 0 ? 'Prolog' : `Etape ${activeStage.stage_number}`
+              const ok = window.confirm(
+                `Du gemmer til ${stageLabel} — men ${labels} har stadig intet lineup. Fortsæt?`,
+              )
+              if (!ok) return
+            }
+            handleSave(activeStage.id)
+          }}
           disabled={!changed || isLocked || isSaving}
           style={{
             width: '100%', padding: '10px 0',
