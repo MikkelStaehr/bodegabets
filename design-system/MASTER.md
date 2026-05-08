@@ -10,32 +10,40 @@ Use this as the single source of truth when building or modifying components.
 
 ### Tailwind theme colors (defined in `@theme` block in `globals.css`)
 
+Tokens er alignet med faktisk-brugte hex i komponenter — `bg-cream`
+giver præcis samme farve som inline `#F2EDE4`.
+
 | Token              | Hex       | Tailwind class        | Usage                                |
 | ------------------ | --------- | --------------------- | ------------------------------------ |
-| `cream`            | `#F5F0E8` | `bg-cream`            | Page background, light surfaces      |
+| `cream`            | `#F2EDE4` | `bg-cream`            | Page background, light surfaces      |
 | `cream-dark`       | `#EDE8DF` | `bg-cream-dark`       | Card backgrounds, secondary surfaces |
-| `forest`           | `#1B3A2D` | `bg-forest`           | Primary buttons, dark backgrounds    |
-| `forest-light`     | `#2E5040` | `bg-forest-light`     | Dark borders, hover states on dark   |
+| `forest`           | `#1a3329` | `bg-forest`           | Primary buttons, dark backgrounds    |
+| `forest-light`     | `#2C4A3E` | `bg-forest-light`     | Card surfaces på dark, hover states  |
+| `forest-dark`      | `#1C3829` | `bg-forest-dark`      | Logo color, deepest brand green      |
 | `vintage-red`      | `#C8392B` | `text-vintage-red`    | Danger, error states, closed badges  |
-| `gold`             | `#C9A84C` | `text-gold`           | Accent, highlights, upcoming badges  |
+| `gold`             | `#C9A84C` | `text-gold`           | Primary accent, highlights, CTAs     |
+| `gold-dark`        | `#B8963E` | `text-gold-dark`      | Aged/muted gold, ranks, subtle marks |
 | `warm-gray`        | `#5C5C4A` | `text-warm-gray`      | Secondary text, helper text          |
+| `warm-taupe`       | `#7a7060` | `text-warm-taupe`     | Tertiary text, eyebrow labels        |
 | `warm-border`      | `#D4CFC4` | `border-warm-border`  | Default border color                 |
 | `ink`              | `#1A1A1A` | `text-ink`            | Primary text on light backgrounds    |
 
 ### CSS custom properties (`:root` in `globals.css`)
 
+Legacy-aliaser brugt af inline `style={{ background: 'var(--bg-primary)' }}`:
+
 ```
---bg-primary:      #F5F0E8
+--bg-primary:      #F2EDE4
 --bg-secondary:    #EDE8DF
---bg-dark:         #1B3A2D
+--bg-dark:         #1a3329
 --text-primary:    #1A1A1A
 --text-secondary:  #5C5C4A
---text-inverted:   #F5F0E8
+--text-inverted:   #F2EDE4
 --accent-red:      #C8392B
---accent-green:    #1B3A2D
+--accent-green:    #1a3329
 --accent-gold:     #C9A84C
 --border:          #D4CFC4
---border-dark:     #2E5040
+--border-dark:     #2C4A3E
 ```
 
 ### Rules
