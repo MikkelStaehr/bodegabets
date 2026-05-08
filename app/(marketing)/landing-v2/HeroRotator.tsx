@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import DemoModal from '@/components/landing/DemoModal'
 
 type Slide = {
   id: 'fodbold' | 'cykling'
@@ -53,6 +54,7 @@ export default function HeroRotator({ activeUserCount }: Props) {
   const [autoRotate, setAutoRotate] = useState(true)
   const [hovered, setHovered] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
+  const [demoOpen, setDemoOpen] = useState(false)
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   // Detect prefers-reduced-motion
@@ -95,6 +97,7 @@ export default function HeroRotator({ activeUserCount }: Props) {
   const current = SLIDES[active]
 
   return (
+    <>
     <section
       className="relative w-full h-[480px] lg:h-[620px] overflow-hidden bg-forest"
       onMouseEnter={() => setHovered(true)}
@@ -193,12 +196,22 @@ export default function HeroRotator({ activeUserCount }: Props) {
             >
               {current.ctaText}
             </Link>
-            <Link
-              href="#how-it-works"
-              className="inline-flex items-center justify-center px-8 py-4 bg-transparent border border-cream/50 text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/80 transition-colors backdrop-blur-sm"
-            >
-              Se hvordan det virker
-            </Link>
+            {current.id === 'fodbold' ? (
+              <button
+                type="button"
+                onClick={() => setDemoOpen(true)}
+                className="inline-flex items-center justify-center px-8 py-4 bg-transparent border border-cream/50 text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/80 transition-colors backdrop-blur-sm cursor-pointer"
+              >
+                Se hvordan det virker
+              </button>
+            ) : (
+              <Link
+                href="#how-it-works"
+                className="inline-flex items-center justify-center px-8 py-4 bg-transparent border border-cream/50 text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/80 transition-colors backdrop-blur-sm"
+              >
+                Se hvordan det virker
+              </Link>
+            )}
 
             {activeUserCount !== null && activeUserCount >= 10 && (
               <div className="flex items-center gap-2 ml-1">
@@ -296,5 +309,8 @@ export default function HeroRotator({ activeUserCount }: Props) {
         </div>
       </div>
     </section>
+
+    <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
+    </>
   )
 }
