@@ -122,51 +122,55 @@ function ProductsSection() {
           {PRODUCT_CARDS.map((card) => (
             <article
               key={card.number}
-              className="group relative bg-cream-dark border border-warm-border rounded-sm hover:border-gold transition-colors overflow-hidden flex flex-col"
+              className="group relative h-[520px] lg:h-[600px] border border-warm-border rounded-sm hover:border-gold transition-colors overflow-hidden bg-forest"
             >
-              {/* Image header with Ken Burns + hover zoom + gradient blend */}
-              <div className="relative h-56 lg:h-64 overflow-hidden bg-forest">
-                <img
-                  src={card.image}
-                  alt={card.title}
-                  className={
-                    'absolute inset-0 w-full h-full object-cover ' +
-                    card.imagePosition +
-                    ' animate-kenburns-slow transition-transform duration-[1200ms] ease-out group-hover:scale-110'
-                  }
-                  loading="lazy"
-                />
-                {/* Subtle dark vignette for legibility */}
-                <div className="absolute inset-0 bg-gradient-to-t from-forest/40 via-transparent to-forest/20 pointer-events-none" />
-                {/* Bottom blend into card body */}
-                <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-cream-dark pointer-events-none" />
-                {/* Tag chip overlay (top-left) */}
-                <span className="absolute top-4 left-4 bg-forest/85 backdrop-blur-sm px-3 py-1 rounded-sm font-condensed text-[10px] uppercase tracking-[0.14em] text-gold">
+              {/* Full-bleed photo with continuous Ken Burns + hover zoom */}
+              <img
+                src={card.image}
+                alt={card.title}
+                className={
+                  'absolute inset-0 w-full h-full object-cover ' +
+                  card.imagePosition +
+                  ' animate-kenburns-slow transition-transform duration-[1500ms] ease-out group-hover:scale-110'
+                }
+                loading="lazy"
+              />
+
+              {/* Cinematic vignettes — top fade, heavy bottom anchor, side darken */}
+              <div className="absolute inset-0 bg-gradient-to-t from-forest via-forest/70 via-40% to-transparent pointer-events-none" />
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    'radial-gradient(ellipse at 50% 30%, transparent 50%, rgba(26,51,41,0.45) 100%)',
+                }}
+              />
+
+              {/* Gold accent line at top — appears on hover */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gold scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-700" />
+
+              {/* Content overlay — bottom anchored */}
+              <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8">
+                <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold">
                   {card.tag}
                 </span>
-                {/* Title overlaid bottom-left for editorial feel */}
-                <h3 className="absolute bottom-4 left-6 right-6 font-display font-bold text-cream text-[28px] lg:text-[32px] leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+
+                <h3 className="mt-2 font-display font-black text-cream text-[36px] lg:text-[44px] leading-[0.95] drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
                   {card.title}
                 </h3>
-              </div>
 
-              {/* Body */}
-              <div className="p-8 pt-6 flex-1 flex flex-col">
-                <p className="font-body text-[14px] text-warm-taupe leading-relaxed">
+                <p className="mt-4 font-body text-[14px] lg:text-[15px] text-cream/85 leading-relaxed max-w-[440px] drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">
                   {card.description}
                 </p>
 
-                <ul className="mt-6 space-y-0">
-                  {card.features.map((feature, i) => (
+                <ul className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                  {card.features.map((feature) => (
                     <li
                       key={feature}
-                      className={
-                        'flex items-center gap-3 py-3 ' +
-                        (i < card.features.length - 1 ? 'border-b border-warm-border' : '')
-                      }
+                      className="flex items-center gap-2.5"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-gold flex-shrink-0" />
-                      <span className="font-body text-[13px] text-ink">
+                      <span className="w-1 h-1 rounded-full bg-gold flex-shrink-0" />
+                      <span className="font-condensed font-semibold text-[12px] uppercase tracking-[0.06em] text-cream/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">
                         {feature}
                       </span>
                     </li>
