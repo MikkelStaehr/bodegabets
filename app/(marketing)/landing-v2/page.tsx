@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { supabaseAdmin } from '@/lib/supabase'
 import HeroRotator from './HeroRotator'
 
@@ -239,11 +240,13 @@ function ProductsSection() {
               key={card.title}
               className="group relative h-[520px] lg:h-[600px] border border-warm-border rounded-sm hover:border-gold transition-colors overflow-hidden bg-forest"
             >
-              <img
+              <Image
                 src={card.image}
                 alt={card.title}
-                className="absolute inset-0 w-full h-full object-cover object-center animate-kenburns-slow transition-transform duration-[1500ms] ease-out group-hover:scale-110"
-                loading="lazy"
+                fill
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                quality={75}
+                className="object-cover object-center animate-kenburns-slow transition-transform duration-[1500ms] ease-out group-hover:scale-110"
               />
 
               {/* Heavier vignette per spec — forest/0.85 top, forest/0.95 bottom */}

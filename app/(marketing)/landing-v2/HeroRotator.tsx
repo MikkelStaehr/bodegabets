@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 type Slide = {
   id: 'fodbold' | 'cykling'
@@ -124,13 +125,15 @@ export default function HeroRotator({ activeUserCount }: Props) {
             }}
             aria-hidden={!isActive}
           >
-            <img
+            <Image
               src={slide.image}
               alt=""
-              className="absolute inset-0 w-full h-full object-cover object-center animate-kenburns"
+              fill
+              sizes="100vw"
+              priority={i === 0}
+              quality={75}
+              className="object-cover object-center animate-kenburns"
               style={slide.brightness ? { filter: `brightness(${slide.brightness})` } : undefined}
-              loading={i === 0 ? 'eager' : 'lazy'}
-              fetchPriority={i === 0 ? 'high' : 'auto'}
             />
           </div>
         )
