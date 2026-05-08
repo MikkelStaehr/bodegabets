@@ -73,7 +73,7 @@ const PRODUCT_CARDS = [
     number: '01',
     tag: 'Fantasy',
     title: 'Cycling Manager',
-    image: '/img/boxcycling.jpg',
+    image: '/img/boxcycling2.jpg',
     imagePosition: 'object-center',
     description:
       'Saml dit drømmehold af ryttere, fordel rolle og bonus, og følg dem gennem Grand Tours og monumenter.',
@@ -88,7 +88,7 @@ const PRODUCT_CARDS = [
     number: '02',
     tag: 'Sports betting',
     title: 'Fodbold',
-    image: '/img/emilio-garcia-AWdCgDDedH0-unsplash.jpg',
+    image: '/img/boxfootball.jpg',
     imagePosition: 'object-center',
     description:
       'Forudsig kampe på tværs af 20 europæiske ligaer. Bet i åbent vindue, lås ved kickoff, scor live.',
