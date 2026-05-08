@@ -24,40 +24,72 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (signInError) {
-      setLoading(false)
-      if (
-        signInError.message.includes('Invalid login credentials') ||
-        signInError.message.includes('invalid_credentials')
-      ) {
-        return setError('Forkert email eller adgangskode')
-      }
-      return setError(signInError.message)
-    }
-
-    // Tjek om bruger har MFA enrolled — i så fald kræv challenge før vi sender til dashboard
-    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (aalData?.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
-      // MFA påkrævet — start challenge
-      const { data: factors } = await supabase.auth.mfa.listFactors()
-      const totp = factors?.totp?.find((f) => f.status === 'verified')
-      if (totp) {
-        const { data: challenge, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: totp.id })
-        if (challengeErr || !challenge) {
-          setError(challengeErr?.message ?? 'Kunne ikke starte 2FA-challenge')
-          setLoading(false)
-          return
+      if (signInError) {
+        if (
+          signInError.message.includes('Invalid login credentials') ||
+          signInError.message.includes('invalid_credentials')
+        ) {
+          setError('Forkert email eller adgangskode')
+        } else {
+          setError(signInError.message)
         }
-        setMfaChallenge({ factorId: totp.id, challengeId: challenge.id })
-        setLoading(false)
         return
       }
-    }
 
-    router.refresh()
-    router.push('/dashboard')
+      // Tjek om bruger har MFA enrolled — i så fald kræv challenge før vi sender til dashboard.
+      // Wrappet i Promise.race med 4s timeout: hvis Supabase MFA-API hænger må det ikke
+      // efterlade brugeren på et evigt-snurrende login. Sessionen er allerede etableret
+      // fra signInWithPassword, så fallback er at lade middleware/dashboard tage over.
+      let aalData: { currentLevel: string | null; nextLevel: string | null } | null = null
+      try {
+        const aalResult = await Promise.race([
+          supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('aal-timeout')), 4000),
+          ),
+        ])
+        aalData = aalResult.data
+      } catch {
+        // Timeout eller netværksfejl → spring MFA-check over og lad dashboard håndtere det
+      }
+
+      if (aalData?.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
+        try {
+          const { data: factors } = await Promise.race([
+            supabase.auth.mfa.listFactors(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('factors-timeout')), 4000),
+            ),
+          ])
+          const totp = factors?.totp?.find((f) => f.status === 'verified')
+          if (totp) {
+            const { data: challenge, error: challengeErr } = await Promise.race([
+              supabase.auth.mfa.challenge({ factorId: totp.id }),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('challenge-timeout')), 4000),
+              ),
+            ])
+            if (challengeErr || !challenge) {
+              setError(challengeErr?.message ?? 'Kunne ikke starte 2FA-challenge')
+              return
+            }
+            setMfaChallenge({ factorId: totp.id, challengeId: challenge.id })
+            return
+          }
+        } catch {
+          // MFA-API hænger — lad sessionen stå og send brugeren videre.
+          // Hvis admin-rute kræves, fanger middleware AAL1 og step-up'er der.
+        }
+      }
+
+      router.refresh()
+      router.push('/dashboard')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleMfaSubmit(e: React.FormEvent) {
@@ -66,21 +98,37 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error: verifyErr } = await supabase.auth.mfa.verify({
-      factorId: mfaChallenge.factorId,
-      challengeId: mfaChallenge.challengeId,
-      code: mfaCode,
-    })
+    try {
+      const { error: verifyErr } = await Promise.race([
+        supabase.auth.mfa.verify({
+          factorId: mfaChallenge.factorId,
+          challengeId: mfaChallenge.challengeId,
+          code: mfaCode,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('verify-timeout')), 6000),
+        ),
+      ])
 
-    if (verifyErr) {
-      setError('Forkert kode — prøv igen')
-      setLoading(false)
+      if (verifyErr) {
+        setError('Forkert kode — prøv igen')
+        setMfaCode('')
+        // Re-issue challenge for next attempt (Supabase invalider efter 1 forsøg)
+        try {
+          const { data: re } = await supabase.auth.mfa.challenge({ factorId: mfaChallenge.factorId })
+          if (re) setMfaChallenge({ factorId: mfaChallenge.factorId, challengeId: re.id })
+        } catch { /* ignored — bruger kan klikke 'Tilbage' */ }
+        return
+      }
+
+      router.refresh()
+      router.push('/dashboard')
+    } catch {
+      setError('Forbindelsen til 2FA-tjenesten svarer ikke. Prøv igen.')
       setMfaCode('')
-      return
+    } finally {
+      setLoading(false)
     }
-
-    router.refresh()
-    router.push('/dashboard')
   }
 
   const inputClass =
