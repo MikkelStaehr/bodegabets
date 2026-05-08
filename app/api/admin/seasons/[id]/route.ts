@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { logAudit } from '@/lib/auditLog'
 
 export async function PATCH(
   req: NextRequest,
@@ -42,6 +43,15 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  await logAudit(req, {
+    action: 'season.update',
+    actorId: auth.actor.id,
+    actorEmail: auth.actor.email,
+    targetTable: 'seasons',
+    targetId: seasonId,
+    after: updates,
+  })
 
   return NextResponse.json({ ok: true, season: data })
 }

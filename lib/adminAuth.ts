@@ -15,16 +15,23 @@ function isBearerAuthorized(req: NextRequest): boolean {
   return req.headers.get('authorization') === `Bearer ${process.env.ADMIN_SECRET}`
 }
 
+export type AdminAuthResult =
+  | { ok: true; response: NextResponse<unknown>; actor: { id: string | null; email: string | null } }
+  | { ok: false; response: NextResponse<unknown>; actor?: undefined }
+
 /**
  * Tjekker om request er fra admin.
- * Returnerer { ok: true } eller { ok: false, response }.
+ * Returnerer { ok: true, actor } eller { ok: false, response }.
+ * Actor.id er null for Bearer-token requests (cron, scripts).
  */
-export async function requireAdmin(
-  req: NextRequest
-): Promise<{ ok: boolean; response: NextResponse<unknown> }> {
+export async function requireAdmin(req: NextRequest): Promise<AdminAuthResult> {
   // 1. Bearer token (cron, scripts, backwards compat)
   if (isBearerAuthorized(req)) {
-    return { ok: true, response: NextResponse.json({ ok: true }) }
+    return {
+      ok: true,
+      response: NextResponse.json({ ok: true }),
+      actor: { id: null, email: 'bearer-token' },
+    }
   }
 
   // 2. Auth fra cookies (browser, admin panel)
@@ -54,5 +61,9 @@ export async function requireAdmin(
     }
   }
 
-  return { ok: true, response: NextResponse.json({ ok: true }) }
+  return {
+    ok: true,
+    response: NextResponse.json({ ok: true }),
+    actor: { id: user.id, email: user.email ?? null },
+  }
 }

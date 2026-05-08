@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { logAudit } from '@/lib/auditLog'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -46,6 +47,15 @@ export async function PATCH(req: NextRequest, { params }: Props) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  await logAudit(req, {
+    action: 'match.update_score',
+    actorId: auth.actor.id,
+    actorEmail: auth.actor.email,
+    targetTable: 'matches',
+    targetId: matchId,
+    after: updatePayload,
+  })
 
   return NextResponse.json({ ok: true, match: data })
 }
