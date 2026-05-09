@@ -819,8 +819,8 @@ function ResultRow({
         </div>
       )}
 
-      {/* Main row: home — score — away — status */}
-      <div className="flex items-center gap-2 px-3 py-2">
+      {/* Main row: home — score — away — status/result */}
+      <div className="flex items-center gap-2 px-3 py-1.5">
         {/* Home */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
           <span className="font-condensed font-semibold text-[13px] text-cream truncate">
@@ -836,7 +836,7 @@ function ResultRow({
         </div>
 
         {/* Score / vs */}
-        <div className="shrink-0 w-12 text-center">
+        <div className="shrink-0 w-11 text-center">
           {revealed ? (
             <span className="font-condensed font-black text-[13px] tabular-nums text-cream">
               {score.home}–{score.away}
@@ -860,78 +860,73 @@ function ResultRow({
           </span>
         </div>
 
-        {/* Status */}
-        <span
-          className={
-            'shrink-0 w-12 text-right font-condensed text-[10px] font-bold uppercase tracking-wider ' +
-            (revealed ? 'text-cream/55' : 'text-gold-dark')
-          }
-        >
-          {revealed ? 'Slut' : 'Live'}
-        </span>
-      </div>
-
-      {/* Distribution row — odds + % */}
-      {revealed && (
-        <div className="flex gap-1 items-center px-3 pb-1.5 border-t border-cream/[0.06] pt-1.5 demo-result-reveal">
-          {(['1', 'X', '2'] as const).map((opt) => {
-            const data = distribution[opt]
-            const isHighest = data.pct === maxPct && data.pct > 0
-            const isUserCorrect = isCorrect && userPick === opt
-            return (
-              <div key={opt} className="flex-1 text-center">
-                <div className="font-condensed text-[10px] font-bold uppercase text-cream/40">
-                  {opt}
-                </div>
-                <div
-                  className="font-condensed text-[11px] tabular-nums text-cream/50"
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                >
-                  {data.odds.toFixed(2)}
-                </div>
-                <div
-                  className={
-                    'font-condensed text-[13px] font-bold tabular-nums ' +
-                    (isUserCorrect
-                      ? 'text-gold'
-                      : isHighest
-                        ? 'text-gold/80'
-                        : 'text-cream/50')
-                  }
-                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-                >
-                  {data.pct}%
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* User pick + result */}
-      {revealed && userPick && (
-        <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-t border-cream/[0.06]">
-          <span className="font-condensed text-[10px] font-bold uppercase tracking-wider text-cream/40">
-            Dit valg{' '}
-            <span className="ml-1 inline-block min-w-[18px] text-center text-cream/85 bg-cream/10 rounded px-1 py-px">
-              {userPick}
-            </span>
-            {correctOutcome && userPick !== correctOutcome && (
-              <span className="ml-2 text-cream/30">
-                Korrekt:{' '}
-                <span className="text-cream/60 bg-cream/10 rounded px-1 py-px">{correctOutcome}</span>
-              </span>
-            )}
-          </span>
+        {/* Result pill (replaces 'SLUT' — score communicates that) */}
+        {revealed ? (
           <span
             className={
-              'font-condensed text-[12px] font-bold tabular-nums ' +
+              'shrink-0 font-condensed text-[12px] font-bold tabular-nums tracking-wider ' +
               (isCorrect ? 'text-gold-dark' : 'text-vintage-red')
             }
+            style={{ minWidth: '54px', textAlign: 'right' }}
           >
             {isCorrect ? '+' : '−'}
             {stake} pt
           </span>
+        ) : (
+          <span
+            className="shrink-0 font-condensed text-[10px] font-bold uppercase tracking-wider text-gold-dark"
+            style={{ minWidth: '54px', textAlign: 'right' }}
+          >
+            Live
+          </span>
+        )}
+      </div>
+
+      {/* Distribution + dit valg — én kompakt vandret række */}
+      {revealed && (
+        <div className="flex items-center gap-3 px-3 pb-1.5 border-t border-cream/[0.06] pt-1.5 demo-result-reveal">
+          <div className="flex items-center gap-3 flex-1 justify-center">
+            {(['1', 'X', '2'] as const).map((opt) => {
+              const data = distribution[opt]
+              const isHighest = data.pct === maxPct && data.pct > 0
+              const isUserPick = userPick === opt
+              const isCorrectOutcome = correctOutcome === opt
+              const valueColor = isUserPick
+                ? isCorrect
+                  ? 'text-gold'
+                  : 'text-vintage-red'
+                : isCorrectOutcome
+                  ? 'text-gold/80'
+                  : isHighest
+                    ? 'text-gold/60'
+                    : 'text-cream/50'
+              return (
+                <div
+                  key={opt}
+                  className={
+                    'flex items-baseline gap-1.5 ' +
+                    (isUserPick ? 'rounded px-1.5 py-0.5 bg-cream/[0.06]' : '')
+                  }
+                >
+                  <span className="font-condensed font-bold text-[10px] uppercase text-cream/40">
+                    {opt}
+                  </span>
+                  <span
+                    className="font-condensed text-[10px] tabular-nums text-cream/40"
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                  >
+                    {data.odds.toFixed(2)}
+                  </span>
+                  <span
+                    className={'font-condensed text-[12px] font-bold tabular-nums ' + valueColor}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                  >
+                    {data.pct}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
