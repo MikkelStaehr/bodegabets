@@ -101,6 +101,20 @@ const MATCHES: Record<LeagueId, readonly Match[]> = {
 // 3 first matches "correct", last "incorrect" — uanset user's faktiske tips.
 const CORRECT_FLAGS: readonly boolean[] = [true, true, true, false]
 
+// Realistisk fordeling per kamp i step 3 — odds + % af spillere der har valgt
+// hvert outcome. Højeste % vises i guld (matcher produktets bet-distribution).
+type Distribution = {
+  '1': { odds: number; pct: number }
+  X: { odds: number; pct: number }
+  '2': { odds: number; pct: number }
+}
+const MATCH_DISTRIBUTIONS: readonly Distribution[] = [
+  { '1': { odds: 1.85, pct: 58 }, X: { odds: 3.6, pct: 22 }, '2': { odds: 4.2, pct: 20 } },
+  { '1': { odds: 2.1, pct: 47 }, X: { odds: 3.3, pct: 30 }, '2': { odds: 3.4, pct: 23 } },
+  { '1': { odds: 2.5, pct: 38 }, X: { odds: 3.1, pct: 35 }, '2': { odds: 2.7, pct: 27 } },
+  { '1': { odds: 2.9, pct: 33 }, X: { odds: 3.2, pct: 25 }, '2': { odds: 2.4, pct: 42 } },
+] as const
+
 // Credits-system — bruger har 500 at fordele over 4 kampe.
 const TOTAL_BUDGET = 500
 const DEFAULT_STAKE = 100
@@ -720,6 +734,7 @@ function Step3({
               isCorrect={CORRECT_FLAGS[idx]}
               score={FAKE_SCORES[idx]}
               stake={stakes[idx] ?? DEFAULT_STAKE}
+              distribution={MATCH_DISTRIBUTIONS[idx]}
             />
           )
         })}
@@ -910,6 +925,7 @@ function MatchCard({
   onAdjustStake,
   remainingBudget,
   compact,
+  distribution,
 }: {
   match: Match
   selected?: Tip
@@ -925,6 +941,8 @@ function MatchCard({
   remainingBudget?: number
   /** Skip inline stake-row (når kuponen håndterer stakes separat) */
   compact?: boolean
+  /** Vises i finished mode efter reveal — odds + % per outcome (mirror af AfgivBets bet distribution) */
+  distribution?: Distribution
 }) {
   const isRivalry = !!match.derby
   const isFinished = mode === 'finished' && revealed
@@ -1144,6 +1162,52 @@ function MatchCard({
             >
               +
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bet distribution — odds + % per outcome (matcher AfgivBets) */}
+      {mode === 'finished' && revealed && distribution && (
+        <div
+          className={
+            'px-2.5 py-2 border-t ' +
+            (isRivalry ? 'border-gold/20' : 'border-black/[0.06]')
+          }
+        >
+          <div className="flex gap-1 items-stretch">
+            {(['1', 'X', '2'] as const).map((opt) => {
+              const data = distribution[opt]
+              const maxPct = Math.max(distribution['1'].pct, distribution.X.pct, distribution['2'].pct)
+              const isHighest = data.pct === maxPct && data.pct > 0
+              const valueColor = isHighest ? 'text-gold-dark' : isRivalry ? 'text-cream/55' : 'text-warm-taupe'
+              return (
+                <div key={opt} className="flex-1 text-center">
+                  <div
+                    className={
+                      'font-condensed text-[10px] font-bold uppercase ' +
+                      (isRivalry ? 'text-cream/45' : 'text-warm-taupe')
+                    }
+                  >
+                    {opt}
+                  </div>
+                  <div
+                    className={
+                      'font-condensed text-[12px] tabular-nums ' +
+                      (isRivalry ? 'text-cream/55' : 'text-warm-taupe')
+                    }
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                  >
+                    {data.odds.toFixed(2)}
+                  </div>
+                  <div
+                    className={'font-condensed text-[13px] font-bold tabular-nums ' + valueColor}
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                  >
+                    {data.pct}%
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
