@@ -664,7 +664,7 @@ function Step2BuildLineup({
             }
             onAutoFill()
           }}
-          className="inline-flex items-center gap-1.5 font-condensed font-bold text-[11px] uppercase tracking-widest text-gold-dark hover:text-forest transition-colors min-h-[36px]"
+          className="inline-flex items-center gap-1.5 font-condensed font-bold text-[11px] uppercase tracking-widest text-gold-dark hover:text-forest transition-colors min-h-[44px] -ml-1 px-1"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
             <path d="M10 2l1.5 5h5.5l-4.5 3.5 1.5 5.5L10 12l-4 4 1.5-5.5L3 7h5.5z" />
@@ -697,14 +697,14 @@ function Step2BuildLineup({
                 type="button"
                 onClick={() => onOpenPicker(role.key)}
                 className={
-                  'w-full flex items-center gap-3 px-3 py-2 rounded-sm border transition-colors min-h-[60px] text-left ' +
+                  'w-full flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 rounded-sm border transition-colors min-h-[60px] text-left ' +
                   (rider
                     ? 'bg-white border-forest shadow-[0_0_0_1px_#1a3329]'
                     : 'bg-white border-warm-border hover:border-forest border-dashed')
                 }
               >
                 {/* Role label column */}
-                <div className="w-[88px] sm:w-[110px] flex-shrink-0">
+                <div className="w-[76px] sm:w-[110px] flex-shrink-0">
                   <div className="font-condensed font-bold text-[11px] uppercase tracking-[0.12em] text-gold-dark">
                     {role.label}
                   </div>
@@ -716,10 +716,10 @@ function Step2BuildLineup({
                   </div>
                 </div>
 
-                {/* Rider info or empty state */}
+                {/* Rider info or empty state — avatar mindre på mobil */}
                 {rider ? (
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <RiderAvatar rider={rider} size={36} />
+                    <RiderAvatar rider={rider} size={32} />
                     <div className="min-w-0 flex-1">
                       <div className="font-condensed font-bold text-[13px] text-forest leading-tight truncate">
                         {rider.lastName}{' '}
@@ -742,8 +742,8 @@ function Step2BuildLineup({
                   </div>
                 )}
 
-                {/* Action affordance */}
-                <span className="font-condensed font-bold text-[11px] uppercase tracking-widest text-gold-dark flex-shrink-0 ml-auto">
+                {/* Action affordance — skjult på mobil for at frigive plads */}
+                <span className="hidden sm:inline font-condensed font-bold text-[11px] uppercase tracking-widest text-gold-dark flex-shrink-0 ml-auto">
                   {rider ? 'Skift' : 'Vælg'}
                 </span>
 
@@ -756,7 +756,7 @@ function Step2BuildLineup({
                       onClearSlot(role.key)
                     }}
                     aria-label="Fjern rytter"
-                    className="w-8 h-8 inline-flex items-center justify-center text-warm-taupe hover:text-vintage-red flex-shrink-0"
+                    className="w-9 h-9 sm:w-8 sm:h-8 inline-flex items-center justify-center text-warm-taupe hover:text-vintage-red flex-shrink-0 -mr-1"
                   >
                     ✕
                   </button>
@@ -813,7 +813,7 @@ function RiderPickerSheet({
           type="button"
           onClick={onClose}
           aria-label="Luk picker"
-          className="w-10 h-10 inline-flex items-center justify-center text-warm-gray hover:text-forest -ml-2 flex-shrink-0"
+          className="w-11 h-11 inline-flex items-center justify-center text-warm-gray hover:text-forest -ml-2 flex-shrink-0"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" d="M19 12H5M12 19l-7-7 7-7" />
@@ -1037,12 +1037,11 @@ function Step3RaceResult({
               <div
                 key={b.role.key}
                 className={
-                  'grid items-center gap-2 px-3 py-2 ' +
+                  'grid items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 grid-cols-[72px_1fr_36px_58px] sm:grid-cols-[90px_1fr_50px_60px] ' +
                   (isLast ? '' : 'border-b border-warm-border ') +
                   (revealed ? 'cyc-result-reveal' : 'opacity-0')
                 }
                 style={{
-                  gridTemplateColumns: '90px 1fr 50px 60px',
                   animationDelay: revealed ? `${(RACE_RESULT.topPositions.length + idx) * 50}ms` : undefined,
                 }}
               >
@@ -1094,10 +1093,7 @@ function Step3RaceResult({
             )
           })}
           {/* Total */}
-          <div
-            className="grid items-center gap-2 px-3 py-3 bg-cream-dark border-t border-warm-border"
-            style={{ gridTemplateColumns: '90px 1fr 50px 60px' }}
-          >
+          <div className="grid items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-3 bg-cream-dark border-t border-warm-border grid-cols-[72px_1fr_36px_58px] sm:grid-cols-[90px_1fr_50px_60px]">
             <div></div>
             <div className="font-condensed font-bold text-[12px] uppercase tracking-widest text-forest">
               Total
@@ -1124,17 +1120,17 @@ function Step3RaceResult({
 const LEADERBOARD: ReadonlyArray<{
   pos: number; name: string; roundWins: number; roundPoints: number; blockWins: number; blockPoints: number; isUser?: boolean
 }> = [
-  { pos: 1, name: 'Stæhr', roundWins: 4, roundPoints: 18, blockWins: 2, blockPoints: 142, isUser: true },
-  { pos: 2, name: 'Nikolaj', roundWins: 2, roundPoints: 11, blockWins: 1, blockPoints: 119 },
-  { pos: 3, name: 'Louise', roundWins: 1, roundPoints: 8, blockWins: 1, blockPoints: 104 },
-  { pos: 4, name: 'Anders', roundWins: 1, roundPoints: 7, blockWins: 0, blockPoints: 88 },
-  { pos: 5, name: 'Mette', roundWins: 0, roundPoints: 5, blockWins: 0, blockPoints: 71 },
-  { pos: 6, name: 'Jens "DNF"', roundWins: 0, roundPoints: 2, blockWins: 0, blockPoints: 49 },
+  { pos: 1, name: 'Dig', roundWins: 4, roundPoints: 18, blockWins: 2, blockPoints: 142, isUser: true },
+  { pos: 2, name: 'Cancellara', roundWins: 2, roundPoints: 11, blockWins: 1, blockPoints: 119 },
+  { pos: 3, name: 'Sagan', roundWins: 1, roundPoints: 8, blockWins: 1, blockPoints: 104 },
+  { pos: 4, name: 'Boonen', roundWins: 1, roundPoints: 7, blockWins: 0, blockPoints: 88 },
+  { pos: 5, name: 'Cavendish', roundWins: 0, roundPoints: 5, blockWins: 0, blockPoints: 71 },
+  { pos: 6, name: 'Riis "DNF"', roundWins: 0, roundPoints: 2, blockWins: 0, blockPoints: 49 },
 ] as const
 
 const CHAT_MESSAGES = [
-  { avatar: 'N', avatarBg: '#B8963E', avatarFg: '#F2EDE4', name: 'Nikolaj', time: 'for 8 min siden', body: 'Hvordan tog du Pogačar som joker?? Det var en risk' },
-  { avatar: 'S', avatarBg: '#2C4A3E', avatarFg: '#F2EDE4', name: 'Stæhr', time: 'for 4 min siden', body: 'Han har vundet 4 i træk, jeg gambler 😎' },
+  { avatar: 'S', avatarBg: '#B8963E', avatarFg: '#F2EDE4', name: 'Sagan', time: 'for 8 min siden', body: 'Hvordan tog du Pogačar som joker?? Det var jo en risk 🎲' },
+  { avatar: 'C', avatarBg: '#2C4A3E', avatarFg: '#F2EDE4', name: 'Cancellara', time: 'for 4 min siden', body: 'Han har vundet 4 i træk. Spartacus ville have gjort det samme 😎' },
 ] as const
 
 function Step4Spilrum({ race, onClose }: { race: Race; onClose: () => void }) {
