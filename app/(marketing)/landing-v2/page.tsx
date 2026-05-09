@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { supabaseAdmin } from '@/lib/supabase'
 import HeroRotator from './HeroRotator'
+import GameTicker from '@/components/games/GameTicker'
 
 export const metadata: Metadata = {
   title: 'Bodega Bets — Spil mod vennerne',
@@ -15,6 +16,119 @@ export const revalidate = 300 // 5 min cache
 
 // Skjult test-side til redesign-iteration. Ikke linket fra navigation.
 // /landing-v2 (route group (marketing) ekskluderes fra URL).
+
+// ─── Ticker data ────────────────────────────────────────────────────────────
+
+const COPENHAGEN_TZ = 'Europe/Copenhagen'
+
+function formatKickoff(iso: string): string {
+  return new Date(iso).toLocaleString('da-DK', {
+    timeZone: COPENHAGEN_TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('da-DK', {
+    timeZone: COPENHAGEN_TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+async function getTickerItems(): Promise<{ items: string[]; currentDate: string }> {
+  const items: string[] = []
+  const nowIso = new Date().toISOString()
+
+  // Næste fodbold-kampe (kommende 14 dage)
+  try {
+    const cutoff = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    const { data: matches } = await supabaseAdmin
+      .from('matches')
+      .select('kickoff, home_team_id, away_team_id')
+      .gt('kickoff', nowIso)
+      .lt('kickoff', cutoff)
+      .order('kickoff', { ascending: true })
+      .limit(8)
+
+    const teamIds = new Set<number>()
+    for (const m of matches ?? []) {
+      teamIds.add(m.home_team_id)
+      teamIds.add(m.away_team_id)
+    }
+    if (teamIds.size > 0) {
+      const { data: teams } = await supabaseAdmin
+        .from('teams')
+        .select('id, name')
+        .in('id', [...teamIds])
+      const nameById = new Map<number, string>(
+        (teams ?? []).map((t) => [t.id as number, t.name as string]),
+      )
+      for (const m of matches ?? []) {
+        const home = nameById.get(m.home_team_id) ?? '?'
+        const away = nameById.get(m.away_team_id) ?? '?'
+        items.push(`⚽ ${home} – ${away} · ${formatKickoff(m.kickoff)}`)
+      }
+    }
+  } catch {
+    // Ignored — ticker virker uden fodbold-items hvis matches/teams ikke kan læses
+  }
+
+  // Næste cykel-stages (5 kommende)
+  try {
+    const { data: stages } = await supabaseAdmin
+      .from('cycling_stages')
+      .select('stage_number, start_date, name, cycling_races(name, race_type)')
+      .gt('start_date', nowIso)
+      .order('start_date', { ascending: true })
+      .limit(5)
+
+    type StageRow = {
+      stage_number: number
+      start_date: string
+      name: string
+      cycling_races: { name: string; race_type: string } | null
+    }
+    for (const s of (stages ?? []) as unknown as StageRow[]) {
+      const race = s.cycling_races
+      if (!race) continue
+      const date = formatDate(s.start_date)
+      if (race.race_type === 'one_day') {
+        items.push(`🚴 ${race.name} · ${date}`)
+      } else {
+        items.push(`🚴 ${race.name} · Etape ${s.stage_number} · ${date}`)
+      }
+    }
+  } catch {
+    // Ignored
+  }
+
+  // Sammenflet fodbold + cykel — alternér så listen føles mixed
+  const merged: string[] = []
+  const footballItems = items.filter((i) => i.startsWith('⚽'))
+  const cyclingItems = items.filter((i) => i.startsWith('🚴'))
+  const max = Math.max(footballItems.length, cyclingItems.length)
+  for (let i = 0; i < max; i++) {
+    if (i < footballItems.length) merged.push(footballItems[i])
+    if (i < cyclingItems.length) merged.push(cyclingItems[i])
+  }
+
+  // Server-rendered datostreng — passes til GameTicker så hydration ikke
+  // mismatcher når cachen spænder over midnat
+  const currentDate = new Date().toLocaleDateString('da-DK', {
+    timeZone: COPENHAGEN_TZ,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+
+  return { items: merged, currentDate }
+}
 
 async function getActiveUserCount(): Promise<number | null> {
   // Tæller brugere med login indenfor de seneste 30 dage. Hvis kaldet
@@ -34,7 +148,10 @@ async function getActiveUserCount(): Promise<number | null> {
 }
 
 export default async function LandingV2() {
-  const activeUserCount = await getActiveUserCount()
+  const [activeUserCount, ticker] = await Promise.all([
+    getActiveUserCount(),
+    getTickerItems(),
+  ])
 
   return (
     <div className="bg-forest text-cream min-h-screen">
@@ -43,6 +160,11 @@ export default async function LandingV2() {
 
       {/* Thick gold divider */}
       <div className="h-[3px] bg-gold" />
+
+      {/* Live nyhedsbjælke — næste runders fodbold-kampe + cykel-etaper */}
+      {ticker.items.length > 0 && (
+        <GameTicker items={ticker.items} currentDate={ticker.currentDate} />
+      )}
 
       <PriceSection />
       <ProductsSection />
