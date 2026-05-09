@@ -180,11 +180,14 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
       null
     )
   }
-  const defaultTabId = findFirstActionable(blockStages)
 
-  const [activeTab, setActiveTab] = useState<string | null>(defaultTabId)
+  // Initial render bruger ALTID første stage by id (deterministisk) så server
+  // og klient er enige under hydration. useEffect (kører kun på klient) opdaterer
+  // til firstActionable umiddelbart efter mount. Forhindrer hydration mismatch
+  // når server's new Date() ≠ klient's new Date() lige omkring deadline-cutoff.
+  const [activeTab, setActiveTab] = useState<string | null>(blockStages[0]?.id ?? null)
 
-  // Reset stage tab when block changes
+  // Mount-effekt: skift til den faktisk relevante tab på klienten
   useEffect(() => {
     setActiveTab(findFirstActionable(blockStages))
   }, [activeBlockId]) // eslint-disable-line react-hooks/exhaustive-deps

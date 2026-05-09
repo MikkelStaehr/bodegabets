@@ -2,16 +2,45 @@
 
 const DANISH_MONTHS = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
-export function formatCyclingDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  return `${d.getDate()}. ${DANISH_MONTHS[d.getMonth()]}`
+const COPENHAGEN_TZ = 'Europe/Copenhagen'
+
+// Brug Intl med eksplicit timezone så server (UTC) og klient (CET/CEST)
+// rendere samme output → ingen hydration mismatch. Plus null-guard så
+// invalid input ikke producerer 'NaN. undefined kl. NaN:NaN'.
+function getCopenhagenParts(d: Date) {
+  const fmt = new Intl.DateTimeFormat('da-DK', {
+    timeZone: COPENHAGEN_TZ,
+    day: 'numeric',
+    month: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  // formatToParts er deterministisk på tværs af Node + browsere
+  const parts = fmt.formatToParts(d)
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? ''
+  return {
+    day: parseInt(get('day'), 10),
+    month: parseInt(get('month'), 10),
+    hour: get('hour'),
+    minute: get('minute'),
+  }
 }
 
-export function formatCyclingDeadline(iso: string): string {
+export function formatCyclingDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
+  const { day, month } = getCopenhagenParts(d)
+  return `${day}. ${DANISH_MONTHS[month - 1]}`
+}
+
+export function formatCyclingDeadline(iso: string | null | undefined): string {
+  if (!iso) return '—'
   const d = new Date(iso)
-  const h = String(d.getHours()).padStart(2, '0')
-  const m = String(d.getMinutes()).padStart(2, '0')
-  return `${d.getDate()}. ${DANISH_MONTHS[d.getMonth()]} kl. ${h}:${m}`
+  if (isNaN(d.getTime())) return '—'
+  const { day, month, hour, minute } = getCopenhagenParts(d)
+  return `${day}. ${DANISH_MONTHS[month - 1]} kl. ${hour}:${minute}`
 }
 
 export const SHORT_RACE_NAMES: Record<string, string> = {
