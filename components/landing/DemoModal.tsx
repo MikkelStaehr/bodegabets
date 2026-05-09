@@ -297,10 +297,14 @@ export default function DemoModal({ open, onClose }: Props) {
     >
       <DemoStyles reducedMotion={reducedMotion} />
 
-      {/* Modal content frame — full-screen on mobile, contained on sm+ */}
+      {/* Modal content frame — full-screen on mobile, contained on sm+.
+          safe-area-inset-top respekterer iOS-notchen så top-bar er klikbar. */}
       <div
         className="relative bg-cream w-full sm:max-w-3xl sm:max-h-[92vh] sm:rounded-sm flex flex-col overflow-hidden"
-        style={{ fontFamily: "'Barlow', sans-serif" }}
+        style={{
+          fontFamily: "'Barlow', sans-serif",
+          paddingTop: 'env(safe-area-inset-top)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top bar */}
@@ -429,7 +433,12 @@ function Step1({
                     Vores format
                   </span>
                 )}
-                <div className="font-condensed font-bold text-forest text-[18px] sm:text-[20px] leading-tight pr-20">
+                <div
+                  className={
+                    'font-condensed font-bold text-forest text-[18px] sm:text-[20px] leading-tight ' +
+                    (league.isFlagship ? 'pr-20' : '')
+                  }
+                >
                   {league.name}
                 </div>
                 <div className="mt-2 font-body text-[13px] text-warm-gray leading-relaxed">
@@ -603,23 +612,23 @@ function KuponPanel({
                   type="button"
                   onClick={() => onRemoveTip(idx)}
                   aria-label="Fjern valg"
-                  className="text-[12px] text-warm-taupe opacity-50 hover:opacity-100 hover:text-vintage-red w-5 h-5 inline-flex items-center justify-center"
+                  className="text-[14px] text-warm-taupe opacity-60 hover:opacity-100 hover:text-vintage-red w-8 h-8 sm:w-6 sm:h-6 inline-flex items-center justify-center -mr-1.5"
                 >
                   ✕
                 </button>
               </div>
-              {/* Stake controls */}
-              <div className="flex items-center gap-1">
+              {/* Stake controls — store touch targets på mobil, mindre på lg */}
+              <div className="flex items-center gap-1.5 sm:gap-1">
                 <button
                   type="button"
                   onClick={() => onAdjustStake(idx, -STAKE_STEP)}
                   disabled={stake <= MIN_STAKE}
                   aria-label="Mindre stake"
-                  className="w-6 h-6 border border-warm-border rounded bg-cream text-forest font-bold text-sm flex items-center justify-center disabled:opacity-30 hover:border-forest"
+                  className="w-9 h-9 sm:w-7 sm:h-7 border border-warm-border rounded bg-cream text-forest font-bold text-base sm:text-sm flex items-center justify-center disabled:opacity-30 hover:border-forest active:bg-warm-border/40"
                 >
                   −
                 </button>
-                <div className="flex-1 text-center font-condensed text-[14px] font-bold text-forest border border-warm-border rounded bg-cream h-6 leading-6 tabular-nums">
+                <div className="flex-1 text-center font-condensed text-[15px] sm:text-[14px] font-bold text-forest border border-warm-border rounded bg-cream h-9 sm:h-7 leading-9 sm:leading-7 tabular-nums">
                   {stake}
                 </div>
                 <span className="text-[10px] text-warm-taupe font-semibold">pt</span>
@@ -628,7 +637,7 @@ function KuponPanel({
                   onClick={() => onAdjustStake(idx, STAKE_STEP)}
                   disabled={remaining < STAKE_STEP}
                   aria-label="Større stake"
-                  className="w-6 h-6 border border-warm-border rounded bg-cream text-forest font-bold text-sm flex items-center justify-center disabled:opacity-30 hover:border-forest"
+                  className="w-9 h-9 sm:w-7 sm:h-7 border border-warm-border rounded bg-cream text-forest font-bold text-base sm:text-sm flex items-center justify-center disabled:opacity-30 hover:border-forest active:bg-warm-border/40"
                 >
                   +
                 </button>
@@ -938,18 +947,18 @@ function ResultRow({
 function Step4({ league, onClose }: { league: League; onClose: () => void }) {
   return (
     <>
-      {/* Hero strip — mirrors gameroom */}
+      {/* Hero strip — mirrors gameroom. Padding strammere på mobil for plads. */}
       <div
-        className="px-5 pt-6 pb-7 text-cream"
+        className="px-4 sm:px-5 pt-5 sm:pt-6 pb-6 sm:pb-7 text-cream"
         style={{ background: '#1a3329', fontFamily: "'Barlow', sans-serif" }}
       >
         <div className="max-w-[680px] mx-auto">
-          <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="flex items-start justify-between gap-2 sm:gap-3 mb-4 sm:mb-5">
             <div className="min-w-0 flex-1">
               <h1
                 id="demo-step-heading"
-                className="font-condensed font-bold leading-tight"
-                style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 24, letterSpacing: '-0.01em' }}
+                className="font-condensed font-bold leading-tight text-[20px] sm:text-[24px]"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '-0.01em' }}
               >
                 {league.name} 25/26
               </h1>
@@ -968,10 +977,11 @@ function Step4({ league, onClose }: { league: League; onClose: () => void }) {
               </span>
             </div>
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-sm flex-shrink-0"
+              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-sm flex-shrink-0"
               style={{ background: 'rgba(242,237,228,0.1)', border: '1px solid rgba(242,237,228,0.2)' }}
             >
               <span
+                className="hidden sm:inline"
                 style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontSize: 9,
@@ -985,10 +995,11 @@ function Step4({ league, onClose }: { league: League; onClose: () => void }) {
               <span
                 style={{
                   fontFamily: "'Courier New', monospace",
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: 700,
                   color: '#B8963E',
                   letterSpacing: '0.08em',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 BDG-7K2A
@@ -996,9 +1007,9 @@ function Step4({ league, onClose }: { league: League; onClose: () => void }) {
             </div>
           </div>
 
-          {/* Stats strip — matches gameroom 4-col grid */}
+          {/* Stats strip — 4-col, smallere padding på mobil for at undgå cramp */}
           <div
-            className="grid grid-cols-4 pt-3.5"
+            className="grid grid-cols-4 pt-3 sm:pt-3.5"
             style={{ borderTop: '1px solid rgba(242,237,228,0.15)' }}
           >
             {[
@@ -1009,9 +1020,11 @@ function Step4({ league, onClose }: { league: League; onClose: () => void }) {
             ].map((stat, i) => (
               <div
                 key={stat.label}
+                className={
+                  (i > 0 ? 'pl-1.5 sm:pl-2.5 ' : '') +
+                  (i < 3 ? 'pr-1.5 sm:pr-2.5 ' : '')
+                }
                 style={{
-                  paddingLeft: i > 0 ? 10 : 0,
-                  paddingRight: i < 3 ? 10 : 0,
                   borderRight: i < 3 ? '1px solid rgba(242,237,228,0.15)' : 'none',
                 }}
               >
@@ -1019,18 +1032,21 @@ function Step4({ league, onClose }: { league: League; onClose: () => void }) {
                   style={{
                     fontFamily: "'Barlow Condensed', sans-serif",
                     fontSize: 9,
-                    letterSpacing: '0.12em',
+                    letterSpacing: '0.1em',
                     textTransform: 'uppercase',
                     color: 'rgba(242,237,228,0.5)',
                     marginBottom: 4,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 >
                   {stat.label}
                 </p>
                 <p
+                  className="text-[18px] sm:text-[20px]"
                   style={{
                     fontFamily: "'Barlow Condensed', sans-serif",
-                    fontSize: 20,
                     fontWeight: 700,
                     color: stat.gold ? '#B8963E' : '#F2EDE4',
                     lineHeight: 1,
@@ -1258,7 +1274,7 @@ function MatchCard({
               disabled={mode === 'finished' || !onTip}
               onClick={() => onTip?.(o)}
               aria-pressed={active}
-              className={`flex-1 py-1 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${btnClass} ${
+              className={`flex-1 py-2 sm:py-1.5 border-[1.5px] rounded-md flex flex-col items-center gap-0.5 transition-all ${btnClass} ${
                 mode === 'finished' ? 'cursor-default' : 'cursor-pointer'
               }`}
             >
