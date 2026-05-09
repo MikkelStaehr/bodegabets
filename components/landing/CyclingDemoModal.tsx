@@ -396,6 +396,9 @@ export default function CyclingDemoModal({ open, onClose }: Props) {
   function setSlot(role: RoleKey, riderId: string | null) {
     setLineup((prev) => ({ ...prev, [role]: riderId }))
   }
+  function autoFillLineup() {
+    setLineup({ ...SUGGESTED_LINEUP } as Record<RoleKey, string | null>)
+  }
   function assignRider(riderId: string) {
     if (!pickerForRole) return
     // Hvis rytter allerede er i andet slot, fjern den fra det andet slot
@@ -476,6 +479,7 @@ export default function CyclingDemoModal({ open, onClose }: Props) {
                 lineup={lineup}
                 onOpenPicker={(role) => setPickerForRole(role)}
                 onClearSlot={(role) => setSlot(role, null)}
+                onAutoFill={autoFillLineup}
               />
             )}
             {step === 3 && currentRace && (
@@ -595,16 +599,32 @@ function Step1ChooseRace({
 
 // ─── Step 2: Sæt lineup ────────────────────────────────────────────────────
 
+// Foreslået lineup når brugeren trykker 'Vælg for mig'. Kuratorerede valg
+// der viser et stærkt lineup men stadig efterlader plads til brugeren at
+// optimere via swap (joker-pick fx kan flyttes til Pogačar for større upside).
+const SUGGESTED_LINEUP: Record<RoleKey, string> = {
+  leader: 'pogacar',
+  lieutenant: 'vingegaard',
+  grimpeur: 'yates',
+  sprinter: 'van-aert',
+  domestique: 'jorgenson',
+  joker: 'skjelmose',
+  equipier_0: 'bernal',
+  equipier_1: 'aranburu',
+}
+
 function Step2BuildLineup({
   race,
   lineup,
   onOpenPicker,
   onClearSlot,
+  onAutoFill,
 }: {
   race: Race
   lineup: Record<RoleKey, string | null>
   onOpenPicker: (role: RoleKey) => void
   onClearSlot: (role: RoleKey) => void
+  onAutoFill: () => void
 }) {
   const filled = ROLES.filter((r) => lineup[r.key] !== null).length
   return (
@@ -633,19 +653,37 @@ function Step2BuildLineup({
         </span>
       </div>
 
-      {/* Filled counter */}
-      <div className="mt-3 flex items-center justify-between">
-        <span className="font-condensed text-[11px] uppercase tracking-widest text-warm-taupe">
-          Roller udfyldt
-        </span>
-        <span
-          className={
-            'font-condensed font-bold text-[14px] tabular-nums ' +
-            (filled === ROLES.length ? 'text-gold-dark' : 'text-forest')
-          }
+      {/* Filled counter + auto-fill action */}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (filled > 0) {
+              const ok = window.confirm('Erstat dit nuværende lineup med vores forslag?')
+              if (!ok) return
+            }
+            onAutoFill()
+          }}
+          className="inline-flex items-center gap-1.5 font-condensed font-bold text-[11px] uppercase tracking-widest text-gold-dark hover:text-forest transition-colors min-h-[36px]"
         >
-          {filled} / {ROLES.length}
-        </span>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+            <path d="M10 2l1.5 5h5.5l-4.5 3.5 1.5 5.5L10 12l-4 4 1.5-5.5L3 7h5.5z" />
+          </svg>
+          Vælg for mig
+        </button>
+        <div className="flex items-baseline gap-2">
+          <span className="font-condensed text-[11px] uppercase tracking-widest text-warm-taupe">
+            Roller udfyldt
+          </span>
+          <span
+            className={
+              'font-condensed font-bold text-[14px] tabular-nums ' +
+              (filled === ROLES.length ? 'text-gold-dark' : 'text-forest')
+            }
+          >
+            {filled} / {ROLES.length}
+          </span>
+        </div>
       </div>
 
       {/* Role slots */}
