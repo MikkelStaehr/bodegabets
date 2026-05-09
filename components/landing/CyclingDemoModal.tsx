@@ -203,6 +203,95 @@ const CAT_COLORS: Record<number, string> = {
   5: '#7A7060', // taupe
 }
 
+// ─── Rider avatar med onError-fallback til initialer ──────────────────────
+
+function RiderAvatar({
+  rider,
+  size = 36,
+  className = '',
+}: {
+  rider: Rider
+  size?: number
+  className?: string
+}) {
+  const [errored, setErrored] = useState(false)
+  const initial = rider.lastName.charAt(0)
+  const ringColor = CAT_COLORS[rider.cat]
+
+  if (errored || !rider.photo) {
+    return (
+      <div
+        className={`flex items-center justify-center rounded-full flex-shrink-0 ${className}`}
+        style={{
+          width: size,
+          height: size,
+          background: ringColor,
+          color: '#F2EDE4',
+          border: `2px solid ${ringColor}`,
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: Math.max(11, Math.round(size * 0.4)),
+          fontWeight: 700,
+        }}
+        aria-hidden
+      >
+        {initial}
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={rider.photo}
+      alt=""
+      onError={() => setErrored(true)}
+      className={`rounded-full object-cover flex-shrink-0 ${className}`}
+      style={{
+        width: size,
+        height: size,
+        border: `2px solid ${ringColor}`,
+        background: 'rgba(212,207,196,0.4)',
+      }}
+      loading="lazy"
+    />
+  )
+}
+
+function TeamLogo({
+  url,
+  height = 12,
+  maxWidth = 36,
+}: {
+  url: string
+  height?: number
+  maxWidth?: number
+}) {
+  const [errored, setErrored] = useState(false)
+  if (errored || !url) {
+    // Lille generic-jersey ikon som fallback (et farvet rectangle med subtil gradient)
+    return (
+      <span
+        className="inline-block flex-shrink-0 rounded-sm"
+        style={{
+          height,
+          width: Math.round(height * 0.85),
+          background: 'linear-gradient(135deg, #D4CFC4 0%, #C0B8A8 100%)',
+        }}
+        aria-hidden
+      />
+    )
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      onError={() => setErrored(true)}
+      className="object-contain flex-shrink-0"
+      style={{ height, width: 'auto', maxWidth }}
+      loading="lazy"
+    />
+  )
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 type Props = { open: boolean; onClose: () => void }
@@ -592,26 +681,14 @@ function Step2BuildLineup({
                 {/* Rider info or empty state */}
                 {rider ? (
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <img
-                      src={rider.photo}
-                      alt=""
-                      className="w-9 h-9 rounded-full object-cover flex-shrink-0 bg-warm-border/40"
-                      style={{ border: `2px solid ${CAT_COLORS[rider.cat]}` }}
-                      loading="lazy"
-                    />
+                    <RiderAvatar rider={rider} size={36} />
                     <div className="min-w-0 flex-1">
                       <div className="font-condensed font-bold text-[13px] text-forest leading-tight truncate">
                         {rider.lastName}{' '}
                         <span className="text-warm-taupe font-normal">{rider.firstName}</span>
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <img
-                          src={rider.teamLogo}
-                          alt=""
-                          className="h-3 w-auto object-contain flex-shrink-0"
-                          style={{ maxWidth: 40 }}
-                          loading="lazy"
-                        />
+                        <TeamLogo url={rider.teamLogo} height={12} maxWidth={40} />
                         <span className="text-[10px] text-warm-taupe truncate">
                           {rider.team}
                         </span>
@@ -748,26 +825,14 @@ function RiderPickerSheet({
                               : 'bg-white border-warm-border hover:border-forest active:bg-cream-dark')
                         }
                       >
-                        <img
-                          src={rider.photo}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover flex-shrink-0 bg-warm-border/40"
-                          style={{ border: `2px solid ${CAT_COLORS[rider.cat]}` }}
-                          loading="lazy"
-                        />
+                        <RiderAvatar rider={rider} size={32} />
                         <div className="min-w-0 flex-1">
                           <div className="font-condensed font-bold text-[13px] text-forest leading-tight truncate">
                             {rider.lastName}{' '}
                             <span className="text-warm-taupe font-normal">{rider.firstName}</span>
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <img
-                              src={rider.teamLogo}
-                              alt=""
-                              className="h-3 w-auto object-contain flex-shrink-0"
-                              style={{ maxWidth: 36 }}
-                              loading="lazy"
-                            />
+                            <TeamLogo url={rider.teamLogo} height={12} maxWidth={36} />
                             <span className="text-[10px] text-warm-taupe truncate">{rider.team}</span>
                           </div>
                         </div>
@@ -898,25 +963,14 @@ function Step3RaceResult({
                 >
                   {pos.pos}
                 </span>
-                <img
-                  src={rider.photo}
-                  alt=""
-                  className="w-6 h-6 rounded-full object-cover bg-cream/10"
-                  loading="lazy"
-                />
+                <RiderAvatar rider={rider} size={24} />
                 <div className="min-w-0">
                   <div className="font-condensed font-bold text-[12px] text-cream leading-tight truncate">
                     {rider.lastName}{' '}
                     <span className="text-cream/55 font-normal">{rider.firstName}</span>
                   </div>
                   <div className="flex items-center gap-1 mt-0.5">
-                    <img
-                      src={rider.teamLogo}
-                      alt=""
-                      className="h-2.5 w-auto object-contain"
-                      style={{ maxWidth: 30 }}
-                      loading="lazy"
-                    />
+                    <TeamLogo url={rider.teamLogo} height={10} maxWidth={30} />
                     <span className="text-[9px] text-cream/45 truncate">{rider.team}</span>
                   </div>
                 </div>
@@ -968,13 +1022,7 @@ function Step3RaceResult({
                 <div className="min-w-0">
                   {b.rider ? (
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <img
-                        src={b.rider.photo}
-                        alt=""
-                        className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-                        style={{ border: `2px solid ${CAT_COLORS[b.rider.cat]}` }}
-                        loading="lazy"
-                      />
+                      <RiderAvatar rider={b.rider} size={24} />
                       <span className="font-condensed font-bold text-[12px] text-forest truncate">
                         {b.rider.lastName}
                       </span>
