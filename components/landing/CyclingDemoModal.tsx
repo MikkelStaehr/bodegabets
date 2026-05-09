@@ -378,7 +378,7 @@ export default function CyclingDemoModal({ open, onClose }: Props) {
         </div>
 
         {/* Step content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain bg-cream relative">
+        <div className="flex-1 overflow-y-auto overscroll-contain bg-cream">
           <div key={step} className="cyc-step-anim" aria-live="polite">
             {step === 1 && <Step1ChooseRace selectedRace={selectedRace} onSelect={selectRace} />}
             {step === 2 && currentRace && (
@@ -399,19 +399,20 @@ export default function CyclingDemoModal({ open, onClose }: Props) {
               />
             )}
           </div>
-
-          {/* Rider picker overlay */}
-          {pickerForRole && (
-            <RiderPickerSheet
-              role={ROLES.find((r) => r.key === pickerForRole)!}
-              currentRiderId={lineup[pickerForRole]}
-              alreadyAssigned={lineup}
-              onPick={assignRider}
-              onClose={() => setPickerForRole(null)}
-              reducedMotion={reducedMotion}
-            />
-          )}
         </div>
+
+        {/* Rider picker overlay — søsken til scroll-area så den dækker hele
+            modal-rammen i stedet for at scrolle med step-indholdet */}
+        {pickerForRole && (
+          <RiderPickerSheet
+            role={ROLES.find((r) => r.key === pickerForRole)!}
+            currentRiderId={lineup[pickerForRole]}
+            alreadyAssigned={lineup}
+            onPick={assignRider}
+            onClose={() => setPickerForRole(null)}
+            reducedMotion={reducedMotion}
+          />
+        )}
 
         {/* Footer nav */}
         <FooterNav
@@ -684,16 +685,20 @@ function RiderPickerSheet({
 
   return (
     <div
-      className="absolute inset-0 z-10 bg-cream"
-      style={{ animation: reducedMotion ? undefined : 'cyc-sheet-in 250ms ease-out both' }}
+      className="absolute inset-0 z-20 bg-cream flex flex-col"
+      style={{
+        animation: reducedMotion ? undefined : 'cyc-sheet-in 250ms ease-out both',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
     >
-      {/* Header */}
-      <div className="sticky top-0 bg-cream border-b border-warm-border px-4 py-3 flex items-center gap-3">
+      {/* Header — fixed at top of picker */}
+      <div className="bg-cream border-b border-warm-border px-4 py-3 flex items-center gap-3 flex-shrink-0">
         <button
           type="button"
           onClick={onClose}
           aria-label="Luk picker"
-          className="w-10 h-10 inline-flex items-center justify-center text-warm-gray hover:text-forest -ml-2"
+          className="w-10 h-10 inline-flex items-center justify-center text-warm-gray hover:text-forest -ml-2 flex-shrink-0"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" d="M19 12H5M12 19l-7-7 7-7" />
@@ -709,8 +714,8 @@ function RiderPickerSheet({
         </div>
       </div>
 
-      {/* Riders grouped by category */}
-      <div className="px-4 sm:px-6 py-3 pb-24">
+      {/* Riders grouped by category — own internal scroll */}
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-3 pb-6">
         {[1, 2, 3, 4, 5].map((cat) => {
           const ridersInCat = sorted.filter((r) => r.cat === cat)
           if (ridersInCat.length === 0) return null
