@@ -713,31 +713,44 @@ function Step3({
         subtitle="Resultaterne ruller ind. Korrekt tip = stake tilbage som point. Forkert = stake tabt."
       />
 
-      <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 bg-forest text-cream rounded-sm">
-        <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.12em]">
-          {league.name} · Runde 27 · Live
-        </span>
-      </div>
+      {/* Round panel — mirror af LiveMatchesTicker / faktisk gameroom-runde */}
+      <div className="mt-5 bg-forest text-cream rounded-sm overflow-hidden">
+        <div className="px-4 py-2.5 flex items-center justify-between border-b border-cream/10">
+          <span className="font-condensed font-bold text-[12px] uppercase tracking-[0.12em]">
+            Runde 27 · {league.name}
+          </span>
+          <span
+            className="text-[10px] text-cream/40"
+            style={{ fontFamily: "'Courier New', monospace" }}
+          >
+            Live · 21:48
+          </span>
+        </div>
 
-      <div className="mt-4 space-y-2">
-        {matches.map((match, idx) => {
-          const revealed = idx < revealedCount
-          return (
-            <MatchCard
-              key={`step3-${idx}`}
-              match={match}
-              selected={tips[idx]}
-              mode="finished"
-              revealed={revealed}
-              userPick={tips[idx] ?? null}
-              correctOutcome={CORRECT_OUTCOMES[idx]}
-              isCorrect={CORRECT_FLAGS[idx]}
-              score={FAKE_SCORES[idx]}
-              stake={stakes[idx] ?? DEFAULT_STAKE}
-              distribution={MATCH_DISTRIBUTIONS[idx]}
-            />
-          )
-        })}
+        {/* Date separator */}
+        <div className="flex items-center gap-2 px-3 py-1.5">
+          <div className="flex-1 h-px bg-cream/10" />
+          <span className="font-condensed text-[10px] font-bold text-cream/55 uppercase tracking-wider">
+            Lørdag 9. maj
+          </span>
+          <div className="flex-1 h-px bg-cream/10" />
+        </div>
+
+        {/* Match rows */}
+        {matches.map((match, idx) => (
+          <ResultRow
+            key={`step3-${idx}`}
+            match={match}
+            revealed={idx < revealedCount}
+            score={FAKE_SCORES[idx]}
+            userPick={tips[idx] ?? null}
+            correctOutcome={CORRECT_OUTCOMES[idx]}
+            isCorrect={CORRECT_FLAGS[idx]}
+            stake={stakes[idx] ?? DEFAULT_STAKE}
+            distribution={MATCH_DISTRIBUTIONS[idx]}
+            isLast={idx === matches.length - 1}
+          />
+        ))}
       </div>
 
       <div className="mt-8 text-center">
@@ -755,6 +768,172 @@ function Step3({
           {correctCount} af {matches.length} rigtige tip
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── ResultRow — kompakt runde-række mirror af LiveMatchesTicker ───────────
+
+function ResultRow({
+  match,
+  revealed,
+  score,
+  userPick,
+  correctOutcome,
+  isCorrect,
+  stake,
+  distribution,
+  isLast,
+}: {
+  match: Match
+  revealed: boolean
+  score: { home: number; away: number }
+  userPick: Tip | null
+  correctOutcome: Tip
+  isCorrect: boolean
+  stake: number
+  distribution: Distribution
+  isLast: boolean
+}) {
+  const isRivalry = !!match.derby
+  const maxPct = Math.max(distribution['1'].pct, distribution.X.pct, distribution['2'].pct)
+
+  return (
+    <div
+      className={
+        (isLast ? '' : 'border-b border-cream/[0.06] ') +
+        (isRivalry ? 'bg-forest-light/30 ' : '')
+      }
+      style={{ fontFamily: "'Barlow', sans-serif" }}
+    >
+      {/* Rivalry tag */}
+      {isRivalry && (
+        <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-0">
+          <span className="text-[10px]" aria-hidden>🔥</span>
+          <span
+            className="font-condensed text-[10px] font-bold uppercase tracking-widest"
+            style={{ color: '#B8963E' }}
+          >
+            {match.derby} {match.multiplier && `· ${match.multiplier}`}
+          </span>
+        </div>
+      )}
+
+      {/* Main row: home — score — away — status */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        {/* Home */}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+          <span className="font-condensed font-semibold text-[13px] text-cream truncate">
+            {match.homeShort}
+          </span>
+          <img
+            src={match.homeLogo}
+            alt=""
+            style={{ width: 18, height: 18, objectFit: 'contain' }}
+            className="shrink-0"
+            loading="lazy"
+          />
+        </div>
+
+        {/* Score / vs */}
+        <div className="shrink-0 w-12 text-center">
+          {revealed ? (
+            <span className="font-condensed font-black text-[13px] tabular-nums text-cream">
+              {score.home}–{score.away}
+            </span>
+          ) : (
+            <span className="text-[10px] text-cream/40 font-semibold">vs</span>
+          )}
+        </div>
+
+        {/* Away */}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <img
+            src={match.awayLogo}
+            alt=""
+            style={{ width: 18, height: 18, objectFit: 'contain' }}
+            className="shrink-0"
+            loading="lazy"
+          />
+          <span className="font-condensed font-semibold text-[13px] text-cream truncate">
+            {match.awayShort}
+          </span>
+        </div>
+
+        {/* Status */}
+        <span
+          className={
+            'shrink-0 w-12 text-right font-condensed text-[10px] font-bold uppercase tracking-wider ' +
+            (revealed ? 'text-cream/55' : 'text-gold-dark')
+          }
+        >
+          {revealed ? 'Slut' : 'Live'}
+        </span>
+      </div>
+
+      {/* Distribution row — odds + % */}
+      {revealed && (
+        <div className="flex gap-1 items-center px-3 pb-1.5 border-t border-cream/[0.06] pt-1.5 demo-result-reveal">
+          {(['1', 'X', '2'] as const).map((opt) => {
+            const data = distribution[opt]
+            const isHighest = data.pct === maxPct && data.pct > 0
+            const isUserCorrect = isCorrect && userPick === opt
+            return (
+              <div key={opt} className="flex-1 text-center">
+                <div className="font-condensed text-[10px] font-bold uppercase text-cream/40">
+                  {opt}
+                </div>
+                <div
+                  className="font-condensed text-[11px] tabular-nums text-cream/50"
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                >
+                  {data.odds.toFixed(2)}
+                </div>
+                <div
+                  className={
+                    'font-condensed text-[13px] font-bold tabular-nums ' +
+                    (isUserCorrect
+                      ? 'text-gold'
+                      : isHighest
+                        ? 'text-gold/80'
+                        : 'text-cream/50')
+                  }
+                  style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                >
+                  {data.pct}%
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* User pick + result */}
+      {revealed && userPick && (
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-t border-cream/[0.06]">
+          <span className="font-condensed text-[10px] font-bold uppercase tracking-wider text-cream/40">
+            Dit valg{' '}
+            <span className="ml-1 inline-block min-w-[18px] text-center text-cream/85 bg-cream/10 rounded px-1 py-px">
+              {userPick}
+            </span>
+            {correctOutcome && userPick !== correctOutcome && (
+              <span className="ml-2 text-cream/30">
+                Korrekt:{' '}
+                <span className="text-cream/60 bg-cream/10 rounded px-1 py-px">{correctOutcome}</span>
+              </span>
+            )}
+          </span>
+          <span
+            className={
+              'font-condensed text-[12px] font-bold tabular-nums ' +
+              (isCorrect ? 'text-gold-dark' : 'text-vintage-red')
+            }
+          >
+            {isCorrect ? '+' : '−'}
+            {stake} pt
+          </span>
+        </div>
+      )}
     </div>
   )
 }
