@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getActiveUserCount } from '@/lib/landingData'
 import HeroRotator from './HeroRotator'
 import GameTicker from '@/components/games/GameTicker'
 
@@ -128,23 +129,6 @@ async function getTickerItems(): Promise<{ items: string[]; currentDate: string 
   })
 
   return { items: merged, currentDate }
-}
-
-async function getActiveUserCount(): Promise<number | null> {
-  // Tæller brugere med login indenfor de seneste 30 dage. Hvis kaldet
-  // fejler returnerer vi null så hero-indikatoren skjules helt.
-  try {
-    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
-    const { data } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-    const users = (data?.users ?? []) as Array<{ last_sign_in_at?: string | null }>
-    if (users.length === 0) return null
-    return users.filter((u) => {
-      const last = u.last_sign_in_at
-      return last ? new Date(last).getTime() > cutoff : false
-    }).length
-  } catch {
-    return null
-  }
 }
 
 export default async function LandingV2() {

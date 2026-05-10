@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import GameTicker from '@/components/games/GameTicker'
-import RotatingWord from '@/components/layout/RotatingWord'
+import HeroRotator from '@/app/(marketing)/landing-v2/HeroRotator'
+import { getActiveUserCount } from '@/lib/landingData'
 import type { Profile } from '@/types'
 
 function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
@@ -19,7 +20,10 @@ function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: { user } }, activeUserCount] = await Promise.all([
+    supabase.auth.getUser(),
+    getActiveUserCount(),
+  ])
 
   const { data: profiles } = await supabase
     .from('public_profiles')
@@ -62,145 +66,10 @@ export default async function HomePage() {
           {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
         </div>
 
-        <header className="relative overflow-hidden min-h-screen">
-          <div className="max-w-6xl mx-auto px-6 lg:px-8 flex items-center min-h-screen">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center w-full py-20">
-
-              {/* Left — copy */}
-              <div className="animate-fadeUp text-center lg:text-left">
-                <div className="flex items-center justify-center lg:justify-start gap-3 mb-8">
-                  <span className="block w-8 h-[2px] bg-gold" />
-                  <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
-                    Privat sport-betting
-                  </span>
-                </div>
-
-                <h1 className="mb-8">
-                  <span className="block font-condensed text-cream uppercase leading-[0.95] font-[800] text-[clamp(56px,8vw,88px)]">
-                    Spil mod
-                  </span>
-                  <span className="block font-display italic text-gold leading-[1.05] font-[900] text-[clamp(60px,8.5vw,96px)]">
-                    <RotatingWord />
-                  </span>
-                </h1>
-
-                <p className="font-body text-cream/50 text-lg max-w-md mx-auto lg:mx-0 mb-2 leading-relaxed font-medium">
-                  Ingen rigtige penge. Al prestige.
-                </p>
-                <p className="font-body text-cream/40 text-base max-w-md mx-auto lg:mx-0 mb-10 leading-relaxed">
-                  Opret private spilrum, afgiv bets på sportskampe og kæmp om point og ære med vennerne.
-                </p>
-
-                {/* CTAs */}
-                {user ? (
-                  <Link
-                    href="/dashboard"
-                    className="inline-flex items-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-85 transition-opacity font-bold text-[15px]"
-                  >
-                    Gå til dashboard
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                ) : (
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-                    <Link
-                      href="/register"
-                      className="inline-flex items-center justify-center gap-2 bg-cream text-forest font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:opacity-85 transition-opacity font-bold text-[15px]"
-                    >
-                      Opret profil gratis
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                    <Link
-                      href="/login"
-                      className="inline-flex items-center justify-center bg-transparent border-[1.5px] border-cream/30 text-cream font-condensed uppercase tracking-[0.08em] px-8 py-4 rounded-sm hover:border-cream/60 transition-colors font-semibold text-[15px]"
-                    >
-                      Log ind
-                    </Link>
-                  </div>
-                )}
-
-                {/* Pills */}
-                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mt-10 justify-center lg:justify-start">
-                  {['Sport & ligaer', 'Konsensus-odds', 'Live resultater', 'Gratis'].map((pill) => (
-                    <span
-                      key={pill}
-                      className="font-condensed text-xs uppercase tracking-[0.08em] text-cream/50 border border-cream/15 px-3 py-1.5 rounded-full font-semibold"
-                    >
-                      {pill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right — coupon mockup (hidden on mobile) */}
-              <div className="hidden lg:flex justify-center animate-fadeUp" style={{ animationDelay: '0.2s' }}>
-                <div
-                  className="w-[340px] rounded-sm overflow-hidden transition-transform duration-500 hover:rotate-0 bg-cream shadow-2xl"
-                  style={{ transform: 'rotate(5deg)' }}
-                >
-                  {/* Coupon header */}
-                  <div className="flex items-center justify-between px-5 py-3 bg-forest">
-                    <span className="font-condensed text-cream text-sm uppercase tracking-[0.08em] font-bold">
-                      Min kupon
-                    </span>
-                    <span className="font-condensed text-xs uppercase tracking-[0.08em] px-2.5 py-0.5 rounded-full font-bold bg-gold/20 text-gold">
-                      Aktiv
-                    </span>
-                  </div>
-
-                  {/* Matches */}
-                  <div className="divide-y divide-ink/[0.06]">
-                    {[
-                      { home: 'Liverpool', away: 'Man United', selected: '1', correct: 'X' },
-                      { home: 'Real Madrid', away: 'Barcelona', selected: null, correct: null },
-                      { home: 'PSG', away: 'Marseille', selected: null, correct: null },
-                    ].map((match, i) => (
-                      <div key={i} className="px-5 py-3.5">
-                        <p className="font-body text-xs text-ink/60 mb-2">
-                          {match.home} – {match.away}
-                        </p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {['1', 'X', '2'].map((opt) => {
-                            const isSelected = match.selected === opt
-                            const isCorrect = match.correct === opt
-                            return (
-                              <div
-                                key={opt}
-                                className={[
-                                  'font-condensed text-center text-sm py-2 rounded-sm font-bold border-2',
-                                  isSelected
-                                    ? 'bg-forest text-cream border-transparent'
-                                    : 'bg-cream-dark text-warm-gray border-transparent',
-                                  isCorrect ? 'border-gold' : '',
-                                ].join(' ')}
-                              >
-                                {opt}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Coupon footer */}
-                  <div className="flex items-center justify-between px-5 py-3 border-t border-ink/[0.06]">
-                    <span className="font-body text-sm text-ink/60">300 pt indsats</span>
-                    <span className="font-condensed text-xs uppercase tracking-[0.08em] px-4 py-2 rounded-sm cursor-pointer font-bold bg-gold text-forest">
-                      Lås valg
-                      <svg className="w-3 h-3 inline ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        {/* Hero (rotating slides + interactive sport-tabs).
+            Genbruger den allerede mobil-auditerede komponent fra /landing-v2.
+            CTAs peger til /games/new — fungerer for både logged-in og anonyme. */}
+        <HeroRotator activeUserCount={activeUserCount} />
       </div>
 
       {/* ── Sådan virker det ──────────────────────────────────── */}
