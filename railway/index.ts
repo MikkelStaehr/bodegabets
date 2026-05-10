@@ -31,6 +31,7 @@ import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, calculateChampionshipRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
 import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage } from '@/lib/calculateCyclingPoints'
+import { syncCyclingResults } from '@/lib/syncCyclingResults'
 
 const app = express()
 app.use(express.json())
@@ -862,6 +863,48 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
   }
 })
 
+// ─── GET /sync-cycling-results ──────────────────────────────────────────────
+// Henter etape-resultater fra PCS for aktive stage races og upserter dem til
+// cycling_results. Trigger derefter automatisk runCyclingPointsForStage for
+// hver nyligt synket etape.
+
+app.get('/sync-cycling-results', async (_req, res) => {
+  try {
+    const result = await syncCyclingResults()
+
+    // Trigger points-beregning for hver nyligt synket stage
+    const pointsErrors: string[] = []
+    for (const stageId of result.syncedStageIds) {
+      try {
+        await runCyclingPointsForStage(stageId)
+      } catch (err) {
+        pointsErrors.push(`stage ${stageId}: ${err}`)
+      }
+    }
+
+    if (result.syncedStageIds.length > 0) {
+      console.log(`[sync-cycling-results] Beregnet point for ${result.syncedStageIds.length} nye stages`)
+    }
+
+    res.json({
+      ok: result.ok && pointsErrors.length === 0,
+      stagesProcessed: result.stagesProcessed,
+      resultsUpserted: result.resultsUpserted,
+      unmatched: result.unmatched,
+      syncedStages: result.syncedStageIds.length,
+      errors: [...result.errors, ...pointsErrors],
+    })
+  } catch (err) {
+    console.error('[sync-cycling-results]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_results_sync',
+      status: 'error',
+      message: `sync-cycling-results failed: ${String(err)}`,
+    })
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /cycling-points ────────────────────────────────────────────────────
 // Finder cykling-løb der netop er skiftet til 'finished' og beregner point
 /*
@@ -882,29 +925,53 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
 
 app.get('/cycling-points', async (_req, res) => {
   try {
-    // Find alle finished cycling races — beregning er idempotent (upsert)
-    // så det er OK at køre den for alle finished races hver gang
+    // Process ALLE stages med results_uploaded_at (active + finished races).
+    // Tidligere filtrerede vi kun på status='finished' hvilket ignorerede
+    // aktive Grand Tours hvor enkelte etaper er færdige — fanget af user
+    // efter Giro 2026 stage 1 ikke fik beregnet point automatisk.
+    const { data: stages } = await supabaseAdmin
+      .from('cycling_stages')
+      .select('id, stage_number, race_id, cycling_races!inner(name)')
+      .not('results_uploaded_at', 'is', null)
+      .order('stage_number')
+
+    const stageRows = (stages ?? []) as unknown as Array<{
+      id: string
+      stage_number: number
+      race_id: string
+      cycling_races: { name: string }
+    }>
+
+    const processed: { race: string; stage: number }[] = []
+    const raceNames = new Set<string>()
+    for (const s of stageRows) {
+      console.log(`[cycling-points] Beregner ${s.cycling_races.name} stage ${s.stage_number}...`)
+      await runCyclingPointsForStage(s.id)
+      processed.push({ race: s.cycling_races.name, stage: s.stage_number })
+      raceNames.add(s.cycling_races.name)
+    }
+
+    // Backwards-compat: bulk-fallback for finished one-day races der ikke
+    // har stage-niveau timestamp (legacy data)
     const { data: finishedRaces } = await supabaseAdmin
       .from('cycling_races')
       .select('id, name')
       .eq('status', 'finished')
-
-    const processed: string[] = []
-
     for (const race of finishedRaces ?? []) {
-      console.log(`[cycling-points] Beregner point for ${race.name}...`)
-      await runCyclingPointsForAllGames(race.id)
-      processed.push(race.name)
+      if (!raceNames.has(race.name)) {
+        await runCyclingPointsForAllGames(race.id)
+        processed.push({ race: race.name, stage: 0 })
+      }
     }
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'cycling_points',
       status: processed.length > 0 ? 'success' : 'info',
-      message: `cycling-points: ${processed.length} løb beregnet`,
-      metadata: { races: processed },
+      message: `cycling-points: ${processed.length} stages beregnet`,
+      metadata: { processed },
     })
 
-    res.json({ ok: true, processed: processed.length, races: processed })
+    res.json({ ok: true, processed: processed.length, items: processed })
   } catch (err) {
     console.error('[cycling-points]', err)
     await supabaseAdmin.from('admin_logs').insert({
@@ -1095,7 +1162,14 @@ app.listen(PORT, () => {
   // Hvert 15. minut — lås cycling lineups (kun 09:00–20:00 UTC / 10:00–21:00 DK)
   cron.schedule('*/15 9-20 * * *', () => callEndpoint('/cycling-lock-lineups'))
 
-  // Hvert 30. minut — beregn cykling-point (kun 09:00–20:00 UTC)
+  // Hver time fra 14:00–22:00 UTC (16:00–24:00 DK) — pull etape-resultater
+  // fra PCS. Etaper slutter typisk 14:30–17:30 UTC. Sync trigger derefter
+  // automatisk runCyclingPointsForStage internt, så vi får point straks.
+  cron.schedule('0 14-22 * * *', () => callEndpoint('/sync-cycling-results'))
+
+  // Hvert 30. minut — beregn cykling-point safety net (kun 09:00–20:00 UTC).
+  // Primær trigger er nu inde i /sync-cycling-results, men dette fanger
+  // legacy data (one-day races) eller stages der mistede deres trigger.
   cron.schedule('*/30 9-20 * * *', () => callEndpoint('/cycling-points'))
 
   // Dagligt kl. 08:00 UTC — auto-arkivér cycling gamerooms efter sidste løb
