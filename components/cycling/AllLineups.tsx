@@ -43,6 +43,16 @@ const ROLE_LABELS: Record<string, string> = {
   equipier: 'Équipier',
   joker: 'Joker',
 }
+// Korte versioner brugt på narrow viewports så rytter-navn får plads
+const ROLE_LABELS_SHORT: Record<string, string> = {
+  leader: 'LDR',
+  lieutenant: 'LIE',
+  grimpeur: 'GRI',
+  sprinter: 'SPR',
+  domestique: 'DOM',
+  equipier: 'EQP',
+  joker: 'JOK',
+}
 
 function sortRiders(riders: RiderInLineup[]): RiderInLineup[] {
   return [...riders].sort((a, b) => {
@@ -144,11 +154,19 @@ export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
           )}
 
           {!loading && !error && lineups && lineups.length > 0 && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${Math.min(lineups.length, 3)}, 1fr)`,
-              gap: 1, background: 'rgba(255,255,255,0.06)',
-            }}>
+            // Responsive grid: 1 kolonne på mobil, 2 på md, op til 3 på lg.
+            // CSS-vars bruges fordi lg-værdien er dynamisk (afhænger af antal
+            // lineups). Mobil-default 1fr forhindrer at navne klippes på
+            // iPhone (Nikolaj-rapporten 11. maj 2026).
+            <div
+              className="grid grid-cols-1 md:grid-cols-[var(--lineups-cols-md)] lg:grid-cols-[var(--lineups-cols-lg)]"
+              style={{
+                gap: 1,
+                background: 'rgba(255,255,255,0.06)',
+                ['--lineups-cols-md' as string]: lineups.length === 1 ? '1fr' : '1fr 1fr',
+                ['--lineups-cols-lg' as string]: `repeat(${Math.min(lineups.length, 3)}, 1fr)`,
+              } as React.CSSProperties}
+            >
               {lineups.map((entry) => {
                 const isMe = entry.user_id === currentUserId
                 return (
@@ -201,12 +219,17 @@ export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
                           borderBottom: idx < entry.riders.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                         }}
                       >
-                        <span style={{
-                          fontFamily: "'Barlow Condensed', sans-serif",
-                          fontSize: 9, fontWeight: 600, color: '#8FABC4',
-                          width: 48, letterSpacing: '0.04em', flexShrink: 0,
-                        }}>
-                          {ROLE_LABELS[r.role] ?? r.role}
+                        <span
+                          className="font-condensed flex-shrink-0 w-9 sm:w-12"
+                          style={{
+                            fontFamily: "'Barlow Condensed', sans-serif",
+                            fontSize: 9, fontWeight: 600, color: '#8FABC4',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          {/* Kort på mobil, fuld på sm+ */}
+                          <span className="sm:hidden">{ROLE_LABELS_SHORT[r.role] ?? r.role.slice(0, 3).toUpperCase()}</span>
+                          <span className="hidden sm:inline">{ROLE_LABELS[r.role] ?? r.role}</span>
                         </span>
                         <TeamLogo url={r.team_logo_url} team={r.team_name} />
                         <span style={{
