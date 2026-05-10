@@ -104,6 +104,20 @@ export default async function SquadPage({ params, searchParams }: Props) {
     }
   }
 
+  // Hent DNF/DNS-ryttere fra de aktive løb — markeres som 'UD' i squad-view
+  // så brugeren ser hvem der er kørt hjem og kan transferre dem ud.
+  const abandonedRiderIds: Set<string> = new Set()
+  if (raceIds.length > 0) {
+    const { data: dnfData } = await supabaseAdmin
+      .from('cycling_results')
+      .select('rider_id')
+      .in('race_id', raceIds)
+      .eq('dnf', true)
+    for (const row of dnfData ?? []) {
+      abandonedRiderIds.add(row.rider_id)
+    }
+  }
+
   // Fetch block name and block race IDs if blockId is provided
   let blockName: string | null = null
   let blockRaceIds: string[] = []
@@ -210,6 +224,7 @@ export default async function SquadPage({ params, searchParams }: Props) {
           blockId={blockId ?? null}
           blockRaceIds={blockRaceIds}
           squadLimits={squadLimits}
+          abandonedRiderIds={[...abandonedRiderIds]}
         />
       </div>
     </div>

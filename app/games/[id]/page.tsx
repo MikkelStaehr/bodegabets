@@ -304,6 +304,8 @@ export default async function GamePage({ params }: Props) {
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null }[] = []
   let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; results_uploaded_at: string | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupStartlists: Record<string, string[]> = {}
+  // raceId → riderId → abandon_type (DNF, DNS, OTL, DSQ)
+  const lineupAbandoned: Record<string, Record<string, string>> = {}
   let blockSquadMap: Record<string, string> = {}
 
   if (typedGame.sport === 'cycling') {
@@ -449,6 +451,18 @@ export default async function GamePage({ params }: Props) {
       for (const row of startlistData ?? []) {
         if (!lineupStartlists[row.race_id]) lineupStartlists[row.race_id] = []
         lineupStartlists[row.race_id].push(row.rider_id)
+      }
+
+      // Hent DNF/DNS-ryttere — i et stage race er en DNF permanent for resten
+      // af løbet, så de skal disables i pickeren for kommende etaper.
+      const { data: dnfData } = await supabaseAdmin
+        .from('cycling_results')
+        .select('race_id, rider_id, abandon_type')
+        .in('race_id', raceIdsForStages)
+        .eq('dnf', true)
+      for (const row of dnfData ?? []) {
+        if (!lineupAbandoned[row.race_id]) lineupAbandoned[row.race_id] = {}
+        lineupAbandoned[row.race_id][row.rider_id] = row.abandon_type ?? 'DNF'
       }
     }
 
@@ -1120,6 +1134,7 @@ export default async function GamePage({ params }: Props) {
               races={lineupRaces}
               stages={lineupStages}
               startlists={lineupStartlists}
+              abandoned={lineupAbandoned}
               squadRiders={lineupSquadRiders}
               blocks={cyclingBlocks}
               defaultBlockId={cyclingActiveBlock?.id ?? null}

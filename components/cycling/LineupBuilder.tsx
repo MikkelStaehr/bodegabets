@@ -20,6 +20,10 @@ type Props = {
   races: CyclingRace[]
   stages: CyclingStage[]
   startlists?: Record<string, string[]>  // race_id → rider_ids
+  /** raceId → riderId → abandon_type (DNF/DNS/OTL/DSQ).
+   *  I et stage race er en abandon permanent for resten af løbet, så de
+   *  ryttere disables i pickeren for kommende etaper. */
+  abandoned?: Record<string, Record<string, string>>
   squadRiders: CyclingSquadRider[]
   blocks: CyclingBlock[]
   defaultBlockId?: string | null
@@ -116,7 +120,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -945,10 +949,11 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         const role = ROLES.find((r) => r.key === roleKey)!
         const usedIds = getUsedRiderIds(stageId)
 
-        // Find race_id for den aktive stage, og hent startliste
+        // Find race_id for den aktive stage, og hent startliste + DNF-set
         const modalStage = stages.find((s) => s.id === stageId)
         const startlistIds = modalStage && startlists?.[modalStage.race_id] ? new Set(startlists[modalStage.race_id]) : null
         const hasStartlist = startlistIds !== null && startlistIds.size > 0
+        const abandonedMap = modalStage ? abandoned?.[modalStage.race_id] ?? {} : {}
 
         // Sort: startliste-ryttere først, så andre
         const filteredRiders = squadRiders
@@ -1065,22 +1070,31 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                   filteredRiders.map((rider, idx) => {
                     const alreadyUsed = usedIds.has(rider.id) && lineups[stageId]?.[roleKey] !== rider.id
                     const isOnStartlist = hasStartlist ? startlistIds!.has(rider.id) : null
-                    const dimmed = alreadyUsed || (hasStartlist && !isOnStartlist)
+                    const abandonType = abandonedMap[rider.id] ?? null
+                    const isOut = !!abandonType
+                    const isDisabled = alreadyUsed || isOut
+                    const tooltip = isOut
+                      ? `Ude af løbet (${abandonType})`
+                      : alreadyUsed
+                        ? 'Allerede valgt i en anden rolle'
+                        : hasStartlist && !isOnStartlist
+                          ? 'Starter ikke i dette løb'
+                          : undefined
                     return (
                       <button
-                        key={rider.id} type="button" disabled={alreadyUsed}
-                        title={alreadyUsed ? 'Allerede valgt i en anden rolle' : (hasStartlist && !isOnStartlist ? 'Starter ikke i dette løb' : undefined)}
+                        key={rider.id} type="button" disabled={isDisabled}
+                        title={tooltip}
                         onClick={() => { setSlot(stageId, roleKey, rider.id); setModalOpen(null) }}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
                           width: '100%', padding: '10px 16px',
                           background: 'transparent', border: 'none',
                           borderBottom: idx < filteredRiders.length - 1 ? '1px solid #1E3A5F' : 'none',
-                          cursor: alreadyUsed ? 'not-allowed' : 'pointer',
-                          opacity: alreadyUsed ? 0.35 : (hasStartlist && !isOnStartlist ? 0.5 : 1),
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          opacity: isOut ? 0.3 : alreadyUsed ? 0.35 : (hasStartlist && !isOnStartlist ? 0.5 : 1),
                           textAlign: 'left', transition: 'background 0.1s',
                         }}
-                        onMouseEnter={(e) => { if (!alreadyUsed) e.currentTarget.style.background = '#1E3A5F' }}
+                        onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = '#1E3A5F' }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                       >
                         <TeamLogo url={rider.team_logo_url} team={rider.team_name} />
@@ -1097,7 +1111,14 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                             {rider.team_name}
                           </div>
                         </div>
-                        {hasStartlist && (
+                        {isOut ? (
+                          <span style={{
+                            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,
+                            padding: '2px 6px', borderRadius: 4,
+                            background: 'rgba(200,57,43,0.18)', color: '#E26D5C',
+                            letterSpacing: '0.06em',
+                          }}>UD · {abandonType}</span>
+                        ) : hasStartlist && (
                           isOnStartlist ? (
                             <span style={{
                               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,

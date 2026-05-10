@@ -37,6 +37,9 @@ type Props = {
   blockId: string | null
   blockRaceIds: string[]
   squadLimits: SquadLimits
+  /** Rider-ids der er DNF/DNS i et af blokkens aktive løb. Vises som
+   *  'UD'-badge så bruger kan se hvem der skal transferres ud. */
+  abandonedRiderIds?: string[]
 }
 
 // Short race name aliases
@@ -95,7 +98,8 @@ function Spinner() {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId, blockRaceIds, squadLimits }: Props) {
+export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId, blockRaceIds, squadLimits, abandonedRiderIds = [] }: Props) {
+  const abandonedSet = useMemo(() => new Set(abandonedRiderIds), [abandonedRiderIds])
   const CAT_LIMITS = squadLimits.catLimits
   const MAX_TOTAL = squadLimits.maxTotal
   const MAX_PER_TEAM = squadLimits.maxPerTeam
@@ -418,7 +422,24 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     >
                       {rider.last_name}
                       <span style={{ fontWeight: 400, color: '#6b6b6b' }}> {rider.first_name}</span>
-                      {isGhost && (
+                      {abandonedSet.has(rider.id) && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            padding: '1px 5px',
+                            background: '#C8392B',
+                            color: '#fff',
+                            fontSize: 9,
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            letterSpacing: '0.05em',
+                          }}
+                          title="Ude af løbet — DNF/DNS"
+                        >
+                          UD AF LØBET
+                        </span>
+                      )}
+                      {!abandonedSet.has(rider.id) && isGhost && (
                         <span
                           style={{
                             marginLeft: 6,
@@ -633,6 +654,23 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                       >
                         {rider.last_name}
                         <span style={{ fontWeight: 400, color: '#6b6b6b' }}> {rider.first_name}</span>
+                        {abandonedSet.has(rider.id) && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              padding: '1px 5px',
+                              background: '#C8392B',
+                              color: '#fff',
+                              fontSize: 9,
+                              fontWeight: 700,
+                              borderRadius: 2,
+                              letterSpacing: '0.05em',
+                            }}
+                            title="Ude af løbet — DNF/DNS"
+                          >
+                            UD
+                          </span>
+                        )}
                       </div>
                       <div
                         style={{
