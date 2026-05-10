@@ -121,6 +121,17 @@ def scrape_stage_results(slug: str, stage_num: int, client: httpx.Client) -> tup
         _log(f"    Fallback: stage page had {len(stage_results)} vs /result {len(results)}")
         results = stage_results
 
+    # Sanity check — en ægte stage har 100+ finishers eller en winner med
+    # tids-gap. Hvis vi har <10 entries OG ingen rytter har time_gap_seconds,
+    # er det sandsynligvis en startlist/favourites-table fra en stage der ikke
+    # er kørt endnu (Giro stage 3 edge case 10. maj 2026 hvor 1 favourite slap
+    # gennem _parse_results_table's tr-filter).
+    if results and len(results) < 10:
+        any_time = any(r.get("time_gap_seconds") is not None for r in results)
+        if not any_time:
+            _log(f"    Sanity: {len(results)} entries uden time-gap — sandsynligvis ikke ægte resultat, skipper")
+            return [], jerseys, profile, won_how, gc_positions
+
     return results, jerseys, profile, won_how, gc_positions
 
 
