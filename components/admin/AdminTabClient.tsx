@@ -15,21 +15,26 @@ import { AdminCyclingDashboardTab } from './tabs/cycling/AdminCyclingDashboardTa
 import { AdminCyclingRidersTab } from './tabs/cycling/AdminCyclingRidersTab'
 import { AdminCyclingRacesTab } from './tabs/cycling/AdminCyclingRacesTab'
 
-const SPORTS = [
+// 3-niveau struktur: Section (System | Fodbold | Cykling) → Tabs i sektionen
+const SECTIONS = [
+  { id: 'system', label: 'System', icon: '⚙' },
   { id: 'football', label: 'Fodbold', icon: '⚽' },
   { id: 'cycling', label: 'Cykling', icon: '🚴' },
 ] as const
 
-type SportId = (typeof SPORTS)[number]['id']
+type SectionId = (typeof SECTIONS)[number]['id']
+
+const SYSTEM_TABS = [
+  { id: 'users', label: 'Brugere', icon: '👤' },
+  { id: 'audit', label: 'Audit log', icon: '🔍' },
+  { id: 'logs', label: 'Logs', icon: '📋' },
+] as const
 
 const FOOTBALL_TABS = [
   { id: 'overview', label: 'Overblik', icon: '◉' },
   { id: 'fixtures', label: 'Kampprogrammer', icon: '⚽' },
   { id: 'seasons', label: 'Sæsoner', icon: '📅' },
   { id: 'games', label: 'Spilrum', icon: '🏆' },
-  { id: 'users', label: 'Brugere', icon: '👤' },
-  { id: 'logs', label: 'Logs', icon: '📋' },
-  { id: 'audit', label: 'Audit log', icon: '🔍' },
   { id: 'championship', label: 'Mesterskabet', icon: '🏅' },
   { id: 'live-test', label: 'LIVE TEST', icon: '🔴' },
 ] as const
@@ -41,40 +46,49 @@ const CYCLING_TABS = [
   { id: 'cycling-games', label: 'Spilrum', icon: '🏆' },
 ] as const
 
-type FootballTabId = (typeof FOOTBALL_TABS)[number]['id']
-type CyclingTabId = (typeof CYCLING_TABS)[number]['id']
+const DEFAULT_TAB: Record<SectionId, string> = {
+  system: 'users',
+  football: 'overview',
+  cycling: 'cycling-overview',
+}
+
+function getTabsForSection(section: SectionId) {
+  switch (section) {
+    case 'system':
+      return SYSTEM_TABS
+    case 'football':
+      return FOOTBALL_TABS
+    case 'cycling':
+      return CYCLING_TABS
+  }
+}
 
 type Props = {
   tournaments: TournamentRow[]
   lastSync: string | null
 }
 
-export default function AdminTabClient({
-  tournaments,
-  lastSync,
-  }: Props) {
+export default function AdminTabClient({ tournaments, lastSync }: Props) {
   const searchParams = useSearchParams()
-  const sport = (searchParams.get('sport') ?? 'football') as SportId
-  const validSport = SPORTS.some((s) => s.id === sport) ? sport : 'football'
+  // Backwards-compat: ?sport=… fra gamle bookmarks mapper til ?section=…
+  const rawSection =
+    searchParams.get('section') ?? searchParams.get('sport') ?? 'system'
+  const validSection = (SECTIONS.some((s) => s.id === rawSection) ? rawSection : 'system') as SectionId
 
-  const tab = searchParams.get('tab') ?? (validSport === 'cycling' ? 'cycling-overview' : 'overview')
-  const validTab = validSport === 'cycling'
-    ? (CYCLING_TABS.some((t) => t.id === tab) ? tab : 'cycling-overview') as CyclingTabId
-    : (FOOTBALL_TABS.some((t) => t.id === tab) ? tab : 'overview') as FootballTabId
-
-  const activeTabs = validSport === 'cycling' ? CYCLING_TABS : FOOTBALL_TABS
-  const defaultTab = validSport === 'cycling' ? 'cycling-overview' : 'overview'
+  const activeTabs = getTabsForSection(validSection)
+  const tab = searchParams.get('tab') ?? DEFAULT_TAB[validSection]
+  const validTab = activeTabs.some((t) => t.id === tab) ? tab : DEFAULT_TAB[validSection]
 
   return (
     <div className="space-y-8">
-      {/* Sport switcher — horizontalt scroll på mobil */}
+      {/* Section switcher — horizontalt scroll på mobil */}
       <nav className="flex gap-1 border-b border-warm-border overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {SPORTS.map((s) => (
+        {SECTIONS.map((s) => (
           <Link
             key={s.id}
-            href={`/admin?sport=${s.id}${s.id === 'cycling' ? '&tab=cycling-overview' : '&tab=overview'}`}
+            href={`/admin?section=${s.id}&tab=${DEFAULT_TAB[s.id]}`}
             className={`px-4 sm:px-5 py-3 text-[13px] font-condensed font-bold uppercase tracking-[0.08em] transition-colors -mb-px whitespace-nowrap shrink-0 ${
-              validSport === s.id
+              validSection === s.id
                 ? 'text-forest border-b-2 border-forest'
                 : 'text-warm-gray hover:text-ink border-b-2 border-transparent'
             }`}
@@ -90,7 +104,7 @@ export default function AdminTabClient({
         {activeTabs.map((t) => (
           <Link
             key={t.id}
-            href={`/admin?sport=${validSport}&tab=${t.id}`}
+            href={`/admin?section=${validSection}&tab=${t.id}`}
             className={`px-3 sm:px-4 py-3 text-[12px] font-bold uppercase tracking-wide transition-colors -mb-px whitespace-nowrap shrink-0 ${
               validTab === t.id
                 ? 'text-forest border-b-2 border-forest'
@@ -103,47 +117,36 @@ export default function AdminTabClient({
         ))}
       </nav>
 
-      {/* Football tab content */}
-      {validSport === 'football' && (
+      {/* System tab content */}
+      {validSection === 'system' && (
         <>
-          {validTab === 'overview' && (
-            <AdminOverviewTab />
-          )}
-          {validTab === 'fixtures' && (
-            <LeagueHubClient
-              tournaments={tournaments}
-              lastSync={lastSync}
-            />
-          )}
-          {validTab === 'seasons' && (
-            <AdminSeasonsTab />
-          )}
-          {validTab === 'games' && (
-            <AdminGamesTab sport="football" />
-          )}
           {validTab === 'users' && <AdminUsersTab />}
-          {validTab === 'logs' && <AdminLogsTab />}
           {validTab === 'audit' && <AdminAuditTab />}
+          {validTab === 'logs' && <AdminLogsTab />}
+        </>
+      )}
+
+      {/* Football tab content */}
+      {validSection === 'football' && (
+        <>
+          {validTab === 'overview' && <AdminOverviewTab />}
+          {validTab === 'fixtures' && (
+            <LeagueHubClient tournaments={tournaments} lastSync={lastSync} />
+          )}
+          {validTab === 'seasons' && <AdminSeasonsTab />}
+          {validTab === 'games' && <AdminGamesTab sport="football" />}
           {validTab === 'championship' && <AdminChampionshipTab />}
           {validTab === 'live-test' && <LiveTestTab />}
         </>
       )}
 
       {/* Cycling tab content */}
-      {validSport === 'cycling' && (
+      {validSection === 'cycling' && (
         <>
-          {validTab === 'cycling-overview' && (
-            <AdminCyclingDashboardTab />
-          )}
-          {validTab === 'cycling-riders' && (
-            <AdminCyclingRidersTab />
-          )}
-          {validTab === 'cycling-races' && (
-            <AdminCyclingRacesTab />
-          )}
-          {validTab === 'cycling-games' && (
-            <AdminGamesTab sport="cycling" />
-          )}
+          {validTab === 'cycling-overview' && <AdminCyclingDashboardTab />}
+          {validTab === 'cycling-riders' && <AdminCyclingRidersTab />}
+          {validTab === 'cycling-races' && <AdminCyclingRacesTab />}
+          {validTab === 'cycling-games' && <AdminGamesTab sport="cycling" />}
         </>
       )}
     </div>
