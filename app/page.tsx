@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import GameTicker from '@/components/games/GameTicker'
+import LandingTicker from '@/components/landing/LandingTicker'
 import HeroRotator from '@/app/(marketing)/landing-v2/HeroRotator'
-import { getActiveUserCount } from '@/lib/landingData'
+import { getActiveUserCount, getLandingTickerItems } from '@/lib/landingData'
 import type { Profile } from '@/types'
 
 function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
@@ -20,9 +20,10 @@ function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient()
 
-  const [{ data: { user } }, activeUserCount] = await Promise.all([
+  const [{ data: { user } }, activeUserCount, ticker] = await Promise.all([
     supabase.auth.getUser(),
     getActiveUserCount(),
+    getLandingTickerItems(),
   ])
 
   const { data: profiles } = await supabase
@@ -31,45 +32,25 @@ export default async function HomePage() {
     .order('points', { ascending: false })
     .limit(10)
 
-  const { data: tickerMatches } = await supabase
-    .from('matches')
-    .select('home_team, away_team, home_score, away_score, match_date, round:rounds!inner(status, betting_closes_at)')
-    .eq('rounds.status', 'finished')
-    .order('match_date', { ascending: false })
-    .limit(20)
-
-  // Shuffle (Fisher-Yates)
-  const shuffled = [...(tickerMatches ?? [])]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-
-  const tickerItems = shuffled.map((m) => {
-    const round = m.round as unknown as { betting_closes_at: string | null } | null
-    const dateStr = m.match_date
-      ? new Date(m.match_date).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
-      : (round?.betting_closes_at
-        ? new Date(round.betting_closes_at).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen', day: 'numeric', month: 'short' })
-        : '')
-    return `${m.home_team} ${m.home_score ?? '?'}–${m.away_score ?? '?'} ${m.away_team}${dateStr ? ` · ${dateStr}` : ''}`
-  })
-
   const ranked = assignRanks((profiles as Profile[]) ?? [])
 
   return (
     <div className="min-h-screen bg-cream">
 
-      {/* ── Ticker + Hero ─────────────────────────────────────── */}
+      {/* ── Hero + Ticker ─────────────────────────────────────── */}
       <div className="-mt-14 bg-forest">
-        <div className="pt-14">
-          {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
-        </div>
+        <div className="pt-14" />
 
         {/* Hero (rotating slides + interactive sport-tabs).
             Genbruger den allerede mobil-auditerede komponent fra /landing-v2.
             CTAs peger til /games/new — fungerer for både logged-in og anonyme. */}
         <HeroRotator activeUserCount={activeUserCount} />
+
+        {/* Gold divider + live nyhedsbjælke (matcher /landing-v2-layout) */}
+        <div className="h-[3px] bg-gold" />
+        {ticker.items.length > 0 && (
+          <LandingTicker items={ticker.items} currentDate={ticker.currentDate} />
+        )}
       </div>
 
       {/* ── Sådan virker det ──────────────────────────────────── */}

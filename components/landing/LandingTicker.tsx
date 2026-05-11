@@ -48,9 +48,9 @@ export default function LandingTicker({ items, currentDate }: Props) {
       className="flex items-center overflow-hidden h-[34px] border-b border-white/5"
       style={{ background: '#0f1f1a' }}
     >
-      {/* LIVE label */}
+      {/* LIVE label — tighter padding på mobil */}
       <div
-        className="shrink-0 h-full flex items-center px-3 font-condensed font-bold text-[10px] tracking-[0.14em] uppercase z-10"
+        className="shrink-0 h-full flex items-center px-2.5 sm:px-3 font-condensed font-bold text-[10px] tracking-[0.14em] uppercase z-10"
         style={{ background: '#B8963E', color: '#0f1f1a' }}
       >
         LIVE
@@ -72,7 +72,7 @@ export default function LandingTicker({ items, currentDate }: Props) {
           onMouseLeave={(e) => (e.currentTarget.style.animationPlayState = 'running')}
         >
           {uniqueItems.map((item, i) => (
-            <span key={i} className="flex items-center px-5">
+            <span key={i} className="flex items-center px-3 sm:px-5">
               {item.parts.map((part, idx) =>
                 part.type === 'logo' ? (
                   <img
@@ -99,8 +99,8 @@ export default function LandingTicker({ items, currentDate }: Props) {
         </div>
       </div>
 
-      {/* Dato til højre */}
-      <div className="ml-auto shrink-0 pl-6 pr-4 text-[11px] text-white/60 font-medium">
+      {/* Dato til højre — strammere på mobil */}
+      <div className="ml-auto shrink-0 pl-3 sm:pl-6 pr-2.5 sm:pr-4 text-[10px] sm:text-[11px] text-white/60 font-medium whitespace-nowrap">
         {currentDate ??
           new Date().toLocaleDateString('da-DK', {
             timeZone: 'Europe/Copenhagen',
