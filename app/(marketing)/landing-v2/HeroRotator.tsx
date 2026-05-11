@@ -15,7 +15,10 @@ type Slide = {
   brightness?: number
   headlinePrimary: string
   headlineSecondary: string
+  /** Fuld subtitle — vises på sm+ (≥640px viewport) */
   subtitle: string
+  /** Kort subtitle — vises på mobil. Skal være ~80-120 tegn for at føles tight på <640px */
+  subtitleShort: string
   ctaText: string
   ctaHref: string
 }
@@ -29,6 +32,8 @@ const SLIDES: readonly Slide[] = [
     headlineSecondary: 'Følg hele Europa.',
     subtitle:
       'Forudsig kampe på tværs af 20 europæiske ligaer. Bet-vinduet låser 30 minutter før kickoff, point opdateres i realtid. Og hver runde samler vores Bodega Championship automatisk de største derbys og rivalopgør på tværs af Europa.',
+    subtitleShort:
+      'Tip kampe i 20 europæiske ligaer. Bet låser 30 min før kickoff, point i realtid.',
     ctaText: 'Start en fodbold-liga →',
     ctaHref: '/games/new?sport=football',
   },
@@ -41,6 +46,8 @@ const SLIDES: readonly Slide[] = [
     headlineSecondary: 'Følg hele sæsonen.',
     subtitle:
       'Byg dit fantasy-hold til Grand Tours og monumenter. Otte roller per rytter, joker når det gælder, hold-bonusser og DNF-straffe. Point efter hver etape, ligaer hele sæsonen igennem.',
+    subtitleShort:
+      'Byg dit fantasy-hold til Grand Tours og monumenter. Point efter hver etape.',
     ctaText: 'Start en cykel-liga →',
     ctaHref: '/games/new?sport=cycling',
   },
@@ -187,7 +194,9 @@ export default function HeroRotator({ activeUserCount }: Props) {
             key={current.id + '-p'}
             style={{ animation: 'fadeUp 0.6s 0.1s cubic-bezier(0.22,1,0.36,1) both' }}
           >
-            {current.subtitle}
+            {/* Kort version på mobil, fuld på sm+ — desktop-copy uændret */}
+            <span className="sm:hidden">{current.subtitleShort}</span>
+            <span className="hidden sm:inline">{current.subtitle}</span>
           </p>
 
           {/* CTA row */}
