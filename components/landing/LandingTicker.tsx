@@ -2,11 +2,17 @@
 
 import { useEffect, useRef } from 'react'
 
+export type TickerPart =
+  | { type: 'logo'; url: string }
+  | { type: 'text'; text: string }
+
 export type LandingTickerItem = {
-  /** Tekst der vises efter logos (fx 'Liverpool – Chelsea · Lør 17:30') */
+  /** Sekvens af logo + tekst-fragmenter, render'es inline i orden.
+   *  Eksempel for fodbold:
+   *    [logo home] ' Liverpool – ' [logo away] ' Chelsea · Lør 17:30' */
+  parts: TickerPart[]
+  /** Plain-text version til dedup/accessibility */
   text: string
-  /** Op til 3 små logo-URLs (hold, race, turnering). 16×16 inline. */
-  logos?: string[]
   /** Optional href hvis hele item skal være klikbart (ikke brugt nu) */
   href?: string
 }
@@ -66,28 +72,28 @@ export default function LandingTicker({ items, currentDate }: Props) {
           onMouseLeave={(e) => (e.currentTarget.style.animationPlayState = 'running')}
         >
           {uniqueItems.map((item, i) => (
-            <span key={i} className="flex items-center px-5 gap-2">
-              {item.logos && item.logos.length > 0 && (
-                <span className="flex items-center gap-1 shrink-0">
-                  {item.logos.slice(0, 3).map((url, idx) => (
-                    <img
-                      key={`${i}-${idx}`}
-                      src={url}
-                      alt=""
-                      className="object-contain shrink-0"
-                      style={{ width: 16, height: 16 }}
-                      loading="lazy"
-                    />
-                  ))}
-                </span>
+            <span key={i} className="flex items-center px-5">
+              {item.parts.map((part, idx) =>
+                part.type === 'logo' ? (
+                  <img
+                    key={`${i}-${idx}`}
+                    src={part.url}
+                    alt=""
+                    className="object-contain shrink-0 mx-1"
+                    style={{ width: 16, height: 16 }}
+                    loading="lazy"
+                  />
+                ) : (
+                  <span
+                    key={`${i}-${idx}`}
+                    className="font-body text-xs"
+                    style={{ color: 'rgba(242,237,228,0.78)', letterSpacing: '0.01em' }}
+                  >
+                    {part.text}
+                  </span>
+                ),
               )}
-              <span
-                className="font-body text-xs"
-                style={{ color: 'rgba(242,237,228,0.78)', letterSpacing: '0.01em' }}
-              >
-                {item.text}
-              </span>
-              <span style={{ color: '#B8963E', opacity: 0.4, fontSize: 14 }}>·</span>
+              <span className="ml-2" style={{ color: '#B8963E', opacity: 0.4, fontSize: 14 }}>·</span>
             </span>
           ))}
         </div>

@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getActiveUserCount } from '@/lib/landingData'
 import HeroRotator from './HeroRotator'
-import LandingTicker, { type LandingTickerItem } from '@/components/landing/LandingTicker'
+import LandingTicker, { type LandingTickerItem, type TickerPart } from '@/components/landing/LandingTicker'
 
 export const metadata: Metadata = {
   title: 'Bodega Bets — Spil mod vennerne',
@@ -77,10 +77,17 @@ async function getTickerItems(): Promise<{ items: LandingTickerItem[]; currentDa
       for (const m of matches ?? []) {
         const home = teamById.get(m.home_team_id)
         const away = teamById.get(m.away_team_id)
-        const logos = [home?.logo_url, away?.logo_url].filter((l): l is string => !!l)
+        const homeName = home?.name ?? '?'
+        const awayName = away?.name ?? '?'
+        const kickoff = formatKickoff(m.kickoff)
+        const parts: TickerPart[] = []
+        if (home?.logo_url) parts.push({ type: 'logo', url: home.logo_url })
+        parts.push({ type: 'text', text: `${home?.logo_url ? ' ' : ''}${homeName} – ` })
+        if (away?.logo_url) parts.push({ type: 'logo', url: away.logo_url })
+        parts.push({ type: 'text', text: `${away?.logo_url ? ' ' : ''}${awayName} · ${kickoff}` })
         footballItems.push({
-          text: `${home?.name ?? '?'} – ${away?.name ?? '?'} · ${formatKickoff(m.kickoff)}`,
-          logos,
+          parts,
+          text: `${homeName} – ${awayName} · ${kickoff}`,
         })
       }
     }
@@ -107,11 +114,13 @@ async function getTickerItems(): Promise<{ items: LandingTickerItem[]; currentDa
       const race = s.cycling_races
       if (!race) continue
       const date = formatDate(s.start_date)
-      const logos = race.logo_url ? [race.logo_url] : []
-      const text = race.race_type === 'one_day'
+      const textBody = race.race_type === 'one_day'
         ? `${race.name} · ${date}`
         : `${race.name} · Etape ${s.stage_number} · ${date}`
-      cyclingItems.push({ text, logos })
+      const parts: TickerPart[] = []
+      if (race.logo_url) parts.push({ type: 'logo', url: race.logo_url })
+      parts.push({ type: 'text', text: `${race.logo_url ? ' ' : ''}${textBody}` })
+      cyclingItems.push({ parts, text: textBody })
     }
   } catch {
     // Ignored
