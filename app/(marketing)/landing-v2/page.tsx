@@ -80,13 +80,15 @@ async function getTickerItems(): Promise<{ items: LandingTickerItem[]; currentDa
         const homeName = home?.name ?? '?'
         const awayName = away?.name ?? '?'
         const kickoff = formatKickoff(m.kickoff)
-        // Hjemmelogo VENSTRE for hjemmenavn, udelogo HØJRE for udenavn:
-        //   [home-logo] Liverpool – Chelsea [away-logo] · 17:30
+        // Logos flankerer dashen indvendigt — hjemmelogo HØJRE for hjemmenavn,
+        // udelogo VENSTRE for udenavn:
+        //   Liverpool [home-logo] – [away-logo] Chelsea · 17:30
         const parts: TickerPart[] = []
+        parts.push({ type: 'text', text: `${homeName} ` })
         if (home?.logo_url) parts.push({ type: 'logo', url: home.logo_url })
-        parts.push({ type: 'text', text: `${home?.logo_url ? ' ' : ''}${homeName} – ${awayName}${away?.logo_url ? ' ' : ''}` })
+        parts.push({ type: 'text', text: ` – ` })
         if (away?.logo_url) parts.push({ type: 'logo', url: away.logo_url })
-        parts.push({ type: 'text', text: ` · ${kickoff}` })
+        parts.push({ type: 'text', text: ` ${awayName} · ${kickoff}` })
         footballItems.push({
           parts,
           text: `${homeName} – ${awayName} · ${kickoff}`,
