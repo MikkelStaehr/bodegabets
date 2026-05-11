@@ -67,13 +67,13 @@ export default function AdminTabClient({
 
   return (
     <div className="space-y-8">
-      {/* Sport switcher */}
-      <nav className="flex gap-1 border-b border-warm-border pb-0">
+      {/* Sport switcher — horizontalt scroll på mobil */}
+      <nav className="flex gap-1 border-b border-warm-border overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {SPORTS.map((s) => (
           <Link
             key={s.id}
             href={`/admin?sport=${s.id}${s.id === 'cycling' ? '&tab=cycling-overview' : '&tab=overview'}`}
-            className={`px-5 py-3 text-[13px] font-condensed font-bold uppercase tracking-[0.08em] transition-colors -mb-px ${
+            className={`px-4 sm:px-5 py-3 text-[13px] font-condensed font-bold uppercase tracking-[0.08em] transition-colors -mb-px whitespace-nowrap shrink-0 ${
               validSport === s.id
                 ? 'text-forest border-b-2 border-forest'
                 : 'text-warm-gray hover:text-ink border-b-2 border-transparent'
@@ -85,13 +85,13 @@ export default function AdminTabClient({
         ))}
       </nav>
 
-      {/* Tab navigation */}
-      <nav className="flex gap-1 border-b border-black/10 pb-0 -mt-4">
+      {/* Tab navigation — horizontalt scroll på mobil */}
+      <nav className="flex gap-1 border-b border-black/10 -mt-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {activeTabs.map((t) => (
           <Link
             key={t.id}
             href={`/admin?sport=${validSport}&tab=${t.id}`}
-            className={`px-4 py-3 text-[12px] font-bold uppercase tracking-wide transition-colors -mb-px ${
+            className={`px-3 sm:px-4 py-3 text-[12px] font-bold uppercase tracking-wide transition-colors -mb-px whitespace-nowrap shrink-0 ${
               validTab === t.id
                 ? 'text-forest border-b-2 border-forest'
                 : 'text-warm-gray hover:text-ink border-b-2 border-transparent'

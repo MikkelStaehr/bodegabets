@@ -125,7 +125,113 @@ export function AdminUsersTab() {
         />
       </div>
 
-      <div className="border border-warm-border overflow-hidden" style={{ borderRadius: '2px' }}>
+      {/* Mobile card-list (vises kun <md) */}
+      <ul className="md:hidden space-y-3">
+        {filtered.map((user) => {
+          const msg = messages[user.id]
+          const suspending = suspendLoading.has(user.id)
+          const comping = compLoading.has(user.id)
+          const subBadge = (() => {
+            switch (user.subscription_status) {
+              case 'active': return { label: 'Aktiv', cls: 'bg-forest/10 text-forest border-forest/30' }
+              case 'comped': return { label: 'Gratis', cls: 'bg-gold/15 text-gold-dark border-gold/40' }
+              case 'past_due': return { label: 'Forfaldet', cls: 'bg-vintage-red/10 text-vintage-red border-vintage-red/30' }
+              case 'canceled': return { label: 'Opsagt', cls: 'bg-warm-gray/10 text-warm-gray border-warm-border' }
+              default: return { label: 'Ingen', cls: 'bg-warm-gray/10 text-warm-gray border-warm-border' }
+            }
+          })()
+          const compDisabled = comping || user.subscription_status === 'active' || user.subscription_status === 'past_due'
+          return (
+            <li
+              key={user.id}
+              className="border border-warm-border bg-cream p-4"
+              style={{ borderRadius: '2px' }}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink truncate">{user.username || '—'}</p>
+                  <p className="font-body text-[12px] text-warm-gray truncate">{user.email || '—'}</p>
+                  <p className="font-body text-[11px] text-warm-taupe mt-0.5">
+                    {formatDate(user.created_at)} · {user.games_count} spilrum
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span
+                    className={`font-condensed text-[10px] uppercase tracking-wide border px-1.5 py-0.5 ${subBadge.cls}`}
+                    style={{ borderRadius: '2px' }}
+                  >
+                    {subBadge.label}
+                  </span>
+                  {user.is_suspended && (
+                    <span
+                      className="font-condensed text-[10px] uppercase tracking-wide border px-1.5 py-0.5 bg-vintage-red/10 text-vintage-red border-vintage-red/30"
+                      style={{ borderRadius: '2px' }}
+                    >
+                      Suspenderet
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {msg && (
+                <p className={`font-body text-xs mb-2 ${msg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>
+                  {msg.text}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    const isComped = user.subscription_status === 'comped'
+                    if (!isComped) {
+                      if (confirm(`Giv "${user.username || user.email}" gratis adgang?`)) toggleComp(user)
+                    } else {
+                      if (confirm(`Fjern gratis adgang for "${user.username || user.email}"?`)) toggleComp(user)
+                    }
+                  }}
+                  disabled={compDisabled}
+                  className={`font-condensed text-[11px] font-bold py-2.5 px-3 border disabled:opacity-50 disabled:cursor-not-allowed ${
+                    user.subscription_status === 'comped'
+                      ? 'bg-gold/15 text-gold-dark active:bg-gold/25 border-gold/40'
+                      : 'bg-forest/10 text-forest active:bg-forest/20 border-forest/30'
+                  }`}
+                  style={{ borderRadius: '2px' }}
+                >
+                  {comping ? '...' : user.subscription_status === 'comped' ? 'Fjern gratis' : 'Gratis adgang'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (user.is_suspended) {
+                      toggleSuspend(user)
+                    } else {
+                      if (confirm(`Suspendér "${user.username || user.email}"?`)) {
+                        toggleSuspend(user)
+                      }
+                    }
+                  }}
+                  disabled={suspending}
+                  className={`font-condensed text-[11px] font-bold py-2.5 px-3 border disabled:opacity-50 ${
+                    user.is_suspended
+                      ? 'bg-forest text-cream active:bg-forest/90 border-forest'
+                      : 'bg-vintage-red/10 text-vintage-red active:bg-vintage-red/20 border-vintage-red/30'
+                  }`}
+                  style={{ borderRadius: '2px' }}
+                >
+                  {suspending ? '...' : user.is_suspended ? 'Genaktivér' : 'Suspendér'}
+                </button>
+              </div>
+            </li>
+          )
+        })}
+        {filtered.length === 0 && (
+          <li className="border border-warm-border bg-cream px-4 py-12 text-center font-body text-warm-gray text-sm" style={{ borderRadius: '2px' }}>
+            Ingen brugere fundet
+          </li>
+        )}
+      </ul>
+
+      {/* Desktop table (vises kun ≥md) */}
+      <div className="hidden md:block border border-warm-border overflow-hidden" style={{ borderRadius: '2px' }}>
         <table className="w-full text-left">
           <thead>
             <tr className="bg-cream-dark border-b border-warm-border">

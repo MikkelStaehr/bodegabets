@@ -60,11 +60,11 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#F2EDE4]">
-      <div className="max-w-6xl mx-auto px-4 py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <p className="font-condensed uppercase text-[#7a7060] mb-1" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>
           Internt
         </p>
-        <h1 className="font-['Playfair_Display'] text-[#1a3329] font-bold mb-6" style={{ fontSize: '28px' }}>
+        <h1 className="font-['Playfair_Display'] text-[#1a3329] font-bold mb-6 text-[24px] sm:text-[28px]">
           Admin panel
         </h1>
 
