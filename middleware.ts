@@ -33,12 +33,14 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname
   const isProtected = path.startsWith('/dashboard') || path.startsWith('/games') || path.startsWith('/admin')
 
-  // Fetch profile once (suspend + admin check in single query)
-  let profile: { is_suspended: boolean; is_admin: boolean } | null = null
+  // Fetch profile once (suspend + admin + subscription i samme query)
+  let profile:
+    | { is_suspended: boolean; is_admin: boolean; subscription_status: string }
+    | null = null
   if (user && (isProtected || !path.startsWith('/suspended'))) {
     const { data } = await supabase
       .from('profiles')
-      .select('is_suspended, is_admin')
+      .select('is_suspended, is_admin, subscription_status')
       .eq('id', user.id)
       .single()
     profile = data
@@ -60,6 +62,35 @@ export async function middleware(req: NextRequest) {
   // Protect /dashboard and /games
   if ((path.startsWith('/dashboard') || path.startsWith('/games')) && !user) {
     return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  // Paywall — kræv aktivt medlemskab på alt der ikke er allow-listet.
+  // Admins, suspenderede (allerede redirected), og uautoriserede brugere
+  // er ikke i scope. Allow-listen dækker login/signup, betalings-flow,
+  // profil-administration, legal-sider og landing.
+  if (user && profile && !profile.is_admin) {
+    const isPaying =
+      profile.subscription_status === 'active' || profile.subscription_status === 'comped'
+    const allowedWithoutSubscription =
+      path === '/' ||
+      path.startsWith('/login') ||
+      path.startsWith('/register') ||
+      path.startsWith('/logout') ||
+      path.startsWith('/subscribe') ||
+      path.startsWith('/profile') ||
+      path.startsWith('/account') ||
+      path.startsWith('/suspended') ||
+      path.startsWith('/api/stripe/') ||
+      path.startsWith('/api/auth/') ||
+      path === '/privacy' ||
+      path === '/terms' ||
+      path === '/cookies' ||
+      path === '/about' ||
+      path === '/contact'
+
+    if (!isPaying && !allowedWithoutSubscription) {
+      return NextResponse.redirect(new URL('/subscribe', req.url))
+    }
   }
 
   return res

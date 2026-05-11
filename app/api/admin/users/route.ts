@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   const { data: profiles } = await supabaseAdmin
     .from('profiles')
-    .select('id, username, created_at, is_suspended')
+    .select('id, username, created_at, is_suspended, subscription_status')
     .order('created_at', { ascending: false })
     .limit(500)
 
@@ -40,10 +40,12 @@ export async function GET(req: NextRequest) {
   const users = profiles.map((p) => ({
     id: p.id,
     username: p.username ?? '—',
+    email: emailById.get(p.id) ?? '',
     created_at: p.created_at,
     games_count: gamesByUser.get(p.id) ?? 0,
     last_active: null as string | null,
     is_suspended: p.is_suspended ?? false,
+    subscription_status: p.subscription_status ?? 'none',
   }))
 
   return NextResponse.json({ users })

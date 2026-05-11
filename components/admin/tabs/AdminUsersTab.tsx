@@ -12,6 +12,7 @@ type User = {
   games_count: number
   last_active: string | null
   is_suspended: boolean
+  subscription_status: 'none' | 'active' | 'comped' | 'past_due' | 'canceled'
 }
 
 type Props = {
@@ -24,6 +25,7 @@ export function AdminUsersTab() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [suspendLoading, setSuspendLoading] = useState<Set<string>>(new Set())
+  const [compLoading, setCompLoading] = useState<Set<string>>(new Set())
   const [messages, setMessages] = useState<Record<string, { type: 'ok' | 'err'; text: string }>>({})
 
   const authHeader = { }
@@ -35,6 +37,35 @@ export function AdminUsersTab() {
       .catch(() => setUsers([]))
       .finally(() => setLoading(false))
   }, [])
+
+  async function toggleComp(user: User) {
+    const comp = user.subscription_status !== 'comped'
+    setCompLoading((s) => new Set(s).add(user.id))
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/comp`, {
+        method: 'PATCH',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comp }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setMessages((prev) => ({
+          ...prev,
+          [user.id]: { type: 'ok', text: comp ? 'Gratis adgang tildelt' : 'Gratis adgang fjernet' },
+        }))
+        setTimeout(() => setMessages((prev) => { const n = { ...prev }; delete n[user.id]; return n }), 3000)
+        setUsers((prev) =>
+          prev.map((u) => (u.id === user.id ? { ...u, subscription_status: data.subscription_status } : u))
+        )
+      } else {
+        setMessages((prev) => ({ ...prev, [user.id]: { type: 'err', text: data.error ?? 'Fejl' } }))
+      }
+    } catch {
+      setMessages((prev) => ({ ...prev, [user.id]: { type: 'err', text: 'Netværksfejl' } }))
+    } finally {
+      setCompLoading((s) => { const n = new Set(s); n.delete(user.id); return n })
+    }
+  }
 
   async function toggleSuspend(user: User) {
     const suspend = !user.is_suspended
@@ -98,7 +129,7 @@ export function AdminUsersTab() {
         <table className="w-full text-left">
           <thead>
             <tr className="bg-cream-dark border-b border-warm-border">
-              {['#', 'Navn', 'Email', 'Oprettet', 'Spilrum', 'Sidst aktiv', 'Status', 'Handling'].map((h) => (
+              {['#', 'Navn', 'Email', 'Oprettet', 'Spilrum', 'Medlemskab', 'Status', 'Handling'].map((h) => (
                 <th key={h} className="px-4 py-3 font-condensed text-[11px] font-bold text-warm-gray uppercase tracking-wide">
                   {h}
                 </th>
@@ -109,6 +140,16 @@ export function AdminUsersTab() {
             {filtered.map((user, i) => {
               const msg = messages[user.id]
               const suspending = suspendLoading.has(user.id)
+              const comping = compLoading.has(user.id)
+              const subBadge = (() => {
+                switch (user.subscription_status) {
+                  case 'active': return { label: 'Aktiv', cls: 'bg-forest/10 text-forest border-forest/30' }
+                  case 'comped': return { label: 'Gratis', cls: 'bg-gold/15 text-gold-dark border-gold/40' }
+                  case 'past_due': return { label: 'Forfaldet', cls: 'bg-vintage-red/10 text-vintage-red border-vintage-red/30' }
+                  case 'canceled': return { label: 'Opsagt', cls: 'bg-warm-gray/10 text-warm-gray border-warm-border' }
+                  default: return { label: 'Ingen', cls: 'bg-warm-gray/10 text-warm-gray border-warm-border' }
+                }
+              })()
               return (
                 <tr key={user.id} className="border-b border-warm-border bg-cream hover:bg-cream-dark/40">
                   <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{i + 1}</td>
@@ -116,7 +157,14 @@ export function AdminUsersTab() {
                   <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{user.email || '—'}</td>
                   <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{formatDate(user.created_at)}</td>
                   <td className="px-4 py-3 font-body text-[13px] text-ink">{user.games_count}</td>
-                  <td className="px-4 py-3 font-body text-[13px] text-warm-gray">{user.last_active ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`font-condensed text-xs uppercase tracking-wide border px-2 py-0.5 ${subBadge.cls}`}
+                      style={{ borderRadius: '2px' }}
+                    >
+                      {subBadge.label}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`font-condensed text-xs uppercase tracking-wide border px-2 py-0.5 ${
@@ -128,12 +176,36 @@ export function AdminUsersTab() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {msg && (
                         <span className={`font-body text-xs ${msg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>
                           {msg.text}
                         </span>
                       )}
+                      <button
+                        onClick={() => {
+                          const isComped = user.subscription_status === 'comped'
+                          if (!isComped) {
+                            if (confirm(`Giv "${user.username || user.email}" gratis adgang?`)) toggleComp(user)
+                          } else {
+                            if (confirm(`Fjern gratis adgang for "${user.username || user.email}"?`)) toggleComp(user)
+                          }
+                        }}
+                        disabled={comping || user.subscription_status === 'active' || user.subscription_status === 'past_due'}
+                        title={
+                          user.subscription_status === 'active' || user.subscription_status === 'past_due'
+                            ? 'Brugeren har Stripe-subscription — administrér via Stripe'
+                            : undefined
+                        }
+                        className={`font-condensed text-[11px] font-bold px-3 py-1 border disabled:opacity-50 disabled:cursor-not-allowed ${
+                          user.subscription_status === 'comped'
+                            ? 'bg-gold/15 text-gold-dark hover:bg-gold/25 border-gold/40'
+                            : 'bg-forest/10 text-forest hover:bg-forest/20 border-forest/30'
+                        }`}
+                        style={{ borderRadius: '2px' }}
+                      >
+                        {comping ? '...' : user.subscription_status === 'comped' ? 'Fjern gratis' : 'Gratis adgang'}
+                      </button>
                       <button
                         onClick={() => {
                           if (user.is_suspended) {
