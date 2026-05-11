@@ -925,14 +925,16 @@ app.get('/sync-cycling-results', async (_req, res) => {
 
 app.get('/cycling-points', async (_req, res) => {
   try {
-    // Process ALLE stages med results_uploaded_at (active + finished races).
-    // Tidligere filtrerede vi kun på status='finished' hvilket ignorerede
-    // aktive Grand Tours hvor enkelte etaper er færdige — fanget af user
-    // efter Giro 2026 stage 1 ikke fik beregnet point automatisk.
+    // Safety net: process kun stages med results_uploaded_at indenfor de
+    // sidste 7 dage. Den primære trigger ligger nu i /sync-cycling-results
+    // umiddelbart efter upload, så denne endpoint er kun til at fange
+    // edge-cases (fx Railway restart midt under sync). Tidligere processede
+    // den ALLE finished stages hver 30. min = ~2400 spildte recalcs/dag.
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const { data: stages } = await supabaseAdmin
       .from('cycling_stages')
       .select('id, stage_number, race_id, cycling_races!inner(name)')
-      .not('results_uploaded_at', 'is', null)
+      .gte('results_uploaded_at', cutoff)
       .order('stage_number')
 
     const stageRows = (stages ?? []) as unknown as Array<{
@@ -1167,10 +1169,12 @@ app.listen(PORT, () => {
   // automatisk runCyclingPointsForStage internt, så vi får point straks.
   cron.schedule('0 14-22 * * *', () => callEndpoint('/sync-cycling-results'))
 
-  // Hvert 30. minut — beregn cykling-point safety net (kun 09:00–20:00 UTC).
-  // Primær trigger er nu inde i /sync-cycling-results, men dette fanger
-  // legacy data (one-day races) eller stages der mistede deres trigger.
-  cron.schedule('*/30 9-20 * * *', () => callEndpoint('/cycling-points'))
+  // Hver 2. time — beregn cykling-point safety net (kun 14-22 UTC,
+  // umiddelbart efter sync-cycling-results). Primær trigger ligger nu
+  // inline i /sync-cycling-results og kører straks pr. ny etape, så
+  // dette behøver ikke køre hyppigt — kun fange edge-cases hvor sync
+  // crashed mellem upload og points-calc.
+  cron.schedule('30 14-22/2 * * *', () => callEndpoint('/cycling-points'))
 
   // Dagligt kl. 08:00 UTC — auto-arkivér cycling gamerooms efter sidste løb
   cron.schedule('0 8 * * *', () => callEndpoint('/cycling-archive-check'))

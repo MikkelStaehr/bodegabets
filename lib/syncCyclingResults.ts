@@ -220,15 +220,22 @@ export async function syncCyclingResults(): Promise<{
     return { ok: true, stagesProcessed: 0, resultsUpserted: 0, unmatched: 0, syncedStageIds: [], errors: [] }
   }
 
-  // 2) Pending stages: results_uploaded_at IS NULL og start_date <= today.
-  //    Date-only midnight UTC i start_date — vi sammenligner som dato-strenge.
-  const todayIso = new Date().toISOString().slice(0, 10)
+  // 2) Pending stages: results_uploaded_at IS NULL, start_date <= today,
+  //    OG start_date >= today - 3 dage. Backoff-vindue: hvis vi ikke har
+  //    fået results på 3 dage er PCS-data sandsynligvis korrupt eller
+  //    rytter-matching ramt fejl (fx Tour de Romandie stage 6 der hænger
+  //    fast efter HTTP 500 fra PCS). Stopper unyttig timely retry-loop.
+  const today = new Date()
+  const todayIso = today.toISOString().slice(0, 10)
+  const cutoffDate = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const cutoffIso = cutoffDate.toISOString().slice(0, 10)
   const raceIds = races.map((r) => r.id)
   const { data: stages, error: stagesErr } = await supabaseAdmin
     .from('cycling_stages')
     .select('id, race_id, stage_number, start_date')
     .in('race_id', raceIds)
     .is('results_uploaded_at', null)
+    .gte('start_date', `${cutoffIso}T00:00:00Z`)
     .lte('start_date', `${todayIso}T23:59:59Z`)
     .order('stage_number', { ascending: true })
 
