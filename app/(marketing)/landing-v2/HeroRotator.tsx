@@ -101,7 +101,9 @@ export default function HeroRotator({ activeUserCount }: Props) {
   return (
     <>
     <section
-      className="relative w-full h-[480px] lg:h-[620px] overflow-hidden bg-forest"
+      // Adaptiv højde på mobil — fylder mere af viewporten på store phones
+      // men kapsles så små phones ikke får tab-rækken under fold. Fast 620px på lg.
+      className="relative w-full overflow-hidden bg-forest h-[min(78vh,580px)] min-h-[460px] lg:h-[620px] lg:min-h-0"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -155,14 +157,14 @@ export default function HeroRotator({ activeUserCount }: Props) {
       />
 
       {/* Content */}
-      <div className="relative h-full max-w-6xl mx-auto px-6 lg:px-8 flex flex-col">
-        {/* Top spacer */}
-        <div className="flex-1 min-h-8" />
+      <div className="relative h-full max-w-6xl mx-auto px-5 sm:px-6 lg:px-8 flex flex-col">
+        {/* Top spacer — mindre på mobil så content sidder højere oppe */}
+        <div className="flex-1 min-h-4 sm:min-h-8" />
 
-        {/* Headline + subtitle + CTAs — pb generøs så der er plads til tabs nedenfor */}
-        <div className="pb-28 lg:pb-36 max-w-3xl">
+        {/* Headline + subtitle + CTAs — pb tighter på mobil for plads til tabs */}
+        <div className="pb-24 sm:pb-28 lg:pb-36 max-w-3xl">
           <h1
-            className="font-display font-black text-cream text-[44px] lg:text-[80px] drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+            className="font-display font-black text-cream text-[38px] sm:text-[44px] lg:text-[80px] drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
             style={{ lineHeight: 0.95 }}
             key={current.id + '-h'}
           >
@@ -181,7 +183,7 @@ export default function HeroRotator({ activeUserCount }: Props) {
           </h1>
 
           <p
-            className="mt-6 font-body text-[18px] text-cream/85 max-w-[560px] leading-relaxed drop-shadow-[0_1px_6px_rgba(0,0,0,0.4)]"
+            className="mt-4 sm:mt-6 font-body text-[15px] sm:text-[18px] text-cream/85 max-w-[560px] leading-relaxed drop-shadow-[0_1px_6px_rgba(0,0,0,0.4)]"
             key={current.id + '-p'}
             style={{ animation: 'fadeUp 0.6s 0.1s cubic-bezier(0.22,1,0.36,1) both' }}
           >
@@ -189,11 +191,11 @@ export default function HeroRotator({ activeUserCount }: Props) {
           </p>
 
           {/* CTA row */}
-          <div className="mt-8 flex flex-wrap items-center gap-4">
+          <div className="mt-6 sm:mt-8 flex flex-wrap items-center gap-2.5 sm:gap-4">
             <Link
               href={current.ctaHref}
               key={current.id + '-cta'}
-              className="inline-flex items-center justify-center px-8 py-4 bg-gold text-forest font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity"
+              className="inline-flex items-center justify-center px-5 sm:px-8 py-3 sm:py-4 bg-gold text-forest font-condensed font-bold text-[12px] sm:text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity"
               style={{ animation: 'fadeUp 0.5s 0.15s cubic-bezier(0.22,1,0.36,1) both' }}
             >
               {current.ctaText}
@@ -204,7 +206,7 @@ export default function HeroRotator({ activeUserCount }: Props) {
                 if (current.id === 'fodbold') setDemoOpen(true)
                 else if (current.id === 'cykling') setCyclingDemoOpen(true)
               }}
-              className="inline-flex items-center justify-center px-8 py-4 bg-transparent border border-cream/50 text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/80 transition-colors backdrop-blur-sm cursor-pointer"
+              className="inline-flex items-center justify-center px-5 sm:px-8 py-3 sm:py-4 bg-transparent border border-cream/50 text-cream font-condensed font-bold text-[12px] sm:text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/80 transition-colors backdrop-blur-sm cursor-pointer"
             >
               Se hvordan det virker
             </button>
@@ -233,7 +235,7 @@ export default function HeroRotator({ activeUserCount }: Props) {
         <div
           role="tablist"
           aria-label="Vælg spil"
-          className="pointer-events-auto flex justify-center gap-8 lg:gap-12 mt-6 pb-6 lg:pb-10"
+          className="pointer-events-auto flex justify-center gap-6 sm:gap-8 lg:gap-12 mt-4 sm:mt-6 pb-5 sm:pb-6 lg:pb-10"
         >
           {SLIDES.map((slide, i) => {
             const isActive = i === active
