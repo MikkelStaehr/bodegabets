@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getActiveUserCount } from '@/lib/landingData'
 import HeroRotator from './HeroRotator'
-import GameTicker from '@/components/games/GameTicker'
+import LandingTicker, { type LandingTickerItem } from '@/components/landing/LandingTicker'
 
 export const metadata: Metadata = {
   title: 'Bodega Bets — Spil mod vennerne',
@@ -42,8 +42,9 @@ function formatDate(iso: string): string {
   })
 }
 
-async function getTickerItems(): Promise<{ items: string[]; currentDate: string }> {
-  const items: string[] = []
+async function getTickerItems(): Promise<{ items: LandingTickerItem[]; currentDate: string }> {
+  const footballItems: LandingTickerItem[] = []
+  const cyclingItems: LandingTickerItem[] = []
   const nowIso = new Date().toISOString()
 
   // Næste fodbold-kampe (kommende 14 dage)
@@ -65,26 +66,33 @@ async function getTickerItems(): Promise<{ items: string[]; currentDate: string 
     if (teamIds.size > 0) {
       const { data: teams } = await supabaseAdmin
         .from('teams')
-        .select('id, name')
+        .select('id, name, logo_url')
         .in('id', [...teamIds])
-      const nameById = new Map<number, string>(
-        (teams ?? []).map((t) => [t.id as number, t.name as string]),
+      const teamById = new Map<number, { name: string; logo_url: string | null }>(
+        (teams ?? []).map((t) => [
+          t.id as number,
+          { name: t.name as string, logo_url: t.logo_url as string | null },
+        ]),
       )
       for (const m of matches ?? []) {
-        const home = nameById.get(m.home_team_id) ?? '?'
-        const away = nameById.get(m.away_team_id) ?? '?'
-        items.push(`⚽ ${home} – ${away} · ${formatKickoff(m.kickoff)}`)
+        const home = teamById.get(m.home_team_id)
+        const away = teamById.get(m.away_team_id)
+        const logos = [home?.logo_url, away?.logo_url].filter((l): l is string => !!l)
+        footballItems.push({
+          text: `${home?.name ?? '?'} – ${away?.name ?? '?'} · ${formatKickoff(m.kickoff)}`,
+          logos,
+        })
       }
     }
   } catch {
     // Ignored — ticker virker uden fodbold-items hvis matches/teams ikke kan læses
   }
 
-  // Næste cykel-stages (5 kommende)
+  // Næste cykel-stages (5 kommende) — bruger race.logo_url som turneringslogo
   try {
     const { data: stages } = await supabaseAdmin
       .from('cycling_stages')
-      .select('stage_number, start_date, name, cycling_races(name, race_type)')
+      .select('stage_number, start_date, name, cycling_races(name, race_type, logo_url)')
       .gt('start_date', nowIso)
       .order('start_date', { ascending: true })
       .limit(5)
@@ -93,26 +101,24 @@ async function getTickerItems(): Promise<{ items: string[]; currentDate: string 
       stage_number: number
       start_date: string
       name: string
-      cycling_races: { name: string; race_type: string } | null
+      cycling_races: { name: string; race_type: string; logo_url: string | null } | null
     }
     for (const s of (stages ?? []) as unknown as StageRow[]) {
       const race = s.cycling_races
       if (!race) continue
       const date = formatDate(s.start_date)
-      if (race.race_type === 'one_day') {
-        items.push(`🚴 ${race.name} · ${date}`)
-      } else {
-        items.push(`🚴 ${race.name} · Etape ${s.stage_number} · ${date}`)
-      }
+      const logos = race.logo_url ? [race.logo_url] : []
+      const text = race.race_type === 'one_day'
+        ? `${race.name} · ${date}`
+        : `${race.name} · Etape ${s.stage_number} · ${date}`
+      cyclingItems.push({ text, logos })
     }
   } catch {
     // Ignored
   }
 
   // Sammenflet fodbold + cykel — alternér så listen føles mixed
-  const merged: string[] = []
-  const footballItems = items.filter((i) => i.startsWith('⚽'))
-  const cyclingItems = items.filter((i) => i.startsWith('🚴'))
+  const merged: LandingTickerItem[] = []
   const max = Math.max(footballItems.length, cyclingItems.length)
   for (let i = 0; i < max; i++) {
     if (i < footballItems.length) merged.push(footballItems[i])
@@ -147,7 +153,7 @@ export default async function LandingV2() {
 
       {/* Live nyhedsbjælke — næste runders fodbold-kampe + cykel-etaper */}
       {ticker.items.length > 0 && (
-        <GameTicker items={ticker.items} currentDate={ticker.currentDate} />
+        <LandingTicker items={ticker.items} currentDate={ticker.currentDate} />
       )}
 
       <PriceSection />
