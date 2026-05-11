@@ -42,7 +42,7 @@ export async function POST() {
       subscription_data: {
         metadata: { user_id: user.id },
       },
-      success_url: `${appUrl}/account?subscribed=1`,
+      success_url: `${appUrl}/profile/billing?subscribed=1`,
       cancel_url: `${appUrl}/subscribe?canceled=1`,
       allow_promotion_codes: true,
     })

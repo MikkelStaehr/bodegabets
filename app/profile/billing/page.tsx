@@ -11,6 +11,8 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
+type Props = { searchParams: Promise<{ subscribed?: string }> }
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   none: { label: 'Intet medlemskab', color: 'text-warm-gray' },
   active: { label: 'Aktiv', color: 'text-forest' },
@@ -19,7 +21,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   canceled: { label: 'Opsagt', color: 'text-warm-gray' },
 }
 
-export default async function BillingPage() {
+export default async function BillingPage({ searchParams }: Props) {
+  const { subscribed } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login?next=/profile/billing')
@@ -50,6 +53,20 @@ export default async function BillingPage() {
         <h1 className="font-display text-4xl font-bold text-forest mb-8">
           Medlemskab
         </h1>
+
+        {subscribed === '1' && (
+          <div
+            className="mb-6 p-4 rounded-sm border"
+            style={{ background: 'rgba(26,51,41,0.08)', borderColor: 'rgba(26,51,41,0.3)' }}
+          >
+            <p className="font-condensed font-bold text-xs uppercase tracking-[0.08em] text-forest mb-1">
+              ✓ Velkommen som medlem
+            </p>
+            <p className="font-body text-sm text-ink">
+              Tak fordi du spiller med. Du har nu fuld adgang til Bodega Bets.
+            </p>
+          </div>
+        )}
 
         <div className="bg-cream-dark border border-warm-border rounded-sm p-6 lg:p-8">
           <div className="flex items-baseline justify-between mb-6">
