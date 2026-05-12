@@ -6,10 +6,9 @@ import Link from 'next/link'
  */
 
 const RECEIPT_LINES = [
-  { label: 'Cykling live-data', value: 'PCS + cron' },
-  { label: 'Fodbold live-data · 20 ligaer', value: 'Bold API' },
-  { label: 'Bodega Championship', value: 'auto-runder' },
-  { label: 'Drift & vedligehold', value: 'Vercel + Supabase' },
+  { label: 'Cykling live-data', value: 'Grand Tours + monumenter' },
+  { label: 'Fodbold live-data', value: '20 europæiske ligaer' },
+  { label: 'Drift & vedligehold', value: 'ingen reklamer' },
 ] as const
 
 export default function PriceSection() {
