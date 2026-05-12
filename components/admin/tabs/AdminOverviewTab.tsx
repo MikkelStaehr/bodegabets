@@ -147,7 +147,32 @@ function MatchList({
 
   return (
     <div className="border-t border-warm-border bg-cream-dark">
-      <table className="w-full font-body text-[13px]">
+      {/* Mobile card-list */}
+      <ul className="md:hidden divide-y divide-warm-border">
+        {matches.map((match) => (
+          <li key={match.id} className="px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-medium text-ink text-[13px] min-w-0">
+                {match.home_team} <span className="text-warm-gray">vs</span> {match.away_team}
+              </p>
+              <StatusBadge status={match.status} />
+            </div>
+            <p className="font-body text-[11px] text-warm-gray mt-1">
+              {new Date(match.kickoff_at).toLocaleDateString('da-DK', {
+                timeZone: 'Europe/Copenhagen',
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop table */}
+      <table className="hidden md:table w-full font-body text-[13px]">
         <thead>
           <tr className="font-condensed text-[10px] font-bold text-warm-gray uppercase tracking-wider border-b border-warm-border">
             <th className="text-left px-5 py-2">Kamp</th>
@@ -196,14 +221,14 @@ function LeagueOverblikCard({
 
   return (
     <div className="border border-warm-border overflow-hidden mb-4" style={{ borderRadius: '2px' }}>
-      <div className="bg-forest px-5 py-3 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h3 className="font-condensed text-lg font-bold text-cream uppercase tracking-wide">
+      <div className="bg-forest px-4 sm:px-5 py-3 flex items-start sm:items-center justify-between flex-col sm:flex-row gap-2 sm:gap-3">
+        <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
+          <h3 className="font-condensed text-base sm:text-lg font-bold text-cream uppercase tracking-wide">
             {league.name}
           </h3>
           <span className="text-cream/50 font-body text-[12px]">{league.country}</span>
         </div>
-        <div className="flex items-center gap-4 font-body text-[12px] text-cream/70">
+        <div className="flex items-center gap-3 sm:gap-4 font-body text-[12px] text-cream/70 flex-wrap">
           <span>{league.activeRooms.toLocaleString('da-DK')} aktive rum</span>
           <span>{league.totalBets.toLocaleString('da-DK')} bets på aktuel runde</span>
         </div>
@@ -329,10 +354,10 @@ export function AdminOverviewTab() {
   return (
     <div>
       {/* Cron jobs */}
-      <div className="border border-warm-border bg-cream p-5 mb-8" style={{ borderRadius: '2px' }}>
+      <div className="border border-warm-border bg-cream p-4 sm:p-5 mb-6 sm:mb-8" style={{ borderRadius: '2px' }}>
         <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>System</p>
-        <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Cron jobs</h2>
-        <div className="flex flex-wrap gap-3">
+        <h2 className="font-condensed font-bold text-ink text-base sm:text-lg uppercase tracking-wide mb-4">Cron jobs</h2>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3">
           {[
             { key: 'batch-sync', label: 'Batch sync' },
             { key: 'sync-scores', label: 'Sync scores' },
@@ -343,7 +368,7 @@ export function AdminOverviewTab() {
               <button
                 onClick={() => runCron(key)}
                 disabled={cronLoading.has(key)}
-                className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-forest px-4 py-2 border border-warm-border hover:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 font-condensed text-[13px] sm:text-[12px] font-semibold text-forest px-4 py-3 sm:py-2 border border-warm-border active:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ borderRadius: '2px' }}
               >
                 {cronLoading.has(key) && (
