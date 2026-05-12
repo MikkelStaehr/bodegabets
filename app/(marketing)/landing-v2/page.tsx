@@ -6,6 +6,7 @@ import HeroRotator from './HeroRotator'
 import LandingTicker from '@/components/landing/LandingTicker'
 import PriceSection from '@/components/landing/PriceSection'
 import ChampionshipSection from '@/components/landing/ChampionshipSection'
+import HowItWorksSection from '@/components/landing/HowItWorksSection'
 
 export const metadata: Metadata = {
   title: 'Bodega Bets — Spil mod vennerne',
@@ -196,71 +197,7 @@ function ProductsSection() {
 
 // ChampionshipSection er nu shared — se components/landing/ChampionshipSection.tsx
 
-// ─── 6. How it works ────────────────────────────────────────────────────────
-
-const HOW_STEPS = [
-  { num: '01', label: 'Opret eller join en liga' },
-  { num: '02', label: 'Tip før kickoff' },
-  { num: '03', label: 'Se hvem der fører' },
-] as const
-
-function HowItWorksSection() {
-  return (
-    <section id="how-it-works" className="bg-cream py-16 lg:py-28">
-      <div className="max-w-5xl mx-auto px-6 lg:px-8">
-        <div className="text-center mb-12 lg:mb-16">
-          <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
-            Sådan virker det
-          </span>
-        </div>
-
-        {/* Desktop horizontal timeline */}
-        <div className="hidden lg:flex items-center">
-          {HOW_STEPS.map((step, i) => (
-            <div key={step.num} className="contents">
-              <div className="flex-1 bg-cream/50 border border-forest/10 rounded-sm p-6 text-center">
-                <div className="font-display font-black text-gold leading-none text-[48px]">
-                  {step.num}
-                </div>
-                <div className="mt-2 font-condensed font-bold text-forest-dark text-[12px] uppercase tracking-widest">
-                  {step.label}
-                </div>
-              </div>
-              {i < HOW_STEPS.length - 1 && (
-                <div
-                  aria-hidden
-                  className="flex-1 h-0 mx-3 border-t border-dotted border-gold/40"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Mobile vertical timeline */}
-        <div className="lg:hidden flex flex-col">
-          {HOW_STEPS.map((step, i) => (
-            <div key={step.num} className="contents">
-              <div className="bg-cream/50 border border-forest/10 rounded-sm p-6 text-center">
-                <div className="font-display font-black text-gold leading-none text-[48px]">
-                  {step.num}
-                </div>
-                <div className="mt-2 font-condensed font-bold text-forest-dark text-[12px] uppercase tracking-widest">
-                  {step.label}
-                </div>
-              </div>
-              {i < HOW_STEPS.length - 1 && (
-                <div
-                  aria-hidden
-                  className="w-0 h-8 mx-auto border-l border-dotted border-gold/40"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
+// HowItWorksSection er nu shared — se components/landing/HowItWorksSection.tsx
 
 // ─── 7. Social proof ────────────────────────────────────────────────────────
 

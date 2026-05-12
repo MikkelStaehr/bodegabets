@@ -15,7 +15,7 @@ const FANTASY_STEPS = [
 const TIPPING_STEPS = [
   { num: '01', title: 'Tip udfald', desc: '1-X-2 + ekstra bets (clean sheet, vindermarginal, scorer 3+).' },
   { num: '02', title: 'Vindue låser før kickoff', desc: 'Bet-vinduet lukker 30 min før kampstart — ingen efter-snak.' },
-  { num: '03', title: 'Score når kampen er slut', desc: 'Konsensus-odds belønner modige tips — op til ×1.8.' },
+  { num: '03', title: 'Score når kampen er slut', desc: 'Point afregnes automatisk på leaderboard så snart kampen er færdig.' },
 ] as const
 
 type Step = (typeof FANTASY_STEPS)[number] | (typeof TIPPING_STEPS)[number]
@@ -42,11 +42,17 @@ function FormatColumn({
   category,
   tagline,
   steps,
+  signatureLabel,
+  signatureTitle,
+  signatureDesc,
   disciplines,
 }: {
   category: string
   tagline: string
   steps: readonly Step[]
+  signatureLabel: string
+  signatureTitle: string
+  signatureDesc: string
   disciplines: string
 }) {
   return (
@@ -68,8 +74,21 @@ function FormatColumn({
         ))}
       </div>
 
+      {/* Signature mechanic */}
+      <div className="mt-10 pt-6 border-t border-gold/20">
+        <p className="font-condensed font-semibold text-[10px] uppercase tracking-[0.14em] text-gold mb-2">
+          ✦ {signatureLabel}
+        </p>
+        <p className="font-display italic text-cream text-[17px] sm:text-[19px] leading-snug mb-1">
+          {signatureTitle}
+        </p>
+        <p className="font-body text-cream/55 text-[13px] leading-relaxed">
+          {signatureDesc}
+        </p>
+      </div>
+
       {/* Disciplines badge */}
-      <div className="mt-8 pt-6 border-t border-cream/10">
+      <div className="mt-6 pt-4 border-t border-cream/10">
         <p className="font-condensed text-[11px] uppercase tracking-[0.14em] text-cream/45">
           {disciplines}
         </p>
@@ -102,12 +121,18 @@ export default function HowItWorksSection() {
             category="Fantasy"
             tagline="Pick-the-heros."
             steps={FANTASY_STEPS}
+            signatureLabel="Signatur"
+            signatureTitle="Role-bonus + joker."
+            signatureDesc="Hver rytter har en rolle (Klatrer, Sprinter, GC...). Tør du gætte hvem der angriber? Joker × 1.5 på den rytter du tror på den dag."
             disciplines="Cykling · F1 snart"
           />
           <FormatColumn
             category="Tipping"
             tagline="Bet udfald."
             steps={TIPPING_STEPS}
+            signatureLabel="Signatur"
+            signatureTitle="Konsensus-odds — op til ×1.8."
+            signatureDesc="Jo sjældnere dit valg, jo større multiplier. Du belønnes for at gå mod strømmen — ikke for at følge favoritten."
             disciplines="Fodbold · Tennis snart"
           />
         </div>
