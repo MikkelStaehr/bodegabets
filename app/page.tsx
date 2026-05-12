@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import LandingTicker from '@/components/landing/LandingTicker'
 import HeroRotator from '@/app/(marketing)/landing-v2/HeroRotator'
+import PriceSection from '@/components/landing/PriceSection'
 import { getActiveUserCount, getLandingTickerItems } from '@/lib/landingData'
 import type { Profile } from '@/types'
 
@@ -52,6 +53,9 @@ export default async function HomePage() {
           <LandingTicker items={ticker.items} currentDate={ticker.currentDate} />
         )}
       </div>
+
+      {/* ── Pris-afsnit (€1/mnd bodega-receipt) ─────────────── */}
+      <PriceSection />
 
       {/* ── Sådan virker det ──────────────────────────────────── */}
       <section className="bg-cream">
