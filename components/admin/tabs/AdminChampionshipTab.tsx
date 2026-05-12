@@ -246,12 +246,12 @@ export function AdminChampionshipTab() {
   return (
     <div>
       <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Administration</p>
-      <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-6">Mesterskabet</h2>
+      <h2 className="font-condensed font-bold text-ink text-base sm:text-lg uppercase tracking-wide mb-6">Mesterskabet</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
 
-        {/* ── Venstre: Kamp-browser ──────────────────────────── */}
-        <div>
+        {/* ── Venstre: Kamp-browser (vises sidst på mobile) ──── */}
+        <div className="order-2 lg:order-1">
           <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide mb-3">
             {activeChampRoundId ? `Kampe · ${champRounds.find((r) => r.id === activeChampRoundId)?.name ?? ''}` : 'Kampe'}
           </h3>
@@ -327,7 +327,7 @@ export function AdminChampionshipTab() {
                       return (
                         <div
                           key={match.id}
-                          className={`flex items-center gap-3 px-4 py-3 ${isSelected ? 'bg-forest/5' : 'bg-cream hover:bg-cream-dark/40'} transition-colors`}
+                          className={`flex items-center gap-3 px-3 sm:px-4 py-3 ${isSelected ? 'bg-forest/5' : 'bg-cream active:bg-cream-dark/40'} transition-colors`}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -348,7 +348,7 @@ export function AdminChampionshipTab() {
                           <button
                             onClick={() => isSelected ? removeMatch(match.id) : addMatch(match)}
                             disabled={!isSelected && selectedMatches.length >= 9}
-                            className={`font-condensed text-xs uppercase tracking-wide px-3 py-1.5 rounded-sm transition-colors cursor-pointer shrink-0 ${
+                            className={`font-condensed text-xs uppercase tracking-wide px-3 py-2 sm:py-1.5 rounded-sm transition-colors cursor-pointer shrink-0 ${
                               isSelected
                                 ? 'bg-vintage-red text-cream hover:opacity-85'
                                 : 'border border-forest/40 text-forest hover:bg-forest hover:text-cream disabled:opacity-30 disabled:cursor-not-allowed'
@@ -366,8 +366,8 @@ export function AdminChampionshipTab() {
           )}
         </div>
 
-        {/* ── Højre: Sæson + runde-liste ────────────────────── */}
-        <div>
+        {/* ── Højre: Sæson + runde-liste (vises først på mobile) */}
+        <div className="order-1 lg:order-2">
           {/* Sæson-vælger */}
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-condensed font-bold text-ink text-sm uppercase tracking-wide">Runder</h3>

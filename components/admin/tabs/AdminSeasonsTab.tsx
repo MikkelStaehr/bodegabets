@@ -299,13 +299,13 @@ export function AdminSeasonsTab() {
         {tournaments.map((tournament) => (
           <div key={tournament.id} className="border border-warm-border overflow-hidden" style={{ borderRadius: '2px' }}>
             {/* Tournament header */}
-            <div className="bg-forest px-5 py-3 flex items-center justify-between">
-              <h3 className="font-condensed font-bold text-cream uppercase tracking-wide">
+            <div className="bg-forest px-4 sm:px-5 py-3 flex items-center justify-between gap-3">
+              <h3 className="font-condensed font-bold text-cream uppercase tracking-wide text-sm sm:text-base min-w-0 truncate">
                 {tournament.name}
               </h3>
               <button
                 onClick={() => setModal({ mode: 'create', tournament_id: tournament.id, tournament_name: tournament.name })}
-                className="font-condensed text-[11px] uppercase tracking-widest text-cream/70 hover:text-cream border border-cream/20 hover:border-cream/50 px-3 py-1 transition-colors"
+                className="font-condensed text-[11px] uppercase tracking-widest text-cream/70 active:text-cream border border-cream/20 px-3 py-1.5 sm:py-1 transition-colors shrink-0"
                 style={{ borderRadius: '2px' }}
               >
                 + Ny sæson
@@ -318,7 +318,46 @@ export function AdminSeasonsTab() {
                 Ingen sæsoner
               </div>
             ) : (
-              <table className="w-full">
+              <>
+              {/* Mobile season cards */}
+              <ul className="md:hidden divide-y divide-warm-border bg-cream">
+                {tournament.seasons.map((season) => (
+                  <li key={season.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="min-w-0">
+                        <p className="font-condensed font-semibold text-ink truncate">{season.name}</p>
+                        <p className="font-body text-[11px] text-warm-taupe mt-0.5">
+                          {season.bold_phase_id != null ? `phase_id ${season.bold_phase_id}` : <span className="text-vintage-red/70">phase_id mangler</span>}
+                        </p>
+                        <p className="font-body text-[11px] text-warm-gray mt-0.5">
+                          {season.start_date || season.end_date
+                            ? `${formatDate(season.start_date)} – ${formatDate(season.end_date)}`
+                            : 'Ingen periode angivet'}
+                        </p>
+                      </div>
+                      <span
+                        className={`font-condensed text-[10px] uppercase tracking-wide border px-1.5 py-0.5 shrink-0 ${
+                          season.is_active
+                            ? 'bg-forest/10 text-forest border-forest/30'
+                            : 'bg-cream-dark text-warm-gray border-warm-border'
+                        }`}
+                        style={{ borderRadius: '2px' }}
+                      >
+                        {season.is_active ? 'Aktiv' : 'Inaktiv'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setModal({ mode: 'edit', season })}
+                      className="w-full font-condensed text-[12px] uppercase tracking-wide text-forest border border-forest/30 active:bg-forest/5 py-2.5 transition-colors"
+                      style={{ borderRadius: '2px' }}
+                    >
+                      Rediger
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              <table className="hidden md:table w-full">
                 <thead>
                   <tr className="bg-cream-dark border-b border-warm-border">
                     <th className="text-left px-5 py-2.5 font-condensed text-[10px] font-bold uppercase tracking-wider text-warm-gray">Sæson</th>
@@ -371,6 +410,7 @@ export function AdminSeasonsTab() {
                   ))}
                 </tbody>
               </table>
+              </>
             )}
           </div>
         ))}

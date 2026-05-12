@@ -107,27 +107,27 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
     <>
       {/* Stats banner */}
       <div className="rounded-sm border border-border overflow-hidden mb-6">
-        <div className="bg-forest text-cream px-5 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-6 flex-wrap">
+        <div className="bg-forest text-cream px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="grid grid-cols-3 sm:flex sm:items-center sm:gap-6 gap-3">
             <div>
               <p className="font-condensed text-[9px] uppercase tracking-[0.14em] text-cream/50 mb-0.5">Sidst synket</p>
-              <p className="font-condensed font-bold text-sm text-cream">{formatDateTime(lastSync)}</p>
+              <p className="font-condensed font-bold text-[12px] sm:text-sm text-cream">{formatDateTime(lastSync)}</p>
             </div>
             <div className="w-px h-8 bg-cream/10 hidden sm:block" />
             <div>
               <p className="font-condensed text-[9px] uppercase tracking-[0.14em] text-cream/50 mb-0.5">Aktive sæsoner</p>
-              <p className="font-condensed font-bold text-sm text-cream">{totalSeasons}</p>
+              <p className="font-condensed font-bold text-[12px] sm:text-sm text-cream">{totalSeasons}</p>
             </div>
             <div className="w-px h-8 bg-cream/10 hidden sm:block" />
             <div>
               <p className="font-condensed text-[9px] uppercase tracking-[0.14em] text-cream/50 mb-0.5">Kampe i alt</p>
-              <p className="font-condensed font-bold text-sm text-cream">{totalMatches.toLocaleString('da-DK')}</p>
+              <p className="font-condensed font-bold text-[12px] sm:text-sm text-cream">{totalMatches.toLocaleString('da-DK')}</p>
             </div>
           </div>
           <button
             onClick={syncAll}
             disabled={syncingAll}
-            className="px-5 py-2 bg-cream/10 hover:bg-cream/20 text-cream font-condensed text-xs uppercase tracking-widest border border-cream/20 rounded-sm disabled:opacity-50 transition-colors"
+            className="w-full sm:w-auto px-5 py-3 sm:py-2 bg-cream/10 active:bg-cream/20 text-cream font-condensed text-xs uppercase tracking-widest border border-cream/20 rounded-sm disabled:opacity-50 transition-colors"
           >
             {syncingAll ? 'Synker...' : 'Sync alle'}
           </button>
@@ -136,26 +136,28 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
 
       {/* Rebuild game */}
       <div className="mb-6 border border-border rounded-sm bg-cream-dark px-4 py-3">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 sm:flex-wrap">
           <label className="font-condensed text-xs uppercase tracking-wider text-text-warm">
             Genbyg kampe for spilrum
           </label>
-          <input
-            type="number"
-            min={1}
-            value={rebuildGameId}
-            onChange={(e) => setRebuildGameId(e.target.value)}
-            placeholder="Spil-ID (fx 5)"
-            className="w-28 px-3 py-2 text-sm border border-border rounded-sm bg-white text-ink font-body focus:outline-none focus:ring-2 focus:ring-forest focus:border-forest"
-          />
-          <button
-            type="button"
-            onClick={handleRebuildGame}
-            disabled={rebuilding || !rebuildGameId.trim()}
-            className="px-4 py-2 font-condensed text-xs uppercase tracking-widest bg-forest text-cream rounded-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-          >
-            {rebuilding ? 'Kører...' : 'Genbyg'}
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={1}
+              value={rebuildGameId}
+              onChange={(e) => setRebuildGameId(e.target.value)}
+              placeholder="Spil-ID (fx 5)"
+              className="w-28 flex-1 sm:flex-none px-3 py-2.5 sm:py-2 text-sm border border-border rounded-sm bg-white text-ink font-body focus:outline-none focus:ring-2 focus:ring-forest focus:border-forest"
+            />
+            <button
+              type="button"
+              onClick={handleRebuildGame}
+              disabled={rebuilding || !rebuildGameId.trim()}
+              className="px-4 py-2.5 sm:py-2 font-condensed text-xs uppercase tracking-widest bg-forest text-cream rounded-sm active:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity shrink-0"
+            >
+              {rebuilding ? 'Kører...' : 'Genbyg'}
+            </button>
+          </div>
           {rebuildResult && (
             <span className="font-body text-sm text-ink">{rebuildResult}</span>
           )}
@@ -191,8 +193,43 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
               </span>
             </div>
 
-            {/* Season rows */}
-            <table className="w-full">
+            {/* Mobile season cards */}
+            <ul className="md:hidden divide-y divide-border bg-cream">
+              {tournament.seasons.map((season) => {
+                const isSyncing = syncing.has(season.id)
+                const fb = feedback[season.id]
+                return (
+                  <li key={season.id} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="min-w-0">
+                        <p className="font-condensed text-[12px] text-warm-gray">
+                          Sæson <span className="font-bold text-ink">#{season.id}</span> · phase_id{' '}
+                          {season.bold_phase_id ?? <span className="text-vintage-red/70">mangler</span>}
+                        </p>
+                        <p className="font-condensed font-bold text-base text-ink mt-0.5">
+                          {season.match_count.toLocaleString('da-DK')} kampe
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => syncSeason(season.id)}
+                        disabled={isSyncing || syncingAll || season.bold_phase_id == null}
+                        className="px-4 py-2.5 bg-forest text-cream font-condensed text-xs uppercase tracking-wide rounded-sm active:opacity-85 disabled:opacity-40 transition-opacity shrink-0"
+                      >
+                        {isSyncing ? '...' : 'Sync'}
+                      </button>
+                    </div>
+                    {fb && (
+                      <p className={`font-body text-xs ${fb.ok ? 'text-forest' : 'text-vintage-red'}`}>
+                        {fb.text}
+                      </p>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+
+            {/* Desktop season rows */}
+            <table className="hidden md:table w-full">
               <thead>
                 <tr className="border-b border-border bg-cream">
                   <th className="text-left px-4 py-2 font-condensed text-[10px] uppercase tracking-wider text-text-warm">Sæson ID</th>

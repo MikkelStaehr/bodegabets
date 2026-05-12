@@ -78,7 +78,7 @@ export function AdminGamesTab({ sport }: Props) {
   return (
     <div>
       <p className="font-condensed uppercase text-warm-gray mb-0.5" style={{ fontSize: '11px', letterSpacing: '0.1em' }}>Administration</p>
-      <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Spilrum</h2>
+      <h2 className="font-condensed font-bold text-ink text-base sm:text-lg uppercase tracking-wide mb-4">Spilrum</h2>
 
       {/* Filter */}
       <div className="mb-6">
@@ -102,7 +102,68 @@ export function AdminGamesTab({ sport }: Props) {
           </p>
         </div>
       ) : (
-        <div className="border border-warm-border overflow-x-auto rounded-sm">
+      <>
+        {/* Mobile card-list */}
+        <ul className="md:hidden space-y-3">
+          {filtered.map((game) => {
+            const isConfirming = deleteConfirm === game.id
+            const isDeleting = deleteLoading.has(game.id)
+            return (
+              <li
+                key={game.id}
+                className="border border-warm-border bg-cream p-4 rounded-sm"
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <a href={`/games/${game.id}`} className="font-medium text-ink active:text-forest block truncate">
+                      {game.name}
+                    </a>
+                    <p className="font-condensed text-[12px] tracking-widest text-warm-gray mt-0.5">{game.invite_code}</p>
+                    <p className="font-body text-[11px] text-warm-taupe mt-1">
+                      {game.member_count} deltagere · {formatDate(game.created_at)}
+                    </p>
+                  </div>
+                  <span className={`font-condensed text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-sm border shrink-0 ${
+                    game.status === 'active'
+                      ? 'text-forest bg-forest/10 border-forest/30'
+                      : 'text-warm-gray bg-warm-border/40 border-warm-border'
+                  }`}>
+                    {game.status === 'active' ? 'Aktiv' : 'Afsluttet'}
+                  </span>
+                </div>
+                {isConfirming ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="font-body text-[12px] text-vintage-red text-center">Er du sikker? Sletning kan ikke fortrydes.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleDelete(game.id)}
+                        disabled={isDeleting}
+                        className="font-condensed text-[12px] uppercase tracking-wide py-2.5 bg-vintage-red text-cream rounded-sm disabled:opacity-40"
+                      >
+                        {isDeleting ? 'Sletter...' : 'Ja, slet'}
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm(null)}
+                        className="font-condensed text-[12px] uppercase tracking-wide py-2.5 border border-warm-border text-warm-gray rounded-sm"
+                      >
+                        Annullér
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirm(game.id)}
+                    className="w-full font-condensed text-[12px] uppercase tracking-wide py-2.5 border border-vintage-red/40 text-vintage-red rounded-sm active:bg-vintage-red/5"
+                  >
+                    Slet spilrum
+                  </button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+
+        <div className="hidden md:block border border-warm-border overflow-x-auto rounded-sm">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-cream-dark border-b border-warm-border">
@@ -173,6 +234,7 @@ export function AdminGamesTab({ sport }: Props) {
             </tbody>
           </table>
         </div>
+      </>
       )}
     </div>
   )

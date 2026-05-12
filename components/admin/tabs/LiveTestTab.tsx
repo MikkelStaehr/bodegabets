@@ -127,8 +127,8 @@ export function LiveTestTab() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
           <span className="text-sm text-[#7a7060]">
             Sidst opdateret: {new Date(d.timestamp).toLocaleString('da-DK', {
               timeZone: 'Europe/Copenhagen',
@@ -143,14 +143,52 @@ export function LiveTestTab() {
         </div>
         <button
           onClick={fetchData}
-          className="px-4 py-2 text-sm font-semibold bg-[#2C4A3E] text-white rounded hover:bg-[#1a3329] transition-colors"
+          className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-semibold bg-[#2C4A3E] text-white rounded active:bg-[#1a3329] transition-colors"
         >
           Refresh
         </button>
       </div>
 
-      {/* Match table */}
-      <div className="border border-black/10 rounded-sm overflow-hidden bg-white">
+      {/* Mobile match card-list */}
+      <ul className="md:hidden space-y-2">
+        {d.liveMatches.length === 0 ? (
+          <li className="border border-black/10 bg-white p-6 text-center text-sm text-[#7a7060] rounded-sm">
+            Ingen live eller halvleg-kampe lige nu
+          </li>
+        ) : (
+          d.liveMatches.map((m) => (
+            <li key={m.id} className="border border-black/10 bg-white p-3 rounded-sm">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <p className="font-medium text-ink text-[13px] min-w-0">
+                  {m.home_team} <span className="text-warm-gray">—</span> {m.away_team}
+                </p>
+                <span
+                  className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                    m.status === 'live'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {m.status}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 mb-1">
+                <span className="font-mono text-base font-bold text-ink">
+                  {m.home_score ?? '—'} : {m.away_score ?? '—'}
+                </span>
+                <span className="text-[11px] text-[#7a7060]">{m.league_name}</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-[#7a7060]">
+                <span>Bold match #{m.bold_match_id ?? '—'}</span>
+                <span>{formatUpdatedAgo(m.updated_at)}</span>
+              </div>
+            </li>
+          ))
+        )}
+      </ul>
+
+      {/* Desktop match table */}
+      <div className="hidden md:block border border-black/10 rounded-sm overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
