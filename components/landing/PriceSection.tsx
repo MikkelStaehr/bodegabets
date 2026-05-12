@@ -6,10 +6,10 @@ import Link from 'next/link'
  */
 
 const RECEIPT_LINES = [
-  { label: 'Cykling live-data', value: 'INKLUDERET' },
-  { label: 'Fodbold live-data · 20 ligaer', value: 'INKLUDERET' },
-  { label: 'Bodega Championship', value: 'INKLUDERET' },
-  { label: 'Drift & vedligehold', value: 'INKLUDERET' },
+  { label: 'Cykling live-data', value: 'PCS + cron' },
+  { label: 'Fodbold live-data · 20 ligaer', value: 'Bold API' },
+  { label: 'Bodega Championship', value: 'auto-runder' },
+  { label: 'Drift & vedligehold', value: 'Vercel + Supabase' },
 ] as const
 
 export default function PriceSection() {
@@ -94,10 +94,19 @@ export default function PriceSection() {
               </span>
             </div>
 
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.14em] text-warm-taupe">
+                Profit til ejer
+              </span>
+              <span className="font-display font-black text-warm-taupe text-[16px] leading-none">
+                €0.00
+              </span>
+            </div>
+
             <div className="my-5 border-t border-dashed border-warm-border" />
 
             <p className="text-center text-[10px] uppercase tracking-[0.14em] text-warm-taupe/80">
-              tak fordi du spiller med
+              ingen er blevet rigere her
             </p>
           </div>
         </div>
