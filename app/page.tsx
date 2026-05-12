@@ -4,6 +4,7 @@ import LandingTicker from '@/components/landing/LandingTicker'
 import HeroRotator from '@/app/(marketing)/landing-v2/HeroRotator'
 import PriceSection from '@/components/landing/PriceSection'
 import ChampionshipSection from '@/components/landing/ChampionshipSection'
+import HowItWorksSection from '@/components/landing/HowItWorksSection'
 import { getActiveUserCount, getLandingTickerItems } from '@/lib/landingData'
 import type { Profile } from '@/types'
 
@@ -61,42 +62,8 @@ export default async function HomePage() {
       {/* ── Bodega Championship (flagship) ──────────────────── */}
       <ChampionshipSection />
 
-      {/* ── Sådan virker det ──────────────────────────────────── */}
-      <section className="bg-cream">
-        <div className="max-w-5xl mx-auto px-6 lg:px-8 py-12 lg:py-24">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="block w-6 h-[2px] bg-gold" />
-            <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
-              Kom i gang
-            </span>
-          </div>
-          <h2 className="font-display italic text-ink mb-16 font-bold text-[clamp(28px,4vw,40px)]">
-            På 2 minutter er du klar.
-          </h2>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-12 gap-x-6 relative">
-            {/* Connector line */}
-            <div className="hidden lg:block absolute top-9 left-[12.5%] right-[12.5%] h-[2px] bg-gold/15" />
-
-            {[
-              { step: 1, title: 'Opret profil', desc: 'Tilmeld dig gratis med e-mail' },
-              { step: 2, title: 'Join et spilrum', desc: 'Brug en 6-tegns invitationskode' },
-              { step: 3, title: 'Afgiv dine bets', desc: 'Vælg udfald inden deadline' },
-              { step: 4, title: 'Høst prestige', desc: 'Følg med live og kæmp om førstepladsen' },
-            ].map(({ step, title, desc }) => (
-              <div key={step} className="flex flex-col relative">
-                <span className="font-display italic text-gold/25 leading-none mb-4 font-[900] text-[72px]">
-                  {step}
-                </span>
-                <h3 className="font-condensed text-ink text-sm uppercase tracking-[0.08em] mb-2 font-bold">
-                  {title}
-                </h3>
-                <p className="font-body text-warm-gray text-sm leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── Sådan virker det (Fantasy + Tipping side-by-side) ──── */}
+      <HowItWorksSection />
 
       {/* ── Features ──────────────────────────────────────────── */}
       <section className="bg-forest-light">
