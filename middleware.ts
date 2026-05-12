@@ -76,17 +76,19 @@ export async function middleware(req: NextRequest) {
       path.startsWith('/login') ||
       path.startsWith('/register') ||
       path.startsWith('/logout') ||
+      path.startsWith('/forgot-password') ||
+      path.startsWith('/reset-password') ||
+      path.startsWith('/verify-email') ||
       path.startsWith('/subscribe') ||
       path.startsWith('/profile') ||
-      path.startsWith('/account') ||
       path.startsWith('/suspended') ||
       path.startsWith('/api/stripe/') ||
       path.startsWith('/api/auth/') ||
-      path === '/privacy' ||
-      path === '/terms' ||
-      path === '/cookies' ||
-      path === '/about' ||
-      path === '/contact'
+      path === '/vilkaar' ||
+      path === '/privatlivspolitik' ||
+      path === '/cookie-politik' ||
+      path === '/om' ||
+      path === '/faq'
 
     if (!isPaying && !allowedWithoutSubscription) {
       return NextResponse.redirect(new URL('/subscribe', req.url))

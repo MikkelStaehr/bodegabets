@@ -29,6 +29,19 @@ export async function POST() {
     )
   }
 
+  // past_due — brugeren har en aktiv Stripe-sub med fejlet betaling.
+  // Lad dem fixe kortet via Customer Portal i stedet for at oprette nyt
+  // abonnement (ville give dobbelt-charge når det første recovery'er).
+  if (profile?.subscription_status === 'past_due') {
+    return NextResponse.json(
+      {
+        error:
+          'Din seneste betaling fejlede. Opdatér betalingsmetode via "Administrér betaling" i stedet for at oprette nyt medlemskab.',
+      },
+      { status: 400 },
+    )
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   try {
