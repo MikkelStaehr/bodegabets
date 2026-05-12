@@ -4,6 +4,8 @@
  *
  * Fantasy: pick-the-heros (Cykling nu, F1 snart)
  * Tipping: bet udfald (Fodbold nu, Tennis snart)
+ *
+ * Cream-baggrund så vi bevarer rytmen cream → forest → cream → ... på landing.
  */
 
 const FANTASY_STEPS = [
@@ -27,10 +29,10 @@ function StepRow({ step }: { step: Step }) {
         {step.num}
       </span>
       <div className="min-w-0 pt-2">
-        <h4 className="font-condensed font-bold text-cream text-sm sm:text-base uppercase tracking-[0.06em] mb-1">
+        <h4 className="font-condensed font-bold text-ink text-sm sm:text-base uppercase tracking-[0.06em] mb-1">
           {step.title}
         </h4>
-        <p className="font-body text-cream/55 text-[13px] sm:text-sm leading-relaxed">
+        <p className="font-body text-warm-gray text-[13px] sm:text-sm leading-relaxed">
           {step.desc}
         </p>
       </div>
@@ -59,10 +61,10 @@ function FormatColumn({
     <div className="flex flex-col">
       {/* Header */}
       <div className="mb-8 sm:mb-10">
-        <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold">
+        <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
           {category}
         </span>
-        <p className="mt-2 font-display italic text-cream text-[22px] sm:text-[28px] leading-tight">
+        <p className="mt-2 font-display italic text-forest text-[22px] sm:text-[28px] leading-tight">
           {tagline}
         </p>
       </div>
@@ -75,21 +77,21 @@ function FormatColumn({
       </div>
 
       {/* Signature mechanic */}
-      <div className="mt-10 pt-6 border-t border-gold/20">
-        <p className="font-condensed font-semibold text-[10px] uppercase tracking-[0.14em] text-gold mb-2">
+      <div className="mt-10 pt-6 border-t border-gold/30">
+        <p className="font-condensed font-semibold text-[10px] uppercase tracking-[0.14em] text-gold-dark mb-2">
           ✦ {signatureLabel}
         </p>
-        <p className="font-display italic text-cream text-[17px] sm:text-[19px] leading-snug mb-1">
+        <p className="font-display italic text-forest text-[17px] sm:text-[19px] leading-snug mb-1">
           {signatureTitle}
         </p>
-        <p className="font-body text-cream/55 text-[13px] leading-relaxed">
+        <p className="font-body text-warm-gray text-[13px] leading-relaxed">
           {signatureDesc}
         </p>
       </div>
 
       {/* Disciplines badge */}
-      <div className="mt-6 pt-4 border-t border-cream/10">
-        <p className="font-condensed text-[11px] uppercase tracking-[0.14em] text-cream/45">
+      <div className="mt-6 pt-4 border-t border-warm-border">
+        <p className="font-condensed text-[11px] uppercase tracking-[0.14em] text-warm-taupe">
           {disciplines}
         </p>
       </div>
@@ -99,19 +101,19 @@ function FormatColumn({
 
 export default function HowItWorksSection() {
   return (
-    <section className="bg-forest py-16 lg:py-24">
+    <section className="bg-cream py-16 lg:py-24">
       <div className="max-w-6xl mx-auto px-6 lg:px-8">
         {/* Section header */}
         <div className="mb-12 lg:mb-16">
           <div className="flex items-center gap-3 mb-3">
             <span className="block w-6 h-[2px] bg-gold" />
-            <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold">
+            <span className="font-condensed font-semibold text-xs uppercase tracking-[0.14em] text-gold-dark">
               Sådan virker det
             </span>
           </div>
-          <h2 className="font-display text-cream text-[clamp(32px,5vw,52px)] leading-[1.05]">
+          <h2 className="font-display text-forest text-[clamp(32px,5vw,52px)] leading-[1.05]">
             <span className="font-display italic font-bold">To formater.</span>{' '}
-            <span className="text-cream/60 font-bold">Samme spil.</span>
+            <span className="text-warm-gray font-bold">Samme spil.</span>
           </h2>
         </div>
 
