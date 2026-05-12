@@ -93,19 +93,10 @@ export default function PriceSection() {
               </span>
             </div>
 
-            <div className="mt-3 flex items-baseline justify-between">
-              <span className="font-condensed font-bold text-[11px] uppercase tracking-[0.14em] text-warm-taupe">
-                Profit til ejer
-              </span>
-              <span className="font-display font-black text-warm-taupe text-[16px] leading-none">
-                €0.00
-              </span>
-            </div>
-
             <div className="my-5 border-t border-dashed border-warm-border" />
 
             <p className="text-center text-[10px] uppercase tracking-[0.14em] text-warm-taupe/80">
-              ingen er blevet rigere her
+              tak fordi du spiller med
             </p>
           </div>
         </div>
