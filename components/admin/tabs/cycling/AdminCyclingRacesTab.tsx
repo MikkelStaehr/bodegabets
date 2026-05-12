@@ -153,7 +153,107 @@ export function AdminCyclingRacesTab() {
       {races.length === 0 ? (
         <p className="font-body text-[13px] text-warm-gray">Ingen l\u00f8b registreret endnu.</p>
       ) : (
-        <div className="border border-warm-border bg-cream overflow-hidden" style={{ borderRadius: '2px' }}>
+        <>
+        {/* Mobile race card-list */}
+        <ul className="md:hidden space-y-3">
+          {races.map((race) => {
+            const isStageRace = race.race_type === 'stage_race'
+            const isExpanded = expandedRace === race.id
+            const stages = stagesCache[race.id]
+            const isLoadingStages = stagesLoading.has(race.id)
+            return (
+              <li key={race.id} className="border border-warm-border bg-cream" style={{ borderRadius: '2px' }}>
+                <div className="p-4">
+                  <div className="mb-3">
+                    <p className="font-medium text-ink">{race.name}</p>
+                    <p className="font-body text-[11px] text-warm-taupe mt-0.5 capitalize">
+                      {isStageRace ? 'Etapeløb' : 'Endagsløb'} · {race.profile} · {race.start_date ?? '—'}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div>
+                      <span className="font-condensed text-[10px] uppercase text-warm-gray tracking-wide block mb-1">Status</span>
+                      <select
+                        value={race.status ?? 'upcoming'}
+                        onChange={(e) => updateRaceStatus(race.id, e.target.value)}
+                        disabled={statusUpdating.has(race.id)}
+                        className="w-full font-condensed text-[12px] uppercase tracking-wide bg-cream border border-warm-border px-2 py-2 text-ink disabled:opacity-50"
+                        style={{ borderRadius: '2px' }}
+                      >
+                        <option value="upcoming">Upcoming</option>
+                        <option value="active">Active</option>
+                        <option value="finished">Finished</option>
+                      </select>
+                    </div>
+                    <div>
+                      <span className="font-condensed text-[10px] uppercase text-warm-gray tracking-wide block mb-1">Resultater</span>
+                      <p className="font-body text-[11px] text-warm-gray pt-2">
+                        {race.results_uploaded_at ? formatDateTime(race.results_uploaded_at) : '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {race.startlist_count > 0 ? (
+                      <button
+                        onClick={() => openStartlistModal(race.id, race.name)}
+                        className="w-full inline-flex items-center justify-center gap-2 font-condensed text-[12px] font-semibold text-forest px-4 py-2.5 border border-forest/30 active:bg-forest/5"
+                        style={{ borderRadius: '2px' }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-forest shrink-0" />
+                        {race.startlist_count}{race.startlist_total ? ` / ${race.startlist_total}` : ''} bekræftede ryttere
+                      </button>
+                    ) : (
+                      <p className="font-body text-[11px] text-warm-gray text-center py-1">Ingen startliste endnu</p>
+                    )}
+                    {isStageRace && (
+                      <button
+                        onClick={() => toggleStages(race.id)}
+                        className="w-full font-condensed text-[12px] font-semibold text-warm-gray px-4 py-2.5 border border-warm-border active:bg-cream-dark"
+                        style={{ borderRadius: '2px' }}
+                      >
+                        {isExpanded ? 'Skjul etaper ▲' : 'Vis etaper ▼'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {isStageRace && isExpanded && (
+                  <div className="bg-cream-dark border-t border-warm-border px-4 py-3 space-y-2">
+                    {isLoadingStages ? (
+                      <p className="font-condensed text-[11px] text-warm-gray uppercase tracking-wide">Henter etaper…</p>
+                    ) : !stages || stages.length === 0 ? (
+                      <p className="font-body text-[12px] text-warm-gray">Ingen etaper registreret.</p>
+                    ) : (
+                      stages.map((stage) => (
+                        <div key={stage.id} className="bg-cream border border-warm-border p-3" style={{ borderRadius: '2px' }}>
+                          <div className="flex items-baseline justify-between gap-2 mb-1">
+                            <span className="font-medium text-ink text-[13px]">
+                              {stage.stage_number === 0 ? 'Prolog' : `Etape ${stage.stage_number}`}
+                            </span>
+                            <span className="font-body text-[11px] text-warm-gray">{stage.start_date ?? '—'}</span>
+                          </div>
+                          <p className="font-body text-[12px] text-warm-gray mb-1.5">
+                            {stage.departure && stage.arrival
+                              ? `${stage.departure} → ${stage.arrival}`
+                              : stage.name ?? '—'}
+                          </p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-warm-gray">
+                            {stage.profile && <span className="capitalize">{stage.profile}</span>}
+                            {stage.distance_km && <span>{stage.distance_km} km</span>}
+                            {stage.vertical_meters != null && <span>{stage.vertical_meters.toLocaleString()} m</span>}
+                            {stage.profile_score != null && <span>PS {stage.profile_score}</span>}
+                            {stage.won_how && <span>· {stage.won_how}</span>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+
+        <div className="hidden md:block border border-warm-border bg-cream overflow-hidden" style={{ borderRadius: '2px' }}>
           <div className="overflow-x-auto">
             <table className="w-full font-body text-[13px]">
               <thead>
@@ -276,13 +376,14 @@ export function AdminCyclingRacesTab() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* ── Startlist modal ──────────────────────────────────────── */}
       {startlistModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setStartlistModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => setStartlistModal(null)}>
           <div
-            className="bg-cream border border-warm-border w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            className="bg-cream border border-warm-border w-full max-w-2xl max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col"
             style={{ borderRadius: '2px' }}
             onClick={(e) => e.stopPropagation()}
           >

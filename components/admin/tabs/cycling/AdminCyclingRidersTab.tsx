@@ -102,9 +102,9 @@ export function AdminCyclingRidersTab() {
       </div>
 
       {/* ── Data quality ─────────────────────────────────────────── */}
-      <div className="border border-warm-border bg-cream p-5" style={{ borderRadius: '2px' }}>
-        <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-3">Datakvalitet</h2>
-        <div className="flex gap-6 font-body text-[13px]">
+      <div className="border border-warm-border bg-cream p-4 sm:p-5" style={{ borderRadius: '2px' }}>
+        <h2 className="font-condensed font-bold text-ink text-base sm:text-lg uppercase tracking-wide mb-3">Datakvalitet</h2>
+        <div className="grid grid-cols-1 sm:flex sm:gap-6 gap-1.5 font-body text-[13px]">
           <div>
             <span className="text-warm-gray">Mangler foto: </span>
             <span className={missingPhotoCount > 0 ? 'text-vintage-red font-medium' : 'text-forest font-medium'}>
@@ -125,19 +125,20 @@ export function AdminCyclingRidersTab() {
       </div>
 
       {/* ── Filters + sync ───────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="S\u00f8g rytter eller hold..."
-          className="font-body text-[13px] border border-warm-border bg-cream px-3 py-2 w-64 outline-none focus:border-forest"
+          className="font-body text-[13px] border border-warm-border bg-cream px-3 py-2.5 sm:py-2 w-full sm:w-64 outline-none focus:border-forest"
           style={{ borderRadius: '2px' }}
         />
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-3">
         <select
           value={filterCat ?? ''}
           onChange={(e) => setFilterCat(e.target.value ? Number(e.target.value) : null)}
-          className="font-condensed text-[12px] uppercase tracking-wide border border-warm-border bg-cream px-3 py-2"
+          className="font-condensed text-[12px] uppercase tracking-wide border border-warm-border bg-cream px-3 py-2.5 sm:py-2"
           style={{ borderRadius: '2px' }}
         >
           <option value="">Alle kategorier</option>
@@ -146,17 +147,19 @@ export function AdminCyclingRidersTab() {
         <select
           value={filterPhoto}
           onChange={(e) => setFilterPhoto(e.target.value as 'all' | 'missing' | 'has')}
-          className="font-condensed text-[12px] uppercase tracking-wide border border-warm-border bg-cream px-3 py-2"
+          className="font-condensed text-[12px] uppercase tracking-wide border border-warm-border bg-cream px-3 py-2.5 sm:py-2"
           style={{ borderRadius: '2px' }}
         >
           <option value="all">Alle billeder</option>
           <option value="missing">Mangler foto</option>
           <option value="has">Har foto</option>
         </select>
+        </div>
+        <div className="flex flex-col gap-1 sm:ml-auto">
         <button
           onClick={handleSync}
           disabled={syncLoading}
-          className="ml-auto font-condensed text-[12px] font-semibold text-forest px-4 py-2 border border-warm-border hover:bg-cream-dark disabled:opacity-50"
+          className="w-full sm:w-auto font-condensed text-[13px] sm:text-[12px] font-semibold text-forest px-4 py-3 sm:py-2 border border-warm-border active:bg-cream-dark disabled:opacity-50"
           style={{ borderRadius: '2px' }}
         >
           {syncLoading ? 'Synkroniserer...' : 'Synkroniser ryttere'}
@@ -166,6 +169,7 @@ export function AdminCyclingRidersTab() {
             {syncMsg.text}
           </span>
         )}
+        </div>
       </div>
 
       {/* ── Rider count ──────────────────────────────────────────── */}
@@ -173,8 +177,44 @@ export function AdminCyclingRidersTab() {
         {filteredRiders.length} ryttere
       </p>
 
-      {/* ── Rider table ──────────────────────────────────────────── */}
-      <div className="border border-warm-border bg-cream overflow-hidden" style={{ borderRadius: '2px' }}>
+      {/* ── Mobile rider card-list (<md) ────────────────────────── */}
+      <ul className="md:hidden space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+        {filteredRiders.map((rider) => (
+          <li
+            key={rider.id}
+            className="flex items-center gap-3 p-3 border border-warm-border bg-cream"
+            style={{ borderRadius: '2px' }}
+          >
+            {rider.photo_url ? (
+              <img src={rider.photo_url} alt="" className="w-10 h-10 object-cover shrink-0" style={{ borderRadius: '2px' }} />
+            ) : (
+              <div className="w-10 h-10 bg-cream-dark flex items-center justify-center shrink-0" style={{ borderRadius: '2px' }}>
+                <span className="text-warm-gray text-[10px]">?</span>
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-ink truncate">
+                {rider.last_name} <span className="font-normal text-warm-gray">{rider.first_name}</span>
+              </p>
+              <p className="font-body text-[12px] text-warm-gray truncate">{rider.team_name}</p>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="font-condensed text-[10px] font-bold uppercase border px-1.5 py-0.5 text-warm-gray border-warm-border" style={{ borderRadius: '2px' }}>
+                Kat {rider.category}
+              </span>
+              {!rider.team_logo_url && (
+                <span className="font-condensed text-[9px] text-vintage-red">Mangler logo</span>
+              )}
+            </div>
+          </li>
+        ))}
+        {filteredRiders.length === 0 && (
+          <li className="p-8 text-center font-body text-[13px] text-warm-gray">Ingen ryttere matcher</li>
+        )}
+      </ul>
+
+      {/* ── Desktop rider table (≥md) ────────────────────────── */}
+      <div className="hidden md:block border border-warm-border bg-cream overflow-hidden" style={{ borderRadius: '2px' }}>
         <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
           <table className="w-full font-body text-[13px]">
             <thead className="sticky top-0 bg-cream">

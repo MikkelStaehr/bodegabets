@@ -67,7 +67,7 @@ export function AdminLogsTab() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`font-condensed text-[11px] font-bold px-3 py-1.5 transition-colors ${
+            className={`font-condensed text-[11px] font-bold px-3 py-2 sm:py-1.5 transition-colors ${
               filter === f
                 ? 'bg-forest text-cream'
                 : 'bg-cream-dark text-warm-gray hover:bg-cream-dark/80 border border-warm-border'

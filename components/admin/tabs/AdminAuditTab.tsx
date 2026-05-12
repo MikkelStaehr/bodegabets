@@ -54,14 +54,14 @@ export function AdminAuditTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 px-5 pt-5">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-1 sm:px-5 pt-1 sm:pt-5">
         <label className="font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray font-bold">
           Filter:
         </label>
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="px-3 py-1.5 rounded-sm border border-warm-border bg-white text-sm font-body"
+          className="px-3 py-2 sm:py-1.5 rounded-sm border border-warm-border bg-white text-sm font-body flex-1 sm:flex-none min-w-0"
         >
           <option value="">Alle handlinger</option>
           {distinctActions.map((a) => (
@@ -87,7 +87,7 @@ export function AdminAuditTab() {
             return (
               <div
                 key={log.id}
-                className={`px-5 py-3 ${idx > 0 ? 'border-t border-warm-border' : ''}`}
+                className={`px-3 sm:px-5 py-3 ${idx > 0 ? 'border-t border-warm-border' : ''}`}
               >
                 <div className="flex items-start gap-3 flex-wrap">
                   <span
