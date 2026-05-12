@@ -131,15 +131,15 @@ export function AdminCyclingDashboardTab() {
   return (
     <div className="space-y-8">
       {/* ── Quick stats ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
         {[
           { label: 'Ryttere', value: riderCount },
           { label: 'L\u00f8b', value: raceCount },
           { label: 'Sidst synkroniseret', value: lastSynced ? formatDateTime(lastSynced) : 'Aldrig', small: true },
         ].map((stat) => (
-          <div key={stat.label} className="border border-warm-border bg-cream p-4" style={{ borderRadius: '2px' }}>
+          <div key={stat.label} className="border border-warm-border bg-cream p-3 sm:p-4" style={{ borderRadius: '2px' }}>
             <span className="font-condensed text-[10px] uppercase text-warm-gray tracking-wide">{stat.label}</span>
-            <p className={`font-condensed font-bold text-ink ${stat.small ? 'text-[13px] mt-1' : 'text-2xl'}`}>
+            <p className={`font-condensed font-bold text-ink ${stat.small ? 'text-[13px] mt-1' : 'text-xl sm:text-2xl'}`}>
               {stat.value}
             </p>
           </div>
@@ -147,42 +147,48 @@ export function AdminCyclingDashboardTab() {
       </div>
 
       {/* ── Sync actions ─────────────────────────────────────────── */}
-      <div className="border border-warm-border bg-cream p-5" style={{ borderRadius: '2px' }}>
-        <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Synkronisering</h2>
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="border border-warm-border bg-cream p-4 sm:p-5" style={{ borderRadius: '2px' }}>
+        <h2 className="font-condensed font-bold text-ink text-base sm:text-lg uppercase tracking-wide mb-4">Synkronisering</h2>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start gap-3">
+          <div className="flex flex-col gap-1">
           <button
             onClick={handleFullSync}
             disabled={syncLoading}
-            className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-forest px-4 py-2 border border-warm-border hover:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 font-condensed text-[13px] sm:text-[12px] font-semibold text-forest px-4 py-3 sm:py-2 border border-warm-border active:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '2px' }}
           >
             {syncLoading ? 'Synkroniserer...' : 'K\u00f8r fuld sync'}
           </button>
+          {syncMsg && <span className={`font-body text-[12px] ${syncMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{syncMsg.text}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
           <button
             onClick={handleCalcPoints}
             disabled={pointsLoading}
-            className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-forest px-4 py-2 border border-warm-border hover:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 font-condensed text-[13px] sm:text-[12px] font-semibold text-forest px-4 py-3 sm:py-2 border border-warm-border active:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '2px' }}
           >
             {pointsLoading ? 'Beregner...' : 'Beregn point'}
           </button>
+          {pointsMsg && <span className={`font-body text-[12px] ${pointsMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{pointsMsg.text}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
           <button
             onClick={handleLockLineups}
             disabled={lockLoading}
-            className="inline-flex items-center gap-1.5 font-condensed text-[12px] font-semibold text-vintage-red px-4 py-2 border border-vintage-red/30 hover:bg-vintage-red/5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 font-condensed text-[13px] sm:text-[12px] font-semibold text-vintage-red px-4 py-3 sm:py-2 border border-vintage-red/30 active:bg-vintage-red/5 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '2px' }}
           >
             {lockLoading ? 'L\u00e5ser...' : 'L\u00e5s lineups'}
           </button>
-          {syncMsg && <span className={`font-body text-[12px] ${syncMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{syncMsg.text}</span>}
-          {pointsMsg && <span className={`font-body text-[12px] ${pointsMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{pointsMsg.text}</span>}
           {lockMsg && <span className={`font-body text-[12px] ${lockMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{lockMsg.text}</span>}
+          </div>
         </div>
       </div>
 
       {/* ── Sync log ─────────────────────────────────────────────── */}
-      <div className="border border-warm-border bg-cream p-5" style={{ borderRadius: '2px' }}>
-        <h2 className="font-condensed font-bold text-ink text-lg uppercase tracking-wide mb-4">Sync log</h2>
+      <div className="border border-warm-border bg-cream p-4 sm:p-5" style={{ borderRadius: '2px' }}>
+        <h2 className="font-condensed font-bold text-ink text-base sm:text-lg uppercase tracking-wide mb-4">Sync log</h2>
         {syncLogs.length === 0 ? (
           <p className="font-body text-[13px] text-warm-gray">Ingen sync-log entries endnu.</p>
         ) : (
