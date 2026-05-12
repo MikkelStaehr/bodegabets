@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import { getActiveUserCount, getLandingTickerItems } from '@/lib/landingData'
 import HeroRotator from './HeroRotator'
 import LandingTicker from '@/components/landing/LandingTicker'
 import PriceSection from '@/components/landing/PriceSection'
 import ChampionshipSection from '@/components/landing/ChampionshipSection'
 import HowItWorksSection from '@/components/landing/HowItWorksSection'
+import ProductsSection from '@/components/landing/ProductsSection'
 
 export const metadata: Metadata = {
   title: 'Bodega Bets — Spil mod vennerne',
@@ -88,110 +88,7 @@ function TopBar() {
 
 // ─── 4. Two products ────────────────────────────────────────────────────────
 
-const PRODUCT_CARDS = [
-  {
-    tag: 'Fantasy',
-    title: 'Cycling Manager',
-    image: '/landing/cycling-manager-app.jpg',
-    description:
-      'Saml dit drømmehold af ryttere, fordel roller og bonusser, og følg dem gennem Grand Tours og monumenter. Otte roller per rytter, joker når det gælder, point efter hver etape.',
-    features: [
-      '8 roller per rytter',
-      'Alle Grand Tours og monumenter',
-      'Joker, hold-bonus, DNF-straffe',
-      'Block-system per løb',
-    ],
-  },
-  {
-    tag: 'Tipping',
-    title: 'Fodbold',
-    image: '/landing/fodbold-app.jpg',
-    description:
-      'Tip vinderne på tværs af 20 europæiske ligaer. Bet-vinduet låser 30 minutter før kickoff, og point opdateres i realtid mens du følger med.',
-    features: [
-      'Per-kamp lock 30 min før kickoff',
-      'Konsensus-odds og rivalopgør',
-      'Block-system med vinder-evaluering',
-      'Realtids-leaderboard hele sæsonen',
-    ],
-  },
-] as const
-
-function ProductsSection() {
-  return (
-    <section id="products" className="bg-cream py-12 lg:py-24">
-      <div className="max-w-6xl mx-auto px-6 lg:px-8">
-        <div className="text-center mb-10 lg:mb-16">
-          <span className="font-condensed text-[11px] uppercase tracking-[0.14em] text-gold-dark">
-            De to spil
-          </span>
-          <h2 className="mt-3 font-display font-black text-forest text-[36px] lg:text-[56px] leading-none">
-            Vælg din disciplin.
-          </h2>
-          <p className="mt-4 font-body text-[16px] text-warm-taupe max-w-[560px] mx-auto">
-            Spil ét. Spil begge. Inkluderet i din månedlige adgang.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {PRODUCT_CARDS.map((card) => (
-            <article
-              key={card.title}
-              className="group relative h-[520px] lg:h-[600px] border border-warm-border rounded-sm hover:border-gold transition-colors overflow-hidden bg-forest"
-            >
-              <Image
-                src={card.image}
-                alt={card.title}
-                fill
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                quality={75}
-                className="object-cover object-center animate-kenburns-slow transition-transform duration-[1500ms] ease-out group-hover:scale-110"
-              />
-
-              {/* Heavier vignette per spec — forest/0.85 top, forest/0.95 bottom */}
-              <div className="absolute inset-0 bg-gradient-to-b from-forest/85 via-forest/60 to-forest/95 pointer-events-none" />
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background:
-                    'radial-gradient(ellipse at 50% 30%, transparent 50%, rgba(26,51,41,0.45) 100%)',
-                }}
-              />
-
-              {/* Gold accent line at top — appears on hover */}
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gold scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-700" />
-
-              <div className="absolute inset-x-0 bottom-0 p-6 lg:p-8">
-                <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold">
-                  {card.tag}
-                </span>
-
-                <h3 className="mt-2 font-display font-black text-cream text-[36px] lg:text-[44px] leading-[0.95] drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
-                  {card.title}
-                </h3>
-
-                <p className="mt-4 font-body text-[14px] lg:text-[15px] text-cream/85 leading-relaxed max-w-[440px] drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">
-                  {card.description}
-                </p>
-
-                <ul className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                  {card.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2.5">
-                      <span className="w-1 h-1 rounded-full bg-gold flex-shrink-0" />
-                      <span className="font-condensed font-semibold text-[12px] uppercase tracking-[0.06em] text-cream/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
+// ProductsSection er nu shared — se components/landing/ProductsSection.tsx
 
 // ─── 5. Bodega Championship ─────────────────────────────────────────────────
 

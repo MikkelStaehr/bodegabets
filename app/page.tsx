@@ -4,7 +4,7 @@ import LandingTicker from '@/components/landing/LandingTicker'
 import HeroRotator from '@/app/(marketing)/landing-v2/HeroRotator'
 import PriceSection from '@/components/landing/PriceSection'
 import ChampionshipSection from '@/components/landing/ChampionshipSection'
-import HowItWorksSection from '@/components/landing/HowItWorksSection'
+import ProductsSection from '@/components/landing/ProductsSection'
 import { getActiveUserCount, getLandingTickerItems } from '@/lib/landingData'
 import type { Profile } from '@/types'
 
@@ -62,8 +62,8 @@ export default async function HomePage() {
       {/* ── Bodega Championship (flagship) ──────────────────── */}
       <ChampionshipSection />
 
-      {/* ── Sådan virker det (Fantasy + Tipping side-by-side) ──── */}
-      <HowItWorksSection />
+      {/* ── De to formater (magazine-cover product cards) ──── */}
+      <ProductsSection />
 
       {/* ── Features ──────────────────────────────────────────── */}
       <section className="bg-forest-light">
