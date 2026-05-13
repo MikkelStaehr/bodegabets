@@ -285,6 +285,17 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
   }
 
   console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
+  // Sample raw-values så vi kan se hvad PCS gemmer per tabel
+  for (const k of ['gc', 'points', 'mountain', 'youth'] as const) {
+    const entries = Object.entries(out[k])
+    if (entries.length === 0) continue
+    const sample = entries
+      .sort((a, b) => a[1].position - b[1].position)
+      .slice(0, 3)
+      .map(([slug, e]) => `${e.position}:${slug}="${e.rawValue ?? ''}"`)
+      .join(' | ')
+    console.log(`[scrapeClassifications] ${k} top3 raw: ${sample}`)
+  }
   return out
 }
 
