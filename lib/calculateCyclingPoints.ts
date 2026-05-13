@@ -526,14 +526,7 @@ export async function calculateCyclingPoints(
         }
       }
 
-      // Bench jersey penalty: -30% of jersey points
-      const jerseyPts = getJerseyPoints(result.jersey)
-      let jerseyPen = 0
-      if (jerseyPts > 0) {
-        jerseyPen = -Math.round(jerseyPts * 0.3 * 10) / 10
-      }
-
-      const total = benchPen + jerseyPen + dnfPen
+      const total = benchPen + dnfPen
 
       if (total === 0) continue // no penalty → skip
 
@@ -549,7 +542,7 @@ export async function calculateCyclingPoints(
         role_multiplier: 0,
         gc_multiplier: 1.0,
         role_bonus: 0,
-        jersey_points: jerseyPen,
+        jersey_points: 0,
         team_bonus: 0,
         bench_penalty: benchPen,
         dnf_penalty: dnfPen,

@@ -211,7 +211,6 @@ export default async function CyclingGuidePage() {
             ['Bænk-rytter vinder', '-50% af would-be score'],
             ['Bænk-rytter top 3', '-40%'],
             ['Bænk-rytter top 10', '-20%'],
-            ['Bænk-rytter med jersey', '-30% af jersey-point'],
             ['Bænk-rytter DNF', '-5'],
           ]} />
           <Callout type="tip">
