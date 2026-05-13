@@ -24,6 +24,7 @@ type ClassementRider = {
   team_logo_url: string | null
   position: number
   time_gap_seconds?: number | null
+  points?: number | null
 }
 
 type Classement = {
@@ -294,15 +295,17 @@ function ClassementCard({ classement }: { classement: Classement }) {
       {/* Top-10 tabel */}
       {activeTop.length > 0 ? (
         <div>
-          <TableHeader valueLabel={tab === 'gc' ? 'Tid' : 'Point'} />
+          <TableHeader valueLabel={tab === 'gc' || tab === 'youth' ? 'Tid' : 'Point'} />
           {activeTop.map((rider) => {
-            const valueText = tab === 'gc'
-              ? (rider.position === 1
-                  ? '0:00'
-                  : rider.time_gap_seconds != null
-                    ? formatTimeGap(rider.time_gap_seconds)
-                    : '—')
-              : '—'
+            const valueText = (() => {
+              // GC + Youth: tidsgap
+              if (tab === 'gc' || tab === 'youth') {
+                if (rider.position === 1) return '0:00'
+                return rider.time_gap_seconds != null ? formatTimeGap(rider.time_gap_seconds) : '—'
+              }
+              // Points + Mountain: point-total
+              return rider.points != null ? String(rider.points) : '—'
+            })()
             return (
               <TableRow
                 key={rider.rider_id}

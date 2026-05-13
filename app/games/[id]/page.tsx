@@ -318,7 +318,8 @@ export default async function GamePage({ params }: Props) {
     photo_url: string | null
     team_logo_url: string | null
     position: number
-    time_gap_seconds?: number | null  // KUN på GC, gap til leder
+    time_gap_seconds?: number | null  // GC: gap til leder | Youth: gap til ung-leder
+    points?: number | null            // Points: total point-score | Mountain: KOM-point
   }
   const lineupClassements: Record<string, {
     raceName: string
@@ -495,7 +496,7 @@ export default async function GamePage({ params }: Props) {
       // GC-tidsgap til leder (mathematisk: forskel i sum = forskel i GC-tid).
       const { data: standingsData } = await supabaseAdmin
         .from('cycling_results')
-        .select('race_id, rider_id, jersey, gc_position_after, points_position_after, mountain_position_after, youth_position_after, time_gap_seconds, stage_number, dnf')
+        .select('race_id, rider_id, jersey, gc_position_after, points_position_after, mountain_position_after, youth_position_after, points_value, mountain_value, youth_gap_seconds, time_gap_seconds, stage_number, dnf')
         .in('race_id', raceIdsForStages)
 
       type StandingsRow = {
@@ -506,6 +507,9 @@ export default async function GamePage({ params }: Props) {
         points_position_after: number | null
         mountain_position_after: number | null
         youth_position_after: number | null
+        points_value: number | null
+        mountain_value: number | null
+        youth_gap_seconds: number | null
         time_gap_seconds: number | null
         stage_number: number
         dnf: boolean
@@ -519,6 +523,9 @@ export default async function GamePage({ params }: Props) {
         points_position: number | null
         mountain_position: number | null
         youth_position: number | null
+        points_value: number | null
+        mountain_value: number | null
+        youth_gap_seconds: number | null
         stageNum: number
         dnfEver: boolean
       }>()
@@ -545,6 +552,9 @@ export default async function GamePage({ params }: Props) {
             points_position: row.points_position_after,
             mountain_position: row.mountain_position_after,
             youth_position: row.youth_position_after,
+            points_value: row.points_value,
+            mountain_value: row.mountain_value,
+            youth_gap_seconds: row.youth_gap_seconds,
             stageNum: row.stage_number,
             dnfEver: (existing?.dnfEver ?? false) || row.dnf,
           })
@@ -611,13 +621,13 @@ export default async function GamePage({ params }: Props) {
         const buildEntry = (
           riderId: string,
           position: number,
-          includeTimeGap: boolean,
+          extras: { gcGap?: boolean; youthGap?: boolean; pointsValue?: number | null; mountainValue?: number | null },
         ): ClassementRider | null => {
           const base = riderInfoMap.get(riderId)
           if (!base) return null
           const entry: ClassementRider = { ...base, position }
-          if (includeTimeGap) {
-            // Lederen er reference-punktet (0:00 til sig selv)
+          if (extras.gcGap) {
+            // GC-leder er reference (0:00 til sig selv)
             if (position === 1) {
               entry.time_gap_seconds = 0
             } else {
@@ -627,6 +637,13 @@ export default async function GamePage({ params }: Props) {
               }
             }
           }
+          if (extras.youthGap) {
+            // Youth: brug youth_gap_seconds direkte fra DB (scraped)
+            const info = latestByKey.get(`${raceId}::${riderId}`)
+            entry.time_gap_seconds = position === 1 ? 0 : (info?.youth_gap_seconds ?? null)
+          }
+          if (extras.pointsValue != null) entry.points = extras.pointsValue
+          if (extras.mountainValue != null) entry.points = extras.mountainValue
           return entry
         }
 
@@ -644,25 +661,25 @@ export default async function GamePage({ params }: Props) {
           if (info.dnfEver) continue
           const riderId = key.split('::')[1]
           if (info.gc_position != null && info.gc_position <= 10) {
-            const e = buildEntry(riderId, info.gc_position, true)
+            const e = buildEntry(riderId, info.gc_position, { gcGap: true })
             if (e) gcTop.push(e)
           }
           if (info.points_position != null && info.points_position <= 10) {
-            const e = buildEntry(riderId, info.points_position, false)
+            const e = buildEntry(riderId, info.points_position, { pointsValue: info.points_value })
             if (e) pointsTop.push(e)
           }
           if (info.mountain_position != null && info.mountain_position <= 10) {
-            const e = buildEntry(riderId, info.mountain_position, false)
+            const e = buildEntry(riderId, info.mountain_position, { mountainValue: info.mountain_value })
             if (e) mountainTop.push(e)
           }
           if (info.youth_position != null && info.youth_position <= 10) {
-            const e = buildEntry(riderId, info.youth_position, false)
+            const e = buildEntry(riderId, info.youth_position, { youthGap: true })
             if (e) youthTop.push(e)
           }
-          if (info.jersey === 'leader') leader = buildEntry(riderId, info.gc_position ?? 1, true)
-          if (info.jersey === 'points') pointsLeader = buildEntry(riderId, info.points_position ?? 1, false)
-          if (info.jersey === 'mountain') mountainLeader = buildEntry(riderId, info.mountain_position ?? 1, false)
-          if (info.jersey === 'youth') youthLeader = buildEntry(riderId, info.youth_position ?? 1, false)
+          if (info.jersey === 'leader') leader = buildEntry(riderId, info.gc_position ?? 1, { gcGap: true })
+          if (info.jersey === 'points') pointsLeader = buildEntry(riderId, info.points_position ?? 1, { pointsValue: info.points_value })
+          if (info.jersey === 'mountain') mountainLeader = buildEntry(riderId, info.mountain_position ?? 1, { mountainValue: info.mountain_value })
+          if (info.jersey === 'youth') youthLeader = buildEntry(riderId, info.youth_position ?? 1, { youthGap: true })
         }
 
         gcTop.sort((a, b) => a.position - b.position)

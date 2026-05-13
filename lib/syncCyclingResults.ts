@@ -190,11 +190,21 @@ async function scrapeStageResults(slug: string, stageNum: number): Promise<Parse
 
 // ─── Classification scraper (dedikerede subsider) ──────────────────────────
 
+type ClassificationEntry = {
+  position: number
+  rawValue: string | null  // sidste celle-tekst (point eller tid)
+}
+
 type ClassificationSet = {
-  gc: Record<string, number>      // pcs_slug → GC-placering
-  points: Record<string, number>  // pcs_slug → points-placering
-  mountain: Record<string, number>// pcs_slug → bjerg-placering
-  youth: Record<string, number>   // pcs_slug → ung-placering
+  gc: Record<string, ClassificationEntry>      // GC: rawValue = tid-gap text
+  points: Record<string, ClassificationEntry>  // points: rawValue = total points
+  mountain: Record<string, ClassificationEntry>// mountain: rawValue = KOM points
+  youth: Record<string, ClassificationEntry>   // youth: rawValue = tid-gap text
+}
+
+// Convenience accessor — returns position if present, else null
+function posOf(entry: ClassificationEntry | undefined): number | null {
+  return entry?.position ?? null
 }
 
 // PCS' classification-subsider er tab-baseret UI: alle 4 URLs returnerer
@@ -266,7 +276,10 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
       const posText = $(cells[0]).text().trim()
       const posNum = parseInt(posText.replace(/[^0-9]/g, ''), 10)
       if (Number.isFinite(posNum) && posNum > 0) {
-        out[key][ridSlug] = posNum
+        // Hent rawValue fra sidste celle (typisk point eller tid-gap)
+        const lastCell = cells[cells.length - 1]
+        const rawValue = lastCell ? $(lastCell).text().trim() : null
+        out[key][ridSlug] = { position: posNum, rawValue: rawValue || null }
       }
     })
   }
@@ -281,11 +294,36 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
  * Tour) vælges højeste prioritet: leader > points > mountain > youth.
  */
 function jerseyForSlug(slug: string, c: ClassificationSet): string | null {
-  if (c.gc[slug] === 1) return 'leader'
-  if (c.points[slug] === 1) return 'points'
-  if (c.mountain[slug] === 1) return 'mountain'
-  if (c.youth[slug] === 1) return 'youth'
+  if (posOf(c.gc[slug]) === 1) return 'leader'
+  if (posOf(c.points[slug]) === 1) return 'points'
+  if (posOf(c.mountain[slug]) === 1) return 'mountain'
+  if (posOf(c.youth[slug]) === 1) return 'youth'
   return null
+}
+
+/**
+ * Parser tid-gap-string fra PCS som "+ 0:34" eller "+ 1:23:45" eller "0:00"
+ * til total sekunder. Returnerer null for tomt eller uparserbart.
+ */
+function parseGapToSeconds(raw: string | null | undefined): number | null {
+  if (!raw) return null
+  const cleaned = raw.replace(/[+,]/g, '').trim()
+  if (!cleaned || cleaned === '-' || cleaned === '—') return null
+  const parts = cleaned.split(':').map((p) => parseInt(p, 10))
+  if (parts.some(isNaN)) return null
+  if (parts.length === 1) return parts[0]
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  return null
+}
+
+/** Parser ren-tal point fra string, fx "115" eller "115 pts" */
+function parsePointsValue(raw: string | null | undefined): number | null {
+  if (!raw) return null
+  const m = raw.match(/(\d+)/)
+  if (!m) return null
+  const n = parseInt(m[1], 10)
+  return Number.isFinite(n) ? n : null
 }
 
 // ─── Public entry point ────────────────────────────────────────────────────
@@ -406,6 +444,9 @@ export async function syncCyclingResults(): Promise<{
       points_position_after: number | null
       mountain_position_after: number | null
       youth_position_after: number | null
+      points_value: number | null
+      mountain_value: number | null
+      youth_gap_seconds: number | null
     }> = []
     for (const r of parsed) {
       const riderId = riderIndex.get(r.pcs_slug)
@@ -414,6 +455,12 @@ export async function syncCyclingResults(): Promise<{
         stageUnmatched++
         if (unmatchedSamples.length < 5) unmatchedSamples.push(r.pcs_slug)
         continue
+      }
+      const slugClassifs = {
+        gc: classifications.gc[r.pcs_slug],
+        points: classifications.points[r.pcs_slug],
+        mountain: classifications.mountain[r.pcs_slug],
+        youth: classifications.youth[r.pcs_slug],
       }
       rows.push({
         race_id: stage.race_id,
@@ -424,10 +471,13 @@ export async function syncCyclingResults(): Promise<{
         dnf: r.dnf,
         abandon_type: r.abandon_type,
         jersey: jerseyForSlug(r.pcs_slug, classifications),
-        gc_position_after: classifications.gc[r.pcs_slug] ?? null,
-        points_position_after: classifications.points[r.pcs_slug] ?? null,
-        mountain_position_after: classifications.mountain[r.pcs_slug] ?? null,
-        youth_position_after: classifications.youth[r.pcs_slug] ?? null,
+        gc_position_after: posOf(slugClassifs.gc),
+        points_position_after: posOf(slugClassifs.points),
+        mountain_position_after: posOf(slugClassifs.mountain),
+        youth_position_after: posOf(slugClassifs.youth),
+        points_value: parsePointsValue(slugClassifs.points?.rawValue),
+        mountain_value: parsePointsValue(slugClassifs.mountain?.rawValue),
+        youth_gap_seconds: parseGapToSeconds(slugClassifs.youth?.rawValue),
       })
     }
     if (stageUnmatched > 0) {
