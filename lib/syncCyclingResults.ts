@@ -178,11 +178,15 @@ async function scrapeStageResults(slug: string, stageNum: number): Promise<Parse
   const resultUrl = `${base}/result`
   const resultHtml = await pcsGet(resultUrl)
   let results = resultHtml ? parseResultsTable(resultHtml) : []
+  console.log(`[scrapeStageResults]   /result: html-len=${resultHtml?.length ?? 0} parsed=${results.length}`)
 
   // Fallback til stage-page hvis /result var tom
   if (results.length === 0) {
     const stageHtml = await pcsGet(base)
-    if (stageHtml) results = parseResultsTable(stageHtml)
+    if (stageHtml) {
+      results = parseResultsTable(stageHtml)
+      console.log(`[scrapeStageResults]   base: html-len=${stageHtml.length} parsed=${results.length}`)
+    }
   }
 
   return results
@@ -390,6 +394,8 @@ export async function syncCyclingResults(): Promise<{
     }
     // Map til DB-rows
     let stageUpserted = 0
+    let stageUnmatched = 0
+    const unmatchedSamples: string[] = []
     const rows: Array<{
       race_id: string
       rider_id: string
@@ -405,6 +411,8 @@ export async function syncCyclingResults(): Promise<{
       const riderId = riderIndex.get(r.pcs_slug)
       if (!riderId) {
         totalUnmatched++
+        stageUnmatched++
+        if (unmatchedSamples.length < 5) unmatchedSamples.push(r.pcs_slug)
         continue
       }
       rows.push({
@@ -419,6 +427,7 @@ export async function syncCyclingResults(): Promise<{
         gc_position_after: classifications.gc[r.pcs_slug] ?? null,
       })
     }
+    console.log(`[syncCyclingResults]   parsed=${parsed.length} matched=${rows.length} unmatched=${stageUnmatched}${unmatchedSamples.length ? ` (sample: ${unmatchedSamples.join(', ')})` : ''}`)
 
     if (rows.length > 0) {
       // Batched upsert (200 ad gangen for at undgå payload-limit)
