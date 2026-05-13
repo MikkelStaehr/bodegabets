@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { getJerseyStyle, type JerseyKey } from '@/lib/cyclingJerseys'
+import { type JerseyKey } from '@/lib/cyclingJerseys'
+import JerseyIcon from './JerseyIcon'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -94,14 +95,6 @@ const ALL_ROLES: { key: string; label: string }[] = [
   { key: 'joker', label: 'Joker' },
 ]
 
-// JERSEY_LABELS er nu i lib/cyclingJerseys.ts (getJerseyLabel/getJerseyStyle)
-// — race-specifikke farver (Giro pink, Tour gul, Vuelta rød) hentes derfra.
-const JERSEY_LABELS: Record<string, string> = {
-  leader: 'FØR',
-  points: 'PT',
-  mountain: 'BT',
-  youth: 'UT',
-}
 
 const ROLE_TOOLTIPS: Record<string, string> = {
   leader: 'Point = placering × kat-multiplikator. +5 holdbonus hvis vinderhold. DNF: -50% af score (min -5)',
@@ -365,47 +358,22 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
               }}>
                 <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
                 {' '}{rider.first_name}
-                {result?.jersey && result.jersey.split(',').map((j) => j.trim()).filter(Boolean).map((j) => {
-                  const style = getJerseyStyle(race.name, j as JerseyKey)
-                  const label = JERSEY_LABELS[j] ?? j.toUpperCase()
-                  return (
-                    <span
-                      key={j}
-                      title={`Bærer ${j}-trøjen`}
-                      style={{
-                        marginLeft: 4, padding: '1px 5px', borderRadius: 2,
-                        color: style.color,
-                        background: style.stripe
-                          ? `linear-gradient(180deg, ${style.bg} 0%, ${style.bg} 55%, ${style.stripe} 55%, ${style.stripe} 70%, ${style.bg} 70%, ${style.bg} 100%)`
-                          : style.bg,
-                        fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
-                      }}
-                    >
-                      {label}
-                    </span>
-                  )
-                })}
+                {result?.jersey && result.jersey.split(',').map((j) => j.trim()).filter(Boolean).map((j) => (
+                  <span key={j} style={{ marginLeft: 4, display: 'inline-flex', verticalAlign: 'middle' }}>
+                    <JerseyIcon jersey={j as JerseyKey} raceName={race.name} size={18} title={`Bærer ${j}-trøjen`} />
+                  </span>
+                ))}
                 {/* Pre-stage current standings (kun hvis stage ikke er done og
                     rytteren ikke allerede har en result.jersey for denne stage) */}
                 {!stageDone && !result?.jersey && standings && (() => {
                   const s = standings[rider.id]
                   if (!s) return null
-                  const style = s.jersey ? getJerseyStyle(race.name, s.jersey as JerseyKey) : null
-                  const label = s.jersey ? JERSEY_LABELS[s.jersey] : null
                   return (
                     <>
-                      {style && label && (
-                        <span
-                          title={`Bærer ${s.jersey}-trøjen`}
-                          style={{
-                            marginLeft: 4, padding: '1px 5px', borderRadius: 2,
-                            color: style.color,
-                            background: style.stripe
-                              ? `linear-gradient(180deg, ${style.bg} 0%, ${style.bg} 55%, ${style.stripe} 55%, ${style.stripe} 70%, ${style.bg} 70%, ${style.bg} 100%)`
-                              : style.bg,
-                            fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
-                          }}
-                        >{label}</span>
+                      {s.jersey && (
+                        <span style={{ marginLeft: 4, display: 'inline-flex', verticalAlign: 'middle' }}>
+                          <JerseyIcon jersey={s.jersey as JerseyKey} raceName={race.name} size={18} title={`Bærer ${s.jersey}-trøjen`} />
+                        </span>
                       )}
                       {s.gc_position != null && s.gc_position <= 20 && (
                         <span

@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Lock, Radio, Check, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import LineupResults from './LineupResults'
-import { getJerseyStyle, getJerseyLabel, type JerseyKey } from '@/lib/cyclingJerseys'
+import { type JerseyKey } from '@/lib/cyclingJerseys'
+import JerseyIcon from './JerseyIcon'
 import AllLineups from './AllLineups'
 import TransferModal from './TransferModal'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
@@ -1221,22 +1222,15 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                             {(() => {
                               const s = raceStandings[rider.id]
                               if (!s) return null
-                              const style = s.jersey ? getJerseyStyle(modalRace?.name, s.jersey as JerseyKey) : null
-                              const label = s.jersey ? getJerseyLabel(s.jersey as JerseyKey) : null
                               return (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                                  {style && label && (
-                                    <span
+                                  {s.jersey && (
+                                    <JerseyIcon
+                                      jersey={s.jersey as JerseyKey}
+                                      raceName={modalRace?.name}
+                                      size={16}
                                       title={`Bærer ${s.jersey}-trøjen`}
-                                      style={{
-                                        padding: '1px 5px', borderRadius: 3,
-                                        fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
-                                        color: style.color,
-                                        background: style.stripe
-                                          ? `linear-gradient(180deg, ${style.bg} 0%, ${style.bg} 55%, ${style.stripe} 55%, ${style.stripe} 70%, ${style.bg} 70%, ${style.bg} 100%)`
-                                          : style.bg,
-                                      }}
-                                    >{label}</span>
+                                    />
                                   )}
                                   {s.gc_position != null && s.gc_position <= 20 && (
                                     <span

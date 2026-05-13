@@ -2,7 +2,8 @@
 
 import type { CyclingRace, CyclingSquadRider } from '@/types/cycling'
 import { formatCyclingDeadline } from '@/lib/cyclingUtils'
-import { getJerseyStyle, type JerseyKey } from '@/lib/cyclingJerseys'
+import { type JerseyKey } from '@/lib/cyclingJerseys'
+import JerseyIcon from './JerseyIcon'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,25 +90,14 @@ function RiderRow({ rider, raceName, jersey, position }: {
           {rider.team_name}
         </div>
       </div>
-      {jersey && (() => {
-        const style = getJerseyStyle(raceName, jersey)
-        const labels: Record<JerseyKey, string> = {
-          leader: 'FØR', points: 'PT', mountain: 'BT', youth: 'UT',
-        }
-        return (
-          <span
-            title={`Bærer ${jersey}-trøjen`}
-            style={{
-              padding: '2px 6px', borderRadius: 2,
-              fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
-              color: style.color, flexShrink: 0,
-              background: style.stripe
-                ? `linear-gradient(180deg, ${style.bg} 0%, ${style.bg} 55%, ${style.stripe} 55%, ${style.stripe} 70%, ${style.bg} 70%, ${style.bg} 100%)`
-                : style.bg,
-            }}
-          >{labels[jersey]}</span>
-        )
-      })()}
+      {jersey && (
+        <JerseyIcon
+          jersey={jersey}
+          raceName={raceName}
+          size={24}
+          title={`Bærer ${jersey}-trøjen`}
+        />
+      )}
     </div>
   )
 }

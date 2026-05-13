@@ -15,6 +15,7 @@ export type JerseyStyle = {
   bg: string         // primær trøjefarve
   color: string      // tekst-farve (kontrast)
   stripe?: string    // valgfri kontrast-stribe (sponsor-band imitation)
+  polkaDots?: { dot: string; base: string }  // til Tour/Vuelta bjergtrøje
 }
 
 const JERSEY_LABELS: Record<JerseyKey, string> = {
@@ -34,14 +35,14 @@ const GIRO: Record<JerseyKey, JerseyStyle> = {
 const TOUR: Record<JerseyKey, JerseyStyle> = {
   leader:   { bg: '#FAC775', color: '#633806', stripe: '#FEF3C7' },  // Yellow
   points:   { bg: '#22C55E', color: '#0A2E14', stripe: '#BBF7D0' },  // Green
-  mountain: { bg: '#FEE2E2', color: '#7F1D1D', stripe: '#DC2626' },  // Polka (red on white)
+  mountain: { bg: '#FFFFFF', color: '#7F1D1D', polkaDots: { dot: '#DC2626', base: '#FFFFFF' } },  // Polka (red dots on white)
   youth:    { bg: '#F8FAFC', color: '#475569', stripe: '#CBD5E1' },  // White
 }
 
 const VUELTA: Record<JerseyKey, JerseyStyle> = {
   leader:   { bg: '#DC2626', color: '#FEE2E2', stripe: '#FCA5A5' },  // Red
   points:   { bg: '#22C55E', color: '#0A2E14', stripe: '#BBF7D0' },  // Green
-  mountain: { bg: '#FEE2E2', color: '#7F1D1D', stripe: '#DC2626' },  // Polka
+  mountain: { bg: '#FFFFFF', color: '#7F1D1D', polkaDots: { dot: '#0066B3', base: '#FFFFFF' } },  // Polka (blue on white)
   youth:    { bg: '#F8FAFC', color: '#475569', stripe: '#CBD5E1' },  // White
 }
 
