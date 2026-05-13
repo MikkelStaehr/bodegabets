@@ -52,6 +52,10 @@ type Props = {
   scores: Score[]
   results: Result[]
   riders: Rider[]
+  /** Current standings snapshot fra seneste stage (jersey + GC position).
+   *  Bruges til at vise hvilke valgte ryttere der bærer trøjer GÅR IND TIL
+   *  denne stage. Forskelligt fra Result.jersey som er per-stage. */
+  standings?: Record<string, { jersey: string | null; gc_position: number | null }>
   onEditRole?: (roleKey: string) => void
 }
 
@@ -221,7 +225,7 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupResults({ race, stageFinished, slots, scores, results, riders, onEditRole }: Props) {
+export default function LineupResults({ race, stageFinished, slots, scores, results, riders, standings, onEditRole }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
@@ -381,6 +385,38 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
                     </span>
                   )
                 })}
+                {/* Pre-stage current standings (kun hvis stage ikke er done og
+                    rytteren ikke allerede har en result.jersey for denne stage) */}
+                {!stageDone && !result?.jersey && standings && (() => {
+                  const s = standings[rider.id]
+                  if (!s) return null
+                  const jerseyColor = s.jersey ? JERSEY_COLORS[s.jersey] : null
+                  const jerseyLabel = s.jersey ? JERSEY_LABELS[s.jersey] : null
+                  return (
+                    <>
+                      {jerseyColor && jerseyLabel && (
+                        <span
+                          title={`Bærer ${s.jersey}-trøjen`}
+                          style={{
+                            marginLeft: 4, padding: '1px 5px', borderRadius: 2,
+                            background: jerseyColor.bg, color: jerseyColor.color,
+                            fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
+                          }}
+                        >{jerseyLabel}</span>
+                      )}
+                      {s.gc_position != null && s.gc_position <= 20 && (
+                        <span
+                          title="Sammenlagt placering"
+                          style={{
+                            marginLeft: 4, padding: '1px 5px', borderRadius: 2,
+                            background: 'rgba(143,171,196,0.15)', color: '#8FABC4',
+                            fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+                          }}
+                        >GC {s.gc_position}</span>
+                      )}
+                    </>
+                  )
+                })()}
               </span>
 
               <div style={{ position: 'relative' }}>
