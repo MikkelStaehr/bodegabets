@@ -226,6 +226,12 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
     const html = await pcsGet(`${base}${suffix}`)
     if (html) {
       const rows = parseResultsTable(html)
+      // Diagnostik: tæl tables + log top 3 rytter-slugs så vi kan se om vi
+      // rammer den rigtige tabel for hver classification.
+      const $ = cheerio.load(html)
+      const tableCount = $('table').length
+      const firstThree = rows.slice(0, 3).map((r) => `${r.position}:${r.pcs_slug}`).join(', ')
+      console.log(`[scrapeClassifications]   ${key}: ${rows.length} riders, ${tableCount} tables. Top 3: ${firstThree}`)
       for (const r of rows) {
         if (r.position != null) out[key][r.pcs_slug] = r.position
       }
