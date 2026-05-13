@@ -197,23 +197,35 @@ type ClassificationSet = {
   youth: Record<string, number>   // pcs_slug → ung-placering
 }
 
-const CLASSIFICATION_URLS: Array<{ key: keyof ClassificationSet; suffix: string }> = [
-  { key: 'gc',       suffix: '-gc' },
-  { key: 'points',   suffix: '-points' },
-  { key: 'mountain', suffix: '-kom' },
-  { key: 'youth',    suffix: '-youth' },
-]
-
-const CLASSIFICATION_DELAY_MS = 500
+// PCS' classification-subsider er tab-baseret UI: alle 4 URLs returnerer
+// præcis samme HTML med 12 <table>-elementer. JavaScript skifter blot hvilken
+// tab der er aktiv. For at parse korrekt henter vi siden ÉN gang og plukker
+// riders fra specifikke table-indekser.
+//
+// Verificeret mod Giro d'Italia 2026 stage 4 (commit 03006fd diagnostik):
+//   Table 0 (177): GC (Maglia Rosa)
+//   Table 1 (174): stage result
+//   Table 5 (15):  points classification (Maglia Ciclamino)
+//   Table 6 (21):  mountain classification (Maglia Blu)
+//   Table 8 (48):  youth classification (Maglia Bianca)
+//
+// Hvis PCS' template ændres eller andre Grand Tours bruger anden struktur,
+// kan vi addressere ved enten at finde tables via class-selector eller
+// scanne header-tekst ved hver table. For nu er hardcoding pragmatisk.
+const CLASSIFICATION_TABLE_INDEX: Record<keyof ClassificationSet, number> = {
+  gc: 0,
+  points: 5,
+  mountain: 6,
+  youth: 8,
+}
 
 /**
- * Henter de 4 dedikerede classification-subsider for en stage og parser
- * rytter-placeringer fra hver. PCS-format: /race/{slug}/{year}/stage-N-{type}
- * hvor type ∈ { gc, points, kom, youth }. Pakkerne er almindelige
- * result-tabeller, så vi genbruger parseResultsTable.
+ * Hent classifications (GC, points, mountain, youth) for en stage via PCS'
+ * stage-N-gc subside (én HTTP-request — alle classifications ligger på samme
+ * HTML, blot i forskellige <table>'er).
  *
- * Hvis en subside ikke findes endnu (PCS publicerer dem først efter stage
- * er færdig) eller fejler, returneres tom map for den klassifikation.
+ * Hvis subsiden ikke findes endnu (PCS publicerer dem først efter stage er
+ * færdig) eller fejler, returneres tomme maps for alle klassifikationer.
  */
 async function scrapeClassifications(slug: string, stageNum: number): Promise<ClassificationSet> {
   const base = stageNum === 0
@@ -222,35 +234,43 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
 
   const out: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
 
-  for (const { key, suffix } of CLASSIFICATION_URLS) {
-    const html = await pcsGet(`${base}${suffix}`)
-    if (html) {
-      const rows = parseResultsTable(html)
-      // Diagnostik: tæl tables + log ryttere PER table så vi kan identificere
-      // hvilken table indeholder hvilken classification (GC har ~all riders,
-      // points/mountain/youth har færre).
-      const $ = cheerio.load(html)
-      const tableCount = $('table').length
-      const tableInfo: string[] = []
-      $('table').each((_, t) => {
-        const slugs: string[] = []
-        $(t).find('a').each((_i, a) => {
-          const href = $(a).attr('href') ?? ''
-          const m = href.match(/^rider\/([\w-]+)$/)
-          if (m && !slugs.includes(m[1])) slugs.push(m[1])
-        })
-        const first = slugs[0]?.split('-').slice(0, 2).join('-') ?? '∅'
-        tableInfo.push(`${slugs.length}(${first})`)
-      })
-      const firstThree = rows.slice(0, 3).map((r) => `${r.position}:${r.pcs_slug}`).join(', ')
-      console.log(`[scrapeClassifications]   ${key}: ${rows.length} riders. ${tableCount} tables: ${tableInfo.join(' ')}. Top 3: ${firstThree}`)
-      for (const r of rows) {
-        if (r.position != null) out[key][r.pcs_slug] = r.position
+  const html = await pcsGet(`${base}-gc`)
+  if (!html) return out
+
+  const $ = cheerio.load(html)
+  const tables = $('table').toArray()
+
+  for (const [key, idx] of Object.entries(CLASSIFICATION_TABLE_INDEX) as Array<[keyof ClassificationSet, number]>) {
+    const table = tables[idx]
+    if (!table) continue
+
+    const seen = new Set<string>()
+    $(table).find('tr').each((_, tr) => {
+      const $tr = $(tr)
+      const cells = $tr.find('td').toArray()
+      if (cells.length === 0) return  // header-row
+
+      const riderLink = $tr.find('a').filter((_i, a) => {
+        const href = $(a).attr('href') ?? ''
+        return /^rider\/[\w-]+$/.test(href)
+      }).first()
+      if (riderLink.length === 0) return
+
+      const m = (riderLink.attr('href') ?? '').match(/^rider\/([\w-]+)$/)
+      if (!m) return
+      const ridSlug = m[1]
+      if (seen.has(ridSlug)) return
+      seen.add(ridSlug)
+
+      const posText = $(cells[0]).text().trim()
+      const posNum = parseInt(posText.replace(/[^0-9]/g, ''), 10)
+      if (Number.isFinite(posNum) && posNum > 0) {
+        out[key][ridSlug] = posNum
       }
-    }
-    await new Promise((r) => setTimeout(r, CLASSIFICATION_DELAY_MS))
+    })
   }
 
+  console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
   return out
 }
 
@@ -368,9 +388,6 @@ export async function syncCyclingResults(): Promise<{
     } catch (err) {
       console.warn(`[syncCyclingResults] Classification scrape failed for ${race.name} stage ${stage.stage_number}: ${err}`)
     }
-    const classifCounts = `gc=${Object.keys(classifications.gc).length} pts=${Object.keys(classifications.points).length} mtn=${Object.keys(classifications.mountain).length} youth=${Object.keys(classifications.youth).length}`
-    console.log(`[syncCyclingResults]   classifications: ${classifCounts}`)
-
     // Map til DB-rows
     let stageUpserted = 0
     const rows: Array<{
