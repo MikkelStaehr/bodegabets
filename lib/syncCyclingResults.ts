@@ -231,18 +231,19 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
       // points/mountain/youth har færre).
       const $ = cheerio.load(html)
       const tableCount = $('table').length
-      const ridersPerTable: number[] = []
+      const tableInfo: string[] = []
       $('table').each((_, t) => {
-        const slugs = new Set<string>()
+        const slugs: string[] = []
         $(t).find('a').each((_i, a) => {
           const href = $(a).attr('href') ?? ''
           const m = href.match(/^rider\/([\w-]+)$/)
-          if (m) slugs.add(m[1])
+          if (m && !slugs.includes(m[1])) slugs.push(m[1])
         })
-        ridersPerTable.push(slugs.size)
+        const first = slugs[0]?.split('-').slice(0, 2).join('-') ?? '∅'
+        tableInfo.push(`${slugs.length}(${first})`)
       })
       const firstThree = rows.slice(0, 3).map((r) => `${r.position}:${r.pcs_slug}`).join(', ')
-      console.log(`[scrapeClassifications]   ${key}: ${rows.length} riders. ${tableCount} tables (riders each: ${ridersPerTable.join(',')}). Top 3: ${firstThree}`)
+      console.log(`[scrapeClassifications]   ${key}: ${rows.length} riders. ${tableCount} tables: ${tableInfo.join(' ')}. Top 3: ${firstThree}`)
       for (const r of rows) {
         if (r.position != null) out[key][r.pcs_slug] = r.position
       }
