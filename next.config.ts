@@ -32,9 +32,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   async headers() {
     return [
       {
@@ -59,10 +56,14 @@ export default withSentryConfig(nextConfig, {
   silent: !process.env.CI,
 
   // Source maps: kun upload hvis token er sat
+  // (deleteSourcemapsAfterUpload defaulter til true → ingen public expose)
   widenClientFileUpload: true,
-  hideSourceMaps: true,
-  disableLogger: true,
 
-  // Automatic vercel cron monitors
-  automaticVercelMonitors: true,
+  // Webpack-only options (ignoreres af Turbopack i dev)
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+    automaticVercelMonitors: true,
+  },
 })

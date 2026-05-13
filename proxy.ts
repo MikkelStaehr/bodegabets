@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Eksponér pathname til server components (root layout læser denne for at
   // skjule global Navbar/Footer på marketing-ruter som /landing-v2). Sættes
   // på request-headers så den overlever Supabase' cookie-callback der

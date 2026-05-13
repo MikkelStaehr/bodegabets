@@ -63,32 +63,6 @@ async function pcsGet(url: string): Promise<string | null> {
   return null
 }
 
-// ─── Time parsing ──────────────────────────────────────────────────────────
-
-export function parseTimeToSeconds(text: string | undefined | null): number | null {
-  if (!text) return null
-  let s = text.trim().replace(/^\+/, '').trim()
-  if (!s || s === ',,' || s === '-') return null
-
-  // H:MM:SS
-  let m = s.match(/^(\d+):(\d{1,2}):(\d{2})$/)
-  if (m) return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10)
-
-  // M:SS
-  m = s.match(/^(\d+):(\d{2})$/)
-  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
-
-  // Xh YY' ZZ"
-  m = s.match(/^(\d+)h\s*(\d+)['’]\s*(\d+)/)
-  if (m) return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10)
-
-  // Bare seconds
-  m = s.match(/^(\d+)["s]?$/)
-  if (m) return parseInt(m[1], 10)
-
-  return null
-}
-
 // ─── HTML parsing ──────────────────────────────────────────────────────────
 
 export function parseResultsTable(html: string): ParsedRow[] {
