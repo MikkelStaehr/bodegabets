@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Lock, Radio, Check, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import LineupResults from './LineupResults'
+import { getJerseyStyle, getJerseyLabel, type JerseyKey } from '@/lib/cyclingJerseys'
 import AllLineups from './AllLineups'
 import TransferModal from './TransferModal'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
@@ -37,20 +38,6 @@ type Props = {
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
-
-const JERSEY_LABELS: Record<string, string> = {
-  leader: 'FØR',
-  points: 'PT',
-  mountain: 'BT',
-  youth: 'UT',
-}
-
-const JERSEY_COLORS: Record<string, { bg: string; color: string }> = {
-  leader:   { bg: '#FAC775', color: '#633806' },
-  points:   { bg: '#9FE1CB', color: '#085041' },
-  mountain: { bg: '#F5C4B3', color: '#712B13' },
-  youth:    { bg: '#F2EDE4', color: '#444441' },
-}
 
 const ROLES: { key: CyclingRoleKey; label: string; catRule: number[] | null }[] = [
   { key: 'leader',      label: 'Leader',     catRule: null },
@@ -984,6 +971,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
 
         // Find race_id for den aktive stage, og hent startliste + DNF-set
         const modalStage = stages.find((s) => s.id === stageId)
+        const modalRace = modalStage ? races.find((r) => r.id === modalStage.race_id) : null
         const startlistIds = modalStage && startlists?.[modalStage.race_id] ? new Set(startlists[modalStage.race_id]) : null
         const hasStartlist = startlistIds !== null && startlistIds.size > 0
         const abandonedMap = modalStage ? abandoned?.[modalStage.race_id] ?? {} : {}
@@ -1233,19 +1221,22 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                             {(() => {
                               const s = raceStandings[rider.id]
                               if (!s) return null
-                              const jerseyColor = s.jersey ? JERSEY_COLORS[s.jersey] : null
-                              const jerseyLabel = s.jersey ? JERSEY_LABELS[s.jersey] : null
+                              const style = s.jersey ? getJerseyStyle(modalRace?.name, s.jersey as JerseyKey) : null
+                              const label = s.jersey ? getJerseyLabel(s.jersey as JerseyKey) : null
                               return (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                                  {jerseyColor && jerseyLabel && (
+                                  {style && label && (
                                     <span
                                       title={`Bærer ${s.jersey}-trøjen`}
                                       style={{
                                         padding: '1px 5px', borderRadius: 3,
                                         fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
-                                        background: jerseyColor.bg, color: jerseyColor.color,
+                                        color: style.color,
+                                        background: style.stripe
+                                          ? `linear-gradient(180deg, ${style.bg} 0%, ${style.bg} 55%, ${style.stripe} 55%, ${style.stripe} 70%, ${style.bg} 70%, ${style.bg} 100%)`
+                                          : style.bg,
                                       }}
-                                    >{jerseyLabel}</span>
+                                    >{label}</span>
                                   )}
                                   {s.gc_position != null && s.gc_position <= 20 && (
                                     <span
