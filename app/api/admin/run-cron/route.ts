@@ -12,6 +12,7 @@ const ALLOWED_CRONS = new Set([
   'sync-scores',
   'update-rounds',
   'calculate-points',
+  'sync-cycling-results',
 ])
 
 export const maxDuration = 65

@@ -62,17 +62,24 @@ export function AdminCyclingDashboardTab() {
     setSyncLoading(true)
     setSyncMsg(null)
     try {
-      const res = await fetch('/api/admin/cycling/sync-riders', {
+      const res = await fetch('/api/admin/run-cron', {
         method: 'POST',
-        headers: authHeader,
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cron: 'sync-cycling-results' }),
       })
       const data = await res.json()
-      setSyncMsg({ type: 'ok', text: data.message ?? 'Sync besked sendt' })
+      if (res.ok) {
+        const upserted = (data as { resultsUpserted?: number }).resultsUpserted ?? 0
+        const stages = (data as { stagesProcessed?: number }).stagesProcessed ?? 0
+        setSyncMsg({ type: 'ok', text: `${stages} stages \u00b7 ${upserted} results synced` })
+      } else {
+        setSyncMsg({ type: 'err', text: (data as { error?: string }).error ?? 'Sync fejlede' })
+      }
     } catch {
       setSyncMsg({ type: 'err', text: 'Netv\u00e6rksfejl' })
     } finally {
       setSyncLoading(false)
-      setTimeout(() => setSyncMsg(null), 5000)
+      setTimeout(() => setSyncMsg(null), 8000)
     }
   }
 
@@ -157,7 +164,7 @@ export function AdminCyclingDashboardTab() {
             className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 font-condensed text-[13px] sm:text-[12px] font-semibold text-forest px-4 py-3 sm:py-2 border border-warm-border active:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ borderRadius: '2px' }}
           >
-            {syncLoading ? 'Synkroniserer...' : 'K\u00f8r fuld sync'}
+            {syncLoading ? 'Synkroniserer...' : 'Sync results nu'}
           </button>
           {syncMsg && <span className={`font-body text-[12px] ${syncMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{syncMsg.text}</span>}
           </div>
