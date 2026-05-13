@@ -61,30 +61,25 @@ function formatTimeGap(seconds: number | null | undefined): string {
   return `${sign}${m}:${String(s).padStart(2, '0')}`
 }
 
-function RiderRow({ rider, raceName, jersey, showTimeGap }: {
+/**
+ * Top-sektion (trøjebærere). Kompakt med foto + navn/hold stacked + jersey.
+ */
+function JerseyRow({ rider, raceName, jersey }: {
   rider: ClassementRider
   raceName: string
-  jersey?: JerseyKey
-  showTimeGap?: boolean
+  jersey: JerseyKey
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{
-        fontFamily: "'Barlow Condensed', sans-serif",
-        fontSize: 13, fontWeight: 700,
-        color: '#9E9486', width: 16, textAlign: 'right', flexShrink: 0,
-      }}>
-        {rider.position}
-      </span>
       {rider.photo_url ? (
         <img
           src={rider.photo_url}
           alt=""
-          style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: '50%', flexShrink: 0 }}
+          style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: '50%', flexShrink: 0 }}
         />
       ) : (
         <div style={{
-          width: 28, height: 28, borderRadius: '50%',
+          width: 32, height: 32, borderRadius: '50%',
           background: '#E8E0D3', flexShrink: 0,
         }} />
       )}
@@ -105,23 +100,98 @@ function RiderRow({ rider, raceName, jersey, showTimeGap }: {
           {rider.team_name}
         </div>
       </div>
-      {showTimeGap && rider.time_gap_seconds != null && (
-        <span style={{
-          fontFamily: "'Courier New', monospace",
-          fontSize: 11, color: rider.position === 1 ? '#1a1a1a' : '#6b6b6b',
-          flexShrink: 0, fontVariantNumeric: 'tabular-nums',
-        }}>
-          {rider.position === 1 ? '0:00' : formatTimeGap(rider.time_gap_seconds)}
-        </span>
-      )}
-      {jersey && (
-        <JerseyIcon
-          jersey={jersey}
-          raceName={raceName}
-          size={22}
-          title={`Bærer ${jersey}-trøjen`}
+      <JerseyIcon
+        jersey={jersey}
+        raceName={raceName}
+        size={24}
+        title={`Bærer ${jersey}-trøjen`}
+      />
+    </div>
+  )
+}
+
+/**
+ * Top-10 tabel-row med eksplicitte kolonner: # | Foto | Rytter | Hold | Værdi
+ * Bruger CSS grid for at få proper kolonne-alignering på tværs af rows.
+ */
+const TABLE_GRID = '24px 28px minmax(0, 1.2fr) minmax(0, 1.2fr) 64px'
+
+function TableRow({ rider, valueText }: {
+  rider: ClassementRider
+  valueText: string
+}) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: TABLE_GRID,
+      alignItems: 'center',
+      gap: 10,
+      padding: '4px 0',
+      borderBottom: '1px solid rgba(232,224,211,0.6)',
+    }}>
+      <span style={{
+        fontFamily: "'Barlow Condensed', sans-serif",
+        fontSize: 12, fontWeight: 700, color: '#9E9486',
+        textAlign: 'right',
+      }}>
+        {rider.position}
+      </span>
+      {rider.photo_url ? (
+        <img
+          src={rider.photo_url}
+          alt=""
+          style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: '50%' }}
         />
+      ) : (
+        <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#E8E0D3' }} />
       )}
+      <span style={{
+        fontFamily: "'Barlow Condensed', sans-serif",
+        fontSize: 13, fontWeight: 600, color: '#1a1a1a',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
+        {' '}<span style={{ fontWeight: 400, color: '#6b6b6b' }}>{rider.first_name}</span>
+      </span>
+      <span style={{
+        fontFamily: "'Barlow Condensed', sans-serif",
+        fontSize: 11, color: '#6b6b6b',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {rider.team_name}
+      </span>
+      <span style={{
+        fontFamily: "'Courier New', monospace",
+        fontSize: 11, color: rider.position === 1 ? '#1a1a1a' : '#6b6b6b',
+        textAlign: 'right',
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+        {valueText}
+      </span>
+    </div>
+  )
+}
+
+function TableHeader({ valueLabel }: { valueLabel: string }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: TABLE_GRID,
+      alignItems: 'center',
+      gap: 10,
+      padding: '4px 0 6px',
+      borderBottom: '1px solid #E8E0D3',
+      fontFamily: "'Barlow Condensed', sans-serif",
+      fontSize: 10, fontWeight: 700,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: '#9E9486',
+    }}>
+      <span style={{ textAlign: 'right' }}>#</span>
+      <span />
+      <span>Rytter</span>
+      <span>Hold</span>
+      <span style={{ textAlign: 'right' }}>{valueLabel}</span>
     </div>
   )
 }
@@ -180,7 +250,7 @@ function ClassementCard({ classement }: { classement: Classement }) {
       {jerseys.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {jerseys.map((j) => (
-            <RiderRow
+            <JerseyRow
               key={j.key}
               rider={j.rider!}
               raceName={classement.raceName}
@@ -221,17 +291,26 @@ function ClassementCard({ classement }: { classement: Classement }) {
         ))}
       </div>
 
-      {/* Top-10 liste */}
+      {/* Top-10 tabel */}
       {activeTop.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {activeTop.map((rider) => (
-            <RiderRow
-              key={rider.rider_id}
-              rider={rider}
-              raceName={classement.raceName}
-              showTimeGap={tab === 'gc'}
-            />
-          ))}
+        <div>
+          <TableHeader valueLabel={tab === 'gc' ? 'Tid' : 'Point'} />
+          {activeTop.map((rider) => {
+            const valueText = tab === 'gc'
+              ? (rider.position === 1
+                  ? '0:00'
+                  : rider.time_gap_seconds != null
+                    ? formatTimeGap(rider.time_gap_seconds)
+                    : '—')
+              : '—'
+            return (
+              <TableRow
+                key={rider.rider_id}
+                rider={rider}
+                valueText={valueText}
+              />
+            )
+          })}
         </div>
       ) : (
         <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: '#9E9486', textAlign: 'center', padding: '12px 0' }}>

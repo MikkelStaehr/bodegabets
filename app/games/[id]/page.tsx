@@ -617,9 +617,14 @@ export default async function GamePage({ params }: Props) {
           if (!base) return null
           const entry: ClassementRider = { ...base, position }
           if (includeTimeGap) {
-            const totalGap = cumGapByKey.get(`${raceId}::${riderId}`)
-            if (totalGap != null && leaderCumGap != null) {
-              entry.time_gap_seconds = totalGap - leaderCumGap
+            // Lederen er reference-punktet (0:00 til sig selv)
+            if (position === 1) {
+              entry.time_gap_seconds = 0
+            } else {
+              const totalGap = cumGapByKey.get(`${raceId}::${riderId}`)
+              if (totalGap != null) {
+                entry.time_gap_seconds = totalGap - (leaderCumGap ?? 0)
+              }
             }
           }
           return entry
