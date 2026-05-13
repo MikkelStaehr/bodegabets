@@ -281,7 +281,22 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
     const tables = $('table').toArray()
     let mainTable: typeof tables[number] | null = null
     let valueColIdx = -1
-    for (const tbl of tables) {
+    let mainTableIdx = -1
+
+    // DIAGNOSTIK: log alle tabeller på subsiden med deres headers, så vi
+    // kan se hvad der konkurrerer om at matche vores markers.
+    console.log(`[scrapeClassifications] ${key} subside (${url}) har ${tables.length} tables:`)
+    tables.forEach((tbl, i) => {
+      const $tbl = $(tbl)
+      const headerCells = $tbl.find('thead th').toArray()
+      const headerTexts = headerCells.map((th) => $(th).text().trim().replace(/\s+/g, ' '))
+      const rowCount = $tbl.find('tbody tr a[href^="rider/"]').length
+      const firstRider = $tbl.find('tbody tr a[href^="rider/"]').first().text().trim()
+      console.log(`  [${i}] rows=${rowCount} firstRider="${firstRider}" headers=[${headerTexts.map((h, j) => `${j}:"${h}"`).join(' | ')}]`)
+    })
+
+    for (let i = 0; i < tables.length; i++) {
+      const tbl = tables[i]
       const $tbl = $(tbl)
       const headerCells = $tbl.find('thead th').toArray()
       const headerTexts = headerCells.map((th) => $(th).text().trim().toLowerCase())
@@ -293,8 +308,10 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
       if (riderRowCount < 5) continue
       mainTable = tbl
       valueColIdx = colIdx
+      mainTableIdx = i
       break
     }
+    console.log(`[scrapeClassifications] ${key} valgt: table[${mainTableIdx}] valueCol=${valueColIdx}`)
     if (!mainTable) {
       console.warn(`[scrapeClassifications] ${key}: ingen primær tabel fundet på ${url}`)
       await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS / 2))
