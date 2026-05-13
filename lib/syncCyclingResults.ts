@@ -211,25 +211,40 @@ const SUBPAGE_PATH: Record<keyof ClassificationSet, string> = {
   youth: 'youth',
 }
 
-// Værdi-kolonnen findes via header-tekst. PCS' subsider har stage-resultat-
-// tabellen øverst (med eget "Time"/"Pnt" som UCI-points) + klassement under.
-// For at undgå at ramme stage-resultatet kræver vi BÅDE en værdi-header OG en
-// marker-header der kun findes på klassement-tabellen:
-//   GC:       [..., Time, Time won/lost]  marker: "time won/lost"
-//   Points:   [..., Pnt, Bonis, Today]    marker: "today"
-//   Mountain: [..., Pnt, Today]           marker: "today"
-//   Youth:    [..., Time, Time won/lost]  marker: "time won/lost"
+// Værdi-kolonnen findes via header-tekst. PCS' subsider returnerer
+// (forskellig markering af aktiv tab, men) stort set samme HTML med alle
+// klassement-tabeller + stage-resultatet til stede. For at finde præcis
+// den rigtige klassement-tabel matcher vi på:
+//   - VALUE_HEADER: kolonnen vi vil aflæse værdien fra
+//   - INCLUDE: header der MÅ være til stede (klassement-marker)
+//   - EXCLUDE: header der IKKE må være til stede (adskiller fra søsterklassement)
+//
+// Faktiske headers fra Giro 2026 stage 4:
+//   GC:       [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, UCI, "", Time, Time won/lost]
+//   Points:   [Rnk, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Bonis, Today]
+//   Mountain: [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Today]
+//   Youth:    [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Time, Time won/lost]
+//
+// Diskriminanter:
+//   GC vs Youth: GC har "UCI", youth har ikke
+//   Points vs Mountain: points har "Bonis", mountain har ikke
 const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
   gc: 'time',
   points: 'pnt',
   mountain: 'pnt',
   youth: 'time',
 }
-const MARKER_HEADER: Record<keyof ClassificationSet, string> = {
+const INCLUDE_HEADER: Record<keyof ClassificationSet, string> = {
   gc: 'time won/lost',
-  points: 'today',
+  points: 'bonis',
   mountain: 'today',
   youth: 'time won/lost',
+}
+const EXCLUDE_HEADER: Record<keyof ClassificationSet, string | null> = {
+  gc: null,           // GC har "UCI" som vi kunne kræve, men "time won/lost" er nok i praksis hvis vi også excluder youth-marker
+  points: null,
+  mountain: 'bonis',  // mountain har IKKE "Bonis" (points har)
+  youth: 'uci',       // youth har IKKE "UCI" (GC har)
 }
 
 /**
@@ -257,11 +272,12 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
 
     const $ = cheerio.load(html)
     const target = VALUE_HEADER[key]
-    const marker = MARKER_HEADER[key]
+    const include = INCLUDE_HEADER[key]
+    const exclude = EXCLUDE_HEADER[key]
 
-    // Find primær tabel: <table> med BÅDE target-header OG klassement-marker
-    // ("Time won/lost" eller "Today" — adskiller klassement fra stage-resultat).
-    // Plus ≥5 rytter-rækker for at filtrere widgets/favourites fra.
+    // Find primær klassement-tabel: <table> der har VALUE_HEADER + INCLUDE_HEADER
+    // i thead, IKKE har EXCLUDE_HEADER (hvis sat), og ≥5 rytter-rækker.
+    // Discriminerer mod stage-resultat OG mod søsterklassementer.
     const tables = $('table').toArray()
     let mainTable: typeof tables[number] | null = null
     let valueColIdx = -1
@@ -271,7 +287,8 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
       const headerTexts = headerCells.map((th) => $(th).text().trim().toLowerCase())
       const colIdx = headerTexts.findIndex((h) => h === target)
       if (colIdx < 0) continue
-      if (!headerTexts.includes(marker)) continue
+      if (!headerTexts.includes(include)) continue
+      if (exclude && headerTexts.includes(exclude)) continue
       const riderRowCount = $tbl.find('tbody tr a[href^="rider/"]').length
       if (riderRowCount < 5) continue
       mainTable = tbl
