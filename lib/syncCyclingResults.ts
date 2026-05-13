@@ -178,15 +178,11 @@ async function scrapeStageResults(slug: string, stageNum: number): Promise<Parse
   const resultUrl = `${base}/result`
   const resultHtml = await pcsGet(resultUrl)
   let results = resultHtml ? parseResultsTable(resultHtml) : []
-  console.log(`[scrapeStageResults]   /result: html-len=${resultHtml?.length ?? 0} parsed=${results.length}`)
 
   // Fallback til stage-page hvis /result var tom
   if (results.length === 0) {
     const stageHtml = await pcsGet(base)
-    if (stageHtml) {
-      results = parseResultsTable(stageHtml)
-      console.log(`[scrapeStageResults]   base: html-len=${stageHtml.length} parsed=${results.length}`)
-    }
+    if (stageHtml) results = parseResultsTable(stageHtml)
   }
 
   return results
@@ -275,10 +271,7 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
     })
   }
 
-  // Sample top 3 GC entries så vi kan se key-format vs r.pcs_slug
-  const gcSample = Object.entries(out.gc).slice(0, 3).map(([k, v]) => `${k}=${v}`).join(', ')
   console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
-  console.log(`[scrapeClassifications] gc top3: ${gcSample}`)
   return out
 }
 
@@ -431,17 +424,11 @@ export async function syncCyclingResults(): Promise<{
         gc_position_after: classifications.gc[r.pcs_slug] ?? null,
       })
     }
-    console.log(`[syncCyclingResults]   parsed=${parsed.length} matched=${rows.length} unmatched=${stageUnmatched}${unmatchedSamples.length ? ` (sample: ${unmatchedSamples.join(', ')})` : ''}`)
-    // Sample lookups: er parsed-slugs også til stede i classifications.gc?
-    const lookupSample = parsed.slice(0, 3).map((r) => `${r.pcs_slug}→gc=${classifications.gc[r.pcs_slug] ?? 'MISS'}`).join(' | ')
-    console.log(`[syncCyclingResults]   lookup sample: ${lookupSample}`)
+    if (stageUnmatched > 0) {
+      console.log(`[syncCyclingResults]   parsed=${parsed.length} matched=${rows.length} unmatched=${stageUnmatched} (sample: ${unmatchedSamples.join(', ')})`)
+    }
 
     if (rows.length > 0) {
-      // Log sample-row inkl. jersey + gc_position_after så vi ser hvad
-      // der faktisk sendes til Supabase
-      const sampleRow = rows[0]
-      console.log(`[syncCyclingResults]   sample row: ${JSON.stringify(sampleRow)}`)
-
       // Batched upsert (200 ad gangen for at undgå payload-limit)
       for (let i = 0; i < rows.length; i += 200) {
         const batch = rows.slice(i, i + 200)
