@@ -34,6 +34,8 @@ export function AdminCyclingDashboardTab() {
   const [pointsMsg, setPointsMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [lockLoading, setLockLoading] = useState(false)
   const [lockMsg, setLockMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [backfillLoading, setBackfillLoading] = useState(false)
+  const [backfillMsg, setBackfillMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const authHeader = {
     'Content-Type': 'application/json',
@@ -102,6 +104,33 @@ export function AdminCyclingDashboardTab() {
     } finally {
       setPointsLoading(false)
       setTimeout(() => setPointsMsg(null), 5000)
+    }
+  }
+
+  async function handleBackfill() {
+    const ok = window.confirm(
+      'Backfill nulstiller alle stages’ uploaded-flag for aktive stage races og kører sync igen. Det kan tage flere minutter. Fortsæt?'
+    )
+    if (!ok) return
+    setBackfillLoading(true)
+    setBackfillMsg(null)
+    try {
+      const res = await fetch('/api/admin/cycling/backfill-stages', {
+        method: 'POST',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger_sync: true }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setBackfillMsg({ type: 'ok', text: data.message ?? 'Backfill done' })
+      } else {
+        setBackfillMsg({ type: 'err', text: data.error ?? 'Backfill fejlede' })
+      }
+    } catch {
+      setBackfillMsg({ type: 'err', text: 'Netværksfejl' })
+    } finally {
+      setBackfillLoading(false)
+      setTimeout(() => setBackfillMsg(null), 15000)
     }
   }
 
@@ -178,6 +207,18 @@ export function AdminCyclingDashboardTab() {
             {pointsLoading ? 'Beregner...' : 'Beregn point'}
           </button>
           {pointsMsg && <span className={`font-body text-[12px] ${pointsMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{pointsMsg.text}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+          <button
+            onClick={handleBackfill}
+            disabled={backfillLoading}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 font-condensed text-[13px] sm:text-[12px] font-semibold text-forest px-4 py-3 sm:py-2 border border-warm-border active:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderRadius: '2px' }}
+            title="Nulstil alle stages' uploaded-flag og re-sync (brug efter parser-fixes)"
+          >
+            {backfillLoading ? 'Backfiller...' : 'Backfill stages'}
+          </button>
+          {backfillMsg && <span className={`font-body text-[12px] ${backfillMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{backfillMsg.text}</span>}
           </div>
           <div className="flex flex-col gap-1">
           <button
