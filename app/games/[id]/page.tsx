@@ -317,15 +317,19 @@ export default async function GamePage({ params }: Props) {
     team_name: string
     photo_url: string | null
     team_logo_url: string | null
-    gc_position: number | null
+    position: number
+    time_gap_seconds?: number | null  // KUN på GC, gap til leder
   }
   const lineupClassements: Record<string, {
     raceName: string
     leader: ClassementRider | null
-    points: ClassementRider | null
-    mountain: ClassementRider | null
-    youth: ClassementRider | null
-    gcTop5: ClassementRider[]
+    pointsLeader: ClassementRider | null
+    mountainLeader: ClassementRider | null
+    youthLeader: ClassementRider | null
+    gcTop: ClassementRider[]       // top 10 incl. time_gap_seconds
+    pointsTop: ClassementRider[]   // top 10
+    mountainTop: ClassementRider[] // top 10
+    youthTop: ClassementRider[]    // top 10
   }> = {}
   let blockSquadMap: Record<string, string> = {}
 
@@ -486,13 +490,12 @@ export default async function GamePage({ params }: Props) {
         lineupAbandoned[row.race_id][row.rider_id] = row.abandon_type ?? 'DNF'
       }
 
-      // Hent jersey + GC fra seneste stage med data pr. (race, rider).
-      // Sync populerer jersey kun for trøjebærere (top-1 i hver klassifikation)
-      // og gc_position_after for alle ryttere i top-N. Vi tager seneste
-      // ikke-NULL værdi pr. rytter.
+      // Hent alle klassement-felter + time_gap_seconds pr. stage pr. rytter.
+      // Vi har brug for sum af time_gap_seconds tværs af stages for at vise
+      // GC-tidsgap til leder (mathematisk: forskel i sum = forskel i GC-tid).
       const { data: standingsData } = await supabaseAdmin
         .from('cycling_results')
-        .select('race_id, rider_id, jersey, gc_position_after, stage_number')
+        .select('race_id, rider_id, jersey, gc_position_after, points_position_after, mountain_position_after, youth_position_after, time_gap_seconds, stage_number, dnf')
         .in('race_id', raceIdsForStages)
 
       type StandingsRow = {
@@ -500,19 +503,53 @@ export default async function GamePage({ params }: Props) {
         rider_id: string
         jersey: string | null
         gc_position_after: number | null
+        points_position_after: number | null
+        mountain_position_after: number | null
+        youth_position_after: number | null
+        time_gap_seconds: number | null
         stage_number: number
+        dnf: boolean
       }
-      const latestByKey = new Map<string, { jersey: string | null; gc_position: number | null; stageNum: number }>()
+      // Aggreger:
+      //   latestByKey[race::rider] = seneste stages position-data + DNF-flag
+      //   cumGapByKey[race::rider] = sum(time_gap_seconds) for ikke-DNF rows
+      const latestByKey = new Map<string, {
+        jersey: string | null
+        gc_position: number | null
+        points_position: number | null
+        mountain_position: number | null
+        youth_position: number | null
+        stageNum: number
+        dnfEver: boolean
+      }>()
+      const cumGapByKey = new Map<string, number>()
       for (const row of (standingsData ?? []) as StandingsRow[]) {
-        if (!row.jersey && row.gc_position_after == null) continue
         const key = `${row.race_id}::${row.rider_id}`
+        // Sum tidsgap (kun ikke-DNF stages med data)
+        if (!row.dnf && row.time_gap_seconds != null) {
+          cumGapByKey.set(key, (cumGapByKey.get(key) ?? 0) + row.time_gap_seconds)
+        }
+        // Behold seneste stage's klassement-data (ikke-NULL)
+        const hasAnyClassement =
+          row.jersey != null ||
+          row.gc_position_after != null ||
+          row.points_position_after != null ||
+          row.mountain_position_after != null ||
+          row.youth_position_after != null
+        if (!hasAnyClassement && !row.dnf) continue
         const existing = latestByKey.get(key)
         if (!existing || row.stage_number > existing.stageNum) {
           latestByKey.set(key, {
             jersey: row.jersey,
             gc_position: row.gc_position_after,
+            points_position: row.points_position_after,
+            mountain_position: row.mountain_position_after,
+            youth_position: row.youth_position_after,
             stageNum: row.stage_number,
+            dnfEver: (existing?.dnfEver ?? false) || row.dnf,
           })
+        } else if (row.dnf) {
+          existing.dnfEver = true
         }
       }
       for (const [key, info] of latestByKey) {
@@ -521,16 +558,19 @@ export default async function GamePage({ params }: Props) {
         lineupStandings[raceId][riderId] = { jersey: info.jersey, gc_position: info.gc_position }
       }
 
-      // Byg klassement-snapshot pr. race med rytter-info til gameroom-display.
-      // Hent navne for alle ryttere der bærer trøje eller er i GC top-5.
+      // Find alle rytter-IDs der har data i top-10 af nogen klassifikation
       const classementRiderIds = new Set<string>()
-      for (const raceId of Object.keys(lineupStandings)) {
-        for (const [riderId, s] of Object.entries(lineupStandings[raceId])) {
-          if (s.jersey) classementRiderIds.add(riderId)
-          if (s.gc_position != null && s.gc_position <= 5) classementRiderIds.add(riderId)
-        }
+      for (const [key, info] of latestByKey) {
+        if (info.dnfEver) continue
+        if (info.gc_position != null && info.gc_position <= 10) classementRiderIds.add(key.split('::')[1])
+        if (info.points_position != null && info.points_position <= 10) classementRiderIds.add(key.split('::')[1])
+        if (info.mountain_position != null && info.mountain_position <= 10) classementRiderIds.add(key.split('::')[1])
+        if (info.youth_position != null && info.youth_position <= 10) classementRiderIds.add(key.split('::')[1])
       }
-      let classementRiderMap = new Map<string, ClassementRider>()
+      let riderInfoMap = new Map<string, {
+        rider_id: string; first_name: string; last_name: string
+        team_name: string; photo_url: string | null; team_logo_url: string | null
+      }>()
       if (classementRiderIds.size > 0) {
         const { data: classementRidersData } = await supabaseAdmin
           .from('cycling_riders')
@@ -540,7 +580,7 @@ export default async function GamePage({ params }: Props) {
           id: string; first_name: string; last_name: string
           team_name: string; photo_url: string | null; team_logo_url: string | null
         }
-        classementRiderMap = new Map((classementRidersData ?? []).map((r) => {
+        riderInfoMap = new Map((classementRidersData ?? []).map((r) => {
           const rider = r as CycRider
           return [rider.id, {
             rider_id: rider.id,
@@ -549,34 +589,88 @@ export default async function GamePage({ params }: Props) {
             team_name: rider.team_name,
             photo_url: rider.photo_url,
             team_logo_url: rider.team_logo_url,
-            gc_position: null,
           }]
         }))
       }
-      for (const raceId of Object.keys(lineupStandings)) {
+
+      // Byg klassement-snapshot pr. race
+      for (const raceId of new Set([...latestByKey.keys()].map((k) => k.split('::')[0]))) {
         const race = lineupRaces.find((r) => r.id === raceId)
         if (!race) continue
-        const snap: typeof lineupClassements[string] = {
-          raceName: race.name,
-          leader: null, points: null, mountain: null, youth: null,
-          gcTop5: [],
-        }
-        for (const [riderId, s] of Object.entries(lineupStandings[raceId])) {
-          const baseRider = classementRiderMap.get(riderId)
-          if (!baseRider) continue
-          const rider: ClassementRider = { ...baseRider, gc_position: s.gc_position }
-          if (s.jersey === 'leader') snap.leader = rider
-          else if (s.jersey === 'points') snap.points = rider
-          else if (s.jersey === 'mountain') snap.mountain = rider
-          else if (s.jersey === 'youth') snap.youth = rider
-          if (s.gc_position != null && s.gc_position <= 5) {
-            snap.gcTop5.push(rider)
+
+        // Find GC-leder's cumulative gap (reference-punkt for andre)
+        let leaderCumGap: number | null = null
+        for (const [key, info] of latestByKey) {
+          if (!key.startsWith(`${raceId}::`)) continue
+          if (info.gc_position === 1 && !info.dnfEver) {
+            leaderCumGap = cumGapByKey.get(key) ?? 0
+            break
           }
         }
-        snap.gcTop5.sort((a, b) => (a.gc_position ?? 999) - (b.gc_position ?? 999))
-        // Tilføj kun hvis racet har MINST ét stykke klassement-data
-        if (snap.leader || snap.points || snap.mountain || snap.youth || snap.gcTop5.length > 0) {
-          lineupClassements[raceId] = snap
+
+        const buildEntry = (
+          riderId: string,
+          position: number,
+          includeTimeGap: boolean,
+        ): ClassementRider | null => {
+          const base = riderInfoMap.get(riderId)
+          if (!base) return null
+          const entry: ClassementRider = { ...base, position }
+          if (includeTimeGap) {
+            const totalGap = cumGapByKey.get(`${raceId}::${riderId}`)
+            if (totalGap != null && leaderCumGap != null) {
+              entry.time_gap_seconds = totalGap - leaderCumGap
+            }
+          }
+          return entry
+        }
+
+        const gcTop: ClassementRider[] = []
+        const pointsTop: ClassementRider[] = []
+        const mountainTop: ClassementRider[] = []
+        const youthTop: ClassementRider[] = []
+        let leader: ClassementRider | null = null
+        let pointsLeader: ClassementRider | null = null
+        let mountainLeader: ClassementRider | null = null
+        let youthLeader: ClassementRider | null = null
+
+        for (const [key, info] of latestByKey) {
+          if (!key.startsWith(`${raceId}::`)) continue
+          if (info.dnfEver) continue
+          const riderId = key.split('::')[1]
+          if (info.gc_position != null && info.gc_position <= 10) {
+            const e = buildEntry(riderId, info.gc_position, true)
+            if (e) gcTop.push(e)
+          }
+          if (info.points_position != null && info.points_position <= 10) {
+            const e = buildEntry(riderId, info.points_position, false)
+            if (e) pointsTop.push(e)
+          }
+          if (info.mountain_position != null && info.mountain_position <= 10) {
+            const e = buildEntry(riderId, info.mountain_position, false)
+            if (e) mountainTop.push(e)
+          }
+          if (info.youth_position != null && info.youth_position <= 10) {
+            const e = buildEntry(riderId, info.youth_position, false)
+            if (e) youthTop.push(e)
+          }
+          if (info.jersey === 'leader') leader = buildEntry(riderId, info.gc_position ?? 1, true)
+          if (info.jersey === 'points') pointsLeader = buildEntry(riderId, info.points_position ?? 1, false)
+          if (info.jersey === 'mountain') mountainLeader = buildEntry(riderId, info.mountain_position ?? 1, false)
+          if (info.jersey === 'youth') youthLeader = buildEntry(riderId, info.youth_position ?? 1, false)
+        }
+
+        gcTop.sort((a, b) => a.position - b.position)
+        pointsTop.sort((a, b) => a.position - b.position)
+        mountainTop.sort((a, b) => a.position - b.position)
+        youthTop.sort((a, b) => a.position - b.position)
+
+        if (leader || pointsLeader || mountainLeader || youthLeader || gcTop.length > 0) {
+          lineupClassements[raceId] = {
+            raceName: race.name,
+            leader, pointsLeader, mountainLeader, youthLeader,
+            gcTop, pointsTop, mountainTop, youthTop,
+          }
         }
       }
 

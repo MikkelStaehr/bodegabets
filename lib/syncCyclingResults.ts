@@ -403,6 +403,9 @@ export async function syncCyclingResults(): Promise<{
       abandon_type: string | null
       jersey: string | null
       gc_position_after: number | null
+      points_position_after: number | null
+      mountain_position_after: number | null
+      youth_position_after: number | null
     }> = []
     for (const r of parsed) {
       const riderId = riderIndex.get(r.pcs_slug)
@@ -422,6 +425,9 @@ export async function syncCyclingResults(): Promise<{
         abandon_type: r.abandon_type,
         jersey: jerseyForSlug(r.pcs_slug, classifications),
         gc_position_after: classifications.gc[r.pcs_slug] ?? null,
+        points_position_after: classifications.points[r.pcs_slug] ?? null,
+        mountain_position_after: classifications.mountain[r.pcs_slug] ?? null,
+        youth_position_after: classifications.youth[r.pcs_slug] ?? null,
       })
     }
     if (stageUnmatched > 0) {

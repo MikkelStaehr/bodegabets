@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { CyclingRace, CyclingSquadRider } from '@/types/cycling'
 import { formatCyclingDeadline } from '@/lib/cyclingUtils'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
@@ -21,16 +22,20 @@ type ClassementRider = {
   team_name: string
   photo_url: string | null
   team_logo_url: string | null
-  gc_position: number | null
+  position: number
+  time_gap_seconds?: number | null
 }
 
 type Classement = {
   raceName: string
   leader: ClassementRider | null
-  points: ClassementRider | null
-  mountain: ClassementRider | null
-  youth: ClassementRider | null
-  gcTop5: ClassementRider[]
+  pointsLeader: ClassementRider | null
+  mountainLeader: ClassementRider | null
+  youthLeader: ClassementRider | null
+  gcTop: ClassementRider[]
+  pointsTop: ClassementRider[]
+  mountainTop: ClassementRider[]
+  youthTop: ClassementRider[]
 }
 
 type Props = {
@@ -44,23 +49,33 @@ type Props = {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function RiderRow({ rider, raceName, jersey, position }: {
+function formatTimeGap(seconds: number | null | undefined): string {
+  if (seconds == null) return ''
+  if (seconds === 0) return '0:00'
+  const sign = seconds < 0 ? '-' : '+'
+  const abs = Math.abs(seconds)
+  const h = Math.floor(abs / 3600)
+  const m = Math.floor((abs % 3600) / 60)
+  const s = abs % 60
+  if (h > 0) return `${sign}${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${sign}${m}:${String(s).padStart(2, '0')}`
+}
+
+function RiderRow({ rider, raceName, jersey, showTimeGap }: {
   rider: ClassementRider
   raceName: string
   jersey?: JerseyKey
-  position?: number
+  showTimeGap?: boolean
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      {position != null && (
-        <span style={{
-          fontFamily: "'Barlow Condensed', sans-serif",
-          fontSize: 13, fontWeight: 700,
-          color: '#9E9486', width: 16, textAlign: 'right',
-        }}>
-          {position}
-        </span>
-      )}
+      <span style={{
+        fontFamily: "'Barlow Condensed', sans-serif",
+        fontSize: 13, fontWeight: 700,
+        color: '#9E9486', width: 16, textAlign: 'right', flexShrink: 0,
+      }}>
+        {rider.position}
+      </span>
       {rider.photo_url ? (
         <img
           src={rider.photo_url}
@@ -90,11 +105,20 @@ function RiderRow({ rider, raceName, jersey, position }: {
           {rider.team_name}
         </div>
       </div>
+      {showTimeGap && rider.time_gap_seconds != null && (
+        <span style={{
+          fontFamily: "'Courier New', monospace",
+          fontSize: 11, color: rider.position === 1 ? '#1a1a1a' : '#6b6b6b',
+          flexShrink: 0, fontVariantNumeric: 'tabular-nums',
+        }}>
+          {rider.position === 1 ? '0:00' : formatTimeGap(rider.time_gap_seconds)}
+        </span>
+      )}
       {jersey && (
         <JerseyIcon
           jersey={jersey}
           raceName={raceName}
-          size={24}
+          size={22}
           title={`Bærer ${jersey}-trøjen`}
         />
       )}
@@ -102,13 +126,29 @@ function RiderRow({ rider, raceName, jersey, position }: {
   )
 }
 
+type TabKey = 'gc' | 'points' | 'mountain' | 'youth'
+
 function ClassementCard({ classement }: { classement: Classement }) {
+  const [tab, setTab] = useState<TabKey>('gc')
+
+  const tabs: Array<{ key: TabKey; label: string; jersey: JerseyKey; available: boolean }> = [
+    { key: 'gc', label: 'GC', jersey: 'leader', available: classement.gcTop.length > 0 },
+    { key: 'points', label: 'Points', jersey: 'points', available: classement.pointsTop.length > 0 },
+    { key: 'mountain', label: 'Bjerg', jersey: 'mountain', available: classement.mountainTop.length > 0 },
+    { key: 'youth', label: 'Ung', jersey: 'youth', available: classement.youthTop.length > 0 },
+  ]
+
   const jerseys = [
     { key: 'leader' as JerseyKey, rider: classement.leader },
-    { key: 'points' as JerseyKey, rider: classement.points },
-    { key: 'mountain' as JerseyKey, rider: classement.mountain },
-    { key: 'youth' as JerseyKey, rider: classement.youth },
+    { key: 'points' as JerseyKey, rider: classement.pointsLeader },
+    { key: 'mountain' as JerseyKey, rider: classement.mountainLeader },
+    { key: 'youth' as JerseyKey, rider: classement.youthLeader },
   ].filter((j) => j.rider)
+
+  const activeTop = tab === 'gc' ? classement.gcTop
+    : tab === 'points' ? classement.pointsTop
+    : tab === 'mountain' ? classement.mountainTop
+    : classement.youthTop
 
   return (
     <div
@@ -136,9 +176,9 @@ function ClassementCard({ classement }: { classement: Classement }) {
         </span>
       </div>
 
-      {/* Jersey-bærere */}
+      {/* Trøje-bærere */}
       {jerseys.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: classement.gcTop5.length > 0 ? 12 : 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {jerseys.map((j) => (
             <RiderRow
               key={j.key}
@@ -150,29 +190,53 @@ function ClassementCard({ classement }: { classement: Classement }) {
         </div>
       )}
 
-      {/* GC top-5 */}
-      {classement.gcTop5.length > 0 && (
-        <>
-          <div style={{ borderTop: '1px dashed #E8E0D3', paddingTop: 12 }}>
-            <div style={{
+      {/* Tabs */}
+      <div style={{
+        display: 'flex', gap: 0, borderBottom: '1px solid #E8E0D3',
+        marginBottom: 12,
+      }}>
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => t.available && setTab(t.key)}
+            disabled={!t.available}
+            style={{
+              flex: 1, padding: '8px 4px',
+              background: 'transparent', border: 'none',
+              borderBottom: tab === t.key ? '2px solid #1a1a1a' : '2px solid transparent',
+              marginBottom: -1,
+              cursor: t.available ? 'pointer' : 'not-allowed',
+              opacity: t.available ? 1 : 0.35,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
               fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: '#9E9486', fontWeight: 600, marginBottom: 8,
-            }}>
-              GC top 5
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {classement.gcTop5.map((rider) => (
-                <RiderRow
-                  key={rider.rider_id}
-                  rider={rider}
-                  raceName={classement.raceName}
-                  position={rider.gc_position ?? undefined}
-                />
-              ))}
-            </div>
-          </div>
-        </>
+              fontSize: 11, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              color: tab === t.key ? '#1a1a1a' : '#9E9486',
+            }}
+          >
+            <JerseyIcon jersey={t.jersey} raceName={classement.raceName} size={16} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Top-10 liste */}
+      {activeTop.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {activeTop.map((rider) => (
+            <RiderRow
+              key={rider.rider_id}
+              rider={rider}
+              raceName={classement.raceName}
+              showTimeGap={tab === 'gc'}
+            />
+          ))}
+        </div>
+      ) : (
+        <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: '#9E9486', textAlign: 'center', padding: '12px 0' }}>
+          Ingen data endnu
+        </p>
       )}
     </div>
   )
@@ -181,7 +245,6 @@ function ClassementCard({ classement }: { classement: Classement }) {
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function CyclingGameroom({ activeBlock, races, classements }: Props) {
-  // Find klassementer for racer i den aktive blok (eller første tilgængelige).
   const classementsList = Object.values(classements ?? {})
 
   return (
