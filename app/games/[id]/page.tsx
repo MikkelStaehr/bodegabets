@@ -309,6 +309,24 @@ export default async function GamePage({ params }: Props) {
   // raceId → riderId → { jersey, gc_position }. Snapshot fra seneste stage
   // med data. Bruges i lineup-picker til trøje + GC top-N badges + sort.
   const lineupStandings: Record<string, Record<string, { jersey: string | null; gc_position: number | null }>> = {}
+  // raceId → klassement-snapshot med rytter-info (til gameroom-display)
+  type ClassementRider = {
+    rider_id: string
+    first_name: string
+    last_name: string
+    team_name: string
+    photo_url: string | null
+    team_logo_url: string | null
+    gc_position: number | null
+  }
+  const lineupClassements: Record<string, {
+    raceName: string
+    leader: ClassementRider | null
+    points: ClassementRider | null
+    mountain: ClassementRider | null
+    youth: ClassementRider | null
+    gcTop5: ClassementRider[]
+  }> = {}
   let blockSquadMap: Record<string, string> = {}
 
   if (typedGame.sport === 'cycling') {
@@ -501,6 +519,65 @@ export default async function GamePage({ params }: Props) {
         const [raceId, riderId] = key.split('::')
         if (!lineupStandings[raceId]) lineupStandings[raceId] = {}
         lineupStandings[raceId][riderId] = { jersey: info.jersey, gc_position: info.gc_position }
+      }
+
+      // Byg klassement-snapshot pr. race med rytter-info til gameroom-display.
+      // Hent navne for alle ryttere der bærer trøje eller er i GC top-5.
+      const classementRiderIds = new Set<string>()
+      for (const raceId of Object.keys(lineupStandings)) {
+        for (const [riderId, s] of Object.entries(lineupStandings[raceId])) {
+          if (s.jersey) classementRiderIds.add(riderId)
+          if (s.gc_position != null && s.gc_position <= 5) classementRiderIds.add(riderId)
+        }
+      }
+      let classementRiderMap = new Map<string, ClassementRider>()
+      if (classementRiderIds.size > 0) {
+        const { data: classementRidersData } = await supabaseAdmin
+          .from('cycling_riders')
+          .select('id, first_name, last_name, team_name, photo_url, team_logo_url')
+          .in('id', [...classementRiderIds])
+        type CycRider = {
+          id: string; first_name: string; last_name: string
+          team_name: string; photo_url: string | null; team_logo_url: string | null
+        }
+        classementRiderMap = new Map((classementRidersData ?? []).map((r) => {
+          const rider = r as CycRider
+          return [rider.id, {
+            rider_id: rider.id,
+            first_name: rider.first_name,
+            last_name: rider.last_name,
+            team_name: rider.team_name,
+            photo_url: rider.photo_url,
+            team_logo_url: rider.team_logo_url,
+            gc_position: null,
+          }]
+        }))
+      }
+      for (const raceId of Object.keys(lineupStandings)) {
+        const race = lineupRaces.find((r) => r.id === raceId)
+        if (!race) continue
+        const snap: typeof lineupClassements[string] = {
+          raceName: race.name,
+          leader: null, points: null, mountain: null, youth: null,
+          gcTop5: [],
+        }
+        for (const [riderId, s] of Object.entries(lineupStandings[raceId])) {
+          const baseRider = classementRiderMap.get(riderId)
+          if (!baseRider) continue
+          const rider: ClassementRider = { ...baseRider, gc_position: s.gc_position }
+          if (s.jersey === 'leader') snap.leader = rider
+          else if (s.jersey === 'points') snap.points = rider
+          else if (s.jersey === 'mountain') snap.mountain = rider
+          else if (s.jersey === 'youth') snap.youth = rider
+          if (s.gc_position != null && s.gc_position <= 5) {
+            snap.gcTop5.push(rider)
+          }
+        }
+        snap.gcTop5.sort((a, b) => (a.gc_position ?? 999) - (b.gc_position ?? 999))
+        // Tilføj kun hvis racet har MINST ét stykke klassement-data
+        if (snap.leader || snap.points || snap.mountain || snap.youth || snap.gcTop5.length > 0) {
+          lineupClassements[raceId] = snap
+        }
       }
 
     }
@@ -1166,6 +1243,7 @@ export default async function GamePage({ params }: Props) {
               activeBlock={cyclingActiveBlock}
               races={lineupRaces}
               squadRiders={lineupSquadRiders}
+              classements={lineupClassements}
             />
             <LineupBuilder
               gameId={gameId}
