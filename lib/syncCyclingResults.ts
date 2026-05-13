@@ -195,68 +195,40 @@ function posOf(entry: ClassificationEntry | undefined): number | null {
   return entry?.position ?? null
 }
 
-// PCS har dedikerede subsider for hver klassifikation:
-//   /stage-N-gc      → GC (Maglia Rosa / Yellow Jersey)
-//   /stage-N-points  → points (Maglia Ciclamino / Green)
-//   /stage-N-kom     → mountain (Maglia Blu / Polka — kom = "king of mountains")
-//   /stage-N-youth   → youth (Maglia Bianca / White)
+// PCS' stage-N-gc subside returnerer 12 tabeller i fast rækkefølge:
+//   [0]  stage-resultat
+//   [1]  GC (Maglia Rosa / Yellow Jersey)
+//   [2-4] sub-klassifikationer (intermediate sprints o.lign.)
+//   [5]  Points (Maglia Ciclamino / Green)
+//   [6]  Mountain (Maglia Blu / Polka — KOM)
+//   [7]  intermediate sub-klassifikation
+//   [8]  Youth (Maglia Bianca / White)
+//   [9-11] team-klassementer
 //
-// Hver subside har den respektive klassement som primær tabel. Vi finder den
-// rigtige tabel via header-tekst (Time eller Pnt) — robust mod PCS' template-
-// ændringer eller widget-tilføjelser.
-const SUBPAGE_PATH: Record<keyof ClassificationSet, string> = {
-  gc: 'gc',
-  points: 'points',
-  mountain: 'kom',
-  youth: 'youth',
+// Subsiderne -points, -kom, -youth returnerer SAMME HTML — kun JS-aktiv tab
+// skifter. Header-baseret detection er ikke unik (sub-klassifikationerne har
+// samme [Pnt, Today]-headers). Hardcoded indekser er pragmatisk fordi PCS'
+// template har været stabil i mange år.
+//
+// Værdi-kolonnen findes via header-tekst INDEN FOR den valgte tabel (Time/Pnt
+// kan være i forskellige kolonner pga. UCI-kolonner mv.).
+const TABLE_INDEX: Record<keyof ClassificationSet, number> = {
+  gc: 1,
+  points: 5,
+  mountain: 6,
+  youth: 8,
 }
-
-// Værdi-kolonnen findes via header-tekst. PCS' subsider returnerer
-// (forskellig markering af aktiv tab, men) stort set samme HTML med alle
-// klassement-tabeller + stage-resultatet til stede. For at finde præcis
-// den rigtige klassement-tabel matcher vi på:
-//   - VALUE_HEADER: kolonnen vi vil aflæse værdien fra
-//   - INCLUDE: header der MÅ være til stede (klassement-marker)
-//   - EXCLUDE: header der IKKE må være til stede (adskiller fra søsterklassement)
-//
-// Faktiske headers fra Giro 2026 stage 4:
-//   GC:       [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, UCI, "", Time, Time won/lost]
-//   Points:   [Rnk, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Bonis, Today]
-//   Mountain: [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Today]
-//   Youth:    [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Time, Time won/lost]
-//
-// Diskriminanter:
-//   GC vs Youth: GC har "UCI", youth har ikke
-//   Points vs Mountain: points har "Bonis", mountain har ikke
 const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
   gc: 'time',
   points: 'pnt',
   mountain: 'pnt',
   youth: 'time',
 }
-const INCLUDE_HEADER: Record<keyof ClassificationSet, string> = {
-  gc: 'time won/lost',
-  points: 'bonis',
-  mountain: 'today',
-  youth: 'time won/lost',
-}
-const EXCLUDE_HEADER: Record<keyof ClassificationSet, string | null> = {
-  gc: null,           // GC har "UCI" som vi kunne kræve, men "time won/lost" er nok i praksis hvis vi også excluder youth-marker
-  points: null,
-  mountain: 'bonis',  // mountain har IKKE "Bonis" (points har)
-  youth: 'uci',       // youth har IKKE "UCI" (GC har)
-}
 
 /**
- * Hent classifications (GC, points, mountain, youth) for en stage via PCS'
- * dedikerede subsider — én HTTP-request pr. klassifikation.
- *
- * Hver subside scannes for den første tabel der har den korrekte værdi-kolonne
- * (Time eller Pnt) i thead OG ≥5 rytter-rækker. Det filtrerer favourites og
- * widgets fra automatisk uden hardcoded table-indekser.
- *
- * Hvis en subside ikke findes endnu (PCS publicerer typisk 15-30 min efter
- * målgang) returneres tomt map for den klassifikation.
+ * Hent alle 4 klassifikationer fra /stage-N-gc subsiden — én HTTP-request.
+ * PCS returnerer 12 tabeller i fast rækkefølge (verificeret stabil) som vi
+ * indekserer direkte i. Hvis subsiden ikke findes endnu returneres tomme maps.
  */
 async function scrapeClassifications(slug: string, stageNum: number): Promise<ClassificationSet> {
   const base = stageNum === 0
@@ -265,61 +237,25 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
 
   const out: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
 
+  const html = await pcsGet(`${base}-gc`)
+  if (!html) return out
+
+  const $ = cheerio.load(html)
+  const tables = $('table').toArray()
+
   for (const key of ['gc', 'points', 'mountain', 'youth'] as const) {
-    const url = `${base}-${SUBPAGE_PATH[key]}`
-    const html = await pcsGet(url)
-    if (!html) continue
-
-    const $ = cheerio.load(html)
-    const target = VALUE_HEADER[key]
-    const include = INCLUDE_HEADER[key]
-    const exclude = EXCLUDE_HEADER[key]
-
-    // Find primær klassement-tabel: <table> der har VALUE_HEADER + INCLUDE_HEADER
-    // i thead, IKKE har EXCLUDE_HEADER (hvis sat), og ≥5 rytter-rækker.
-    // Discriminerer mod stage-resultat OG mod søsterklassementer.
-    const tables = $('table').toArray()
-    let mainTable: typeof tables[number] | null = null
-    let valueColIdx = -1
-    let mainTableIdx = -1
-
-    // DIAGNOSTIK: log alle tabeller på subsiden med deres headers, så vi
-    // kan se hvad der konkurrerer om at matche vores markers.
-    console.log(`[scrapeClassifications] ${key} subside (${url}) har ${tables.length} tables:`)
-    tables.forEach((tbl, i) => {
-      const $tbl = $(tbl)
-      const headerCells = $tbl.find('thead th').toArray()
-      const headerTexts = headerCells.map((th) => $(th).text().trim().replace(/\s+/g, ' '))
-      const rowCount = $tbl.find('tbody tr a[href^="rider/"]').length
-      const firstRider = $tbl.find('tbody tr a[href^="rider/"]').first().text().trim()
-      console.log(`  [${i}] rows=${rowCount} firstRider="${firstRider}" headers=[${headerTexts.map((h, j) => `${j}:"${h}"`).join(' | ')}]`)
-    })
-
-    for (let i = 0; i < tables.length; i++) {
-      const tbl = tables[i]
-      const $tbl = $(tbl)
-      const headerCells = $tbl.find('thead th').toArray()
-      const headerTexts = headerCells.map((th) => $(th).text().trim().toLowerCase())
-      const colIdx = headerTexts.findIndex((h) => h === target)
-      if (colIdx < 0) continue
-      if (!headerTexts.includes(include)) continue
-      if (exclude && headerTexts.includes(exclude)) continue
-      const riderRowCount = $tbl.find('tbody tr a[href^="rider/"]').length
-      if (riderRowCount < 5) continue
-      mainTable = tbl
-      valueColIdx = colIdx
-      mainTableIdx = i
-      break
-    }
-    console.log(`[scrapeClassifications] ${key} valgt: table[${mainTableIdx}] valueCol=${valueColIdx}`)
-    if (!mainTable) {
-      console.warn(`[scrapeClassifications] ${key}: ingen primær tabel fundet på ${url}`)
-      await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS / 2))
+    const table = tables[TABLE_INDEX[key]]
+    if (!table) {
+      console.warn(`[scrapeClassifications] ${key}: tabel-index ${TABLE_INDEX[key]} mangler (PCS-template ændret?)`)
       continue
     }
 
+    // Find værdi-kolonne via header (Time/Pnt kan være i forskellige indekser)
+    const headerCells = $(table).find('thead th').toArray()
+    const valueColIdx = headerCells.findIndex((th) => $(th).text().trim().toLowerCase() === VALUE_HEADER[key])
+
     const seen = new Set<string>()
-    $(mainTable).find('tbody tr').each((_, tr) => {
+    $(table).find('tbody tr').each((_, tr) => {
       const $tr = $(tr)
       const cells = $tr.find('td').toArray()
       if (cells.length === 0) return
@@ -346,9 +282,6 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
         out[key][ridSlug] = { position: posNum, rawValue: rawValue || null }
       }
     })
-
-    // Polite delay mellem subside-requests så vi ikke hammer'er PCS
-    await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS / 2))
   }
 
   console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
