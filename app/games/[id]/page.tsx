@@ -491,12 +491,12 @@ export default async function GamePage({ params }: Props) {
         lineupAbandoned[row.race_id][row.rider_id] = row.abandon_type ?? 'DNF'
       }
 
-      // Hent alle klassement-felter + time_gap_seconds pr. stage pr. rytter.
-      // Vi har brug for sum af time_gap_seconds tværs af stages for at vise
-      // GC-tidsgap til leder (mathematisk: forskel i sum = forskel i GC-tid).
+      // Hent klassement-felter pr. stage pr. rytter. gc_gap_seconds og
+      // youth_gap_seconds er scraped direkte fra PCS' klassifikations-tabel
+      // og afspejler officielle GC-/youth-gaps inkl. bonus-sekunder.
       const { data: standingsData } = await supabaseAdmin
         .from('cycling_results')
-        .select('race_id, rider_id, jersey, gc_position_after, points_position_after, mountain_position_after, youth_position_after, points_value, mountain_value, youth_gap_seconds, time_gap_seconds, stage_number, dnf')
+        .select('race_id, rider_id, jersey, gc_position_after, points_position_after, mountain_position_after, youth_position_after, points_value, mountain_value, gc_gap_seconds, youth_gap_seconds, stage_number, dnf')
         .in('race_id', raceIdsForStages)
 
       type StandingsRow = {
@@ -509,14 +509,12 @@ export default async function GamePage({ params }: Props) {
         youth_position_after: number | null
         points_value: number | null
         mountain_value: number | null
+        gc_gap_seconds: number | null
         youth_gap_seconds: number | null
-        time_gap_seconds: number | null
         stage_number: number
         dnf: boolean
       }
-      // Aggreger:
-      //   latestByKey[race::rider] = seneste stages position-data + DNF-flag
-      //   cumGapByKey[race::rider] = sum(time_gap_seconds) for ikke-DNF rows
+      // Aggreger: latestByKey[race::rider] = seneste stages position-data + DNF-flag
       const latestByKey = new Map<string, {
         jersey: string | null
         gc_position: number | null
@@ -525,17 +523,13 @@ export default async function GamePage({ params }: Props) {
         youth_position: number | null
         points_value: number | null
         mountain_value: number | null
+        gc_gap_seconds: number | null
         youth_gap_seconds: number | null
         stageNum: number
         dnfEver: boolean
       }>()
-      const cumGapByKey = new Map<string, number>()
       for (const row of (standingsData ?? []) as StandingsRow[]) {
         const key = `${row.race_id}::${row.rider_id}`
-        // Sum tidsgap (kun ikke-DNF stages med data)
-        if (!row.dnf && row.time_gap_seconds != null) {
-          cumGapByKey.set(key, (cumGapByKey.get(key) ?? 0) + row.time_gap_seconds)
-        }
         // Behold seneste stage's klassement-data (ikke-NULL)
         const hasAnyClassement =
           row.jersey != null ||
@@ -554,6 +548,7 @@ export default async function GamePage({ params }: Props) {
             youth_position: row.youth_position_after,
             points_value: row.points_value,
             mountain_value: row.mountain_value,
+            gc_gap_seconds: row.gc_gap_seconds,
             youth_gap_seconds: row.youth_gap_seconds,
             stageNum: row.stage_number,
             dnfEver: (existing?.dnfEver ?? false) || row.dnf,
@@ -608,16 +603,6 @@ export default async function GamePage({ params }: Props) {
         const race = lineupRaces.find((r) => r.id === raceId)
         if (!race) continue
 
-        // Find GC-leder's cumulative gap (reference-punkt for andre)
-        let leaderCumGap: number | null = null
-        for (const [key, info] of latestByKey) {
-          if (!key.startsWith(`${raceId}::`)) continue
-          if (info.gc_position === 1 && !info.dnfEver) {
-            leaderCumGap = cumGapByKey.get(key) ?? 0
-            break
-          }
-        }
-
         const buildEntry = (
           riderId: string,
           position: number,
@@ -626,20 +611,13 @@ export default async function GamePage({ params }: Props) {
           const base = riderInfoMap.get(riderId)
           if (!base) return null
           const entry: ClassementRider = { ...base, position }
+          const info = latestByKey.get(`${raceId}::${riderId}`)
           if (extras.gcGap) {
-            // GC-leder er reference (0:00 til sig selv)
-            if (position === 1) {
-              entry.time_gap_seconds = 0
-            } else {
-              const totalGap = cumGapByKey.get(`${raceId}::${riderId}`)
-              if (totalGap != null) {
-                entry.time_gap_seconds = totalGap - (leaderCumGap ?? 0)
-              }
-            }
+            // GC: brug gc_gap_seconds direkte fra DB (scraped fra PCS' GC-tabel inkl. bonus-sek)
+            entry.time_gap_seconds = position === 1 ? 0 : (info?.gc_gap_seconds ?? null)
           }
           if (extras.youthGap) {
             // Youth: brug youth_gap_seconds direkte fra DB (scraped)
-            const info = latestByKey.get(`${raceId}::${riderId}`)
             entry.time_gap_seconds = position === 1 ? 0 : (info?.youth_gap_seconds ?? null)
           }
           if (extras.pointsValue != null) entry.points = extras.pointsValue

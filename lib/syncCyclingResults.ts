@@ -494,6 +494,7 @@ export async function syncCyclingResults(): Promise<{
       youth_position_after: number | null
       points_value: number | null
       mountain_value: number | null
+      gc_gap_seconds: number | null
       youth_gap_seconds: number | null
     }> = []
     for (const r of parsed) {
@@ -525,6 +526,9 @@ export async function syncCyclingResults(): Promise<{
         youth_position_after: posOf(slugClassifs.youth),
         points_value: parsePointsValue(slugClassifs.points?.rawValue),
         mountain_value: parsePointsValue(slugClassifs.mountain?.rawValue),
+        gc_gap_seconds: slugClassifs.gc
+          ? parseGapToSeconds(slugClassifs.gc.rawValue, slugClassifs.gc.position)
+          : null,
         youth_gap_seconds: slugClassifs.youth
           ? parseGapToSeconds(slugClassifs.youth.rawValue, slugClassifs.youth.position)
           : null,
