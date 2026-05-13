@@ -8,8 +8,6 @@
  * Kører fra Railway-cron (se railway/index.ts /sync-cycling-results endpoint).
  *
  * Begrænsninger ift. Python-scriptet (deferred til v2):
- * - Ingen jersey-parsing (leader/sprint/mountain/youth)
- * - Ingen GC positions / gc_multiplier
  * - Ingen stage profile/won_how update (ændrer sig sjældent efter løbet
  *   kører — stage-data forventes oprettet via sync_race_info først)
  * - Startlist sync forbliver i Python (ikke kritisk for daglig drift)
@@ -190,6 +188,67 @@ async function scrapeStageResults(slug: string, stageNum: number): Promise<Parse
   return results
 }
 
+// ─── Classification scraper (dedikerede subsider) ──────────────────────────
+
+type ClassificationSet = {
+  gc: Record<string, number>      // pcs_slug → GC-placering
+  points: Record<string, number>  // pcs_slug → points-placering
+  mountain: Record<string, number>// pcs_slug → bjerg-placering
+  youth: Record<string, number>   // pcs_slug → ung-placering
+}
+
+const CLASSIFICATION_URLS: Array<{ key: keyof ClassificationSet; suffix: string }> = [
+  { key: 'gc',       suffix: '-gc' },
+  { key: 'points',   suffix: '-points' },
+  { key: 'mountain', suffix: '-kom' },
+  { key: 'youth',    suffix: '-youth' },
+]
+
+const CLASSIFICATION_DELAY_MS = 500
+
+/**
+ * Henter de 4 dedikerede classification-subsider for en stage og parser
+ * rytter-placeringer fra hver. PCS-format: /race/{slug}/{year}/stage-N-{type}
+ * hvor type ∈ { gc, points, kom, youth }. Pakkerne er almindelige
+ * result-tabeller, så vi genbruger parseResultsTable.
+ *
+ * Hvis en subside ikke findes endnu (PCS publicerer dem først efter stage
+ * er færdig) eller fejler, returneres tom map for den klassifikation.
+ */
+async function scrapeClassifications(slug: string, stageNum: number): Promise<ClassificationSet> {
+  const base = stageNum === 0
+    ? `${PCS_BASE}/race/${slug}/2026/prologue`
+    : `${PCS_BASE}/race/${slug}/2026/stage-${stageNum}`
+
+  const out: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
+
+  for (const { key, suffix } of CLASSIFICATION_URLS) {
+    const html = await pcsGet(`${base}${suffix}`)
+    if (html) {
+      const rows = parseResultsTable(html)
+      for (const r of rows) {
+        if (r.position != null) out[key][r.pcs_slug] = r.position
+      }
+    }
+    await new Promise((r) => setTimeout(r, CLASSIFICATION_DELAY_MS))
+  }
+
+  return out
+}
+
+/**
+ * Map en rytters bedste trøje fra classifications. Top-1 i hver kategori
+ * bærer den respektive trøje. Hvis en rytter er #1 i flere (ofte Tadej i
+ * Tour) vælges højeste prioritet: leader > points > mountain > youth.
+ */
+function jerseyForSlug(slug: string, c: ClassificationSet): string | null {
+  if (c.gc[slug] === 1) return 'leader'
+  if (c.points[slug] === 1) return 'points'
+  if (c.mountain[slug] === 1) return 'mountain'
+  if (c.youth[slug] === 1) return 'youth'
+  return null
+}
+
 // ─── Public entry point ────────────────────────────────────────────────────
 
 export async function syncCyclingResults(): Promise<{
@@ -283,6 +342,17 @@ export async function syncCyclingResults(): Promise<{
       continue
     }
 
+    // Hent classifications (GC, points, mountain, youth) fra dedikerede
+    // PCS-subsider. 4 ekstra HTTP-requests pr. stage med tighter delay.
+    let classifications: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
+    try {
+      classifications = await scrapeClassifications(race.pcs_slug, stage.stage_number)
+    } catch (err) {
+      console.warn(`[syncCyclingResults] Classification scrape failed for ${race.name} stage ${stage.stage_number}: ${err}`)
+    }
+    const classifCounts = `gc=${Object.keys(classifications.gc).length} pts=${Object.keys(classifications.points).length} mtn=${Object.keys(classifications.mountain).length} youth=${Object.keys(classifications.youth).length}`
+    console.log(`[syncCyclingResults]   classifications: ${classifCounts}`)
+
     // Map til DB-rows
     let stageUpserted = 0
     const rows: Array<{
@@ -293,6 +363,8 @@ export async function syncCyclingResults(): Promise<{
       time_gap_seconds: number | null
       dnf: boolean
       abandon_type: string | null
+      jersey: string | null
+      gc_position_after: number | null
     }> = []
     for (const r of parsed) {
       const riderId = riderIndex.get(r.pcs_slug)
@@ -308,6 +380,8 @@ export async function syncCyclingResults(): Promise<{
         time_gap_seconds: r.time_gap_seconds,
         dnf: r.dnf,
         abandon_type: r.abandon_type,
+        jersey: jerseyForSlug(r.pcs_slug, classifications),
+        gc_position_after: classifications.gc[r.pcs_slug] ?? null,
       })
     }
 
