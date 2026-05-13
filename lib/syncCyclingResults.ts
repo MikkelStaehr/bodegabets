@@ -240,6 +240,21 @@ function parseJerseys(html: string): Record<string, string> {
   let headersMatched = 0
   let tablesFound = 0
 
+  // Diagnostik: hvor mange h3/h4/div elementer findes overhovedet?
+  const h3Count = $('h3').length
+  const h4Count = $('h4').length
+  const divCount = $('div').length
+  const tableCount = $('table').length
+  const titleText = $('title').first().text().slice(0, 80)
+  // Først 3 unikke class-attributter for sample
+  const classSample: string[] = []
+  $('[class]').each((_, el) => {
+    if (classSample.length >= 3) return
+    const c = $(el).attr('class') ?? ''
+    if (c && !classSample.includes(c)) classSample.push(c)
+  })
+  console.log(`[parseJerseys] html-len=${html.length} title="${titleText}" h3=${h3Count} h4=${h4Count} div=${divCount} table=${tableCount} sample-classes=${classSample.slice(0, 3).join(' | ')}`)
+
   $('h3, h4, div').each((_, header) => {
     const $header = $(header)
     const cls = $header.attr('class') ?? ''
