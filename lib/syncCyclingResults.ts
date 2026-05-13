@@ -437,6 +437,11 @@ export async function syncCyclingResults(): Promise<{
     console.log(`[syncCyclingResults]   lookup sample: ${lookupSample}`)
 
     if (rows.length > 0) {
+      // Log sample-row inkl. jersey + gc_position_after så vi ser hvad
+      // der faktisk sendes til Supabase
+      const sampleRow = rows[0]
+      console.log(`[syncCyclingResults]   sample row: ${JSON.stringify(sampleRow)}`)
+
       // Batched upsert (200 ad gangen for at undgå payload-limit)
       for (let i = 0; i < rows.length; i += 200) {
         const batch = rows.slice(i, i + 200)
@@ -444,7 +449,9 @@ export async function syncCyclingResults(): Promise<{
           .from('cycling_results')
           .upsert(batch, { onConflict: 'race_id,rider_id,stage_number' })
         if (upErr) {
-          errors.push(`Upsert (${race.name} stage ${stage.stage_number}): ${upErr.message}`)
+          const msg = `Upsert (${race.name} stage ${stage.stage_number}): ${upErr.message}`
+          console.error(`[syncCyclingResults] ${msg}`)
+          errors.push(msg)
           continue
         }
         stageUpserted += batch.length
