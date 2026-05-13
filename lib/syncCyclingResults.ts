@@ -226,12 +226,23 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
     const html = await pcsGet(`${base}${suffix}`)
     if (html) {
       const rows = parseResultsTable(html)
-      // Diagnostik: tæl tables + log top 3 rytter-slugs så vi kan se om vi
-      // rammer den rigtige tabel for hver classification.
+      // Diagnostik: tæl tables + log ryttere PER table så vi kan identificere
+      // hvilken table indeholder hvilken classification (GC har ~all riders,
+      // points/mountain/youth har færre).
       const $ = cheerio.load(html)
       const tableCount = $('table').length
+      const ridersPerTable: number[] = []
+      $('table').each((_, t) => {
+        const slugs = new Set<string>()
+        $(t).find('a').each((_i, a) => {
+          const href = $(a).attr('href') ?? ''
+          const m = href.match(/^rider\/([\w-]+)$/)
+          if (m) slugs.add(m[1])
+        })
+        ridersPerTable.push(slugs.size)
+      })
       const firstThree = rows.slice(0, 3).map((r) => `${r.position}:${r.pcs_slug}`).join(', ')
-      console.log(`[scrapeClassifications]   ${key}: ${rows.length} riders, ${tableCount} tables. Top 3: ${firstThree}`)
+      console.log(`[scrapeClassifications]   ${key}: ${rows.length} riders. ${tableCount} tables (riders each: ${ridersPerTable.join(',')}). Top 3: ${firstThree}`)
       for (const r of rows) {
         if (r.position != null) out[key][r.pcs_slug] = r.position
       }
