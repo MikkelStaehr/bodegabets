@@ -96,54 +96,70 @@ export function parseResultsTable(html: string): ParsedRow[] {
   const results: ParsedRow[] = []
   const seen = new Set<string>()
 
-  $('a').each((_, el) => {
-    const href = $(el).attr('href')
-    if (!href) return
-    const m = href.match(/^rider\/([\w-]+)$/)
+  // Find resultat-tabellen: første <table> med "Time" i header og >5 rytter-rækker.
+  // Filtrerer favourites/widgets fra (de har ikke Time-header).
+  const tables = $('table').toArray()
+  let resultTable: typeof tables[number] | null = null
+  let timeColIdx = -1
+  let rnkColIdx = 0
+
+  for (const tbl of tables) {
+    const $tbl = $(tbl)
+    const headerCells = $tbl.find('thead th').toArray()
+    if (headerCells.length === 0) continue
+    const headerTexts = headerCells.map((th) => $(th).text().trim().toLowerCase())
+    const timeIdx = headerTexts.findIndex((h) => h === 'time')
+    if (timeIdx < 0) continue
+    const rnkIdx = headerTexts.findIndex((h) => h === 'rnk' || h === '#' || h === 'pos')
+    const riderRowCount = $tbl.find('tbody tr a[href^="rider/"]').length
+    if (riderRowCount < 5) continue
+    resultTable = tbl
+    timeColIdx = timeIdx
+    rnkColIdx = rnkIdx >= 0 ? rnkIdx : 0
+    break
+  }
+
+  if (!resultTable) return []
+
+  $(resultTable).find('tbody tr').each((_, tr) => {
+    const $tr = $(tr)
+    const cells = $tr.find('td').toArray()
+    if (cells.length === 0) return
+
+    const riderLink = $tr.find('a').filter((_i, a) => {
+      const href = $(a).attr('href') ?? ''
+      return /^rider\/[\w-]+$/.test(href)
+    }).first()
+    if (riderLink.length === 0) return
+
+    const m = (riderLink.attr('href') ?? '').match(/^rider\/([\w-]+)$/)
     if (!m) return
     const slug = m[1]
     if (seen.has(slug)) return
 
-    // Skip links der IKKE er i en <tr> (favourites/widgets — Giro stage 3
-    // edge case 2026-05-10 hvor en favourite-rytter slap igennem)
-    const $row = $(el).closest('tr')
-    if ($row.length === 0) return
-
-    const name = $(el).text().trim()
+    const name = riderLink.text().trim()
     if (!name) return
 
     seen.add(slug)
 
-    const cells = $row.find('td').toArray()
     let position: number | null = results.length + 1
     let dnf = false
     let abandonType: string | null = null
     let timeGapSeconds: number | null = null
-    let team = ''
 
-    if (cells.length > 0) {
-      const posText = $(cells[0]).text().trim().toLowerCase()
-      if (['dnf', 'dns', 'otl', 'dsq'].includes(posText)) {
-        dnf = true
-        abandonType = posText.toUpperCase()
-        position = null
-      } else {
-        const posNum = posText.replace(/[^0-9]/g, '')
-        if (/^\d+$/.test(posNum)) position = parseInt(posNum, 10)
-      }
+    const posText = $(cells[rnkColIdx] ?? cells[0]).text().trim().toLowerCase()
+    if (['dnf', 'dns', 'otl', 'dsq'].includes(posText)) {
+      dnf = true
+      abandonType = posText.toUpperCase()
+      position = null
+    } else {
+      const posNum = posText.replace(/[^0-9]/g, '')
+      if (/^\d+$/.test(posNum)) position = parseInt(posNum, 10)
+    }
 
-      // Team link
-      const teamLink = $row.find('a[href^="team/"]').first()
-      if (teamLink.length > 0) team = teamLink.text().trim()
-
-      // Time gap fra sidste td
-      if (cells.length >= 4) {
-        const lastTd = $(cells[cells.length - 1])
-        // Brug kun direkte text, ikke alle descendants
-        const raw = lastTd.contents().filter(function () { return this.type === 'text' }).text().trim()
-          || lastTd.text().trim()
-        timeGapSeconds = parseTimeToSeconds(raw)
-      }
+    if (timeColIdx >= 0 && timeColIdx < cells.length && position !== null) {
+      const raw = $(cells[timeColIdx]).text().trim()
+      timeGapSeconds = parseGapToSeconds(raw, position)
     }
 
     results.push({
@@ -154,11 +170,9 @@ export function parseResultsTable(html: string): ParsedRow[] {
       dnf,
       abandon_type: abandonType,
     })
-    void team
   })
 
   // Sanity: <10 entries uden time-gap → sandsynligvis startlist/favourites
-  // (Giro stage 3 fanget her — 1 favourite slap gennem tr-filteret)
   if (results.length > 0 && results.length < 10) {
     const anyTime = results.some((r) => r.time_gap_seconds != null)
     if (!anyTime) return []
