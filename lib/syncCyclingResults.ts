@@ -275,7 +275,10 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
     })
   }
 
+  // Sample top 3 GC entries så vi kan se key-format vs r.pcs_slug
+  const gcSample = Object.entries(out.gc).slice(0, 3).map(([k, v]) => `${k}=${v}`).join(', ')
   console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
+  console.log(`[scrapeClassifications] gc top3: ${gcSample}`)
   return out
 }
 
@@ -429,6 +432,9 @@ export async function syncCyclingResults(): Promise<{
       })
     }
     console.log(`[syncCyclingResults]   parsed=${parsed.length} matched=${rows.length} unmatched=${stageUnmatched}${unmatchedSamples.length ? ` (sample: ${unmatchedSamples.join(', ')})` : ''}`)
+    // Sample lookups: er parsed-slugs også til stede i classifications.gc?
+    const lookupSample = parsed.slice(0, 3).map((r) => `${r.pcs_slug}→gc=${classifications.gc[r.pcs_slug] ?? 'MISS'}`).join(' | ')
+    console.log(`[syncCyclingResults]   lookup sample: ${lookupSample}`)
 
     if (rows.length > 0) {
       // Batched upsert (200 ad gangen for at undgå payload-limit)
