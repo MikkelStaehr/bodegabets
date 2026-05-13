@@ -24,10 +24,6 @@ type Props = {
    *  I et stage race er en abandon permanent for resten af løbet, så de
    *  ryttere disables i pickeren for kommende etaper. */
   abandoned?: Record<string, Record<string, string>>
-  /** raceId → riderId → { jersey, gc_position }. Snapshot fra seneste
-   *  stage med data — bruges i picker til at vise trøje + GC top-N
-   *  så bruger ved hvem der bærer hvad inden de vælger til næste etape. */
-  standings?: Record<string, Record<string, { jersey: string | null; gc_position: number | null }>>
   squadRiders: CyclingSquadRider[]
   blocks: CyclingBlock[]
   defaultBlockId?: string | null
@@ -38,20 +34,6 @@ type Props = {
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
-
-const JERSEY_LABELS: Record<string, string> = {
-  leader: 'FØR',
-  points: 'PT',
-  mountain: 'BT',
-  youth: 'UT',
-}
-
-const JERSEY_COLORS: Record<string, { bg: string; color: string }> = {
-  leader:   { bg: '#FAC775', color: '#633806' },
-  points:   { bg: '#9FE1CB', color: '#085041' },
-  mountain: { bg: '#F5C4B3', color: '#712B13' },
-  youth:    { bg: '#F2EDE4', color: '#444441' },
-}
 
 const ROLES: { key: CyclingRoleKey; label: string; catRule: number[] | null }[] = [
   { key: 'leader',      label: 'Leader',     catRule: null },
@@ -138,7 +120,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -222,7 +204,6 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const [modalOpen, setModalOpen] = useState<{ stageId: string; roleKey: CyclingRoleKey } | null>(null)
   const [modalSearch, setModalSearch] = useState('')
   const [modalTeamFilter, setModalTeamFilter] = useState<string>('')
-  const [modalSort, setModalSort] = useState<'default' | 'gc' | 'jersey'>('default')
   const [showOnlyStarters, setShowOnlyStarters] = useState(false)
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
@@ -834,7 +815,6 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             setModalOpen({ stageId: activeStage.id, roleKey: roleKey as CyclingRoleKey })
             setModalSearch('')
             setModalTeamFilter('')
-            setModalSort('default')
           } : undefined}
         />
       )}
@@ -987,13 +967,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           )
         ).sort()
 
-        // Standings for det aktuelle race — bruges til både badges og sort
-        const raceStandings = standings?.[modalStage.race_id] ?? {}
-        const hasAnyStandings = Object.keys(raceStandings).length > 0
-
-        // Jersey-prioritet til sort: leader > points > mountain > youth
-        const JERSEY_SORT: Record<string, number> = { leader: 4, points: 3, mountain: 2, youth: 1 }
-
+        // Sort: startliste-ryttere først, så andre
         const filteredRiders = squadRiders
           .filter((r) => {
             if (role.catRule && !role.catRule.includes(r.category)) return false
@@ -1006,21 +980,6 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             return true
           })
           .sort((a, b) => {
-            // Sort efter GC-placering (top først, ryttere uden GC i bunden)
-            if (modalSort === 'gc') {
-              const aGc = raceStandings[a.id]?.gc_position ?? 9999
-              const bGc = raceStandings[b.id]?.gc_position ?? 9999
-              if (aGc !== bGc) return aGc - bGc
-            }
-            // Sort efter trøje-bærere (leader → points → mountain → youth → andre)
-            if (modalSort === 'jersey') {
-              const aJ = raceStandings[a.id]?.jersey
-              const bJ = raceStandings[b.id]?.jersey
-              const aPrio = aJ ? (JERSEY_SORT[aJ] ?? 0) : 0
-              const bPrio = bJ ? (JERSEY_SORT[bJ] ?? 0) : 0
-              if (aPrio !== bPrio) return bPrio - aPrio
-            }
-            // Fallback / default: startliste-ryttere først
             if (!hasStartlist) return 0
             const aStarts = startlistIds!.has(a.id) ? 1 : 0
             const bStarts = startlistIds!.has(b.id) ? 1 : 0
@@ -1086,47 +1045,26 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                     outline: 'none', background: '#1E3A5F', color: '#F2EDE4',
                   }}
                 />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {teamsForFilter.length > 1 && (
-                    <select
-                      value={modalTeamFilter}
-                      onChange={(e) => setModalTeamFilter(e.target.value)}
-                      style={{
-                        flex: 1, minWidth: 140, padding: '8px 12px',
-                        border: `1px solid ${modalTeamFilter ? '#8FBF8F' : '#2B4F7A'}`,
-                        borderRadius: 2, cursor: 'pointer',
-                        background: modalTeamFilter ? 'rgba(107,143,113,0.12)' : '#1E3A5F',
-                        color: modalTeamFilter ? '#8FBF8F' : '#F2EDE4',
-                        fontFamily: "'Barlow', sans-serif", fontSize: 13,
-                        outline: 'none', appearance: 'none',
-                      }}
-                    >
-                      <option value="">Alle hold ({teamsForFilter.length})</option>
-                      {teamsForFilter.map((team) => (
-                        <option key={team} value={team}>{team}</option>
-                      ))}
-                    </select>
-                  )}
-                  {hasAnyStandings && (
-                    <select
-                      value={modalSort}
-                      onChange={(e) => setModalSort(e.target.value as 'default' | 'gc' | 'jersey')}
-                      style={{
-                        flex: 1, minWidth: 140, padding: '8px 12px',
-                        border: `1px solid ${modalSort !== 'default' ? '#8FBF8F' : '#2B4F7A'}`,
-                        borderRadius: 2, cursor: 'pointer',
-                        background: modalSort !== 'default' ? 'rgba(107,143,113,0.12)' : '#1E3A5F',
-                        color: modalSort !== 'default' ? '#8FBF8F' : '#F2EDE4',
-                        fontFamily: "'Barlow', sans-serif", fontSize: 13,
-                        outline: 'none', appearance: 'none',
-                      }}
-                    >
-                      <option value="default">Sortér: standard</option>
-                      <option value="gc">Sortér: GC top → bund</option>
-                      <option value="jersey">Sortér: trøjer først</option>
-                    </select>
-                  )}
-                </div>
+                {teamsForFilter.length > 1 && (
+                  <select
+                    value={modalTeamFilter}
+                    onChange={(e) => setModalTeamFilter(e.target.value)}
+                    style={{
+                      width: '100%', padding: '8px 12px',
+                      border: `1px solid ${modalTeamFilter ? '#8FBF8F' : '#2B4F7A'}`,
+                      borderRadius: 2, cursor: 'pointer',
+                      background: modalTeamFilter ? 'rgba(107,143,113,0.12)' : '#1E3A5F',
+                      color: modalTeamFilter ? '#8FBF8F' : '#F2EDE4',
+                      fontFamily: "'Barlow', sans-serif", fontSize: 13,
+                      outline: 'none', appearance: 'none',
+                    }}
+                  >
+                    <option value="">Alle hold ({teamsForFilter.length})</option>
+                    {teamsForFilter.map((team) => (
+                      <option key={team} value={team}>{team}</option>
+                    ))}
+                  </select>
+                )}
                 {hasStartlist && (
                   <button
                     type="button"
@@ -1202,43 +1140,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                             {rider.last_name}
                             <span style={{ fontWeight: 400, color: '#8FABC4' }}> {rider.first_name}</span>
                           </div>
-                          <div style={{
-                            display: 'flex', alignItems: 'center', gap: 6, marginTop: 1,
-                            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: '#64748B', lineHeight: 1.2,
-                          }}>
-                            <span style={{
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1,
-                            }}>{rider.team_name}</span>
-                            {(() => {
-                              const s = standings?.[modalStage.race_id]?.[rider.id]
-                              if (!s) return null
-                              const jerseyColor = s.jersey ? JERSEY_COLORS[s.jersey] : null
-                              const jerseyLabel = s.jersey ? JERSEY_LABELS[s.jersey] : null
-                              return (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                                  {jerseyColor && jerseyLabel && (
-                                    <span
-                                      title={`Bærer ${s.jersey}-trøjen`}
-                                      style={{
-                                        padding: '1px 5px', borderRadius: 3,
-                                        fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
-                                        background: jerseyColor.bg, color: jerseyColor.color,
-                                      }}
-                                    >{jerseyLabel}</span>
-                                  )}
-                                  {s.gc_position != null && s.gc_position <= 20 && (
-                                    <span
-                                      title="Sammenlagt placering"
-                                      style={{
-                                        padding: '1px 5px', borderRadius: 3,
-                                        fontSize: 9, fontWeight: 600, letterSpacing: '0.04em',
-                                        background: 'rgba(143,171,196,0.15)', color: '#8FABC4',
-                                      }}
-                                    >GC {s.gc_position}</span>
-                                  )}
-                                </span>
-                              )
-                            })()}
+                          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: '#64748B', lineHeight: 1.2 }}>
+                            {rider.team_name}
                           </div>
                         </div>
                         {isOut ? (

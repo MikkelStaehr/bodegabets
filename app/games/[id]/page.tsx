@@ -304,10 +304,6 @@ export default async function GamePage({ params }: Props) {
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null }[] = []
   let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; results_uploaded_at: string | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupStartlists: Record<string, string[]> = {}
-  // Nuværende jersey + GC-position pr. rytter pr. race (efter seneste
-  // afsluttede stage med data). Bruges i lineup-picker til at vise
-  // hvilke ryttere bærer trøjer og hvor de står sammenlagt.
-  const lineupStandings: Record<string, Record<string, { jersey: string | null; gc_position: number | null }>> = {}
   // raceId → riderId → abandon_type (DNF, DNS, OTL, DSQ)
   const lineupAbandoned: Record<string, Record<string, string>> = {}
   let blockSquadMap: Record<string, string> = {}
@@ -469,41 +465,6 @@ export default async function GamePage({ params }: Props) {
         lineupAbandoned[row.race_id][row.rider_id] = row.abandon_type ?? 'DNF'
       }
 
-      // Hent jersey + GC-position fra seneste stage med data, pr. (race, rider).
-      // Bruges i lineup-picker så bruger kan se hvem der bærer trøje og GC
-      // top-N inden de vælger lineup til næste stage.
-      const { data: standingsData } = await supabaseAdmin
-        .from('cycling_results')
-        .select('race_id, rider_id, jersey, gc_position_after, cycling_stages!inner(start_date)')
-        .in('race_id', raceIdsForStages)
-
-      type StandingsRow = {
-        race_id: string
-        rider_id: string
-        jersey: string | null
-        gc_position_after: number | null
-        cycling_stages: { start_date: string } | null
-      }
-      const latestByKey = new Map<string, { jersey: string | null; gc_position: number | null; stageDate: string }>()
-      for (const row of (standingsData ?? []) as unknown as StandingsRow[]) {
-        const stageDate = row.cycling_stages?.start_date
-        if (!stageDate) continue
-        if (!row.jersey && row.gc_position_after == null) continue
-        const key = `${row.race_id}::${row.rider_id}`
-        const existing = latestByKey.get(key)
-        if (!existing || stageDate > existing.stageDate) {
-          latestByKey.set(key, {
-            jersey: row.jersey,
-            gc_position: row.gc_position_after,
-            stageDate,
-          })
-        }
-      }
-      for (const [key, info] of latestByKey) {
-        const [raceId, riderId] = key.split('::')
-        if (!lineupStandings[raceId]) lineupStandings[raceId] = {}
-        lineupStandings[raceId][riderId] = { jersey: info.jersey, gc_position: info.gc_position }
-      }
     }
 
     // Hent squad riders fra alle squads
@@ -1175,7 +1136,6 @@ export default async function GamePage({ params }: Props) {
               stages={lineupStages}
               startlists={lineupStartlists}
               abandoned={lineupAbandoned}
-              standings={lineupStandings}
               squadRiders={lineupSquadRiders}
               blocks={cyclingBlocks}
               defaultBlockId={cyclingActiveBlock?.id ?? null}
