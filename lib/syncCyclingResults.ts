@@ -211,19 +211,25 @@ const SUBPAGE_PATH: Record<keyof ClassificationSet, string> = {
   youth: 'youth',
 }
 
-// Værdi-kolonnen findes via header-tekst (NOT sidste celle — sidste celle er
-// typisk "Today" eller "Time won/lost" som er null/dummy for klassement-totaler).
-// Headers fra Giro d'Italia stage 4 (exact match påkrævet fordi GC/youth har
-// både "Time" og "Time won/lost"):
-//   GC:       [..., Time, Time won/lost]
-//   Points:   [..., Pnt, Bonis, Today]
-//   Mountain: [..., Pnt, Today]
-//   Youth:    [..., Time, Time won/lost]
+// Værdi-kolonnen findes via header-tekst. PCS' subsider har stage-resultat-
+// tabellen øverst (med eget "Time"/"Pnt" som UCI-points) + klassement under.
+// For at undgå at ramme stage-resultatet kræver vi BÅDE en værdi-header OG en
+// marker-header der kun findes på klassement-tabellen:
+//   GC:       [..., Time, Time won/lost]  marker: "time won/lost"
+//   Points:   [..., Pnt, Bonis, Today]    marker: "today"
+//   Mountain: [..., Pnt, Today]           marker: "today"
+//   Youth:    [..., Time, Time won/lost]  marker: "time won/lost"
 const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
   gc: 'time',
   points: 'pnt',
   mountain: 'pnt',
   youth: 'time',
+}
+const MARKER_HEADER: Record<keyof ClassificationSet, string> = {
+  gc: 'time won/lost',
+  points: 'today',
+  mountain: 'today',
+  youth: 'time won/lost',
 }
 
 /**
@@ -251,16 +257,21 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
 
     const $ = cheerio.load(html)
     const target = VALUE_HEADER[key]
+    const marker = MARKER_HEADER[key]
 
-    // Find primær tabel: første <table> med target-header OG ≥5 rytter-rækker
+    // Find primær tabel: <table> med BÅDE target-header OG klassement-marker
+    // ("Time won/lost" eller "Today" — adskiller klassement fra stage-resultat).
+    // Plus ≥5 rytter-rækker for at filtrere widgets/favourites fra.
     const tables = $('table').toArray()
     let mainTable: typeof tables[number] | null = null
     let valueColIdx = -1
     for (const tbl of tables) {
       const $tbl = $(tbl)
       const headerCells = $tbl.find('thead th').toArray()
-      const colIdx = headerCells.findIndex((th) => $(th).text().trim().toLowerCase() === target)
+      const headerTexts = headerCells.map((th) => $(th).text().trim().toLowerCase())
+      const colIdx = headerTexts.findIndex((h) => h === target)
       if (colIdx < 0) continue
+      if (!headerTexts.includes(marker)) continue
       const riderRowCount = $tbl.find('tbody tr a[href^="rider/"]').length
       if (riderRowCount < 5) continue
       mainTable = tbl
