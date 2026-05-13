@@ -222,6 +222,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const [modalOpen, setModalOpen] = useState<{ stageId: string; roleKey: CyclingRoleKey } | null>(null)
   const [modalSearch, setModalSearch] = useState('')
   const [modalTeamFilter, setModalTeamFilter] = useState<string>('')
+  const [modalSort, setModalSort] = useState<'default' | 'gc' | 'jersey'>('default')
   const [showOnlyStarters, setShowOnlyStarters] = useState(false)
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
@@ -833,6 +834,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             setModalOpen({ stageId: activeStage.id, roleKey: roleKey as CyclingRoleKey })
             setModalSearch('')
             setModalTeamFilter('')
+            setModalSort('default')
           } : undefined}
         />
       )}
@@ -985,7 +987,13 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           )
         ).sort()
 
-        // Sort: startliste-ryttere først, så andre
+        // Standings for det aktuelle race — bruges til både badges og sort
+        const raceStandings = standings?.[modalStage.race_id] ?? {}
+        const hasAnyStandings = Object.keys(raceStandings).length > 0
+
+        // Jersey-prioritet til sort: leader > points > mountain > youth
+        const JERSEY_SORT: Record<string, number> = { leader: 4, points: 3, mountain: 2, youth: 1 }
+
         const filteredRiders = squadRiders
           .filter((r) => {
             if (role.catRule && !role.catRule.includes(r.category)) return false
@@ -998,6 +1006,21 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             return true
           })
           .sort((a, b) => {
+            // Sort efter GC-placering (top først, ryttere uden GC i bunden)
+            if (modalSort === 'gc') {
+              const aGc = raceStandings[a.id]?.gc_position ?? 9999
+              const bGc = raceStandings[b.id]?.gc_position ?? 9999
+              if (aGc !== bGc) return aGc - bGc
+            }
+            // Sort efter trøje-bærere (leader → points → mountain → youth → andre)
+            if (modalSort === 'jersey') {
+              const aJ = raceStandings[a.id]?.jersey
+              const bJ = raceStandings[b.id]?.jersey
+              const aPrio = aJ ? (JERSEY_SORT[aJ] ?? 0) : 0
+              const bPrio = bJ ? (JERSEY_SORT[bJ] ?? 0) : 0
+              if (aPrio !== bPrio) return bPrio - aPrio
+            }
+            // Fallback / default: startliste-ryttere først
             if (!hasStartlist) return 0
             const aStarts = startlistIds!.has(a.id) ? 1 : 0
             const bStarts = startlistIds!.has(b.id) ? 1 : 0
@@ -1063,26 +1086,47 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                     outline: 'none', background: '#1E3A5F', color: '#F2EDE4',
                   }}
                 />
-                {teamsForFilter.length > 1 && (
-                  <select
-                    value={modalTeamFilter}
-                    onChange={(e) => setModalTeamFilter(e.target.value)}
-                    style={{
-                      width: '100%', padding: '8px 12px',
-                      border: `1px solid ${modalTeamFilter ? '#8FBF8F' : '#2B4F7A'}`,
-                      borderRadius: 2, cursor: 'pointer',
-                      background: modalTeamFilter ? 'rgba(107,143,113,0.12)' : '#1E3A5F',
-                      color: modalTeamFilter ? '#8FBF8F' : '#F2EDE4',
-                      fontFamily: "'Barlow', sans-serif", fontSize: 13,
-                      outline: 'none', appearance: 'none',
-                    }}
-                  >
-                    <option value="">Alle hold ({teamsForFilter.length})</option>
-                    {teamsForFilter.map((team) => (
-                      <option key={team} value={team}>{team}</option>
-                    ))}
-                  </select>
-                )}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {teamsForFilter.length > 1 && (
+                    <select
+                      value={modalTeamFilter}
+                      onChange={(e) => setModalTeamFilter(e.target.value)}
+                      style={{
+                        flex: 1, minWidth: 140, padding: '8px 12px',
+                        border: `1px solid ${modalTeamFilter ? '#8FBF8F' : '#2B4F7A'}`,
+                        borderRadius: 2, cursor: 'pointer',
+                        background: modalTeamFilter ? 'rgba(107,143,113,0.12)' : '#1E3A5F',
+                        color: modalTeamFilter ? '#8FBF8F' : '#F2EDE4',
+                        fontFamily: "'Barlow', sans-serif", fontSize: 13,
+                        outline: 'none', appearance: 'none',
+                      }}
+                    >
+                      <option value="">Alle hold ({teamsForFilter.length})</option>
+                      {teamsForFilter.map((team) => (
+                        <option key={team} value={team}>{team}</option>
+                      ))}
+                    </select>
+                  )}
+                  {hasAnyStandings && (
+                    <select
+                      value={modalSort}
+                      onChange={(e) => setModalSort(e.target.value as 'default' | 'gc' | 'jersey')}
+                      style={{
+                        flex: 1, minWidth: 140, padding: '8px 12px',
+                        border: `1px solid ${modalSort !== 'default' ? '#8FBF8F' : '#2B4F7A'}`,
+                        borderRadius: 2, cursor: 'pointer',
+                        background: modalSort !== 'default' ? 'rgba(107,143,113,0.12)' : '#1E3A5F',
+                        color: modalSort !== 'default' ? '#8FBF8F' : '#F2EDE4',
+                        fontFamily: "'Barlow', sans-serif", fontSize: 13,
+                        outline: 'none', appearance: 'none',
+                      }}
+                    >
+                      <option value="default">Sortér: standard</option>
+                      <option value="gc">Sortér: GC top → bund</option>
+                      <option value="jersey">Sortér: trøjer først</option>
+                    </select>
+                  )}
+                </div>
                 {hasStartlist && (
                   <button
                     type="button"
