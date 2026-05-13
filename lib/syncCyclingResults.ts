@@ -8,8 +8,6 @@
  * Kører fra Railway-cron (se railway/index.ts /sync-cycling-results endpoint).
  *
  * Begrænsninger ift. Python-scriptet (deferred til v2):
- * - Ingen jersey-parsing (leader/sprint/mountain/youth)
- * - Ingen GC positions / gc_multiplier
  * - Ingen stage profile/won_how update (ændrer sig sjældent efter løbet
  *   kører — stage-data forventes oprettet via sync_race_info først)
  * - Startlist sync forbliver i Python (ikke kritisk for daglig drift)
@@ -169,9 +167,133 @@ export function parseResultsTable(html: string): ParsedRow[] {
   return results
 }
 
+// ─── Jersey + GC parsers ───────────────────────────────────────────────────
+
+// PCS-classification-keyword → vores race-agnostiske jersey-key.
+// Trøjefarve varierer per race (Tour gul, Giro rosa, Vuelta rød) men logikken
+// er den samme.
+const CLASSIFICATION_MAP: Record<string, 'leader' | 'points' | 'mountain' | 'youth'> = {
+  general: 'leader',
+  gc: 'leader',
+  leader: 'leader',
+  points: 'points',
+  sprint: 'points',
+  mountain: 'mountain',
+  kom: 'mountain',
+  climber: 'mountain',
+  young: 'youth',
+  youth: 'youth',
+  u25: 'youth',
+}
+
+// Jersey-prioritet hvis en rytter bærer flere (kun én kan gemmes per row).
+const JERSEY_PRIORITY: Record<string, number> = {
+  leader: 4,
+  points: 3,
+  mountain: 2,
+  youth: 1,
+}
+
+/**
+ * Find trøjebærere fra stage-side. PCS viser classifications i sektioner
+ * efter stage-result, hver med <h3>/<h4>/<div class="(sub)head"> + tabel.
+ * Første rytter-link i hver tabel er trøjebæreren.
+ */
+function parseJerseys(html: string): Record<string, string> {
+  const $ = cheerio.load(html)
+  const riderRe = /^rider\/([\w-]+)$/
+  // slug → højeste-prioritet jersey-key
+  const result: Record<string, string> = {}
+
+  $('h3, h4, div').each((_, header) => {
+    const $header = $(header)
+    const cls = $header.attr('class') ?? ''
+    if (!/(sub)?head/i.test(cls)) return
+
+    const text = $header.text().trim().toLowerCase()
+    let jerseyType: string | null = null
+    for (const [keyword, jtype] of Object.entries(CLASSIFICATION_MAP)) {
+      if (text.includes(keyword)) {
+        jerseyType = jtype
+        break
+      }
+    }
+    if (!jerseyType) return
+
+    // Find næste <table> efter header'en
+    const table = $header.nextAll('table').first()
+    if (table.length === 0) return
+
+    const firstRider = table.find('a').filter((_i, el) => {
+      const href = $(el).attr('href') ?? ''
+      return riderRe.test(href)
+    }).first()
+    if (firstRider.length === 0) return
+
+    const m = (firstRider.attr('href') ?? '').match(riderRe)
+    if (!m) return
+    const slug = m[1]
+
+    const existing = result[slug]
+    const incomingPrio = JERSEY_PRIORITY[jerseyType] ?? 0
+    const existingPrio = existing ? (JERSEY_PRIORITY[existing] ?? 0) : 0
+    if (!existing || incomingPrio > existingPrio) {
+      result[slug] = jerseyType
+    }
+  })
+
+  return result
+}
+
+/**
+ * Find GC-placering pr. rytter fra stage-side. Top-N typically ~20 ryttere.
+ * Ryttere uden for top-N er ikke i map'et (får ingen GC-badge).
+ */
+function parseGcPositions(html: string): Record<string, number> {
+  const $ = cheerio.load(html)
+  const riderRe = /^rider\/([\w-]+)$/
+  const result: Record<string, number> = {}
+
+  let found = false
+  $('h3, h4, div').each((_, header) => {
+    if (found) return
+    const $header = $(header)
+    const cls = $header.attr('class') ?? ''
+    if (!/(sub)?head/i.test(cls)) return
+
+    const text = $header.text().trim().toLowerCase()
+    const isGc = ['general', 'gc', 'leader'].some((kw) => text.includes(kw))
+    const isOther = ['points', 'sprint', 'mountain', 'kom', 'climber', 'young', 'youth', 'u25', 'team', 'combativ'].some((kw) => text.includes(kw))
+    if (!isGc || isOther) return
+
+    const table = $header.nextAll('table').first()
+    if (table.length === 0) return
+
+    let position = 0
+    table.find('a').each((_i, el) => {
+      const href = $(el).attr('href') ?? ''
+      const m = href.match(riderRe)
+      if (!m) return
+      const slug = m[1]
+      if (result[slug]) return  // skip dup-links i samme row
+      position++
+      result[slug] = position
+    })
+    if (position > 0) found = true
+  })
+
+  return result
+}
+
 // ─── Stage scraper ─────────────────────────────────────────────────────────
 
-async function scrapeStageResults(slug: string, stageNum: number): Promise<ParsedRow[]> {
+type StageScrape = {
+  results: ParsedRow[]
+  jerseys: Record<string, string>      // slug → 'leader'|'points'|...
+  gcPositions: Record<string, number>  // slug → GC position
+}
+
+async function scrapeStageResults(slug: string, stageNum: number): Promise<StageScrape> {
   const base = stageNum === 0
     ? `${PCS_BASE}/race/${slug}/2026/prologue`
     : `${PCS_BASE}/race/${slug}/2026/stage-${stageNum}`
@@ -181,13 +303,17 @@ async function scrapeStageResults(slug: string, stageNum: number): Promise<Parse
   const resultHtml = await pcsGet(resultUrl)
   let results = resultHtml ? parseResultsTable(resultHtml) : []
 
-  // Fallback til stage-page hvis /result var tom
-  if (results.length === 0) {
-    const stageHtml = await pcsGet(base)
-    if (stageHtml) results = parseResultsTable(stageHtml)
+  // Hent stage-base for jersey + GC sektioner (de er ikke på /result-siden).
+  // Falder også tilbage til at parse results herfra hvis /result var tom.
+  const stageHtml = await pcsGet(base)
+  if (results.length === 0 && stageHtml) {
+    results = parseResultsTable(stageHtml)
   }
 
-  return results
+  const jerseys = stageHtml ? parseJerseys(stageHtml) : {}
+  const gcPositions = stageHtml ? parseGcPositions(stageHtml) : {}
+
+  return { results, jerseys, gcPositions }
 }
 
 // ─── Public entry point ────────────────────────────────────────────────────
@@ -266,15 +392,17 @@ export async function syncCyclingResults(): Promise<{
 
     console.log(`[syncCyclingResults] ${race.name} stage ${stage.stage_number}...`)
 
-    let parsed: ParsedRow[] = []
+    let scrape: StageScrape = { results: [], jerseys: {}, gcPositions: {} }
     try {
-      parsed = await scrapeStageResults(race.pcs_slug, stage.stage_number)
+      scrape = await scrapeStageResults(race.pcs_slug, stage.stage_number)
     } catch (err) {
       const msg = `Scrape failed (${race.name} stage ${stage.stage_number}): ${err}`
       console.warn(`[syncCyclingResults] ${msg}`)
       errors.push(msg)
       continue
     }
+
+    const { results: parsed, jerseys, gcPositions } = scrape
 
     if (parsed.length === 0) {
       console.log(`[syncCyclingResults]   ingen results — skipper`)
@@ -293,6 +421,8 @@ export async function syncCyclingResults(): Promise<{
       time_gap_seconds: number | null
       dnf: boolean
       abandon_type: string | null
+      jersey: string | null
+      gc_position_after: number | null
     }> = []
     for (const r of parsed) {
       const riderId = riderIndex.get(r.pcs_slug)
@@ -308,6 +438,8 @@ export async function syncCyclingResults(): Promise<{
         time_gap_seconds: r.time_gap_seconds,
         dnf: r.dnf,
         abandon_type: r.abandon_type,
+        jersey: jerseys[r.pcs_slug] ?? null,
+        gc_position_after: gcPositions[r.pcs_slug] ?? null,
       })
     }
 
