@@ -194,21 +194,57 @@ const JERSEY_PRIORITY: Record<string, number> = {
   youth: 1,
 }
 
+// Cheerio v1 typer er ikke stabilt eksporteret. Vi gemmer DOM-noder som
+// returneret af $('*').each-callbacken og caster ved $()-kald. Strukturen
+// vi har brug for er .name (tag-navn) — domhandler-noder har den.
+type DomNode = { name?: string }
+
+/**
+ * Find næste <table> i dokumentorden efter et givet element. Mimics
+ * BeautifulSoup's find_next("table") som traverserer hele DOM-træet
+ * forward, ikke kun direkte søskende. Vores oprindelige nextAll('table')
+ * fangede intet fordi PCS pakker classifications i wrapper-divs.
+ */
+function findNextTableInDoc(
+  fromEl: DomNode,
+  allElements: DomNode[],
+): DomNode | null {
+  const fromIdx = allElements.indexOf(fromEl)
+  if (fromIdx < 0) return null
+  for (let i = fromIdx + 1; i < allElements.length; i++) {
+    const el = allElements[i]
+    if (el.name === 'table') return el
+  }
+  return null
+}
+
+function getAllElementsInOrder($: cheerio.CheerioAPI): DomNode[] {
+  const out: DomNode[] = []
+  $('*').each((_, el) => {
+    out.push(el as unknown as DomNode)
+  })
+  return out
+}
+
 /**
  * Find trøjebærere fra stage-side. PCS viser classifications i sektioner
- * efter stage-result, hver med <h3>/<h4>/<div class="(sub)head"> + tabel.
- * Første rytter-link i hver tabel er trøjebæreren.
+ * efter stage-result, hver med en header (h3/h4/div med 'head'/'subhead'-
+ * klasse) + tabel. Første rytter-link i hver tabel er trøjebæreren.
  */
 function parseJerseys(html: string): Record<string, string> {
   const $ = cheerio.load(html)
   const riderRe = /^rider\/([\w-]+)$/
-  // slug → højeste-prioritet jersey-key
   const result: Record<string, string> = {}
+  const allElements = getAllElementsInOrder($)
+  let headersInspected = 0
+  let headersMatched = 0
+  let tablesFound = 0
 
   $('h3, h4, div').each((_, header) => {
     const $header = $(header)
     const cls = $header.attr('class') ?? ''
     if (!/(sub)?head/i.test(cls)) return
+    headersInspected++
 
     const text = $header.text().trim().toLowerCase()
     let jerseyType: string | null = null
@@ -219,13 +255,14 @@ function parseJerseys(html: string): Record<string, string> {
       }
     }
     if (!jerseyType) return
+    headersMatched++
 
-    // Find næste <table> efter header'en
-    const table = $header.nextAll('table').first()
-    if (table.length === 0) return
+    const table = findNextTableInDoc(header as unknown as DomNode, allElements)
+    if (!table) return
+    tablesFound++
 
-    const firstRider = table.find('a').filter((_i, el) => {
-      const href = $(el).attr('href') ?? ''
+    const firstRider = $(table as Parameters<typeof $>[0]).find('a').filter((_i, a) => {
+      const href = $(a).attr('href') ?? ''
       return riderRe.test(href)
     }).first()
     if (firstRider.length === 0) return
@@ -242,6 +279,7 @@ function parseJerseys(html: string): Record<string, string> {
     }
   })
 
+  console.log(`[parseJerseys] headers inspected=${headersInspected} matched=${headersMatched} tables=${tablesFound} found=${Object.keys(result).length}`)
   return result
 }
 
@@ -253,6 +291,7 @@ function parseGcPositions(html: string): Record<string, number> {
   const $ = cheerio.load(html)
   const riderRe = /^rider\/([\w-]+)$/
   const result: Record<string, number> = {}
+  const allElements = getAllElementsInOrder($)
 
   let found = false
   $('h3, h4, div').each((_, header) => {
@@ -266,12 +305,12 @@ function parseGcPositions(html: string): Record<string, number> {
     const isOther = ['points', 'sprint', 'mountain', 'kom', 'climber', 'young', 'youth', 'u25', 'team', 'combativ'].some((kw) => text.includes(kw))
     if (!isGc || isOther) return
 
-    const table = $header.nextAll('table').first()
-    if (table.length === 0) return
+    const table = findNextTableInDoc(header as unknown as DomNode, allElements)
+    if (!table) return
 
     let position = 0
-    table.find('a').each((_i, el) => {
-      const href = $(el).attr('href') ?? ''
+    $(table as Parameters<typeof $>[0]).find('a').each((_i, a) => {
+      const href = $(a).attr('href') ?? ''
       const m = href.match(riderRe)
       if (!m) return
       const slug = m[1]
@@ -282,6 +321,7 @@ function parseGcPositions(html: string): Record<string, number> {
     if (position > 0) found = true
   })
 
+  console.log(`[parseGcPositions] found=${Object.keys(result).length}`)
   return result
 }
 
