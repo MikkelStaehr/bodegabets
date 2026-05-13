@@ -230,6 +230,20 @@ const CLASSIFICATION_TABLE_INDEX: Record<keyof ClassificationSet, number> = {
   youth: 8,
 }
 
+// Værdi-kolonnen findes via header-tekst (NOT sidste celle — sidste celle er
+// typisk "Today" eller "Time won/lost" som er null/dummy for klassement-totaler).
+// Verificeret mod Giro d'Italia stage 4:
+//   GC headers:       [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, UCI, "", Time, Time won/lost]
+//   Points headers:   [Rnk, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Bonis, Today]
+//   Mountain headers: [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Today]
+//   Youth headers:    [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Time, Time won/lost]
+const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
+  gc: 'time',
+  points: 'pnt',
+  mountain: 'pnt',
+  youth: 'time',
+}
+
 /**
  * Hent classifications (GC, points, mountain, youth) for en stage via PCS'
  * stage-N-gc subside (én HTTP-request — alle classifications ligger på samme
@@ -251,27 +265,19 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
   const $ = cheerio.load(html)
   const tables = $('table').toArray()
 
-  // Per-classification diagnostik: gem header-rækkens labels + top-3 rækkers
-  // alle celler så vi kan se hvilken kolonne der indeholder værdien.
-  const dbg: Record<keyof ClassificationSet, { headers: string[]; rows: Array<{ slug: string; cells: string[] }> }> = {
-    gc: { headers: [], rows: [] },
-    points: { headers: [], rows: [] },
-    mountain: { headers: [], rows: [] },
-    youth: { headers: [], rows: [] },
-  }
-
   for (const [key, idx] of Object.entries(CLASSIFICATION_TABLE_INDEX) as Array<[keyof ClassificationSet, number]>) {
     const table = tables[idx]
     if (!table) continue
 
-    // Header
+    // Find værdi-kolonnen via header-tekst (exact match, case-insensitive).
+    // Vigtigt: bruger exact-match fordi GC/youth headers har både "Time" og
+    // "Time won/lost" — vi vil ramme "Time".
+    const target = VALUE_HEADER[key]
     const headerCells = $(table).find('thead th').toArray()
-    if (headerCells.length > 0) {
-      dbg[key].headers = headerCells.map((th) => $(th).text().trim().replace(/\s+/g, ' '))
-    } else {
-      // Fallback: first tr's th's or td's
-      const firstRow = $(table).find('tr').first()
-      dbg[key].headers = firstRow.find('th, td').toArray().map((c) => $(c).text().trim().replace(/\s+/g, ' '))
+    let valueColIdx = headerCells.findIndex((th) => $(th).text().trim().toLowerCase() === target)
+    if (valueColIdx < 0) {
+      // Fallback til sidste celle hvis header ikke fundet
+      valueColIdx = -1
     }
 
     const seen = new Set<string>()
@@ -295,30 +301,16 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
       const posText = $(cells[0]).text().trim()
       const posNum = parseInt(posText.replace(/[^0-9]/g, ''), 10)
       if (Number.isFinite(posNum) && posNum > 0) {
-        // Hent rawValue fra sidste celle (typisk point eller tid-gap)
-        const lastCell = cells[cells.length - 1]
-        const rawValue = lastCell ? $(lastCell).text().trim() : null
+        const valCell = valueColIdx >= 0 && valueColIdx < cells.length
+          ? cells[valueColIdx]
+          : cells[cells.length - 1]
+        const rawValue = valCell ? $(valCell).text().trim() : null
         out[key][ridSlug] = { position: posNum, rawValue: rawValue || null }
-
-        // Gem alle cells for top-3 til diagnostik
-        if (posNum <= 3) {
-          dbg[key].rows.push({
-            slug: ridSlug,
-            cells: cells.map((c) => $(c).text().trim().replace(/\s+/g, ' ')),
-          })
-        }
       }
     })
   }
 
   console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
-  for (const k of ['gc', 'points', 'mountain', 'youth'] as const) {
-    if (dbg[k].headers.length === 0) continue
-    console.log(`[scrapeClassifications] ${k} headers: [${dbg[k].headers.map((h, i) => `${i}:"${h}"`).join(' | ')}]`)
-    for (const row of dbg[k].rows) {
-      console.log(`[scrapeClassifications] ${k} ${row.slug}: [${row.cells.map((c, i) => `${i}:"${c}"`).join(' | ')}]`)
-    }
-  }
   return out
 }
 
@@ -336,19 +328,27 @@ function jerseyForSlug(slug: string, c: ClassificationSet): string | null {
 }
 
 /**
- * Parser tid-gap-string fra PCS som "+ 0:34" eller "+ 1:23:45" eller "0:00"
- * til total sekunder. Returnerer null for tomt eller uparserbart.
+ * Parser tid-gap fra PCS' classification-celle. Cellen har to sub-rendering
+ * (abs-tid + gap), som cheerio.text() konkatenerer:
+ *   Leader:     "16:18:51 16:18:51"       → abs tid x2 → gap = 0
+ *   Pos 2 GC:   ",,0:04"                  → tom + gap → 4 sek
+ *   Pos 2 yth:  "0:020:02"                → gap x2 → 2 sek
+ *
+ * Heuristik: hvis position er 1 → gap = 0. Ellers find første tid-substring
+ * (HH:MM:SS eller MM:SS), parse den.
  */
-function parseGapToSeconds(raw: string | null | undefined): number | null {
+function parseGapToSeconds(raw: string | null | undefined, position: number): number | null {
+  if (position === 1) return 0
   if (!raw) return null
-  const cleaned = raw.replace(/[+,]/g, '').trim()
+  const cleaned = raw.replace(/[+,]/g, ' ').trim()
   if (!cleaned || cleaned === '-' || cleaned === '—') return null
-  const parts = cleaned.split(':').map((p) => parseInt(p, 10))
-  if (parts.some(isNaN)) return null
-  if (parts.length === 1) return parts[0]
-  if (parts.length === 2) return parts[0] * 60 + parts[1]
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  return null
+  const m = cleaned.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/)
+  if (!m) return null
+  const h = m[3] ? parseInt(m[1], 10) : 0
+  const mins = m[3] ? parseInt(m[2], 10) : parseInt(m[1], 10)
+  const secs = m[3] ? parseInt(m[3], 10) : parseInt(m[2], 10)
+  if ([h, mins, secs].some(isNaN)) return null
+  return h * 3600 + mins * 60 + secs
 }
 
 /** Parser ren-tal point fra string, fx "115" eller "115 pts" */
@@ -511,7 +511,9 @@ export async function syncCyclingResults(): Promise<{
         youth_position_after: posOf(slugClassifs.youth),
         points_value: parsePointsValue(slugClassifs.points?.rawValue),
         mountain_value: parsePointsValue(slugClassifs.mountain?.rawValue),
-        youth_gap_seconds: parseGapToSeconds(slugClassifs.youth?.rawValue),
+        youth_gap_seconds: slugClassifs.youth
+          ? parseGapToSeconds(slugClassifs.youth.rawValue, slugClassifs.youth.position)
+          : null,
       })
     }
     if (stageUnmatched > 0) {
