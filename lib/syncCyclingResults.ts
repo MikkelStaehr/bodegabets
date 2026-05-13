@@ -195,36 +195,30 @@ function posOf(entry: ClassificationEntry | undefined): number | null {
   return entry?.position ?? null
 }
 
-// PCS' classification-subsider er tab-baseret UI: alle 4 URLs returnerer
-// præcis samme HTML med 12 <table>-elementer. JavaScript skifter blot hvilken
-// tab der er aktiv. For at parse korrekt henter vi siden ÉN gang og plukker
-// riders fra specifikke table-indekser.
+// PCS har dedikerede subsider for hver klassifikation:
+//   /stage-N-gc      → GC (Maglia Rosa / Yellow Jersey)
+//   /stage-N-points  → points (Maglia Ciclamino / Green)
+//   /stage-N-kom     → mountain (Maglia Blu / Polka — kom = "king of mountains")
+//   /stage-N-youth   → youth (Maglia Bianca / White)
 //
-// Verificeret mod Giro d'Italia 2026 stage 4 (commit 03006fd diagnostik):
-//   Table 0 (177): stage result (Narvaez vandt stage 4 → han er #1 her,
-//                   inkl. 3 DNFs listed sidst → 177 vs 174)
-//   Table 1 (174): GC (Maglia Rosa — Ciccone leading)
-//   Table 5 (15):  points classification (Maglia Ciclamino)
-//   Table 6 (21):  mountain classification (Maglia Blu)
-//   Table 8 (48):  youth classification (Maglia Bianca)
-//
-// Hvis PCS' template ændres eller andre Grand Tours bruger anden struktur,
-// kan vi addressere ved enten at finde tables via class-selector eller
-// scanne header-tekst ved hver table. For nu er hardcoding pragmatisk.
-const CLASSIFICATION_TABLE_INDEX: Record<keyof ClassificationSet, number> = {
-  gc: 1,
-  points: 5,
-  mountain: 6,
-  youth: 8,
+// Hver subside har den respektive klassement som primær tabel. Vi finder den
+// rigtige tabel via header-tekst (Time eller Pnt) — robust mod PCS' template-
+// ændringer eller widget-tilføjelser.
+const SUBPAGE_PATH: Record<keyof ClassificationSet, string> = {
+  gc: 'gc',
+  points: 'points',
+  mountain: 'kom',
+  youth: 'youth',
 }
 
 // Værdi-kolonnen findes via header-tekst (NOT sidste celle — sidste celle er
 // typisk "Today" eller "Time won/lost" som er null/dummy for klassement-totaler).
-// Verificeret mod Giro d'Italia stage 4:
-//   GC headers:       [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, UCI, "", Time, Time won/lost]
-//   Points headers:   [Rnk, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Bonis, Today]
-//   Mountain headers: [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Pnt, Today]
-//   Youth headers:    [Rnk, Prev, ▼▲, BIB, H2H, Specialty, Age, Rider, Team, Time, Time won/lost]
+// Headers fra Giro d'Italia stage 4 (exact match påkrævet fordi GC/youth har
+// både "Time" og "Time won/lost"):
+//   GC:       [..., Time, Time won/lost]
+//   Points:   [..., Pnt, Bonis, Today]
+//   Mountain: [..., Pnt, Today]
+//   Youth:    [..., Time, Time won/lost]
 const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
   gc: 'time',
   points: 'pnt',
@@ -234,11 +228,14 @@ const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
 
 /**
  * Hent classifications (GC, points, mountain, youth) for en stage via PCS'
- * stage-N-gc subside (én HTTP-request — alle classifications ligger på samme
- * HTML, blot i forskellige <table>'er).
+ * dedikerede subsider — én HTTP-request pr. klassifikation.
  *
- * Hvis subsiden ikke findes endnu (PCS publicerer dem først efter stage er
- * færdig) eller fejler, returneres tomme maps for alle klassifikationer.
+ * Hver subside scannes for den første tabel der har den korrekte værdi-kolonne
+ * (Time eller Pnt) i thead OG ≥5 rytter-rækker. Det filtrerer favourites og
+ * widgets fra automatisk uden hardcoded table-indekser.
+ *
+ * Hvis en subside ikke findes endnu (PCS publicerer typisk 15-30 min efter
+ * målgang) returneres tomt map for den klassifikation.
  */
 async function scrapeClassifications(slug: string, stageNum: number): Promise<ClassificationSet> {
   const base = stageNum === 0
@@ -247,32 +244,40 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
 
   const out: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
 
-  const html = await pcsGet(`${base}-gc`)
-  if (!html) return out
+  for (const key of ['gc', 'points', 'mountain', 'youth'] as const) {
+    const url = `${base}-${SUBPAGE_PATH[key]}`
+    const html = await pcsGet(url)
+    if (!html) continue
 
-  const $ = cheerio.load(html)
-  const tables = $('table').toArray()
-
-  for (const [key, idx] of Object.entries(CLASSIFICATION_TABLE_INDEX) as Array<[keyof ClassificationSet, number]>) {
-    const table = tables[idx]
-    if (!table) continue
-
-    // Find værdi-kolonnen via header-tekst (exact match, case-insensitive).
-    // Vigtigt: bruger exact-match fordi GC/youth headers har både "Time" og
-    // "Time won/lost" — vi vil ramme "Time".
+    const $ = cheerio.load(html)
     const target = VALUE_HEADER[key]
-    const headerCells = $(table).find('thead th').toArray()
-    let valueColIdx = headerCells.findIndex((th) => $(th).text().trim().toLowerCase() === target)
-    if (valueColIdx < 0) {
-      // Fallback til sidste celle hvis header ikke fundet
-      valueColIdx = -1
+
+    // Find primær tabel: første <table> med target-header OG ≥5 rytter-rækker
+    const tables = $('table').toArray()
+    let mainTable: typeof tables[number] | null = null
+    let valueColIdx = -1
+    for (const tbl of tables) {
+      const $tbl = $(tbl)
+      const headerCells = $tbl.find('thead th').toArray()
+      const colIdx = headerCells.findIndex((th) => $(th).text().trim().toLowerCase() === target)
+      if (colIdx < 0) continue
+      const riderRowCount = $tbl.find('tbody tr a[href^="rider/"]').length
+      if (riderRowCount < 5) continue
+      mainTable = tbl
+      valueColIdx = colIdx
+      break
+    }
+    if (!mainTable) {
+      console.warn(`[scrapeClassifications] ${key}: ingen primær tabel fundet på ${url}`)
+      await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS / 2))
+      continue
     }
 
     const seen = new Set<string>()
-    $(table).find('tr').each((_, tr) => {
+    $(mainTable).find('tbody tr').each((_, tr) => {
       const $tr = $(tr)
       const cells = $tr.find('td').toArray()
-      if (cells.length === 0) return  // header-row
+      if (cells.length === 0) return
 
       const riderLink = $tr.find('a').filter((_i, a) => {
         const href = $(a).attr('href') ?? ''
@@ -296,6 +301,9 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
         out[key][ridSlug] = { position: posNum, rawValue: rawValue || null }
       }
     })
+
+    // Polite delay mellem subside-requests så vi ikke hammer'er PCS
+    await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS / 2))
   }
 
   console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
