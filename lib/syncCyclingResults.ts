@@ -207,8 +207,9 @@ type ClassificationSet = {
 // riders fra specifikke table-indekser.
 //
 // Verificeret mod Giro d'Italia 2026 stage 4 (commit 03006fd diagnostik):
-//   Table 0 (177): GC (Maglia Rosa)
-//   Table 1 (174): stage result
+//   Table 0 (177): stage result (Narvaez vandt stage 4 → han er #1 her,
+//                   inkl. 3 DNFs listed sidst → 177 vs 174)
+//   Table 1 (174): GC (Maglia Rosa — Ciccone leading)
 //   Table 5 (15):  points classification (Maglia Ciclamino)
 //   Table 6 (21):  mountain classification (Maglia Blu)
 //   Table 8 (48):  youth classification (Maglia Bianca)
@@ -217,7 +218,7 @@ type ClassificationSet = {
 // kan vi addressere ved enten at finde tables via class-selector eller
 // scanne header-tekst ved hver table. For nu er hardcoding pragmatisk.
 const CLASSIFICATION_TABLE_INDEX: Record<keyof ClassificationSet, number> = {
-  gc: 0,
+  gc: 1,
   points: 5,
   mountain: 6,
   youth: 8,
