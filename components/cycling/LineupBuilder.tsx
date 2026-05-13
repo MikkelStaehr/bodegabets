@@ -271,10 +271,21 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   }, [gameId, hasAnySquad]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setSlot = useCallback((raceId: string, roleKey: CyclingRoleKey, riderId: string | null) => {
-    setLineups((prev) => ({
-      ...prev,
-      [raceId]: { ...(prev[raceId] ?? { ...EMPTY_SLOTS }), [roleKey]: riderId },
-    }))
+    setLineups((prev) => {
+      const currentSlots = prev[raceId] ?? { ...EMPTY_SLOTS }
+      const newSlots = { ...currentSlots }
+      // Hvis vi sætter en rytter der allerede er i en anden rolle, flyt
+      // dem dertil — undgå at samme rytter står i to slots samtidig.
+      if (riderId) {
+        for (const k of Object.keys(newSlots) as CyclingRoleKey[]) {
+          if (k !== roleKey && newSlots[k] === riderId) {
+            newSlots[k] = null
+          }
+        }
+      }
+      newSlots[roleKey] = riderId
+      return { ...prev, [raceId]: newSlots }
+    })
     setError(null)
     setSuccess(null)
   }, [])
@@ -1102,14 +1113,24 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 ) : (
                   filteredRiders.map((rider, idx) => {
                     const alreadyUsed = usedIds.has(rider.id) && lineups[stageId]?.[roleKey] !== rider.id
+                    // Hvis rytteren allerede er i en anden rolle, find labelen
+                    // så vi kan vise 'Flyt fra X' på badge'en
+                    const otherRoleKey = alreadyUsed
+                      ? (Object.entries(lineups[stageId] ?? {}).find(
+                          ([k, v]) => v === rider.id && k !== roleKey,
+                        )?.[0] as CyclingRoleKey | undefined)
+                      : undefined
+                    const otherRoleLabel = otherRoleKey
+                      ? ROLES.find((r) => r.key === otherRoleKey)?.label ?? otherRoleKey
+                      : null
                     const isOnStartlist = hasStartlist ? startlistIds!.has(rider.id) : null
                     const abandonType = abandonedMap[rider.id] ?? null
                     const isOut = !!abandonType
-                    const isDisabled = alreadyUsed || isOut
+                    const isDisabled = isOut
                     const tooltip = isOut
                       ? `Ude af løbet (${abandonType})`
                       : alreadyUsed
-                        ? 'Allerede valgt i en anden rolle'
+                        ? `Flyt fra ${otherRoleLabel} til ${role.label}`
                         : hasStartlist && !isOnStartlist
                           ? 'Starter ikke i dette løb'
                           : undefined
@@ -1124,7 +1145,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                           background: 'transparent', border: 'none',
                           borderBottom: idx < filteredRiders.length - 1 ? '1px solid #1E3A5F' : 'none',
                           cursor: isDisabled ? 'not-allowed' : 'pointer',
-                          opacity: isOut ? 0.3 : alreadyUsed ? 0.35 : (hasStartlist && !isOnStartlist ? 0.5 : 1),
+                          opacity: isOut ? 0.3 : (hasStartlist && !isOnStartlist ? 0.5 : 1),
                           textAlign: 'left', transition: 'background 0.1s',
                         }}
                         onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = '#1E3A5F' }}
@@ -1144,6 +1165,17 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                             {rider.team_name}
                           </div>
                         </div>
+                        {alreadyUsed && !isOut && (
+                          <span
+                            title={`Flyt fra ${otherRoleLabel}`}
+                            style={{
+                              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,
+                              padding: '2px 6px', borderRadius: 4,
+                              background: 'rgba(184,150,62,0.18)', color: '#D4B16F',
+                              letterSpacing: '0.04em',
+                            }}
+                          >FLYT FRA {otherRoleLabel?.toUpperCase()}</span>
+                        )}
                         {isOut ? (
                           <span style={{
                             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, fontWeight: 700,
