@@ -251,9 +251,28 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
   const $ = cheerio.load(html)
   const tables = $('table').toArray()
 
+  // Per-classification diagnostik: gem header-rækkens labels + top-3 rækkers
+  // alle celler så vi kan se hvilken kolonne der indeholder værdien.
+  const dbg: Record<keyof ClassificationSet, { headers: string[]; rows: Array<{ slug: string; cells: string[] }> }> = {
+    gc: { headers: [], rows: [] },
+    points: { headers: [], rows: [] },
+    mountain: { headers: [], rows: [] },
+    youth: { headers: [], rows: [] },
+  }
+
   for (const [key, idx] of Object.entries(CLASSIFICATION_TABLE_INDEX) as Array<[keyof ClassificationSet, number]>) {
     const table = tables[idx]
     if (!table) continue
+
+    // Header
+    const headerCells = $(table).find('thead th').toArray()
+    if (headerCells.length > 0) {
+      dbg[key].headers = headerCells.map((th) => $(th).text().trim().replace(/\s+/g, ' '))
+    } else {
+      // Fallback: first tr's th's or td's
+      const firstRow = $(table).find('tr').first()
+      dbg[key].headers = firstRow.find('th, td').toArray().map((c) => $(c).text().trim().replace(/\s+/g, ' '))
+    }
 
     const seen = new Set<string>()
     $(table).find('tr').each((_, tr) => {
@@ -280,21 +299,25 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
         const lastCell = cells[cells.length - 1]
         const rawValue = lastCell ? $(lastCell).text().trim() : null
         out[key][ridSlug] = { position: posNum, rawValue: rawValue || null }
+
+        // Gem alle cells for top-3 til diagnostik
+        if (posNum <= 3) {
+          dbg[key].rows.push({
+            slug: ridSlug,
+            cells: cells.map((c) => $(c).text().trim().replace(/\s+/g, ' ')),
+          })
+        }
       }
     })
   }
 
   console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
-  // Sample raw-values så vi kan se hvad PCS gemmer per tabel
   for (const k of ['gc', 'points', 'mountain', 'youth'] as const) {
-    const entries = Object.entries(out[k])
-    if (entries.length === 0) continue
-    const sample = entries
-      .sort((a, b) => a[1].position - b[1].position)
-      .slice(0, 3)
-      .map(([slug, e]) => `${e.position}:${slug}="${e.rawValue ?? ''}"`)
-      .join(' | ')
-    console.log(`[scrapeClassifications] ${k} top3 raw: ${sample}`)
+    if (dbg[k].headers.length === 0) continue
+    console.log(`[scrapeClassifications] ${k} headers: [${dbg[k].headers.map((h, i) => `${i}:"${h}"`).join(' | ')}]`)
+    for (const row of dbg[k].rows) {
+      console.log(`[scrapeClassifications] ${k} ${row.slug}: [${row.cells.map((c, i) => `${i}:"${c}"`).join(' | ')}]`)
+    }
   }
   return out
 }
