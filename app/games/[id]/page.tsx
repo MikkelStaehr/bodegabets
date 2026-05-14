@@ -654,16 +654,25 @@ export default async function GamePage({ params }: Props) {
             const e = buildEntry(riderId, info.youth_position, { youthGap: true })
             if (e) youthTop.push(e)
           }
-          if (info.jersey === 'leader') leader = buildEntry(riderId, info.gc_position ?? 1, { gcGap: true })
-          if (info.jersey === 'points') pointsLeader = buildEntry(riderId, info.points_position ?? 1, { pointsValue: info.points_value })
-          if (info.jersey === 'mountain') mountainLeader = buildEntry(riderId, info.mountain_position ?? 1, { mountainValue: info.mountain_value })
-          if (info.jersey === 'youth') youthLeader = buildEntry(riderId, info.youth_position ?? 1, { youthGap: true })
         }
 
         gcTop.sort((a, b) => a.position - b.position)
         pointsTop.sort((a, b) => a.position - b.position)
         mountainTop.sort((a, b) => a.position - b.position)
         youthTop.sort((a, b) => a.position - b.position)
+
+        // Find faktiske trøje-bærere (PCS-regler): GC-leder bærer altid Maglia
+        // Rosa. De andre trøjer bæres af næste berettigede klassement-leder der
+        // ikke allerede bærer en højere trøje. Sker fx når Eulálio er #1 i
+        // både GC og points — han bærer rosa, og ciclamino går til points #2.
+        const usedIds = new Set<string>()
+        leader = gcTop.find((r) => r.position === 1) ?? null
+        if (leader) usedIds.add(leader.rider_id)
+        pointsLeader = pointsTop.find((r) => !usedIds.has(r.rider_id)) ?? null
+        if (pointsLeader) usedIds.add(pointsLeader.rider_id)
+        mountainLeader = mountainTop.find((r) => !usedIds.has(r.rider_id)) ?? null
+        if (mountainLeader) usedIds.add(mountainLeader.rider_id)
+        youthLeader = youthTop.find((r) => !usedIds.has(r.rider_id)) ?? null
 
         if (leader || pointsLeader || mountainLeader || youthLeader || gcTop.length > 0) {
           lineupClassements[raceId] = {
