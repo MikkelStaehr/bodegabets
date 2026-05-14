@@ -438,13 +438,36 @@ export async function syncCyclingResults(): Promise<{
       continue
     }
 
-    // Hent classifications (GC, points, mountain, youth) fra dedikerede
-    // PCS-subsider. 4 ekstra HTTP-requests pr. stage med tighter delay.
+    // Hent classifications (GC, points, mountain, youth) fra PCS' stage-N-gc
+    // subside. PCS publicerer stage-resultatet ~15-30 min efter målgang, men
+    // de fulde klassement-tabeller kan komme TIMER senere. Hvis vi rammer for
+    // tidligt får vi tomme/delvise klassementer.
     let classifications: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
     try {
       classifications = await scrapeClassifications(race.pcs_slug, stage.stage_number)
     } catch (err) {
       console.warn(`[syncCyclingResults] Classification scrape failed for ${race.name} stage ${stage.stage_number}: ${err}`)
+    }
+
+    // Klassementerne ser komplette ud hvis GC har et fornuftigt antal ryttere.
+    // Et Grand Tour-felt er 150-180 ryttere; <50 betyder PCS ikke har publiceret
+    // de fulde tabeller endnu (eller template har skiftet). I så fald upserter vi
+    // stadig stage-resultatet (det ER klar), men markerer IKKE stagen som færdig
+    // — så den eksisterende hourly cron retry'er indtil klassementerne er klar.
+    // Escape-hatch: hvis stagen er >24t gammel accepterer vi delvise data, så
+    // en evig PCS-fejl ikke blokerer point-beregning permanent.
+    const gcCount = Object.keys(classifications.gc).length
+    const classificationsComplete = gcCount >= 50
+    const stageAgeMs = Date.now() - new Date(stage.start_date).getTime()
+    const stageOlderThan24h = stageAgeMs > 24 * 60 * 60 * 1000
+    const shouldMarkUploaded = classificationsComplete || stageOlderThan24h
+    if (!classificationsComplete) {
+      console.warn(
+        `[syncCyclingResults]   klassementer ufuldstændige (gc=${gcCount}) — ` +
+        (stageOlderThan24h
+          ? 'stage >24t gammel, markerer alligevel som færdig'
+          : 'markerer IKKE som færdig, retry næste cron')
+      )
     }
     // Map til DB-rows
     let stageUpserted = 0
@@ -526,15 +549,22 @@ export async function syncCyclingResults(): Promise<{
       }
 
       if (stageUpserted > 0) {
-        // Mark stage as uploaded
-        await supabaseAdmin
-          .from('cycling_stages')
-          .update({ results_uploaded_at: new Date().toISOString() })
-          .eq('id', stage.id)
-
-        syncedStageIds.push(stage.id)
         totalUpserted += stageUpserted
-        console.log(`[syncCyclingResults]   upserted ${stageUpserted}, unmatched in this stage tracked separately`)
+        if (shouldMarkUploaded) {
+          // Mark stage as uploaded — klassementer er komplette (eller stagen
+          // er gammel nok til at vi accepterer delvise data)
+          await supabaseAdmin
+            .from('cycling_stages')
+            .update({ results_uploaded_at: new Date().toISOString() })
+            .eq('id', stage.id)
+
+          syncedStageIds.push(stage.id)
+          console.log(`[syncCyclingResults]   upserted ${stageUpserted}, stage markeret færdig`)
+        } else {
+          // Stage-resultat er upsertet men klassementerne mangler — lad stagen
+          // forblive pending så næste cron retry'er klassement-scrapen.
+          console.log(`[syncCyclingResults]   upserted ${stageUpserted}, stage forbliver pending (afventer klassementer)`)
+        }
       }
     }
 
