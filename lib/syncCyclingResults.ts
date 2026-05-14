@@ -243,6 +243,17 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
   const $ = cheerio.load(html)
   const tables = $('table').toArray()
 
+  // Diagnostik: log alle tabeller så vi ser om PCS-template har skiftet
+  console.log(`[scrapeClassifications] ${slug} stage-${stageNum}: ${tables.length} tables fundet`)
+  tables.forEach((tbl, i) => {
+    const $tbl = $(tbl)
+    const headerCells = $tbl.find('thead th').toArray()
+    const headerTexts = headerCells.map((th) => $(th).text().trim().replace(/\s+/g, ' '))
+    const rowCount = $tbl.find('tbody tr a[href^="rider/"]').length
+    const firstRider = $tbl.find('tbody tr a[href^="rider/"]').first().text().trim()
+    console.log(`  [${i}] rows=${rowCount} firstRider="${firstRider}" headers=[${headerTexts.join(' | ')}]`)
+  })
+
   for (const key of ['gc', 'points', 'mountain', 'youth'] as const) {
     const table = tables[TABLE_INDEX[key]]
     if (!table) {

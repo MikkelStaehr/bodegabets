@@ -514,8 +514,12 @@ export default async function GamePage({ params }: Props) {
         stage_number: number
         dnf: boolean
       }
-      // Aggreger: latestByKey[race::rider] = seneste stages position-data + DNF-flag
-      const latestByKey = new Map<string, {
+      // Aggreger: latestByKey[race::rider] = klassement-data, per-felt seneste-
+      // ikke-null. Hvis stage 5's sync fejler for fx youth, falder vi tilbage
+      // til stage 4's youth-data så Christen ikke "forsvinder" fra Bianca-tabellen.
+      // En klassifikation-værdi opdateres kun hvis nyere stage faktisk har data
+      // (ikke null) for det felt.
+      type LatestEntry = {
         jersey: string | null
         gc_position: number | null
         points_position: number | null
@@ -525,36 +529,58 @@ export default async function GamePage({ params }: Props) {
         mountain_value: number | null
         gc_gap_seconds: number | null
         youth_gap_seconds: number | null
-        stageNum: number
+        gcStage: number
+        pointsStage: number
+        mountainStage: number
+        youthStage: number
         dnfEver: boolean
-      }>()
+      }
+      const latestByKey = new Map<string, LatestEntry>()
+      const ensure = (key: string): LatestEntry => {
+        let e = latestByKey.get(key)
+        if (!e) {
+          e = {
+            jersey: null,
+            gc_position: null, points_position: null, mountain_position: null, youth_position: null,
+            points_value: null, mountain_value: null,
+            gc_gap_seconds: null, youth_gap_seconds: null,
+            gcStage: 0, pointsStage: 0, mountainStage: 0, youthStage: 0,
+            dnfEver: false,
+          }
+          latestByKey.set(key, e)
+        }
+        return e
+      }
       for (const row of (standingsData ?? []) as StandingsRow[]) {
         const key = `${row.race_id}::${row.rider_id}`
-        // Behold seneste stage's klassement-data (ikke-NULL)
-        const hasAnyClassement =
-          row.jersey != null ||
-          row.gc_position_after != null ||
-          row.points_position_after != null ||
-          row.mountain_position_after != null ||
-          row.youth_position_after != null
-        if (!hasAnyClassement && !row.dnf) continue
-        const existing = latestByKey.get(key)
-        if (!existing || row.stage_number > existing.stageNum) {
-          latestByKey.set(key, {
-            jersey: row.jersey,
-            gc_position: row.gc_position_after,
-            points_position: row.points_position_after,
-            mountain_position: row.mountain_position_after,
-            youth_position: row.youth_position_after,
-            points_value: row.points_value,
-            mountain_value: row.mountain_value,
-            gc_gap_seconds: row.gc_gap_seconds,
-            youth_gap_seconds: row.youth_gap_seconds,
-            stageNum: row.stage_number,
-            dnfEver: (existing?.dnfEver ?? false) || row.dnf,
-          })
-        } else if (row.dnf) {
-          existing.dnfEver = true
+        const e = ensure(key)
+        if (row.dnf) e.dnfEver = true
+        // Per-klassifikation: opdater kun hvis denne række har ikke-null data
+        // og er fra et stage senere end den allerede gemte værdi.
+        if (row.gc_position_after != null && row.stage_number > e.gcStage) {
+          e.gc_position = row.gc_position_after
+          e.gc_gap_seconds = row.gc_gap_seconds
+          e.gcStage = row.stage_number
+        }
+        if (row.points_position_after != null && row.stage_number > e.pointsStage) {
+          e.points_position = row.points_position_after
+          e.points_value = row.points_value
+          e.pointsStage = row.stage_number
+        }
+        if (row.mountain_position_after != null && row.stage_number > e.mountainStage) {
+          e.mountain_position = row.mountain_position_after
+          e.mountain_value = row.mountain_value
+          e.mountainStage = row.stage_number
+        }
+        if (row.youth_position_after != null && row.stage_number > e.youthStage) {
+          e.youth_position = row.youth_position_after
+          e.youth_gap_seconds = row.youth_gap_seconds
+          e.youthStage = row.stage_number
+        }
+        // Jersey: tag den seneste ikke-null pr. rytter
+        if (row.jersey != null) {
+          const maxStage = Math.max(e.gcStage, e.pointsStage, e.mountainStage, e.youthStage)
+          if (row.stage_number >= maxStage) e.jersey = row.jersey
         }
       }
       for (const [key, info] of latestByKey) {
