@@ -460,12 +460,16 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           const stageFinished =
             stage.results_uploaded_at != null || stageRace?.status === 'finished'
           const isFinished = stageFinished
-          // Live: stage er startet og ikke færdig. NÆG at fortolke 'active' race
-          // som 'live' for hver enkelt etape — det gjorde alle 21 Giro-etaper live
-          // når kun stage 1 faktisk var i gang.
+          // Live: stage er startet, ikke færdig, og startet inden for sidste 12 timer.
+          // NÆG at fortolke 'active' race som 'live' for hver enkelt etape (det gjorde
+          // alle 21 Giro-etaper live når kun stage 1 faktisk var i gang). 12-timers
+          // vinduet beskytter også mod manglende sync — gamle stages der aldrig blev
+          // markeret som uploaded vises ikke som 'live' for evigt.
           const stageStart = getStageStartTime(stage.start_date)
           const hasStarted = stageStart != null && stageStart <= new Date()
-          const isLive = hasStarted && !stageFinished
+          const startedRecently = stageStart != null
+            && stageStart.getTime() >= new Date().getTime() - 12 * 60 * 60 * 1000
+          const isLive = hasStarted && !stageFinished && startedRecently
           const stageLocked = lockedStages.has(stage.id)
           const stageSlots = lineups[stage.id]
           const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
