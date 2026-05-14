@@ -195,29 +195,30 @@ function posOf(entry: ClassificationEntry | undefined): number | null {
   return entry?.position ?? null
 }
 
-// PCS' stage-N-gc subside returnerer 12 tabeller i fast rækkefølge:
-//   [0]  stage-resultat
-//   [1]  GC (Maglia Rosa / Yellow Jersey)
-//   [2-4] sub-klassifikationer (intermediate sprints o.lign.)
-//   [5]  Points (Maglia Ciclamino / Green)
-//   [6]  Mountain (Maglia Blu / Polka — KOM)
-//   [7]  intermediate sub-klassifikation
-//   [8]  Youth (Maglia Bianca / White)
-//   [9-11] team-klassementer
+// PCS' stage-N-gc subside har main-tabs (STAGE, GC, POINTS, KOM, YOUTH, TEAMS).
+// Hver tab har en "general" tabel (sammenlagt klassement) + valgfri "today hide"
+// sub-tabeller (per-stage breakdowns som "Sprint at X", "KOM Sprint (2)" osv.).
 //
-// Subsiderne -points, -kom, -youth returnerer SAMME HTML — kun JS-aktiv tab
-// skifter. Header-baseret detection er ikke unik (sub-klassifikationerne har
-// samme [Pnt, Today]-headers). Hardcoded indekser er pragmatisk fordi PCS'
-// template har været stabil i mange år.
+// De tabeller hvis DIREKTE parent har class "general" er ALTID de 6 hoved-
+// klassementer i fast rækkefølge — uanset hvor mange "today hide" sub-tabeller
+// PCS indsætter (de varierer pr. stage-type: TT, bjergetape, fladetape):
+//   general[0] = STAGE-resultat
+//   general[1] = GC (Maglia Rosa)
+//   general[2] = POINTS (Maglia Ciclamino)
+//   general[3] = MOUNTAIN / KOM (Maglia Azzurra)
+//   general[4] = YOUTH (Maglia Bianca)
+//   general[5] = TEAMS
 //
-// Værdi-kolonnen findes via header-tekst INDEN FOR den valgte tabel (Time/Pnt
-// kan være i forskellige kolonner pga. UCI-kolonner mv.).
-const TABLE_INDEX: Record<keyof ClassificationSet, number> = {
+// Verificeret mod Giro 2026 stage 4 (12 tables) og stage 5 (13 tables) —
+// "general"-filteret giver konsekvent de samme 6 hovedklassementer.
+const GENERAL_INDEX: Record<keyof ClassificationSet, number> = {
   gc: 1,
-  points: 5,
-  mountain: 6,
-  youth: 8,
+  points: 2,
+  mountain: 3,
+  youth: 4,
 }
+// Værdi-kolonnen findes via header-tekst INDEN FOR den valgte tabel (Time/Pnt
+// kan ligge i forskellige kolonne-indekser pga. UCI/Prev-kolonner mv.).
 const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
   gc: 'time',
   points: 'pnt',
@@ -227,8 +228,8 @@ const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
 
 /**
  * Hent alle 4 klassifikationer fra /stage-N-gc subsiden — én HTTP-request.
- * PCS returnerer 12 tabeller i fast rækkefølge (verificeret stabil) som vi
- * indekserer direkte i. Hvis subsiden ikke findes endnu returneres tomme maps.
+ * Filtrerer til "general"-tabeller (de sammenlagte klassementer) og indekserer
+ * direkte. Robust mod PCS' varierende antal "today"-sub-tabeller.
  */
 async function scrapeClassifications(slug: string, stageNum: number): Promise<ClassificationSet> {
   const base = stageNum === 0
@@ -241,38 +242,19 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
   if (!html) return out
 
   const $ = cheerio.load(html)
-  const tables = $('table').toArray()
 
-  // Diagnostik: log alle tabeller + hvad der står lige FØR dem (sektion-titel?)
-  // så vi kan finde en robust måde at identificere klassement-tabellerne på.
-  console.log(`[scrapeClassifications] ${slug} stage-${stageNum}: ${tables.length} tables fundet`)
-  tables.forEach((tbl, i) => {
-    const $tbl = $(tbl)
-    const rowCount = $tbl.find('tbody tr a[href^="rider/"]').length
-    const firstRider = $tbl.find('tbody tr a[href^="rider/"]').first().text().trim()
-
-    // Kontekst: walk op og find nærmeste forudgående heading/label-tekst
-    let context = ''
-    let $node = $tbl
-    for (let hop = 0; hop < 4 && !context; hop++) {
-      let $prev = $node.prev()
-      while ($prev.length) {
-        const txt = $prev.text().trim().replace(/\s+/g, ' ').slice(0, 60)
-        const tag = ($prev.prop('tagName') ?? '').toLowerCase()
-        if (txt && txt.length < 60) { context = `<${tag}>"${txt}"`; break }
-        $prev = $prev.prev()
-      }
-      $node = $node.parent()
-    }
-    const tblClass = $tbl.attr('class') ?? ''
-    const parentClass = $tbl.parent().attr('class') ?? ''
-    console.log(`  [${i}] rows=${rowCount} first="${firstRider}" ctx=${context} tblClass="${tblClass}" parentClass="${parentClass}"`)
-  })
+  // Filtrér til de 6 "general"-tabeller (sammenlagte klassementer).
+  // Rækkefølge: [stage-resultat, GC, points, mountain, youth, teams].
+  const generalTables = $('table').toArray().filter((tbl) => $(tbl).parent().hasClass('general'))
+  if (generalTables.length < 5) {
+    console.warn(`[scrapeClassifications] kun ${generalTables.length} general-tabeller fundet — PCS-template ændret?`)
+    return out
+  }
 
   for (const key of ['gc', 'points', 'mountain', 'youth'] as const) {
-    const table = tables[TABLE_INDEX[key]]
+    const table = generalTables[GENERAL_INDEX[key]]
     if (!table) {
-      console.warn(`[scrapeClassifications] ${key}: tabel-index ${TABLE_INDEX[key]} mangler (PCS-template ændret?)`)
+      console.warn(`[scrapeClassifications] ${key}: general-index ${GENERAL_INDEX[key]} mangler`)
       continue
     }
 
