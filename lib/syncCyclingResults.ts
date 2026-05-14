@@ -243,15 +243,30 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
   const $ = cheerio.load(html)
   const tables = $('table').toArray()
 
-  // Diagnostik: log alle tabeller så vi ser om PCS-template har skiftet
+  // Diagnostik: log alle tabeller + hvad der står lige FØR dem (sektion-titel?)
+  // så vi kan finde en robust måde at identificere klassement-tabellerne på.
   console.log(`[scrapeClassifications] ${slug} stage-${stageNum}: ${tables.length} tables fundet`)
   tables.forEach((tbl, i) => {
     const $tbl = $(tbl)
-    const headerCells = $tbl.find('thead th').toArray()
-    const headerTexts = headerCells.map((th) => $(th).text().trim().replace(/\s+/g, ' '))
     const rowCount = $tbl.find('tbody tr a[href^="rider/"]').length
     const firstRider = $tbl.find('tbody tr a[href^="rider/"]').first().text().trim()
-    console.log(`  [${i}] rows=${rowCount} firstRider="${firstRider}" headers=[${headerTexts.join(' | ')}]`)
+
+    // Kontekst: walk op og find nærmeste forudgående heading/label-tekst
+    let context = ''
+    let $node = $tbl
+    for (let hop = 0; hop < 4 && !context; hop++) {
+      let $prev = $node.prev()
+      while ($prev.length) {
+        const txt = $prev.text().trim().replace(/\s+/g, ' ').slice(0, 60)
+        const tag = ($prev.prop('tagName') ?? '').toLowerCase()
+        if (txt && txt.length < 60) { context = `<${tag}>"${txt}"`; break }
+        $prev = $prev.prev()
+      }
+      $node = $node.parent()
+    }
+    const tblClass = $tbl.attr('class') ?? ''
+    const parentClass = $tbl.parent().attr('class') ?? ''
+    console.log(`  [${i}] rows=${rowCount} first="${firstRider}" ctx=${context} tblClass="${tblClass}" parentClass="${parentClass}"`)
   })
 
   for (const key of ['gc', 'points', 'mountain', 'youth'] as const) {
