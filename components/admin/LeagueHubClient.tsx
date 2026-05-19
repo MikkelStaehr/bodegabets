@@ -8,6 +8,7 @@ export type SeasonRow = {
   id: number
   bold_phase_id: number | null
   bold_phase_ids: string | null
+  is_free_event: boolean
   match_count: number
 }
 
@@ -30,6 +31,33 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
   const [syncing, setSyncing] = useState<Set<number>>(new Set())
   const [syncingAll, setSyncingAll] = useState(false)
   const [feedback, setFeedback] = useState<Record<number, { ok: boolean; text: string }>>({})
+  const [freeEventState, setFreeEventState] = useState<Record<number, boolean>>(() => {
+    const initial: Record<number, boolean> = {}
+    for (const t of tournaments) for (const s of t.seasons) initial[s.id] = s.is_free_event
+    return initial
+  })
+
+  async function toggleFreeEvent(seasonId: number, next: boolean) {
+    setFreeEventState((m) => ({ ...m, [seasonId]: next }))
+    try {
+      const res = await fetch(`/api/admin/seasons/${seasonId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_free_event: next }),
+      })
+      if (!res.ok) {
+        // revert on failure
+        setFreeEventState((m) => ({ ...m, [seasonId]: !next }))
+        const data = await res.json().catch(() => ({}))
+        alert(data.error ?? 'Kunne ikke opdatere free-event flag')
+      } else {
+        router.refresh()
+      }
+    } catch {
+      setFreeEventState((m) => ({ ...m, [seasonId]: !next }))
+      alert('Netværksfejl')
+    }
+  }
   const [rebuildGameId, setRebuildGameId] = useState('')
   const [rebuilding, setRebuilding] = useState(false)
   const [rebuildResult, setRebuildResult] = useState<string | null>(null)
@@ -213,13 +241,26 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
                           {season.match_count.toLocaleString('da-DK')} kampe
                         </p>
                       </div>
-                      <button
-                        onClick={() => syncSeason(season.id)}
-                        disabled={isSyncing || syncingAll || !hasPhase(season)}
-                        className="px-4 py-2.5 bg-forest text-cream font-condensed text-xs uppercase tracking-wide rounded-sm active:opacity-85 disabled:opacity-40 transition-opacity shrink-0"
-                      >
-                        {isSyncing ? '...' : 'Sync'}
-                      </button>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <button
+                          onClick={() => syncSeason(season.id)}
+                          disabled={isSyncing || syncingAll || !hasPhase(season)}
+                          className="px-4 py-2.5 bg-forest text-cream font-condensed text-xs uppercase tracking-wide rounded-sm active:opacity-85 disabled:opacity-40 transition-opacity"
+                        >
+                          {isSyncing ? '...' : 'Sync'}
+                        </button>
+                        <button
+                          onClick={() => toggleFreeEvent(season.id, !freeEventState[season.id])}
+                          className={`px-4 py-2 font-condensed text-[11px] uppercase tracking-wide rounded-sm border transition-colors ${
+                            freeEventState[season.id]
+                              ? 'border-gold-dark bg-gold/10 text-gold-dark'
+                              : 'border-warm-border text-warm-gray'
+                          }`}
+                          title="Tillader brugere uden subscription at oprette spilrum bundet til denne sæson"
+                        >
+                          {freeEventState[season.id] ? 'Gratis ✓' : 'Gør gratis'}
+                        </button>
+                      </div>
                     </div>
                     {fb && (
                       <p className={`font-body text-xs ${fb.ok ? 'text-forest' : 'text-vintage-red'}`}>
@@ -238,6 +279,7 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
                   <th className="text-left px-4 py-2 font-condensed text-[10px] uppercase tracking-wider text-text-warm">Sæson ID</th>
                   <th className="text-left px-4 py-2 font-condensed text-[10px] uppercase tracking-wider text-text-warm">Bold phase_id</th>
                   <th className="text-right px-4 py-2 font-condensed text-[10px] uppercase tracking-wider text-text-warm">Kampe</th>
+                  <th className="text-center px-4 py-2 font-condensed text-[10px] uppercase tracking-wider text-text-warm">Free event</th>
                   <th className="text-right px-4 py-2 font-condensed text-[10px] uppercase tracking-wider text-text-warm">Handling</th>
                 </tr>
               </thead>
@@ -253,6 +295,19 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
                       </td>
                       <td className="px-4 py-3 text-right font-condensed font-bold text-sm text-ink">
                         {season.match_count.toLocaleString('da-DK')}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => toggleFreeEvent(season.id, !freeEventState[season.id])}
+                          className={`px-3 py-1.5 font-condensed text-xs uppercase tracking-wide rounded-sm border transition-colors cursor-pointer ${
+                            freeEventState[season.id]
+                              ? 'border-gold-dark bg-gold/10 text-gold-dark hover:bg-gold/20'
+                              : 'border-warm-border text-warm-gray hover:border-ink hover:text-ink'
+                          }`}
+                          title="Tillader brugere uden subscription at oprette spilrum bundet til denne sæson"
+                        >
+                          {freeEventState[season.id] ? 'Gratis ✓' : 'Gør gratis'}
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-3">

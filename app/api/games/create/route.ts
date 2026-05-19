@@ -35,9 +35,31 @@ export async function POST(req: NextRequest) {
   // Sikr at brugerens profil eksisterer (FK games.host_id → profiles.id)
   const { data: existingProfile } = await supabaseAdmin
     .from('profiles')
-    .select('id')
+    .select('id, subscription_status, is_admin')
     .eq('id', user.id)
     .maybeSingle()
+
+  // Subscription-gate: ikke-betalende brugere kan kun oprette spilrum bundet
+  // til free-event sæsoner (VM 2026 tryout-kampagne). Forhindrer API-bypass
+  // af UI-filtreringen.
+  const isPaying =
+    existingProfile?.subscription_status === 'active' ||
+    existingProfile?.subscription_status === 'comped' ||
+    existingProfile?.is_admin === true
+  if (!isPaying && !bodega_rounds && season_id) {
+    const seasonIdsToCheck = [season_id, ...(cup_season_ids ?? [])]
+    const { data: freeSeasons } = await supabaseAdmin
+      .from('seasons')
+      .select('id, is_free_event')
+      .in('id', seasonIdsToCheck)
+    const allFree = (freeSeasons ?? []).every((s) => (s as { is_free_event?: boolean }).is_free_event === true)
+    if (!allFree) {
+      return NextResponse.json(
+        { error: 'Et aktivt medlemskab kræves for at oprette spilrum i denne turnering' },
+        { status: 403 }
+      )
+    }
+  }
 
   if (!existingProfile) {
     const username = user.user_metadata?.username

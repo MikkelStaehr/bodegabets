@@ -37,6 +37,23 @@ export default async function SubscribePage({ searchParams }: Props) {
     redirect('/dashboard')
   }
 
+  // Hent navnet på en aktiv free-event-turnering (typisk VM 2026) så vi kan
+  // vise "Skip — spil gratis"-option til ikke-betalende brugere.
+  const { data: freeEventSeasonRaw } = await supabaseAdmin
+    .from('seasons')
+    .select('id, name, tournaments:tournament_id(name)')
+    .eq('is_free_event', true)
+    .limit(1)
+    .maybeSingle()
+  const freeEventSeason = freeEventSeasonRaw as unknown as { id: number; name: string; tournaments: { name: string } | { name: string }[] | null } | null
+  const freeEventTournament = freeEventSeason?.tournaments
+  const freeEventTournamentName = Array.isArray(freeEventTournament)
+    ? freeEventTournament[0]?.name
+    : freeEventTournament?.name
+  const freeEventName = freeEventSeason
+    ? (freeEventTournamentName ?? freeEventSeason.name)
+    : null
+
   return (
     <div className="min-h-screen bg-cream">
       <div className="max-w-5xl mx-auto px-6 lg:px-8 py-16 lg:py-24">
@@ -77,6 +94,25 @@ export default async function SubscribePage({ searchParams }: Props) {
             <p className="mt-4 font-body text-[12px] text-warm-taupe">
               Du kan opsige når som helst. Ingen binding.
             </p>
+
+            {/* Free-event "skip"-option (vises kun under aktiv kampagne) */}
+            {freeEventName && (
+              <div className="mt-8 pt-8 border-t border-warm-border/60 max-w-[460px]">
+                <p className="font-condensed text-[11px] uppercase tracking-[0.14em] text-warm-taupe mb-3">
+                  Vil du prøve først?
+                </p>
+                <p className="font-body text-[14px] text-warm-gray mb-4 leading-relaxed">
+                  Spil <span className="font-semibold text-ink">{freeEventName}</span> gratis
+                  uden medlemskab. Opret eller join et spilrum og prøv pointsystemet.
+                </p>
+                <Link
+                  href="/games/fodbold/new"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-sm border border-forest text-forest font-condensed font-bold text-xs uppercase tracking-[0.08em] hover:bg-forest hover:text-cream transition-colors"
+                >
+                  Spil {freeEventName} gratis →
+                </Link>
+              </div>
+            )}
 
             <p className="mt-6 font-body text-[13px] text-warm-gray">
               <Link href="/logout" className="underline hover:text-forest transition-colors">

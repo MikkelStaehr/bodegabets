@@ -49,22 +49,32 @@ export default async function GamePage({ params }: Props) {
   // Hent game
   const { data: game } = await supabaseAdmin
     .from('games')
-    .select('id, name, host_id, invite_code, status, created_at, sport, championship_mode, is_free_event')
+    .select('id, name, host_id, invite_code, status, created_at, sport, championship_mode')
     .eq('id', gameId)
     .single()
 
   if (!game) notFound()
 
-  // Hent brugerens subscription-status — bruges til at vise free-event-pitch
-  // banner i spilrum med is_free_event=true (ingen banner for betalende brugere)
-  const { data: viewerProfile } = await supabaseAdmin
-    .from('profiles')
-    .select('subscription_status')
-    .eq('id', user.id)
-    .maybeSingle()
+  // Hent brugerens subscription-status og om spillet er bundet til en
+  // free-event sæson — bruges til at vise tryout-pitch-banner.
+  const [{ data: viewerProfile }, { data: freeEventSeasonRow }] = await Promise.all([
+    supabaseAdmin
+      .from('profiles')
+      .select('subscription_status')
+      .eq('id', user.id)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('game_seasons')
+      .select('seasons!inner(is_free_event)')
+      .eq('game_id', gameId)
+      .eq('seasons.is_free_event', true)
+      .limit(1)
+      .maybeSingle(),
+  ])
   const viewerIsPaying =
     viewerProfile?.subscription_status === 'active' ||
     viewerProfile?.subscription_status === 'comped'
+  const gameIsFreeEvent = freeEventSeasonRow != null
 
   // Hent season_ids fra game_seasons
   const { data: gameSeasons } = await supabase
@@ -1237,7 +1247,7 @@ export default async function GamePage({ params }: Props) {
 
       {/* Free-event pitch banner — vises kun for gratis-spilrum til brugere
           uden aktivt medlemskab. Konverteringsskub efter eventet slutter. */}
-      {typedGame.is_free_event && !viewerIsPaying && <FreeEventPitchBanner />}
+      {gameIsFreeEvent && !viewerIsPaying && <FreeEventPitchBanner />}
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <div style={{ background: theme.primary, color: '#F2EDE4', padding: '24px 20px 28px' }}>

@@ -112,6 +112,7 @@ export type Season = {
   tournament_id: number
   name: string
   bold_phase_id?: string | null
+  is_free_event?: boolean
 }
 
 // Extended types med joins

@@ -24,22 +24,27 @@ function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient()
 
-  const [{ data: { user } }, activeUserCount, ticker, freeEventGame] = await Promise.all([
+  const [{ data: { user } }, activeUserCount, ticker, freeEventSeason] = await Promise.all([
     supabase.auth.getUser(),
     getActiveUserCount(),
     getLandingTickerItems(),
-    // Hent første aktive free-event spilrum (typisk VM-eventet). Hvis intet
-    // findes vises banneret ikke.
+    // Hent en aktiv free-event sæson (typisk VM 2026). Viser tryout-banneret
+    // når den findes — uafhængigt af om der allerede er oprettet spilrum.
     supabase
-      .from('games')
-      .select('id, name')
+      .from('seasons')
+      .select('id, name, tournaments:tournament_id(name)')
       .eq('is_free_event', true)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then((r) => r.data as { id: number; name: string } | null),
+      .then((r) => r.data as unknown as { id: number; name: string; tournaments: { name: string } | { name: string }[] | null } | null),
   ])
+  const freeEventTournament = freeEventSeason?.tournaments
+  const freeEventTournamentName = Array.isArray(freeEventTournament)
+    ? freeEventTournament[0]?.name
+    : freeEventTournament?.name
+  const freeEventName = freeEventSeason
+    ? (freeEventTournamentName ?? freeEventSeason.name)
+    : null
 
   const { data: profiles } = await supabase
     .from('public_profiles')
@@ -68,10 +73,8 @@ export default async function HomePage() {
         )}
       </div>
 
-      {/* ── Free-event banner (vises kun hvis aktivt free-event-spilrum) ── */}
-      {freeEventGame && (
-        <WorldCupBanner gameId={freeEventGame.id} gameName={freeEventGame.name} />
-      )}
+      {/* ── Free-event banner (vises kun hvis aktiv free-event-sæson) ── */}
+      {freeEventName && <WorldCupBanner eventName={freeEventName} />}
 
       {/* ── Pris-afsnit (€1/mnd bodega-receipt) ─────────────── */}
       <PriceSection />

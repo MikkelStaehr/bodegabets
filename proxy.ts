@@ -91,19 +91,34 @@ export async function proxy(req: NextRequest) {
       path === '/faq'
 
     if (!isPaying && !allowedWithoutSubscription) {
-      // Free-event undtagelse: tillad /games/<id> hvis spillet er markeret
-      // som free event (fx VM 2026). Bruges til engangs-events der skal
-      // fungere som akkvisitions-kanal uden Stripe-friktion.
+      // Free-event-undtagelse (VM 2026 tryout-kampagne):
+      // - /games/new (vælg sport) og /games/fodbold/new tillades så
+      //   gratis-brugere kan oprette fodbold-spilrum bundet til VM-sæson
+      // - /games/cykling/new forbliver paywalled (cykling kun for medlemmer)
+      // - /games/join tillades altid
+      // - /games/<id>/* tillades hvis spillet har mindst én sæson markeret
+      //   som is_free_event=true
+      if (
+        path === '/games/new' ||
+        path === '/games/fodbold/new' ||
+        path === '/games/create' ||
+        path.startsWith('/games/join')
+      ) {
+        return res
+      }
       const gameMatch = path.match(/^\/games\/(\d+)(?:\/|$)/)
       if (gameMatch) {
         const gameId = parseInt(gameMatch[1], 10)
         if (Number.isFinite(gameId)) {
-          const { data: game } = await supabase
-            .from('games')
-            .select('is_free_event')
-            .eq('id', gameId)
+          // Tjek om spillet har mindst én free-event sæson (via game_seasons-junction)
+          const { data: freeSeason } = await supabase
+            .from('game_seasons')
+            .select('seasons!inner(is_free_event)')
+            .eq('game_id', gameId)
+            .eq('seasons.is_free_event', true)
+            .limit(1)
             .maybeSingle()
-          if (game?.is_free_event) {
+          if (freeSeason) {
             return res
           }
         }
