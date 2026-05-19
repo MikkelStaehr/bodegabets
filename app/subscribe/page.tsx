@@ -95,25 +95,6 @@ export default async function SubscribePage({ searchParams }: Props) {
               Du kan opsige når som helst. Ingen binding.
             </p>
 
-            {/* Free-event "skip"-option (vises kun under aktiv kampagne) */}
-            {freeEventName && (
-              <div className="mt-8 pt-8 border-t border-warm-border/60 max-w-[460px]">
-                <p className="font-condensed text-[11px] uppercase tracking-[0.14em] text-warm-taupe mb-3">
-                  Vil du prøve først?
-                </p>
-                <p className="font-body text-[14px] text-warm-gray mb-4 leading-relaxed">
-                  Spil <span className="font-semibold text-ink">{freeEventName}</span> gratis
-                  uden medlemskab. Opret eller join et spilrum og prøv pointsystemet.
-                </p>
-                <Link
-                  href="/games/fodbold/new"
-                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-sm border border-forest text-forest font-condensed font-bold text-xs uppercase tracking-[0.08em] hover:bg-forest hover:text-cream transition-colors"
-                >
-                  Spil {freeEventName} gratis →
-                </Link>
-              </div>
-            )}
-
             <p className="mt-6 font-body text-[13px] text-warm-gray">
               <Link href="/logout" className="underline hover:text-forest transition-colors">
                 Log ud
@@ -181,6 +162,43 @@ export default async function SubscribePage({ searchParams }: Props) {
             </p>
           </div>
         </div>
+
+        {/* VM-tryout sektion — vises kun under aktiv free-event-kampagne */}
+        {freeEventName && (
+          <div className="mt-20 lg:mt-28">
+            <div className="flex items-center max-w-3xl mx-auto mb-10">
+              <div className="flex-1 border-t border-warm-border" />
+              <span className="px-5 font-condensed text-[11px] uppercase tracking-[0.18em] text-warm-taupe">
+                Eller
+              </span>
+              <div className="flex-1 border-t border-warm-border" />
+            </div>
+
+            <div className="max-w-3xl mx-auto bg-cream-dark border border-warm-border rounded-sm p-7 lg:p-10">
+              <span className="font-condensed font-semibold text-[11px] uppercase tracking-[0.14em] text-gold-dark">
+                Lige nu · gratis under VM
+              </span>
+              <h2 className="mt-3 font-display font-black text-forest text-[28px] lg:text-[36px] leading-[1.05]">
+                Prøv det først. Det koster ingenting.
+              </h2>
+              <p className="mt-5 font-body text-[15px] lg:text-[16px] text-warm-gray leading-relaxed max-w-[560px]">
+                VM 2026 er gratis at spille hele turneringen igennem. Lav et
+                spilrum, inviter vennegruppen og forudsig alle 104 kampe. Når
+                VM er slut kan du blive medlem hvis du vil have cykling, Premier
+                League og resten med.
+              </p>
+              <p className="mt-4 font-body text-[14px] text-warm-taupe">
+                Ingen betaling. Ingen kreditkort. Bare opret et spilrum og spil.
+              </p>
+              <Link
+                href="/games/fodbold/new"
+                className="mt-6 inline-flex items-center justify-center px-5 py-3 rounded-sm border border-forest text-forest font-condensed font-bold text-xs uppercase tracking-[0.08em] hover:bg-forest hover:text-cream transition-colors"
+              >
+                Opret VM-spilrum →
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
