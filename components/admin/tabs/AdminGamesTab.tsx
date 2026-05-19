@@ -11,6 +11,7 @@ type GameSummary = {
   status: string
   created_at: string
   member_count: number
+  is_free_event: boolean
 }
 
 type Props = {
@@ -43,6 +44,24 @@ export function AdminGamesTab({ sport }: Props) {
       // silent
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleToggleFreeEvent(gameId: number, next: boolean) {
+    try {
+      const res = await fetch(`/api/admin/games/${gameId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeader },
+        body: JSON.stringify({ is_free_event: next }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setGames((prev) => prev.map((g) => g.id === gameId ? { ...g, is_free_event: next } : g))
+      } else {
+        alert(data.error ?? 'Fejl ved opdatering')
+      }
+    } catch {
+      alert('Netværksfejl')
     }
   }
 
@@ -151,12 +170,25 @@ export function AdminGamesTab({ sport }: Props) {
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setDeleteConfirm(game.id)}
-                    className="w-full font-condensed text-[12px] uppercase tracking-wide py-2.5 border border-vintage-red/40 text-vintage-red rounded-sm active:bg-vintage-red/5"
-                  >
-                    Slet spilrum
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleToggleFreeEvent(game.id, !game.is_free_event)}
+                      className={`font-condensed text-[12px] uppercase tracking-wide py-2.5 border rounded-sm active:opacity-80 ${
+                        game.is_free_event
+                          ? 'border-forest text-forest bg-forest/5'
+                          : 'border-warm-border text-warm-gray'
+                      }`}
+                      title="Gratis event lader brugere uden subscription spille i dette spilrum"
+                    >
+                      {game.is_free_event ? 'Gratis event ✓' : 'Gør gratis'}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(game.id)}
+                      className="font-condensed text-[12px] uppercase tracking-wide py-2.5 border border-vintage-red/40 text-vintage-red rounded-sm active:bg-vintage-red/5"
+                    >
+                      Slet
+                    </button>
+                  </div>
                 )}
               </li>
             )
@@ -167,7 +199,7 @@ export function AdminGamesTab({ sport }: Props) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-cream-dark border-b border-warm-border">
-                {['Navn', 'Kode', 'Deltagere', 'Oprettet', 'Status', ''].map((h) => (
+                {['Navn', 'Kode', 'Deltagere', 'Oprettet', 'Status', 'Free event', ''].map((h) => (
                   <th key={h} className="px-4 py-2.5 font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray whitespace-nowrap">
                     {h}
                   </th>
@@ -200,6 +232,19 @@ export function AdminGamesTab({ sport }: Props) {
                       }`}>
                         {game.status === 'active' ? 'Aktiv' : 'Afsluttet'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleToggleFreeEvent(game.id, !game.is_free_event)}
+                        className={`font-condensed text-xs uppercase tracking-wide px-3 py-1.5 rounded-sm border transition-colors cursor-pointer ${
+                          game.is_free_event
+                            ? 'border-forest text-forest bg-forest/10 hover:bg-forest/20'
+                            : 'border-warm-border text-warm-gray hover:border-ink'
+                        }`}
+                        title="Tillader brugere uden subscription at spille i dette spilrum"
+                      >
+                        {game.is_free_event ? 'Gratis ✓' : 'Gør gratis'}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {isConfirming ? (

@@ -5,6 +5,7 @@ import HeroRotator from '@/app/(marketing)/landing-v2/HeroRotator'
 import PriceSection from '@/components/landing/PriceSection'
 import ChampionshipSection from '@/components/landing/ChampionshipSection'
 import ProductsSection from '@/components/landing/ProductsSection'
+import WorldCupBanner from '@/components/landing/WorldCupBanner'
 import { getActiveUserCount, getLandingTickerItems } from '@/lib/landingData'
 import type { Profile } from '@/types'
 
@@ -23,10 +24,21 @@ function assignRanks(profiles: Profile[]): (Profile & { rank: number })[] {
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient()
 
-  const [{ data: { user } }, activeUserCount, ticker] = await Promise.all([
+  const [{ data: { user } }, activeUserCount, ticker, freeEventGame] = await Promise.all([
     supabase.auth.getUser(),
     getActiveUserCount(),
     getLandingTickerItems(),
+    // Hent første aktive free-event spilrum (typisk VM-eventet). Hvis intet
+    // findes vises banneret ikke.
+    supabase
+      .from('games')
+      .select('id, name')
+      .eq('is_free_event', true)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then((r) => r.data as { id: number; name: string } | null),
   ])
 
   const { data: profiles } = await supabase
@@ -55,6 +67,11 @@ export default async function HomePage() {
           <LandingTicker items={ticker.items} currentDate={ticker.currentDate} />
         )}
       </div>
+
+      {/* ── Free-event banner (vises kun hvis aktivt free-event-spilrum) ── */}
+      {freeEventGame && (
+        <WorldCupBanner gameId={freeEventGame.id} gameName={freeEventGame.name} />
+      )}
 
       {/* ── Pris-afsnit (€1/mnd bodega-receipt) ─────────────── */}
       <PriceSection />

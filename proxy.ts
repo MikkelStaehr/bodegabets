@@ -91,6 +91,23 @@ export async function proxy(req: NextRequest) {
       path === '/faq'
 
     if (!isPaying && !allowedWithoutSubscription) {
+      // Free-event undtagelse: tillad /games/<id> hvis spillet er markeret
+      // som free event (fx VM 2026). Bruges til engangs-events der skal
+      // fungere som akkvisitions-kanal uden Stripe-friktion.
+      const gameMatch = path.match(/^\/games\/(\d+)(?:\/|$)/)
+      if (gameMatch) {
+        const gameId = parseInt(gameMatch[1], 10)
+        if (Number.isFinite(gameId)) {
+          const { data: game } = await supabase
+            .from('games')
+            .select('is_free_event')
+            .eq('id', gameId)
+            .maybeSingle()
+          if (game?.is_free_event) {
+            return res
+          }
+        }
+      }
       return NextResponse.redirect(new URL('/subscribe', req.url))
     }
   }

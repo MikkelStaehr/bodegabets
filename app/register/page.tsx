@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
 
@@ -31,6 +31,10 @@ function useDebounce(value: string, delay: number) {
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Whitelisted relative-path redirect (open-redirect protection)
+  const rawRedirect = searchParams.get('redirect') ?? ''
+  const safeRedirect = /^\/[a-zA-Z0-9/_?&=-]+$/.test(rawRedirect) ? rawRedirect : null
 
   /* ── Form state ──────────────────────────────────────────── */
   const [firstName, setFirstName] = useState('')
@@ -138,12 +142,14 @@ export default function RegisterPage() {
 
     const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ')
 
-    // Opret auth-bruger — brugernavn sendes som metadata og oprettes via trigger
+    // Opret auth-bruger — brugernavn sendes som metadata og oprettes via trigger.
+    // emailRedirectTo respekterer ?redirect= så fx VM-flow sender brugeren
+    // direkte ind i spilrummet efter email-bekræftelse.
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}${safeRedirect ?? '/dashboard'}`,
         data: {
           username: trimmedUsername,
           ...(fullName ? { full_name: fullName } : {}),
@@ -180,6 +186,9 @@ export default function RegisterPage() {
       if (inviteStatus === 'valid' && inviteGame) {
         params.set('invite', String(inviteGame.id))
       }
+      if (safeRedirect) {
+        params.set('redirect', safeRedirect)
+      }
       router.push(`/verify-email?${params.toString()}`)
       return
     }
@@ -189,6 +198,10 @@ export default function RegisterPage() {
     if (inviteStatus === 'valid' && inviteGame && signUpData.user) {
       await supabase.from('game_members').insert({ game_id: inviteGame.id, user_id: signUpData.user.id })
       router.push(`/games/${inviteGame.id}`)
+    } else if (safeRedirect) {
+      // Free-event flow: ?redirect=/games/<id> sender den nyoprettede bruger
+      // direkte ind i VM-spilrummet (eller hvilket andet free-event flag der peges på)
+      router.push(safeRedirect)
     } else {
       router.push('/dashboard')
     }

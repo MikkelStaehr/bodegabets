@@ -18,6 +18,7 @@ import CyclingGameroom from '@/components/cycling/CyclingGameroom'
 import RolesGuide from '@/components/cycling/RolesGuide'
 import Leaderboard from '@/components/games/Leaderboard'
 import FootballLiveSection from '@/components/games/FootballLiveSection'
+import FreeEventPitchBanner from '@/components/games/FreeEventPitchBanner'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
 import { getGameState } from '@/lib/gameState'
 import { getSportTheme, assignRanks, computeRoundStatus, getLeagueAbbr, getCurrentChampionshipSeason } from '@/lib/gamePageHelpers'
@@ -48,11 +49,22 @@ export default async function GamePage({ params }: Props) {
   // Hent game
   const { data: game } = await supabaseAdmin
     .from('games')
-    .select('id, name, host_id, invite_code, status, created_at, sport, championship_mode')
+    .select('id, name, host_id, invite_code, status, created_at, sport, championship_mode, is_free_event')
     .eq('id', gameId)
     .single()
 
   if (!game) notFound()
+
+  // Hent brugerens subscription-status — bruges til at vise free-event-pitch
+  // banner i spilrum med is_free_event=true (ingen banner for betalende brugere)
+  const { data: viewerProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('subscription_status')
+    .eq('id', user.id)
+    .maybeSingle()
+  const viewerIsPaying =
+    viewerProfile?.subscription_status === 'active' ||
+    viewerProfile?.subscription_status === 'comped'
 
   // Hent season_ids fra game_seasons
   const { data: gameSeasons } = await supabase
@@ -1222,6 +1234,10 @@ export default async function GamePage({ params }: Props) {
     <div className="min-h-screen" style={{ background: '#F2EDE4', fontFamily: "'Barlow', sans-serif" }}>
       <NavbarSportTheme sport={typedGame.sport} />
       <GameTicker items={tickerItems} />
+
+      {/* Free-event pitch banner — vises kun for gratis-spilrum til brugere
+          uden aktivt medlemskab. Konverteringsskub efter eventet slutter. */}
+      {typedGame.is_free_event && !viewerIsPaying && <FreeEventPitchBanner />}
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <div style={{ background: theme.primary, color: '#F2EDE4', padding: '24px 20px 28px' }}>

@@ -15,6 +15,7 @@ export type Game = {
   status: 'active' | 'finished'
   created_at: string
   championship_mode?: boolean
+  is_free_event?: boolean
 }
 
 export type League = {

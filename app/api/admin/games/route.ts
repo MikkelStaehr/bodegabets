@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from('games')
-    .select('id, name, invite_code, status, created_at, sport, game_members(count)')
+    .select('id, name, invite_code, status, created_at, sport, is_free_event, game_members(count)')
     .order('created_at', { ascending: false })
 
   if (sport) {
@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       invite_code: g.invite_code,
       status: g.status,
       created_at: g.created_at,
+      is_free_event: (g as { is_free_event?: boolean }).is_free_event ?? false,
       member_count: memberCount,
     }
   })
