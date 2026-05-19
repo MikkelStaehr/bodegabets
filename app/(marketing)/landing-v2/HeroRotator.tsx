@@ -7,7 +7,7 @@ import DemoModal from '@/components/landing/DemoModal'
 import CyclingDemoModal from '@/components/landing/CyclingDemoModal'
 
 type Slide = {
-  id: 'fodbold' | 'cykling'
+  id: 'vm' | 'fodbold' | 'cykling'
   pillLabel: string
   image: string
   /** CSS filter brightness multiplier — bruges hvis råbillede er for lyst i forhold til
@@ -24,6 +24,20 @@ type Slide = {
 }
 
 const SLIDES: readonly Slide[] = [
+  {
+    id: 'vm',
+    pillLabel: 'VM 2026',
+    image: '/img/VMHeroComm.jpg',
+    brightness: 0.55,
+    headlinePrimary: 'VM mod vennerne.',
+    headlineSecondary: 'Helt gratis.',
+    subtitle:
+      'VM 2026 i USA, Canada og Mexico starter 11. juni. Opret en gratis konto, lav dit eget spilrum med vennegruppen og forudsig alle 104 kampe. Bodega Bets er det eneste sted hvor I kan følge hele turneringen som runde-fantasy med live-data.',
+    subtitleShort:
+      'VM 2026 starter 11. juni. Opret gratis spilrum og bet på alle 104 kampe.',
+    ctaText: 'Opret gratis konto →',
+    ctaHref: '/register?redirect=/subscribe',
+  },
   {
     id: 'fodbold',
     pillLabel: 'Fodbold',
@@ -212,7 +226,8 @@ export default function HeroRotator({ activeUserCount }: Props) {
             <button
               type="button"
               onClick={() => {
-                if (current.id === 'fodbold') setDemoOpen(true)
+                // VM bruger samme demo som fodbold (VM ER fodbold-format)
+                if (current.id === 'fodbold' || current.id === 'vm') setDemoOpen(true)
                 else if (current.id === 'cykling') setCyclingDemoOpen(true)
               }}
               className="inline-flex items-center justify-center px-5 sm:px-8 py-3 sm:py-4 bg-transparent border border-cream/50 text-cream font-condensed font-bold text-[12px] sm:text-[13px] uppercase tracking-widest rounded-sm hover:border-cream/80 transition-colors backdrop-blur-sm cursor-pointer"

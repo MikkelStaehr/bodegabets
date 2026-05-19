@@ -31,7 +31,7 @@ export default function SubscribeButton() {
         disabled={loading}
         className="inline-flex items-center justify-center px-10 py-4 bg-forest text-cream font-condensed font-bold text-[13px] uppercase tracking-widest rounded-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-wait"
       >
-        {loading ? 'Sender til Stripe…' : 'Tegn medlemskab → €1/måned'}
+        {loading ? 'Sender til Stripe…' : 'Bliv medlem · €1/måned'}
       </button>
       {error && (
         <p className="font-body text-sm text-vintage-red text-center max-w-sm">

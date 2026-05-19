@@ -65,15 +65,15 @@ export default async function SubscribePage({ searchParams }: Props) {
             </span>
 
             <h1 className="mt-4 font-display font-black text-forest text-[40px] lg:text-[56px] leading-[0.95]">
-              Tegn dit medlemskab.
+              Bliv medlem af klubben.
               <br />
-              <em className="not-italic text-gold-dark italic">Spil med vennerne.</em>
+              <em className="not-italic text-gold-dark italic">Spil mod vennerne.</em>
             </h1>
 
             <p className="mt-6 font-body text-[16px] text-warm-gray leading-relaxed max-w-[460px]">
-              Din krone går direkte til licenser på live etape-resultater,
-              kamp-data og statistik fra 20 europæiske ligaer. Ingen rigtige
-              penge i spil — kun ære og prestige.
+              Din krone går til licenser på live etape-resultater, kamp-data og
+              statistik fra 20 europæiske ligaer. Ingen rigtige penge i spil.
+              Kun ære og prestige.
             </p>
 
             {canceled === '1' && (
