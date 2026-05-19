@@ -299,14 +299,27 @@ export async function syncMatchScores(options?: {
 
   const { data: seasons } = await supabaseAdmin
     .from('seasons')
-    .select('id, bold_phase_id')
+    .select('id, bold_phase_id, bold_phase_ids')
     .in('id', [...new Set(activeMatches.map((m) => m.season_id))])
-    .not('bold_phase_id', 'is', null)
+    .or('bold_phase_id.not.is.null,bold_phase_ids.not.is.null') as { data: Array<{ id: number; bold_phase_id: number | null; bold_phase_ids: string | null }> | null }
 
-  const phaseIds = (seasons ?? []).map((s) => s.bold_phase_id).filter((id): id is number => id != null)
+  // Saml alle phase_ids fra både legacy single-kolonnen og den nye multi-kolonne.
+  // bold_phase_ids (text) kan indeholde flere komma-separerede IDs ("22620,22621").
+  const phaseIdSet = new Set<string>()
+  for (const s of seasons ?? []) {
+    if (s.bold_phase_ids) {
+      for (const id of s.bold_phase_ids.split(',')) {
+        const trimmed = id.trim()
+        if (trimmed) phaseIdSet.add(trimmed)
+      }
+    } else if (s.bold_phase_id != null) {
+      phaseIdSet.add(String(s.bold_phase_id))
+    }
+  }
+  const phaseIds = [...phaseIdSet]
 
   if (!phaseIds.length) {
-    errors.push('Ingen sæsoner med bold_phase_id for aktive kampe')
+    errors.push('Ingen sæsoner med bold_phase_id/bold_phase_ids for aktive kampe')
     return { updated, errors }
   }
 

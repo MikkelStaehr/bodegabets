@@ -213,10 +213,15 @@ function danishToUtc(date: Date): Date {
 /**
  * Henter fixtures fra Bold API via phase_ids og upsert direkte til
  * rounds + matches tabellerne.
+ *
+ * boldPhaseId accepterer:
+ *   - et tal (legacy: enkelt phase_id, fx Premier League): 1234
+ *   - en string (single eller multi: "1234" eller "22620,22621,22622"): bruges
+ *     uændret i Bold's ?phase_ids= parameter
  */
 export async function syncBoldFixtures(
   seasonId: number,
-  boldPhaseId: number,
+  boldPhaseId: number | string,
   options?: { dryRun?: boolean }
 ): Promise<{
   synced: number
@@ -536,7 +541,12 @@ export async function syncBoldFixtures(
 
 // ─── syncSeasonViaBold ──────────────────────────────────────────────────────
 
-/** Synkroniser en sæson via Bold API. Kræver bold_phase_id på seasons. */
+/**
+ * Synkroniser en sæson via Bold API. Kræver bold_phase_ids (multi-phase, fx VM)
+ * eller bold_phase_id (single phase, fx Premier League). bold_phase_ids har
+ * forrang når sat — så multi-phase turneringer kan opgraderes uden at miste
+ * den oprindelige int-værdi.
+ */
 export async function syncSeasonViaBold(seasonId: number): Promise<{
   synced: number
   rounds_created: number
@@ -546,14 +556,15 @@ export async function syncSeasonViaBold(seasonId: number): Promise<{
 }> {
   const { data: season } = await supabaseAdmin
     .from('seasons')
-    .select('bold_phase_id')
+    .select('bold_phase_id, bold_phase_ids')
     .eq('id', seasonId)
-    .single()
+    .single() as { data: { bold_phase_id: number | null; bold_phase_ids: string | null } | null }
 
-  if (!season?.bold_phase_id) {
-    return { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0, errors: [`Sæson ${seasonId} mangler bold_phase_id`] }
+  const phaseIds = season?.bold_phase_ids ?? season?.bold_phase_id
+  if (phaseIds == null) {
+    return { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0, errors: [`Sæson ${seasonId} mangler bold_phase_id/bold_phase_ids`] }
   }
-  return syncBoldFixtures(seasonId, season.bold_phase_id)
+  return syncBoldFixtures(seasonId, phaseIds)
 }
 
 // ─── buildLeagueRounds (compat wrapper) ─────────────────────────────────────
@@ -580,10 +591,12 @@ export const buildGameRounds = (_gameId: number, seasonId: number) => buildLeagu
 // ─── Daglig cron: synkroniser alle sæsoner ──────────────────────────────────
 
 export async function runLeagueSync(): Promise<SyncResult[]> {
+  // Hent sæsoner med ENTEN bold_phase_id (legacy single) ELLER bold_phase_ids
+  // (multi-phase). bold_phase_ids har forrang.
   const { data: seasons } = await supabaseAdmin
     .from('seasons')
-    .select('id, bold_phase_id, tournaments:tournament_id(name)')
-    .not('bold_phase_id', 'is', null)
+    .select('id, bold_phase_id, bold_phase_ids, tournaments:tournament_id(name)')
+    .or('bold_phase_id.not.is.null,bold_phase_ids.not.is.null') as { data: Array<{ id: number; bold_phase_id: number | null; bold_phase_ids: string | null; tournaments: unknown }> | null }
 
   if (!seasons?.length) {
     return []
@@ -596,19 +609,20 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
     const name = tournaments?.name ?? `Sæson ${season.id}`
 
     try {
-      if (!season.bold_phase_id) {
+      const phaseIds = season.bold_phase_ids ?? season.bold_phase_id
+      if (phaseIds == null) {
         results.push({
           season_id: season.id,
           synced: 0,
           rounds_created: 0,
           matches_created: 0,
           matches_updated: 0,
-          errors: [`Ingen datakilde konfigureret for ${name} (bold_phase_id mangler)`],
+          errors: [`Ingen datakilde konfigureret for ${name} (bold_phase_id/bold_phase_ids mangler)`],
         })
         continue
       }
 
-      const res = await syncBoldFixtures(season.id, season.bold_phase_id)
+      const res = await syncBoldFixtures(season.id, phaseIds)
 
       results.push({
         season_id: season.id,
@@ -657,16 +671,17 @@ export async function runSyncResultsOnly(): Promise<SyncResult[]> {
 
   const { data: seasons } = await supabaseAdmin
     .from('seasons')
-    .select('id, bold_phase_id, tournaments:tournament_id(name)')
+    .select('id, bold_phase_id, bold_phase_ids, tournaments:tournament_id(name)')
     .in('id', seasonIds)
-    .not('bold_phase_id', 'is', null)
+    .or('bold_phase_id.not.is.null,bold_phase_ids.not.is.null') as { data: Array<{ id: number; bold_phase_id: number | null; bold_phase_ids: string | null; tournaments: unknown }> | null }
 
   const results: SyncResult[] = []
 
   for (const season of (seasons ?? [])) {
-    if (!season.bold_phase_id) continue
+    const phaseIds = season.bold_phase_ids ?? season.bold_phase_id
+    if (phaseIds == null) continue
 
-    const res = await syncBoldFixtures(season.id, season.bold_phase_id)
+    const res = await syncBoldFixtures(season.id, phaseIds)
 
     results.push({
       season_id: season.id,

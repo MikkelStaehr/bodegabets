@@ -22,7 +22,7 @@ export default async function AdminPage() {
       .select(`
         id, name, logo_url,
         seasons (
-          id, bold_phase_id,
+          id, bold_phase_id, bold_phase_ids,
           match_count:matches(count)
         )
       `)
@@ -40,11 +40,13 @@ export default async function AdminPage() {
     const rawSeasons = (t.seasons ?? []) as unknown as Array<{
       id: number
       bold_phase_id: number | null
+      bold_phase_ids: string | null
       match_count: { count: number }[]
     }>
     const seasons: SeasonRow[] = rawSeasons.map((s) => ({
       id: s.id,
       bold_phase_id: s.bold_phase_id,
+      bold_phase_ids: s.bold_phase_ids,
       match_count: (s.match_count as unknown as { count: number }[])?.[0]?.count ?? 0,
     }))
     return {

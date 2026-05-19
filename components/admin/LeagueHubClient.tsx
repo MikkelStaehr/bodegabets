@@ -7,6 +7,7 @@ import { formatDateTime } from '@/lib/dateUtils'
 export type SeasonRow = {
   id: number
   bold_phase_id: number | null
+  bold_phase_ids: string | null
   match_count: number
 }
 
@@ -36,8 +37,10 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
   const totalMatches = tournaments.reduce(
     (s, t) => s + t.seasons.reduce((ss, se) => ss + se.match_count, 0), 0
   )
+  const hasPhase = (s: SeasonRow) => s.bold_phase_id != null || s.bold_phase_ids != null
+  const phaseLabel = (s: SeasonRow) => s.bold_phase_ids ?? (s.bold_phase_id != null ? String(s.bold_phase_id) : null)
   const totalSeasons = tournaments.reduce(
-    (s, t) => s + t.seasons.filter((se) => se.bold_phase_id != null).length, 0
+    (s, t) => s + t.seasons.filter(hasPhase).length, 0
   )
 
   async function syncSeason(seasonId: number) {
@@ -204,7 +207,7 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
                       <div className="min-w-0">
                         <p className="font-condensed text-[12px] text-warm-gray">
                           Sæson <span className="font-bold text-ink">#{season.id}</span> · phase_id{' '}
-                          {season.bold_phase_id ?? <span className="text-vintage-red/70">mangler</span>}
+                          {phaseLabel(season) ?? <span className="text-vintage-red/70">mangler</span>}
                         </p>
                         <p className="font-condensed font-bold text-base text-ink mt-0.5">
                           {season.match_count.toLocaleString('da-DK')} kampe
@@ -212,7 +215,7 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
                       </div>
                       <button
                         onClick={() => syncSeason(season.id)}
-                        disabled={isSyncing || syncingAll || season.bold_phase_id == null}
+                        disabled={isSyncing || syncingAll || !hasPhase(season)}
                         className="px-4 py-2.5 bg-forest text-cream font-condensed text-xs uppercase tracking-wide rounded-sm active:opacity-85 disabled:opacity-40 transition-opacity shrink-0"
                       >
                         {isSyncing ? '...' : 'Sync'}
@@ -246,7 +249,7 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
                     <tr key={season.id} className="border-b border-border last:border-0 bg-cream hover:bg-cream-dark/30 transition-colors">
                       <td className="px-4 py-3 font-condensed text-sm text-ink">#{season.id}</td>
                       <td className="px-4 py-3 font-condensed text-sm text-text-warm">
-                        {season.bold_phase_id ?? <span className="text-vintage-red/70">mangler</span>}
+                        {phaseLabel(season) ?? <span className="text-vintage-red/70">mangler</span>}
                       </td>
                       <td className="px-4 py-3 text-right font-condensed font-bold text-sm text-ink">
                         {season.match_count.toLocaleString('da-DK')}
@@ -260,7 +263,7 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
                           )}
                           <button
                             onClick={() => syncSeason(season.id)}
-                            disabled={isSyncing || syncingAll || season.bold_phase_id == null}
+                            disabled={isSyncing || syncingAll || !hasPhase(season)}
                             className="px-3 py-1.5 bg-forest text-cream font-condensed text-xs uppercase tracking-wide rounded-sm hover:opacity-85 disabled:opacity-40 transition-opacity"
                           >
                             {isSyncing ? '...' : 'Sync'}
