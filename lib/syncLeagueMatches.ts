@@ -72,6 +72,17 @@ export type SyncBoldFixturesPreview = Array<{
 
 const BOLD_CDN = 'https://bold.dk/img/tag/64x64'
 
+// Dansk dato-suffix til runde-navne ved date-split (multi-phase turneringer).
+// Bold leverer dato i dansk lokaltid, så vi grupperer på den viste kalenderdag.
+const DANISH_MONTHS = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+function danishDateLabel(boldDate: string): string {
+  const m = boldDate.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return ''
+  const day = parseInt(m[3], 10)
+  const month = parseInt(m[2], 10)
+  return `${day}. ${DANISH_MONTHS[month - 1] ?? ''}`.trim()
+}
+
 async function resolveTeamId(
   boldTeam: { id: number; name: string; slug: string; image_name?: string | null },
   teamCache: Map<number, number>,
@@ -222,7 +233,7 @@ function danishToUtc(date: Date): Date {
 export async function syncBoldFixtures(
   seasonId: number,
   boldPhaseId: number | string,
-  options?: { dryRun?: boolean }
+  options?: { dryRun?: boolean; splitRoundsByDate?: boolean }
 ): Promise<{
   synced: number
   rounds_created: number
@@ -233,6 +244,7 @@ export async function syncBoldFixtures(
   raw_bold_response?: BoldMatchItem[]
 }> {
   const dryRun = options?.dryRun ?? false
+  const splitRoundsByDate = options?.splitRoundsByDate ?? false
   const errors: string[] = []
   const stats = { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0 }
 
@@ -355,7 +367,13 @@ export async function syncBoldFixtures(
       status = 'scheduled'
     }
 
-    const round_name = mt.round || 'Ukendt runde'
+    // Multi-phase turneringer (VM/EM) har 24-kamps gruppe-runder fra Bold —
+    // split dem op pr. kalenderdag så betting-kuponerne ikke bliver enorme.
+    // Knockout-runder splittes også (16-kamps 1/16-finale → ~4 pr. dag).
+    const baseRound = mt.round || 'Ukendt runde'
+    const round_name = splitRoundsByDate
+      ? `${baseRound} · ${danishDateLabel(mt.date)}`
+      : baseRound
 
     // Result (1, X, 2)
     let result: string | null = null
@@ -564,7 +582,9 @@ export async function syncSeasonViaBold(seasonId: number): Promise<{
   if (phaseIds == null) {
     return { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0, errors: [`Sæson ${seasonId} mangler bold_phase_id/bold_phase_ids`] }
   }
-  return syncBoldFixtures(seasonId, phaseIds)
+  // Multi-phase sæsoner (bold_phase_ids) er turneringer som VM/EM med store
+  // gruppe-runder → split runder pr. dato for overskuelige betting-kuponer.
+  return syncBoldFixtures(seasonId, phaseIds, { splitRoundsByDate: season?.bold_phase_ids != null })
 }
 
 // ─── buildLeagueRounds (compat wrapper) ─────────────────────────────────────
@@ -622,7 +642,7 @@ export async function runLeagueSync(): Promise<SyncResult[]> {
         continue
       }
 
-      const res = await syncBoldFixtures(season.id, phaseIds)
+      const res = await syncBoldFixtures(season.id, phaseIds, { splitRoundsByDate: season.bold_phase_ids != null })
 
       results.push({
         season_id: season.id,
@@ -681,7 +701,7 @@ export async function runSyncResultsOnly(): Promise<SyncResult[]> {
     const phaseIds = season.bold_phase_ids ?? season.bold_phase_id
     if (phaseIds == null) continue
 
-    const res = await syncBoldFixtures(season.id, phaseIds)
+    const res = await syncBoldFixtures(season.id, phaseIds, { splitRoundsByDate: season.bold_phase_ids != null })
 
     results.push({
       season_id: season.id,
