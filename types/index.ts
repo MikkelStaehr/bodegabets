@@ -111,7 +111,8 @@ export type Season = {
   id: number
   tournament_id: number
   name: string
-  bold_phase_id?: string | null
+  bold_phase_id?: number | string | null
+  bold_phase_ids?: string | null
   is_free_event?: boolean
 }
 
