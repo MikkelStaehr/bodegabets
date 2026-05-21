@@ -552,6 +552,39 @@ export async function syncBoldFixtures(
     }
   }
 
+  // ─── 6. Ryd forældreløse runder (kun multi-phase) ─────────────────────────
+  // Når runde-navne ændrer sig (fx date-split slået til), flytter kampene til
+  // nye runder og efterlader de gamle tomme. Slet runder for denne sæson der
+  // ikke længere har kampe. Scoped til splitRoundsByDate så normale ligaer
+  // (hvor navne er stabile) aldrig rammes.
+  if (splitRoundsByDate) {
+    const { data: seasonRounds } = await supabaseAdmin
+      .from('rounds')
+      .select('id')
+      .eq('season_id', seasonId)
+    const roundIds = (seasonRounds ?? []).map((r) => r.id as number)
+    if (roundIds.length) {
+      const { data: roundsWithMatches } = await supabaseAdmin
+        .from('matches')
+        .select('round_id')
+        .eq('season_id', seasonId)
+        .not('round_id', 'is', null)
+      const usedRoundIds = new Set((roundsWithMatches ?? []).map((m) => m.round_id as number))
+      const orphanIds = roundIds.filter((id) => !usedRoundIds.has(id))
+      if (orphanIds.length) {
+        const { error: delErr } = await supabaseAdmin
+          .from('rounds')
+          .delete()
+          .in('id', orphanIds)
+        if (delErr) {
+          errors.push(`Kunne ikke rydde forældreløse runder: ${delErr.message}`)
+        } else {
+          console.log(`[syncBoldFixtures] Ryddede ${orphanIds.length} forældreløse runder for sæson ${seasonId}`)
+        }
+      }
+    }
+  }
+
   stats.synced = parsedMatches.length
 
   return { ...stats, errors }
