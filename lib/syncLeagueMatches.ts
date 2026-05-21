@@ -83,6 +83,42 @@ function danishDateLabel(boldDate: string): string {
   return `${day}. ${DANISH_MONTHS[month - 1] ?? ''}`.trim()
 }
 
+// Normalisér Bolds rå round-felt ("1. runde", "Final. runde", "kvartfinale"
+// osv.) til pæne danske stage-navne + en rang (til at vælge dominerende stage
+// på blandede dage). Rækkefølgen er vigtig: knockout tjekkes før "final" og
+// gruppe-mønstret er præcist så det ikke fanger "1/16-finale".
+const STAGE_DEFS: ReadonlyArray<{ test: RegExp; label: string; rank: number }> = [
+  { test: /^[1-3]\.\s*runde/i, label: 'Gruppespil', rank: 0 },
+  { test: /1\s*\/\s*16/i, label: '1/16-finale', rank: 1 },
+  { test: /ottendedels/i, label: 'Ottendedelsfinale', rank: 2 },
+  { test: /kvart/i, label: 'Kvartfinale', rank: 3 },
+  { test: /semi/i, label: 'Semifinale', rank: 4 },
+  { test: /bronze/i, label: 'Bronzekamp', rank: 5 },
+  { test: /final/i, label: 'Finale', rank: 6 },
+]
+function stageOf(boldRound: string): { label: string; rank: number } {
+  for (const s of STAGE_DEFS) if (s.test.test(boldRound)) return { label: s.label, rank: s.rank }
+  return { label: boldRound, rank: 0 }
+}
+// Vælg dominerende stage for en dags kampe: flest kampe vinder, ties brydes
+// af tidligste stage (laveste rang) — fx på overgangsdage med gruppe + knockout.
+function dominantStageLabel(boldRounds: string[]): string {
+  const tally = new Map<string, { count: number; rank: number }>()
+  for (const r of boldRounds) {
+    const s = stageOf(r)
+    const e = tally.get(s.label) ?? { count: 0, rank: s.rank }
+    e.count++
+    tally.set(s.label, e)
+  }
+  let best: { label: string; count: number; rank: number } | null = null
+  for (const [label, { count, rank }] of tally) {
+    if (!best || count > best.count || (count === best.count && rank < best.rank)) {
+      best = { label, count, rank }
+    }
+  }
+  return best?.label ?? 'VM'
+}
+
 async function resolveTeamId(
   boldTeam: { id: number; name: string; slug: string; image_name?: string | null },
   teamCache: Map<number, number>,
@@ -311,6 +347,7 @@ export async function syncBoldFixtures(
 
   type ParsedMatch = {
     round_name: string
+    bold_round: string
     home_team_id: number
     away_team_id: number
     kickoff: string
@@ -367,12 +404,13 @@ export async function syncBoldFixtures(
       status = 'scheduled'
     }
 
-    // Multi-phase turneringer (VM/EM) har 24-kamps gruppe-runder fra Bold —
-    // split dem op pr. kalenderdag så betting-kuponerne ikke bliver enorme.
-    // Knockout-runder splittes også (16-kamps 1/16-finale → ~4 pr. dag).
+    // Multi-phase turneringer (VM/EM): gruppér KUN på kalenderdag, så vi aldrig
+    // får to runder samme dag (Bolds runde-felt overlapper — fx gruppe-spilledag
+    // og første knockout-kamp samme dato). Det pæne stage-navn udledes post-loop
+    // fra dagens kampe. For normale ligaer bruges Bolds round-felt direkte.
     const baseRound = mt.round || 'Ukendt runde'
     const round_name = splitRoundsByDate
-      ? `${baseRound} · ${danishDateLabel(mt.date)}`
+      ? danishDateLabel(mt.date)
       : baseRound
 
     // Result (1, X, 2)
@@ -383,6 +421,7 @@ export async function syncBoldFixtures(
 
     const parsed: ParsedMatch = {
       round_name,
+      bold_round: baseRound,
       home_team_id: homeTeamId,
       away_team_id: awayTeamId,
       kickoff,
@@ -402,6 +441,20 @@ export async function syncBoldFixtures(
 
   if (!parsedMatches.length) {
     return { ...stats, errors }
+  }
+
+  // Split-mode: rundene er pt. grupperet på ren dato ("18. jun"). Giv hver dag
+  // et pænt stage-navn udledt fra dagens kampe ("Gruppespil · 18. jun",
+  // "Kvartfinale · 9. jul"). Stadig præcis én runde pr. dag.
+  if (splitRoundsByDate) {
+    const renamed = new Map<string, ParsedMatch[]>()
+    for (const [dateLabel, group] of roundGroups) {
+      const name = `${dominantStageLabel(group.map((m) => m.bold_round))} · ${dateLabel}`
+      for (const p of group) p.round_name = name
+      renamed.set(name, group)
+    }
+    roundGroups.clear()
+    for (const [name, group] of renamed) roundGroups.set(name, group)
   }
 
   // Preview (for dry-run)
