@@ -51,7 +51,7 @@ export default async function CyclingGuidePage() {
           ]} />
           <Callout type="tip">
             Ryttere der ikke er i din lineup for et løb sidder på <B>bænken</B>.
-            Hvis en bænk-rytter scorer, får du en straf — så vælg klogt hvem du tager med i truppen.
+            Bænk-ryttere giver hverken plus eller minus — det er kun rytterne i din lineup der scorer.
           </Callout>
         </Section>
 
