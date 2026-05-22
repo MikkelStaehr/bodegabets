@@ -112,18 +112,35 @@ function getBasePoints(position: number | null): number {
   return 0
 }
 
-function getJerseyPoints(jerseyStr: string | null): number {
-  if (!jerseyStr) return 0
-  let total = 0
-  for (const j of jerseyStr.split(',')) {
-    total += JERSEY_POINTS[j.trim()] ?? 0
-  }
-  return total
-}
+// Trøjebærere for en etape — udledt af klassement-placeringerne (position 1 =
+// fører), samme princip som klassement-visningen. Som på vejen bærer hver
+// rytter kun ÉN trøje: fører samme rytter flere klassementer, går de lavere
+// trøjer videre til næste mand i klassementet. Prioritet: leder > points >
+// bjerg > ungdom. En trøje tildeles kun hvis klassementet er registreret (#1 findes).
+const JERSEY_CLASSIFICATIONS: Array<{
+  jersey: string
+  field: 'gc_position_after' | 'points_position_after' | 'mountain_position_after' | 'youth_position_after'
+}> = [
+  { jersey: 'leader', field: 'gc_position_after' },
+  { jersey: 'points', field: 'points_position_after' },
+  { jersey: 'mountain', field: 'mountain_position_after' },
+  { jersey: 'youth', field: 'youth_position_after' },
+]
 
-function getJerseyList(jerseyStr: string | null): string[] {
-  if (!jerseyStr) return []
-  return jerseyStr.split(',').map((j) => j.trim()).filter(Boolean)
+function computeJerseyWearers(results: RiderResult[]): Map<string, string> {
+  const wearers = new Map<string, string>()
+  const used = new Set<string>()
+  for (const { jersey, field } of JERSEY_CLASSIFICATIONS) {
+    if (!results.some((r) => r[field] === 1)) continue // klassement ikke registreret for etapen
+    const wearer = results
+      .filter((r) => r[field] != null && !used.has(r.rider_id))
+      .sort((a, b) => (a[field] as number) - (b[field] as number))[0]
+    if (wearer) {
+      wearers.set(wearer.rider_id, jersey)
+      used.add(wearer.rider_id)
+    }
+  }
+  return wearers
 }
 
 function getGcMultiplier(gcPosition: number | null): number {
@@ -168,8 +185,10 @@ type RiderResult = {
   position: number | null
   dnf: boolean
   abandon_type: string | null
-  jersey: string | null
   gc_position_after: number | null
+  points_position_after: number | null
+  mountain_position_after: number | null
+  youth_position_after: number | null
 }
 
 type LineupRider = {
@@ -228,7 +247,7 @@ export async function calculateCyclingPoints(
   // 2. Fetch results for this stage
   const { data: resultsRaw } = await supabaseAdmin
     .from('cycling_results')
-    .select('rider_id, position, dnf, abandon_type, jersey, gc_position_after')
+    .select('rider_id, position, dnf, abandon_type, gc_position_after, points_position_after, mountain_position_after, youth_position_after')
     .eq('race_id', raceId)
     .eq('stage_number', stageNumber)
 
@@ -236,6 +255,9 @@ export async function calculateCyclingPoints(
   for (const r of resultsRaw ?? []) {
     resultMap.set(r.rider_id, r)
   }
+
+  // Trøjebærere for etapen — udledt af klassement-placeringerne i resultaterne
+  const jerseyWearers = computeJerseyWearers([...resultMap.values()])
 
   // 3. Find the winner and their team
   const winner = (resultsRaw ?? []).find((r) => r.position === 1)
@@ -296,24 +318,17 @@ export async function calculateCyclingPoints(
 
   // Map: squad_id → rider_id → category (effektiv efter anvendte transfers)
   const categoryBySquadRider = new Map<string, number>()
-  // Map: squad_id → Set af aktive rider_ids i effektiv trup
-  const effectiveSquadRiders = new Map<string, Set<string>>()
 
   for (const sr of squadCats ?? []) {
     const squadId = sr.squad_id as string
     categoryBySquadRider.set(`${squadId}:${sr.rider_id}`, sr.category_slot as number)
-    if (!effectiveSquadRiders.has(squadId)) effectiveSquadRiders.set(squadId, new Set())
-    effectiveSquadRiders.get(squadId)!.add(sr.rider_id as string)
   }
 
   for (const t of allTransfers ?? []) {
     const restDay = t.rest_day_date as string
     if (restDay >= stageStartDate) continue  // transfer skete EFTER denne etape
     const squadId = t.squad_id as string
-    const outId = t.rider_out_id as string
     const inId = t.rider_in_id as string
-    effectiveSquadRiders.get(squadId)?.delete(outId)
-    effectiveSquadRiders.get(squadId)?.add(inId)
     categoryBySquadRider.set(`${squadId}:${inId}`, t.rider_in_category as number)
   }
 
@@ -339,31 +354,12 @@ export async function calculateCyclingPoints(
     })
   }
 
-  // 6. Effektiv brutto-trup per squad (bruges til bench penalty)
-  const squadRidersBySquad = effectiveSquadRiders
-
-  // Fetch rider details (team) for alle der har været i en effektiv trup
-  const allSquadRiderIds = new Set<string>()
-  for (const rids of squadRidersBySquad.values()) {
-    for (const rid of rids) allSquadRiderIds.add(rid)
-  }
-  const { data: allRiderDetails } = await supabaseAdmin
-    .from('cycling_riders')
-    .select('id, category, team_name')
-    .in('id', [...allSquadRiderIds])
-
-  const riderDetailMap = new Map<string, { category: number; team_name: string }>()
-  for (const rd of allRiderDetails ?? []) {
-    riderDetailMap.set(rd.id, { category: rd.category, team_name: rd.team_name })
-  }
-
   const now = new Date().toISOString()
   const allScores: ScoreRow[] = []
 
-  // 7. Calculate points per lineup
+  // 6. Calculate points per lineup
   for (const lineup of lineups) {
     const activeRiders = ridersByLineup.get(String(lineup.id)) ?? []
-    const activeRiderIds = new Set(activeRiders.map((r) => r.rider_id))
 
     // Check if leader DNF'd (for lieutenant bonus)
     const leaderRider = activeRiders.find((r) => r.role === 'leader')
@@ -382,7 +378,8 @@ export async function calculateCyclingPoints(
       const gcMul = getGcMultiplier(result?.gc_position_after ?? null)
       let roleMul = 1.0
       let roleBonus = 0
-      let jerseyPts = getJerseyPoints(result?.jersey ?? null)
+      const jerseyKey = jerseyWearers.get(rider.rider_id)
+      const jerseyPts = jerseyKey ? (JERSEY_POINTS[jerseyKey] ?? 0) : 0
       let teamBonus = 0
       let dnfPen = 0
 
@@ -485,71 +482,22 @@ export async function calculateCyclingPoints(
       })
     }
 
-    // ── B. Bench riders (in squad, not in lineup) ──────────────
-    const squad = squads.find((s) => s.id === lineup.squad_id)
-    if (!squad) continue
-
-    const allSquadRids = squadRidersBySquad.get(squad.id) ?? new Set()
-
-    for (const riderId of allSquadRids) {
-      if (activeRiderIds.has(riderId)) continue // already scored as active
-
-      const result = resultMap.get(riderId)
-      if (!result) continue // no result → no penalty
-
-      const riderDetail = riderDetailMap.get(riderId)
-      const isJoker = false // bench riders don't have a role assignment for this race
-      const position = result.position
-      const isDnf = result.dnf
-
-      let benchPen = 0
-      let dnfPen = 0
-
-      if (isDnf) {
-        dnfPen = DNF_PENALTY_MIN
-      }
-
-      if (position != null && !isDnf) {
-        // Calculate what they would have scored (base × cat multiplier)
-        // Brug snapshot category fra squad (ikke live rating)
-        const snapshotCat = categoryBySquadRider.get(`${squad.id}:${riderId}`) ?? riderDetail?.category ?? 5
-        const wouldBase = getBasePoints(position)
-        const catMul = CAT_MULTIPLIER[snapshotCat] ?? 1.0
-        const wouldScore = Math.round(wouldBase * catMul * 10) / 10
-
-        if (position === 1) {
-          benchPen = -Math.round(wouldScore * 0.5 * 10) / 10
-        } else if (position <= 3) {
-          benchPen = -Math.round(wouldScore * 0.4 * 10) / 10
-        } else if (position <= 10) {
-          benchPen = -Math.round(wouldScore * 0.2 * 10) / 10
-        }
-      }
-
-      const total = benchPen + dnfPen
-
-      if (total === 0) continue // no penalty → skip
-
-      allScores.push({
-        lineup_id: lineup.id,
-        rider_id: riderId,
-        race_id: raceId,
-        stage_id: stageId,
-        game_id: gameId,
-        role: 'bench',
-        is_bench: true,
-        base_points: 0,
-        role_multiplier: 0,
-        gc_multiplier: 1.0,
-        role_bonus: 0,
-        jersey_points: 0,
-        team_bonus: 0,
-        bench_penalty: benchPen,
-        dnf_penalty: dnfPen,
-        calculated_at: now,
-      })
-    }
+    // ── B. Bænk-ryttere: ingen point ───────────────────────────
+    // Ryttere på bænken giver hverken plus eller minus — de er helt
+    // udeladt af scoringen, uanset placering eller DNF. Eksisterende
+    // bænk-rækker ryddes i trin 7 før upsert, så gamle penalties
+    // forsvinder ved genberegning.
   }
+
+  // 7. Ryd gamle bænk-scores for denne etape/spil — bænk-ryttere giver
+  //    hverken plus eller minus, og upsert sletter ikke forældede rækker.
+  await supabaseAdmin
+    .from('cycling_scores')
+    .delete()
+    .eq('stage_id', stageId)
+    .eq('game_id', gameId)
+    .eq('is_bench', true)
+    .throwOnError()
 
   // 8. Upsert all scores
   if (allScores.length > 0) {
