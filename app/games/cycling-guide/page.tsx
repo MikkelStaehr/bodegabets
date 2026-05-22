@@ -203,19 +203,14 @@ export default async function CyclingGuidePage() {
             Minimum straf er <B>-5 point</B>. Joker er undtaget.
           </P>
 
-          <SubHeading>Bænk-straf</SubHeading>
+          <SubHeading>Bænk-ryttere</SubHeading>
           <P>
-            Ryttere i din brutto trup der <em>ikke</em> er i lineup men alligevel scorer:
+            Ryttere i din brutto trup der <em>ikke</em> er i din lineup, tæller
+            <B> hverken plus eller minus</B>. De er helt udeladt af scoringen,
+            uanset hvordan de placerer sig i løbet.
           </P>
-          <PointTable rows={[
-            ['Bænk-rytter vinder', '-50% af would-be score'],
-            ['Bænk-rytter top 3', '-40%'],
-            ['Bænk-rytter top 10', '-20%'],
-            ['Bænk-rytter DNF', '-5'],
-          ]} />
           <Callout type="tip">
-            Bænk-straffen belønner dig for at have en lille, fokuseret trup.
-            Tag kun ryttere med i truppen som du realistisk vil bruge.
+            Det er kun rytterne i din lineup der scorer point — så sæt din lineup med omhu.
           </Callout>
         </Section>
 

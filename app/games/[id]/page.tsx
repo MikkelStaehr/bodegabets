@@ -516,11 +516,6 @@ export default async function GamePage({ params }: Props) {
       // Hent klassement-felter pr. stage pr. rytter. gc_gap_seconds og
       // youth_gap_seconds er scraped direkte fra PCS' klassifikations-tabel
       // og afspejler officielle GC-/youth-gaps inkl. bonus-sekunder.
-      const { data: standingsData } = await supabaseAdmin
-        .from('cycling_results')
-        .select('race_id, rider_id, jersey, gc_position_after, points_position_after, mountain_position_after, youth_position_after, points_value, mountain_value, gc_gap_seconds, youth_gap_seconds, stage_number, dnf')
-        .in('race_id', raceIdsForStages)
-
       type StandingsRow = {
         race_id: string
         rider_id: string
@@ -535,6 +530,19 @@ export default async function GamePage({ params }: Props) {
         youth_gap_seconds: number | null
         stage_number: number
         dnf: boolean
+      }
+      // Paginér — uden dette afkorter Supabase til 1000 rækker, hvilket giver
+      // ufuldstændige klassementer (manglende ryttere → forkert trøjebærer).
+      const standingsData: StandingsRow[] = []
+      for (let from = 0; ; from += 1000) {
+        const { data: page } = await supabaseAdmin
+          .from('cycling_results')
+          .select('race_id, rider_id, jersey, gc_position_after, points_position_after, mountain_position_after, youth_position_after, points_value, mountain_value, gc_gap_seconds, youth_gap_seconds, stage_number, dnf')
+          .in('race_id', raceIdsForStages)
+          .range(from, from + 999)
+        if (!page?.length) break
+        standingsData.push(...(page as StandingsRow[]))
+        if (page.length < 1000) break
       }
       // Aggreger: latestByKey[race::rider] = klassement-data, per-felt seneste-
       // ikke-null. Hvis stage 5's sync fejler for fx youth, falder vi tilbage
@@ -573,7 +581,7 @@ export default async function GamePage({ params }: Props) {
         }
         return e
       }
-      for (const row of (standingsData ?? []) as StandingsRow[]) {
+      for (const row of standingsData) {
         const key = `${row.race_id}::${row.rider_id}`
         const e = ensure(key)
         if (row.dnf) e.dnfEver = true
