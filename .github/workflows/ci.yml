@@ -23,6 +23,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # railway/ er en selvstændig cron-service med egne deps (express, node-cron).
+      # Root-tsconfig type-checker den med, så dens deps skal være installeret.
+      - name: Install railway dependencies
+        run: npm ci
+        working-directory: railway
+
       - name: Type-check
         run: npx tsc --noEmit
 
@@ -37,3 +43,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder' }}
+
+      # Valider cron-servicen med sin egen tsconfig + build
+      - name: Build (railway cron-service)
+        run: npm run build
+        working-directory: railway
