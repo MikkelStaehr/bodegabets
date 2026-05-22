@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { lazyProxy } from './lazyProxy'
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -6,12 +7,16 @@ function requireEnv(name: string): string {
   return value
 }
 
-export const stripe = new Stripe(requireEnv('STRIPE_SECRET_KEY'), {
+// Lazy (se lib/lazyProxy): klient og secrets resolves først ved faktisk brug,
+// ikke ved module-load — så `next build` ikke kræver Stripe-secrets.
+export const stripe = lazyProxy(() => new Stripe(requireEnv('STRIPE_SECRET_KEY'), {
   apiVersion: '2026-04-22.dahlia',
   typescript: true,
-})
+}))
 
-export const STRIPE_PRICE_ID = requireEnv('STRIPE_PRICE_ID')
+export function getStripePriceId(): string {
+  return requireEnv('STRIPE_PRICE_ID')
+}
 
 export type SubscriptionStatus =
   | 'none'

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import { stripe, STRIPE_PRICE_ID } from '@/lib/stripe'
+import { stripe, getStripePriceId } from '@/lib/stripe'
 
 /**
  * Opretter en Stripe Checkout Session for medlemskab og returnerer URL.
@@ -47,7 +47,7 @@ export async function POST() {
   try {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: getStripePriceId(), quantity: 1 }],
       ...(profile?.stripe_customer_id
         ? { customer: profile.stripe_customer_id }
         : { customer_email: user.email ?? undefined }),

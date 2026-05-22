@@ -1,6 +1,7 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { lazyProxy } from './lazyProxy'
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -8,24 +9,12 @@ function requireEnv(name: string): string {
   return value
 }
 
-// Klienterne initialiseres LAZY: env-vars læses og klient-instansen oprettes
-// først ved faktisk brug (i en request), ikke ved module-load. Dermed kræver
-// `next build` — som evaluerer route-moduler for at samle page-data — ingen
-// runtime-secrets, og builds fejler aldrig pga. manglende env-vars.
-function lazyClient(factory: () => SupabaseClient): SupabaseClient {
-  let instance: SupabaseClient | null = null
-  const resolve = (): SupabaseClient => (instance ??= factory())
-  return new Proxy({} as SupabaseClient, {
-    get(_target, prop) {
-      const client = resolve()
-      const value = Reflect.get(client, prop)
-      return typeof value === 'function' ? value.bind(client) : value
-    },
-  })
-}
+// Klienterne initialiseres LAZY (se lib/lazyProxy): env-vars læses og
+// klient-instansen oprettes først ved faktisk brug, ikke ved module-load.
+// Dermed kræver `next build` ingen runtime-secrets.
 
 // Anon-client (public key)
-export const supabase = lazyClient(() =>
+export const supabase = lazyProxy(() =>
   createClient(
     requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
     requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
@@ -58,7 +47,7 @@ export async function createServerSupabaseClient() {
 }
 
 // Admin-client med service role key (bypass RLS)
-export const supabaseAdmin = lazyClient(() =>
+export const supabaseAdmin = lazyProxy(() =>
   createClient(
     requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
     requireEnv('SUPABASE_SERVICE_ROLE_KEY'),

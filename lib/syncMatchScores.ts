@@ -7,10 +7,15 @@
 import { createClient } from '@supabase/supabase-js'
 import { calculateRoundPoints, calculateChampionshipRoundPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
+import { lazyProxy } from '@/lib/lazyProxy'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+// Lazy (se lib/lazyProxy): klienten oprettes først ved brug, ikke ved
+// module-load — så `next build` ikke kræver service-role-key.
+const supabaseAdmin = lazyProxy(() =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 )
 
 const BOLD_MATCHES_API = 'https://api.bold.dk/aggregator/v1/apps/page/matches'
