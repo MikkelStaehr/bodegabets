@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { getEffectiveSquadRidersForSquads } from '@/lib/cyclingTransfers'
 import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
@@ -741,28 +742,27 @@ export default async function GamePage({ params }: Props) {
 
     }
 
-    // Hent squad riders fra alle squads
+    // Hent EFFEKTIV brutto-trup (med hviledags-transfers anvendt), så indbyttede
+    // ryttere også vises i truppen — ikke kun den oprindelige squad.
     const allSquadIds = (userSquads ?? []).map((sq) => sq.id)
     if (allSquadIds.length > 0) {
-      const { data: srData } = await supabaseAdmin
-        .from('cycling_squad_riders')
-        .select('rider_id, category_slot, cycling_riders!inner(id, first_name, last_name, team_name, team_logo_url, photo_url)')
-        .in('squad_id', allSquadIds)
-
-      // Brug category_slot som snapshot (ikke live cycling_riders.category)
-      const seen = new Set<string>()
-      lineupSquadRiders = (srData ?? [])
-        .map((r) => {
-          const rider = r.cycling_riders as unknown as {
-            id: string; first_name: string; last_name: string; team_name: string
-            team_logo_url: string | null; photo_url: string | null
-          }
-          return {
-            ...rider,
-            category: (r.category_slot as number) ?? 5,
-          }
-        })
-        .filter((r) => { if (seen.has(r.id)) return false; seen.add(r.id); return true })
+      const effRiders = await getEffectiveSquadRidersForSquads(allSquadIds)
+      if (effRiders.length > 0) {
+        const catById = new Map(effRiders.map((e) => [e.rider_id, e.category_slot]))
+        const { data: rd } = await supabaseAdmin
+          .from('cycling_riders')
+          .select('id, first_name, last_name, team_name, team_logo_url, photo_url')
+          .in('id', effRiders.map((e) => e.rider_id))
+        lineupSquadRiders = (rd ?? []).map((r) => ({
+          id: r.id as string,
+          first_name: r.first_name as string,
+          last_name: r.last_name as string,
+          team_name: r.team_name as string,
+          team_logo_url: (r.team_logo_url as string | null) ?? null,
+          photo_url: (r.photo_url as string | null) ?? null,
+          category: catById.get(r.id as string) ?? 5,
+        }))
+      }
     }
 
   }

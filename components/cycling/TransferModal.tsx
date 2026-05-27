@@ -35,6 +35,9 @@ type Props = {
 }
 
 const MAX_SWAPS = 3
+// Standard kategori-grænser (matcher DEFAULT_CAT_LIMITS i lib/cyclingSquadLimits).
+// Defineret lokalt fordi det modul er server-only (importerer supabase).
+const CAT_LIMITS: Record<number, number> = { 1: 3, 2: 5, 3: 5, 4: 5, 5: 7 }
 
 export default function TransferModal({
   gameId,
@@ -104,6 +107,18 @@ export default function TransferModal({
     for (const r of startlist) m.set(r.id, r)
     return m
   }, [startlist])
+
+  // Kategori-fordeling EFTER de planlagte swaps (out fjernet, in tilføjet) — så
+  // man kan se hvor mange man har af hver kategori mens man bytter.
+  const catCounts = useMemo(() => {
+    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    const outSet = new Set(swaps.map((s) => s.out))
+    for (const r of currentSquad) if (!outSet.has(r.id)) counts[r.category] = (counts[r.category] ?? 0) + 1
+    for (const s of swaps) {
+      if (s.in) { const ir = startlistById.get(s.in); if (ir) counts[ir.category] = (counts[ir.category] ?? 0) + 1 }
+    }
+    return counts
+  }, [currentSquad, swaps, startlistById])
 
   const outIds = new Set(swaps.map((s) => s.out))
   const inIds = new Set(swaps.map((s) => s.in).filter(Boolean) as string[])
@@ -227,6 +242,35 @@ export default function TransferModal({
         }}>
           Du kan lave op til <strong style={{ color: '#F2EDE4' }}>{MAX_SWAPS} swaps</strong> pr. hviledag.
           {' '}Brugt: {swaps.length}/{MAX_SWAPS}.
+        </div>
+
+        {/* Kategori-tæller — opdaterer med de planlagte swaps */}
+        <div style={{
+          padding: '8px 16px', background: '#11243c',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center',
+        }}>
+          <span style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+            color: '#8FABC4', textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>
+            Kategorier
+          </span>
+          {[1, 2, 3, 4, 5].map((cat) => {
+            const count = catCounts[cat] ?? 0
+            const limit = CAT_LIMITS[cat] ?? 0
+            const over = count > limit
+            return (
+              <span key={cat} style={{
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                color: over ? '#ff6b6b' : '#8FABC4',
+              }}>
+                <span style={{ color: over ? '#ff6b6b' : '#F2EDE4' }}>Kat {cat}</span>
+                {count}/{limit}
+              </span>
+            )
+          })}
         </div>
 
         {/* Body */}
