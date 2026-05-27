@@ -87,3 +87,45 @@ export async function getCurrentEffectiveSquad(
 ): Promise<SquadRider[]> {
   return getEffectiveSquadRiders(squadId, raceId, '9999-12-31')
 }
+
+/**
+ * Effektiv brutto-trup (ALLE transfers anvendt) for et sæt squads, merget og
+ * dedupet på rider_id. Returnerer rider_id + category_slot, hvor transfer-ind-
+ * ryttere får deres rider_in_category. Bruges til at VISE truppen inkl. de
+ * indbyttede ryttere (display anvendte ikke transfers før — derfor manglede de).
+ * Transfers anvendes per squad, så en out-rytter i én squad ikke fjernes fra en
+ * anden.
+ */
+export async function getEffectiveSquadRidersForSquads(
+  squadIds: string[],
+): Promise<SquadRider[]> {
+  if (squadIds.length === 0) return []
+  const [{ data: base }, { data: transfers }] = await Promise.all([
+    supabaseAdmin
+      .from('cycling_squad_riders')
+      .select('squad_id, rider_id, category_slot')
+      .in('squad_id', squadIds),
+    supabaseAdmin
+      .from('cycling_squad_transfers')
+      .select('squad_id, rider_out_id, rider_in_id, rider_in_category')
+      .in('squad_id', squadIds),
+  ])
+
+  const outBySquad = new Map<string, Set<string>>()
+  for (const t of transfers ?? []) {
+    const sq = t.squad_id as string
+    if (!outBySquad.has(sq)) outBySquad.set(sq, new Set())
+    outBySquad.get(sq)!.add(t.rider_out_id as string)
+  }
+
+  const byRider = new Map<string, number>()
+  for (const r of base ?? []) {
+    if (outBySquad.get(r.squad_id as string)?.has(r.rider_id as string)) continue
+    if (!byRider.has(r.rider_id as string)) byRider.set(r.rider_id as string, (r.category_slot as number) ?? 5)
+  }
+  for (const t of transfers ?? []) {
+    byRider.set(t.rider_in_id as string, (t.rider_in_category as number) ?? 5)
+  }
+
+  return [...byRider.entries()].map(([rider_id, category_slot]) => ({ rider_id, category_slot }))
+}
