@@ -48,12 +48,13 @@ const ROLES: { key: CyclingRoleKey; label: string; catRule: number[] | null }[] 
   { key: 'domestique',  label: 'Domestique', catRule: [4] },
   { key: 'equipier_0',  label: 'Équipier',   catRule: null },
   { key: 'equipier_1',  label: 'Équipier',   catRule: null },
+  { key: 'equipier_2',  label: 'Équipier',   catRule: null },
   { key: 'joker',       label: 'Joker',      catRule: null },
 ]
 
 const EMPTY_SLOTS: Record<CyclingRoleKey, null> = {
   leader: null, lieutenant: null, grimpeur: null, sprinter: null,
-  domestique: null, equipier_0: null, equipier_1: null, joker: null,
+  domestique: null, equipier_0: null, equipier_1: null, equipier_2: null, joker: null,
 }
 
 // Constants imported from @/lib/cyclingUtils
@@ -62,6 +63,7 @@ const EMPTY_SLOTS: Record<CyclingRoleKey, null> = {
 
 import CatBadge from './CatBadge'
 import TeamLogo from './TeamLogo'
+import { slotsForProfile } from '@/lib/cyclingRoles'
 
 // ── Scrollable tab bar ─────────────────────────────────────────────────────
 
@@ -368,6 +370,14 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
     activeStage?.results_uploaded_at != null || activeRace?.status === 'finished'
   const isLocked = activeStage ? lockedStages.has(activeStage.id) : false
   const slots = activeStage ? (lineups[activeStage.id] ?? { ...EMPTY_SLOTS }) : { ...EMPTY_SLOTS }
+  // Dynamiske roller: rolle-sættet afhænger af etape-profilen. Eventuelle
+  // legacy-roller (fx en gemt grimpeur på en flad etape fra før) tilføjes til
+  // sidst, så låste/gamle lineups stadig vises korrekt.
+  const activeSlotKeys: CyclingRoleKey[] = (() => {
+    const base = slotsForProfile(activeStage?.profile)
+    const extra = (Object.keys(slots) as CyclingRoleKey[]).filter((k) => slots[k] && !base.includes(k))
+    return [...base, ...extra]
+  })()
   const changed = activeStage ? hasChanges(activeStage.id) : false
   const isSaving = activeStage ? savingStage === activeStage.id : false
   const isSuccess = activeStage ? success === activeStage.id : false
@@ -829,6 +839,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           race={activeRace}
           stageFinished={isFinished}
           slots={slots}
+          slotKeys={activeSlotKeys}
           scores={raceScores[activeStage.id] ?? []}
           results={raceResults[activeStage.id] ?? []}
           riders={squadRiders}
