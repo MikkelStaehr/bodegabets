@@ -150,15 +150,16 @@ function getGcMultiplier(gcPosition: number | null): number {
 
 // ── Profile-based role multipliers ──────────────────────────────────────────
 
+// cobbled (brosten) behandles som 'hilly' (bakket) — begge roller får ×1.2.
 function getGrimpeurMultiplier(profile: string): number {
   if (profile === 'mountain') return 1.8
-  if (profile === 'hilly') return 1.2
+  if (profile === 'hilly' || profile === 'cobbled') return 1.2
   return 1.0
 }
 
 function getSprinterMultiplier(profile: string): number {
   if (profile === 'flat' || profile === 'mixed') return 1.8
-  if (profile === 'hilly') return 1.2
+  if (profile === 'hilly' || profile === 'cobbled') return 1.2
   return 1.0
 }
 
@@ -366,6 +367,17 @@ export async function calculateCyclingPoints(
     const leaderResult = leaderRider ? resultMap.get(leaderRider.rider_id) : null
     const leaderDnf = leaderResult?.dnf ?? false
 
+    // Spurt-tog: en spurter forstærkes af equipiers fra SAMME hold (= leadouts).
+    // Udløses kun hvis spurteren er top-3. Multiplieren bages ind i spurterens
+    // role_multiplier: +0.2 pr. leadout-equipier (cap ×1.4).
+    const sprinterRider = activeRiders.find((r) => r.role === 'sprinter')
+    const sprinterResult = sprinterRider ? resultMap.get(sprinterRider.rider_id) : null
+    const sprinterTop3 = !!sprinterResult && !sprinterResult.dnf && sprinterResult.position != null && sprinterResult.position <= 3
+    const leadoutCount = sprinterRider
+      ? activeRiders.filter((r) => r.role === 'equipier' && r.team_name === sprinterRider.team_name).length
+      : 0
+    const trainMul = (sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
+
     // ── A. Active riders ──────────────────────────────────────
     for (const rider of activeRiders) {
       const result = resultMap.get(rider.rider_id)
@@ -405,7 +417,8 @@ export async function calculateCyclingPoints(
           break
 
         case 'sprinter':
-          roleMul = catMul * getSprinterMultiplier(profile)
+          // trainMul = ×1.0 uden tog; ×1.2–1.4 med 1-2 leadout-equipiers fra samme hold
+          roleMul = catMul * getSprinterMultiplier(profile) * trainMul
           if (wonHow && position != null && position <= 10) {
             roleBonus = WON_HOW_SPRINTER_BONUS[wonHow] ?? 0
           }

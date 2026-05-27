@@ -55,4 +55,4 @@ export type CyclingSquadRider = {
   photo_url: string | null
 }
 
-export type CyclingRoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' | 'equipier_0' | 'equipier_1' | 'joker'
+export type CyclingRoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' | 'equipier_0' | 'equipier_1' | 'equipier_2' | 'joker'

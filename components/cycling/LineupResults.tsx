@@ -59,6 +59,9 @@ type Props = {
    *  denne stage. Forskelligt fra Result.jersey som er per-stage. */
   standings?: Record<string, { jersey: string | null; gc_position: number | null }>
   onEditRole?: (roleKey: string) => void
+  /** Dynamiske roller: hvilke rolle-slots der vises (afhænger af etape-profil).
+   *  Falder tilbage til det fulde faste sæt hvis ikke angivet. */
+  slotKeys?: string[]
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -99,10 +102,10 @@ const ALL_ROLES: { key: string; label: string }[] = [
 const ROLE_TOOLTIPS: Record<string, string> = {
   leader: 'Point = placering × kat-multiplikator. +5 holdbonus hvis vinderhold. DNF: -50% af score (min -5)',
   lieutenant: 'Top 10 → ×1.8 (×2.8 hvis Leader DNF). +5 holdbonus. Kun Kat 2-3',
-  grimpeur: 'Mountain ×1.8, Hilly ×1.2. Won how bonus: Solo +50 (+1/km), Sprint a deux +25, Small group +20. Kun Kat 3-5',
-  sprinter: 'Flat/Mixed ×1.8, Hilly ×1.2. Won how bonus: Bunch sprint +20, Small group +25, Sprint a deux +50. Kun Kat 1-3',
+  grimpeur: 'Mountain ×1.8, Hilly/Cobbled ×1.2. Won how bonus: Solo +50 (+1/km), Sprint a deux +25, Small group +20. Kun Kat 3-5',
+  sprinter: 'Flat/Mixed ×1.8, Hilly/Cobbled ×1.2. Forstærkes af leadout-tog (equipier fra samme hold) hvis top-3. Kun Kat 1-3',
   domestique: '+8p hvis top 40 OG Leader top 10. Ingen multiplikator. Kun Kat 4',
-  equipier: '+7p hvis samme hold som vinder. Ingen multiplikator',
+  equipier: '+7p hvis samme hold som vinder. Fungerer som leadout for en spurter på samme hold. Ingen multiplikator',
   joker: '+7p hvis vinderhold. Immun mod DNF-straf og minuspoint',
 }
 
@@ -214,10 +217,17 @@ function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: M
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupResults({ race, stageFinished, slots, scores, results, riders, standings, onEditRole }: Props) {
+export default function LineupResults({ race, stageFinished, slots, scores, results, riders, standings, onEditRole, slotKeys }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [hoveredBench, setHoveredBench] = useState(false)
+
+  // Dynamiske roller: brug de medsendte slot-keys (afhænger af profil), ellers
+  // det fulde faste sæt. Label udledes fra base-rollen (equipier_N → Équipier).
+  const roleSlots = (slotKeys && slotKeys.length > 0 ? slotKeys : ALL_ROLES.map((r) => r.key)).map((key) => ({
+    key,
+    label: ROLE_LABELS[key.startsWith('equipier_') ? 'equipier' : key] ?? key,
+  }))
 
   const hasScores = scores.length > 0
 
@@ -293,7 +303,7 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
       </div>
 
       {/* ── Role rows (always all 8) ────────────────────────── */}
-      {ALL_ROLES.map((roleSlot, idx) => {
+      {roleSlots.map((roleSlot, idx) => {
         const riderId = slots[roleSlot.key] ?? null
         const rider = riderId ? riderMap.get(riderId) : null
         const baseRole = roleSlot.key.startsWith('equipier_') ? 'equipier' : roleSlot.key
@@ -334,7 +344,7 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
                 gap: 10,
                 cursor: canEdit ? 'pointer' : 'default',
                 padding: '8px 14px',
-                borderBottom: idx < ALL_ROLES.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                borderBottom: idx < roleSlots.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                 transition: 'background 0.1s',
               }}
               onMouseEnter={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
@@ -458,7 +468,7 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
               gap: 10,
               cursor: canEdit ? 'pointer' : 'default',
               padding: '8px 14px',
-              borderBottom: idx < ALL_ROLES.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              borderBottom: idx < roleSlots.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
               transition: 'background 0.1s',
             }}
             onMouseEnter={(e) => { if (canEdit) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}

@@ -61,6 +61,11 @@ export default async function CyclingGuidePage() {
             Din lineup består af 8 ryttere med hver sin rolle. Roller bestemmer
             multiplikatorer og bonusser. Kategori-regler begrænser hvem der kan have hvilken rolle.
           </P>
+          <P>
+            <B>Rollerne er dynamiske</B> — hvilke roller du kan vælge afhænger af etapens profil.
+            På en <B>flad</B> etape er der ingen klatrer (men en ekstra equipier), på en
+            <B>bjerg</B>-etape ingen spurter (men en ekstra equipier). Bakket og brosten har begge.
+          </P>
           <div className="space-y-3 mt-4">
             <RoleCard
               role="Leader"
@@ -77,14 +82,14 @@ export default async function CyclingGuidePage() {
             <RoleCard
               role="Grimpeur"
               cat="Kat 3–5"
-              desc="Bjergrytteren. Mountain ×1.8, Hilly ×1.2."
+              desc="Bjergrytteren. Mountain ×1.8, Hilly/Cobbled ×1.2."
               extra="Won how bonus: Solo +50 (+1p/km), Sprint a deux +25, Small group +20."
             />
             <RoleCard
               role="Sprinter"
               cat="Kat 1–3"
-              desc="Spurteren. Flat/Mixed ×1.8, Hilly ×1.2."
-              extra="Won how bonus: Bunch sprint +20, Small group +25, Sprint a deux +50."
+              desc="Spurteren. Flat/Mixed ×1.8, Hilly/Cobbled ×1.2."
+              extra="Forstærkes af et leadout-tog (equipier fra samme hold) hvis top-3 — op til ×1.4."
             />
             <RoleCard
               role="Domestique"
@@ -95,8 +100,8 @@ export default async function CyclingGuidePage() {
             <RoleCard
               role="Équipier"
               cat="Alle"
-              desc="Holdkammeraten (2 pladser). Ingen multiplikator."
-              extra="+7 bonus hvis samme hold som etapens vinder."
+              desc="Holdkammeraten. Ingen multiplikator."
+              extra="+7 bonus hvis samme hold som etapens vinder. Fungerer som leadout for en spurter på samme hold."
             />
             <RoleCard
               role="Joker"
@@ -105,6 +110,11 @@ export default async function CyclingGuidePage() {
               extra="+7 holdbonus. Immun mod DNF-straf og alle minuspoint."
             />
           </div>
+          <Callout type="tip">
+            <B>Spurt-tog:</B> har du en spurter og en eller flere equipiers fra <em>samme hold</em>,
+            fungerer de som leadout — din spurter får en multiplier (op til ×1.4) hvis han ender top-3.
+            Et tog koster pladser fra samme hold, så det er en satsning: stort loft hvis spurteren leverer, lille hvis ikke.
+          </Callout>
         </Section>
 
         {/* Pointsystem */}
