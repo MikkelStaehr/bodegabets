@@ -31,6 +31,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 import { slotsForProfile } from '@/lib/cyclingRoles'
+import { getEffectiveSquadRiders } from '@/lib/cyclingTransfers'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -293,46 +294,29 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Samme rytter kan ikke vælges to gange' }, { status: 400 })
   }
 
-  // Valider at alle ryttere er i brutto truppen
-  const { data: squadRiders } = await supabaseAdmin
-    .from('cycling_squad_riders')
-    .select('rider_id')
-    .eq('squad_id', squad.id)
-
-  const squadRiderIds = new Set((squadRiders ?? []).map((sr) => sr.rider_id))
+  // Valider at alle ryttere er i den EFFEKTIVE brutto-trup (med hviledags-
+  // transfers anvendt frem til etapens dato): en rytter byttet UD kan ikke
+  // vælges, en rytter byttet IND kan. Tidligere blev kun den oprindelige trup
+  // tjekket, så udbyttede ryttere slap igennem.
+  const effSquad = await getEffectiveSquadRiders(squad.id, stageData.race_id, stageData.start_date)
+  const effCatById = new Map(effSquad.map((sr) => [sr.rider_id, sr.category_slot]))
   for (const r of riders) {
-    if (!squadRiderIds.has(r.rider_id)) {
-      return NextResponse.json({ error: 'Rytter er ikke i din brutto trup' }, { status: 400 })
+    if (!effCatById.has(r.rider_id)) {
+      return NextResponse.json({ error: 'Rytter er ikke i din (effektive) brutto trup' }, { status: 400 })
     }
   }
 
-  // Valider kategori-regler per rolle
-  const catRuleRiders = riders.filter((r) => {
+  // Valider kategori-regler per rolle (kategori fra effektiv trup — incl.
+  // transfer-ind-rytteres kategori).
+  for (const r of riders) {
     const baseRole = r.role.startsWith('equipier_') ? 'equipier' : r.role
-    return baseRole in CAT_RULES
-  })
-
-  if (catRuleRiders.length > 0) {
-    // Brug category_slot fra squad (snapshot på udtagelsestidspunktet)
-    // — ikke live cycling_riders.category som ændres med UCI ranking
-    const { data: squadRiderRows } = await supabaseAdmin
-      .from('cycling_squad_riders')
-      .select('rider_id, category_slot')
-      .eq('squad_id', squad.id)
-      .in('rider_id', catRuleRiders.map((r) => r.rider_id))
-
-    const catById = new Map((squadRiderRows ?? []).map((r) => [r.rider_id, r.category_slot]))
-
-    for (const r of catRuleRiders) {
-      const baseRole = r.role.startsWith('equipier_') ? 'equipier' : r.role
-      const allowed = CAT_RULES[baseRole]
-      if (!allowed) continue
-      const cat = catById.get(r.rider_id)
-      if (cat != null && !allowed.includes(cat)) {
-        return NextResponse.json({
-          error: `${baseRole} kræver kat ${allowed.join('/')} — rytteren er kat ${cat}`,
-        }, { status: 400 })
-      }
+    const allowed = CAT_RULES[baseRole]
+    if (!allowed) continue
+    const cat = effCatById.get(r.rider_id)
+    if (cat != null && !allowed.includes(cat)) {
+      return NextResponse.json({
+        error: `${baseRole} kræver kat ${allowed.join('/')} — rytteren er kat ${cat}`,
+      }, { status: 400 })
     }
   }
 
