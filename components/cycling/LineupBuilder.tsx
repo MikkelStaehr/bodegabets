@@ -183,22 +183,21 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   // ellers betragte dagens etape som 'allerede startet' og hoppe direkte til
   // morgendagens (Nikolaj-buggen 8. maj 2026 hvor han udfyldte etape 2 i stedet
   // for etape 1).
+  // Land på den første etape der endnu ikke er kørt (ingen resultater) — dvs.
+  // den aktive/næste etape, ikke etape 1. Er alle kørt, vis den sidste.
+  // Bruger results_uploaded_at (deterministisk fra data, ikke new Date()), så
+  // server og klient er enige under hydration.
   const findFirstActionable = (stages: typeof blockStages) => {
-    const now = new Date()
     return (
-      stages.find((s) => !isStageDeadlinePassed(s.start_date, now))?.id ??
-      stages[0]?.id ??
+      stages.find((s) => s.results_uploaded_at == null)?.id ??
+      stages[stages.length - 1]?.id ??
       null
     )
   }
 
-  // Initial render bruger ALTID første stage by id (deterministisk) så server
-  // og klient er enige under hydration. useEffect (kører kun på klient) opdaterer
-  // til firstActionable umiddelbart efter mount. Forhindrer hydration mismatch
-  // når server's new Date() ≠ klient's new Date() lige omkring deadline-cutoff.
-  const [activeTab, setActiveTab] = useState<string | null>(blockStages[0]?.id ?? null)
+  const [activeTab, setActiveTab] = useState<string | null>(findFirstActionable(blockStages))
 
-  // Mount-effekt: skift til den faktisk relevante tab på klienten
+  // Skift til den relevante tab når blokken skifter
   useEffect(() => {
     setActiveTab(findFirstActionable(blockStages))
   }, [activeBlockId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -483,6 +482,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           const stageLocked = lockedStages.has(stage.id)
           const stageSlots = lineups[stage.id]
           const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
+          // Point vundet på etapen (sum af dine scores) — vises i fanen når kørt.
+          const stageScores = raceScores[stage.id] ?? []
+          const stagePoints = stageScores.reduce((sum, s) => sum + (s.total_points ?? 0), 0)
+          const showPoints = isFinished && stageScores.length > 0
           // One-day races: show race short name. Stage races: show "Etape N"
           const tabLabel = stage.race_type === 'one_day'
             ? shortRaceName(stage.race_name)
@@ -524,7 +527,15 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                   <Lock size={10} color="#ff6b6b" />
                 )}
               </span>
-              {filled > 0 && (
+              {showPoints ? (
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 10, fontWeight: 700,
+                  color: stagePoints < 0 ? '#D98A8A' : '#C9A84C',
+                }}>
+                  {Math.round(stagePoints)} pt
+                </span>
+              ) : filled > 0 ? (
                 <span style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontSize: 9, fontWeight: 700,
@@ -532,7 +543,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 }}>
                   {filled}/8
                 </span>
-              )}
+              ) : null}
             </button>
           )
         })}
