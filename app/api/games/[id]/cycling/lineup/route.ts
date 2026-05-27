@@ -30,18 +30,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
+import { slotsForProfile } from '@/lib/cyclingRoles'
 
 type Props = { params: Promise<{ id: string }> }
-
-const ROLE_LIMITS: Record<string, number> = {
-  leader: 1,
-  lieutenant: 1,
-  grimpeur: 1,
-  sprinter: 1,
-  domestique: 1,
-  equipier: 2,
-  joker: 1,
-}
 
 const CAT_RULES: Record<string, number[]> = {
   lieutenant: [2, 3],
@@ -253,7 +244,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Tjek deadline — find stage → race → block lock_deadline, eller stage start - 30 min
   const { data: stageData } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, race_id, start_date')
+    .select('id, race_id, start_date, profile')
     .eq('id', stage_id)
     .single()
 
@@ -267,16 +258,27 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Deadline er passeret — lineup kan ikke ændres' }, { status: 400 })
   }
 
-  // Valider antal per rolle
+  // Valider rolle-sammensætning mod den DYNAMISKE formation for etapens profil
+  // (samme kilde som builderen). Flad/bjerg tillader 3 equipiers, bakket 2 osv.
+  const allowedSlots = slotsForProfile((stageData as { profile?: string | null }).profile)
+  const roleLimits: Record<string, number> = {}
+  for (const key of allowedSlots) {
+    const base = key.startsWith('equipier_') ? 'equipier' : key
+    roleLimits[base] = (roleLimits[base] ?? 0) + 1
+  }
   const roleCounts: Record<string, number> = {}
   for (const r of riders) {
     const baseRole = r.role.startsWith('equipier_') ? 'equipier' : r.role
     roleCounts[baseRole] = (roleCounts[baseRole] ?? 0) + 1
   }
-  for (const [role, limit] of Object.entries(ROLE_LIMITS)) {
-    const count = roleCounts[role] ?? 0
+  for (const [role, count] of Object.entries(roleCounts)) {
+    const limit = roleLimits[role] ?? 0
     if (count > limit) {
-      return NextResponse.json({ error: `Max ${limit} rytter(e) som ${role}` }, { status: 400 })
+      return NextResponse.json({
+        error: limit === 0
+          ? `${role} kan ikke vælges på denne etape-profil`
+          : `Max ${limit} rytter(e) som ${role}`,
+      }, { status: 400 })
     }
   }
 
