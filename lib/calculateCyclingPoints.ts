@@ -102,6 +102,11 @@ const GC_MULTIPLIER: Record<number, number> = {
 const DNF_PENALTY_PCT = 0.5   // 50% of would-be score
 const DNF_PENALTY_MIN = -5    // minimum penalty even if no placement points
 
+// Nye regler (spurt-tog + cobbled ×1.2) gælder KUN for etaper der starter fra
+// denne dato og frem. Allerede-kørte Giro-etaper (sat under de gamle regler)
+// rescores ikke retroaktivt. Dynamiske roller er uanset hvad kun fremadrettede.
+const NEW_SCORING_FROM = '2026-05-27'
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function getBasePoints(position: number | null): number {
@@ -150,16 +155,19 @@ function getGcMultiplier(gcPosition: number | null): number {
 
 // ── Profile-based role multipliers ──────────────────────────────────────────
 
-// cobbled (brosten) behandles som 'hilly' (bakket) — begge roller får ×1.2.
-function getGrimpeurMultiplier(profile: string): number {
+// cobbled (brosten) behandles som 'hilly' (bakket) ×1.2 — men kun under de nye
+// regler. Før NEW_SCORING_FROM gav cobbled ×1.0 (uændret bagud).
+function getGrimpeurMultiplier(profile: string, newRules: boolean): number {
   if (profile === 'mountain') return 1.8
-  if (profile === 'hilly' || profile === 'cobbled') return 1.2
+  if (profile === 'hilly') return 1.2
+  if (profile === 'cobbled') return newRules ? 1.2 : 1.0
   return 1.0
 }
 
-function getSprinterMultiplier(profile: string): number {
+function getSprinterMultiplier(profile: string, newRules: boolean): number {
   if (profile === 'flat' || profile === 'mixed') return 1.8
-  if (profile === 'hilly' || profile === 'cobbled') return 1.2
+  if (profile === 'hilly') return 1.2
+  if (profile === 'cobbled') return newRules ? 1.2 : 1.0
   return 1.0
 }
 
@@ -304,6 +312,8 @@ export async function calculateCyclingPoints(
   // Hent effektiv brutto-trup per squad (original + hviledag-transfers anvendt)
   // Effektiv trup for scoring på denne etape = original - outs(før stage) + ins(før stage)
   const stageStartDate = (stage as { start_date?: string } | null)?.start_date ?? '9999-12-31'
+  // Nye scoring-regler (spurt-tog + cobbled ×1.2) kun for etaper fra denne dato.
+  const newRules = stageStartDate >= NEW_SCORING_FROM
 
   const [{ data: squadCats }, { data: allTransfers }] = await Promise.all([
     supabaseAdmin
@@ -376,7 +386,7 @@ export async function calculateCyclingPoints(
     const leadoutCount = sprinterRider
       ? activeRiders.filter((r) => r.role === 'equipier' && r.team_name === sprinterRider.team_name).length
       : 0
-    const trainMul = (sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
+    const trainMul = (newRules && sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
 
     // ── A. Active riders ──────────────────────────────────────
     for (const rider of activeRiders) {
@@ -410,7 +420,7 @@ export async function calculateCyclingPoints(
           break
 
         case 'grimpeur':
-          roleMul = catMul * getGrimpeurMultiplier(profile)
+          roleMul = catMul * getGrimpeurMultiplier(profile, newRules)
           if (wonHow && position != null && position <= 10) {
             roleBonus = getWonHowGrimpeurBonus(wonHow)
           }
@@ -418,7 +428,7 @@ export async function calculateCyclingPoints(
 
         case 'sprinter':
           // trainMul = ×1.0 uden tog; ×1.2–1.4 med 1-2 leadout-equipiers fra samme hold
-          roleMul = catMul * getSprinterMultiplier(profile) * trainMul
+          roleMul = catMul * getSprinterMultiplier(profile, newRules) * trainMul
           if (wonHow && position != null && position <= 10) {
             roleBonus = WON_HOW_SPRINTER_BONUS[wonHow] ?? 0
           }
