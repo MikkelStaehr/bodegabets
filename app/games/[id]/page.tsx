@@ -328,7 +328,7 @@ export default async function GamePage({ params }: Props) {
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   // Visnings-navn for aktiv blok: aktiv sub-blok (uge) hvis findes, ellers top-blokken.
   let cyclingActiveBlockDisplayName: string | null = null
-  let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null }[] = []
+  let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null; stage_number_min?: number | null; stage_number_max?: number | null }[] = []
   let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; results_uploaded_at: string | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupStartlists: Record<string, string[]> = {}
   // raceId → riderId → abandon_type (DNF, DNS, OTL, DSQ)
@@ -397,7 +397,7 @@ export default async function GamePage({ params }: Props) {
     // Hent alle blokke for gameroom (inkl. status for tab-rendering)
     const { data: blocksData } = await supabaseAdmin
       .from('cycling_blocks')
-      .select('id, name, block_order, parent_block_id, lock_deadline, status')
+      .select('id, name, block_order, parent_block_id, lock_deadline, status, stage_number_min, stage_number_max')
       .eq('game_id', gameId)
       .order('block_order', { ascending: true })
 
