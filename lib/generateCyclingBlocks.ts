@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { computeSubBlockRanges } from '@/lib/cyclingBlocks'
 
 // ── Slug-grupper ────────────────────────────────────────────────────────────
 
@@ -27,7 +28,10 @@ type RaceRow = {
   pcs_slug: string
   race_type: string
   start_date: string
+  rest_days: string[] | null
 }
+
+type StageRow = { stage_number: number; start_date: string }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,6 +48,8 @@ function lockDeadline(startDates: string[]): string {
   if (deadline < new Date()) return new Date().toISOString()
   return deadline.toISOString()
 }
+
+// computeSubBlockRanges er flyttet til lib/cyclingBlocks.ts (pure function).
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -82,14 +88,14 @@ export async function generateCyclingBlocks(
 
   const { data: races } = await supabaseAdmin
     .from('cycling_races')
-    .select('id, name, pcs_slug, race_type, start_date')
+    .select('id, name, pcs_slug, race_type, start_date, rest_days')
     .in('id', raceIds)
     .order('start_date', { ascending: true })
 
   if (!races?.length) return
 
   const raceMap = new Map<string, RaceRow>()
-  for (const r of races) raceMap.set(r.pcs_slug, r)
+  for (const r of races) raceMap.set(r.pcs_slug, r as RaceRow)
 
   // Gruppér løb (kun nye, ikke-blok-tildelte) — sortér stage races kronologisk
   const flandern = FLANDERN_SLUGS
@@ -100,7 +106,7 @@ export async function generateCyclingBlocks(
     .map((s) => raceMap.get(s))
     .filter((r): r is RaceRow => !!r)
 
-  const stageRaces = races
+  const stageRaces = (races as RaceRow[])
     .filter((r) => r.race_type === 'stage_race')
     .sort((a, b) => a.start_date.localeCompare(b.start_date))
 
@@ -108,6 +114,8 @@ export async function generateCyclingBlocks(
 
   if (flandern.length > 0) {
     const deadline = lockDeadline(flandern.map((r) => r.start_date))
+    const startsAt = flandern.map((r) => r.start_date).filter(Boolean).sort()[0] ?? null
+    const endsAt = flandern.map((r) => r.start_date).filter(Boolean).sort().reverse()[0] ?? null
 
     const { data: block } = await supabaseAdmin
       .from('cycling_blocks')
@@ -116,6 +124,8 @@ export async function generateCyclingBlocks(
         name: 'Flandern-klassikerne',
         block_order: blockOrder,
         lock_deadline: deadline,
+        starts_at: startsAt,
+        ends_at: endsAt,
       })
       .select('id')
       .single()
@@ -136,6 +146,8 @@ export async function generateCyclingBlocks(
 
   if (ardennerne.length > 0) {
     const deadline = lockDeadline(ardennerne.map((r) => r.start_date))
+    const startsAt = ardennerne.map((r) => r.start_date).filter(Boolean).sort()[0] ?? null
+    const endsAt = ardennerne.map((r) => r.start_date).filter(Boolean).sort().reverse()[0] ?? null
 
     const { data: block } = await supabaseAdmin
       .from('cycling_blocks')
@@ -144,6 +156,8 @@ export async function generateCyclingBlocks(
         name: 'Ardennerne-klassikerne',
         block_order: blockOrder,
         lock_deadline: deadline,
+        starts_at: startsAt,
+        ends_at: endsAt,
       })
       .select('id')
       .single()
@@ -160,7 +174,7 @@ export async function generateCyclingBlocks(
     blockOrder++
   }
 
-  // ── Stage races — parent + 3 sub-blokke ───────────────────────────────
+  // ── Stage races — parent + sub-blokke pr. hviledag ────────────────────
 
   for (const race of stageRaces) {
     // Hent etaper
@@ -170,8 +184,13 @@ export async function generateCyclingBlocks(
       .eq('race_id', race.id)
       .order('stage_number', { ascending: true })
 
-    if (!stages?.length) {
-      // Ingen etaper — opret en simpel blok
+    const stageRows: StageRow[] = (stages ?? []).map((s) => ({
+      stage_number: s.stage_number as number,
+      start_date: s.start_date as string,
+    }))
+
+    if (stageRows.length === 0) {
+      // Ingen etaper — opret en simpel blok (fx endags-løb fejlagtigt markeret som stage_race)
       const deadline = lockDeadline([race.start_date])
 
       const { data: block } = await supabaseAdmin
@@ -181,6 +200,8 @@ export async function generateCyclingBlocks(
           name: race.name,
           block_order: blockOrder,
           lock_deadline: deadline,
+          starts_at: race.start_date,
+          ends_at: race.start_date,
         })
         .select('id')
         .single()
@@ -197,9 +218,20 @@ export async function generateCyclingBlocks(
       continue
     }
 
-    // Opret parent-blok
-    const uge1Stages = stages.filter((s) => s.stage_number >= 1 && s.stage_number <= 7)
-    const parentDeadline = lockDeadline(uge1Stages.map((s) => s.start_date))
+    const sortedStages = [...stageRows].sort((a, b) => a.stage_number - b.stage_number)
+    const minStage = sortedStages[0].stage_number
+    const maxStage = sortedStages[sortedStages.length - 1].stage_number
+    const raceStartsAt = sortedStages[0].start_date
+    const raceEndsAt = sortedStages[sortedStages.length - 1].start_date
+
+    // Beregn sub-blokke FØR vi opretter parent — så vi kender deadline for første uge
+    const subRanges = computeSubBlockRanges(sortedStages, race.rest_days)
+    const firstWeekStages = sortedStages.filter(
+      (s) => subRanges.length > 0 && s.stage_number >= subRanges[0].range[0] && s.stage_number <= subRanges[0].range[1]
+    )
+    const parentDeadline = lockDeadline(
+      firstWeekStages.length > 0 ? firstWeekStages.map((s) => s.start_date) : [race.start_date]
+    )
 
     const { data: parentBlock } = await supabaseAdmin
       .from('cycling_blocks')
@@ -208,6 +240,10 @@ export async function generateCyclingBlocks(
         name: race.name,
         block_order: blockOrder,
         lock_deadline: parentDeadline,
+        stage_number_min: minStage,
+        stage_number_max: maxStage,
+        starts_at: raceStartsAt,
+        ends_at: raceEndsAt,
       })
       .select('id')
       .single()
@@ -226,21 +262,18 @@ export async function generateCyclingBlocks(
 
     blockOrder++
 
-    // Opret 3 sub-blokke
-    const subBlocks = [
-      { label: 'Uge 1', range: [1, 7] as const },
-      { label: 'Uge 2', range: [8, 14] as const },
-      { label: 'Uge 3', range: [15, 21] as const },
-    ]
+    // Opret sub-blokke (én pr. uge mellem hviledage, eller 3 lige uger som fallback)
+    if (subRanges.length <= 1) continue
 
-    for (const sub of subBlocks) {
-      const subStages = stages.filter(
+    for (const sub of subRanges) {
+      const subStages = sortedStages.filter(
         (s) => s.stage_number >= sub.range[0] && s.stage_number <= sub.range[1]
       )
-
       if (subStages.length === 0) continue
 
       const subDeadline = lockDeadline(subStages.map((s) => s.start_date))
+      const subStartsAt = subStages[0].start_date
+      const subEndsAt = subStages[subStages.length - 1].start_date
 
       await supabaseAdmin
         .from('cycling_blocks')
@@ -250,6 +283,10 @@ export async function generateCyclingBlocks(
           block_order: blockOrder,
           lock_deadline: subDeadline,
           parent_block_id: parentBlock.id,
+          stage_number_min: sub.range[0],
+          stage_number_max: sub.range[1],
+          starts_at: subStartsAt,
+          ends_at: subEndsAt,
         })
 
       blockOrder++

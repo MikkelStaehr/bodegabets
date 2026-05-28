@@ -63,7 +63,7 @@
 */
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { parseStageRange, isSubBlockFinished } from '@/lib/cyclingBlocks'
+import { getBlockStageRange, isSubBlockFinished } from '@/lib/cyclingBlocks'
 
 // ── Point tables ────────────────────────────────────────────────────────────
 
@@ -585,7 +585,7 @@ export async function updateCyclingBlockStatuses(gameId?: number): Promise<numbe
   // begræns til det spilrum.
   const blockQuery = supabaseAdmin
     .from('cycling_blocks')
-    .select('id, game_id, status, name, parent_block_id')
+    .select('id, game_id, status, name, parent_block_id, stage_number_min, stage_number_max')
     .neq('status', 'finished')
   if (gameId != null) blockQuery.eq('game_id', gameId)
   const { data: blocks } = await blockQuery
@@ -657,8 +657,14 @@ export async function updateCyclingBlockStatuses(gameId?: number): Promise<numbe
         })
       }
       for (const sub of subBlocks) {
-        const sb = sub as { id: string; name?: string; parent_block_id: string }
-        const range = parseStageRange(sb.name)
+        const sb = sub as {
+          id: string
+          name?: string
+          parent_block_id: string
+          stage_number_min?: number | null
+          stage_number_max?: number | null
+        }
+        const range = getBlockStageRange(sb)
         if (!range) continue
         const raceIds = parentRaceIdsByParent.get(sb.parent_block_id) ?? []
         if (raceIds.length === 0) continue
