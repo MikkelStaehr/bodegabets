@@ -63,6 +63,7 @@
 */
 
 import { supabaseAdmin } from '@/lib/supabase'
+import { parseStageRange, isSubBlockFinished } from '@/lib/cyclingBlocks'
 
 // ── Point tables ────────────────────────────────────────────────────────────
 
@@ -584,7 +585,7 @@ export async function updateCyclingBlockStatuses(gameId?: number): Promise<numbe
   // begræns til det spilrum.
   const blockQuery = supabaseAdmin
     .from('cycling_blocks')
-    .select('id, game_id, status')
+    .select('id, game_id, status, name, parent_block_id')
     .neq('status', 'finished')
   if (gameId != null) blockQuery.eq('game_id', gameId)
   const { data: blocks } = await blockQuery
@@ -631,6 +632,45 @@ export async function updateCyclingBlockStatuses(gameId?: number): Promise<numbe
       .eq('id', block.id)
     flipped++
   }
+
+  // Sub-blok-pas: flip uger inden i et stage race når deres etaper er kørt.
+  // Sub-blokke har parent_block_id != null og ingen direkte race-links;
+  // deres stage_number-range parses fra navnet ("… Uge X (Etape A-B)").
+  const subBlocks = blocks.filter((b) => (b as { parent_block_id?: string | null }).parent_block_id != null)
+  if (subBlocks.length > 0) {
+    const parentIds = [...new Set(subBlocks.map((b) => (b as { parent_block_id: string }).parent_block_id))]
+    const parentRaceIdsByParent = new Map<string, string[]>()
+    for (const pid of parentIds) parentRaceIdsByParent.set(pid, racesByBlock.get(pid) ?? [])
+    const allParentRaceIds = [...new Set([...parentRaceIdsByParent.values()].flat())]
+    if (allParentRaceIds.length > 0) {
+      const { data: stages } = await supabaseAdmin
+        .from('cycling_stages')
+        .select('race_id, stage_number, results_uploaded_at')
+        .in('race_id', allParentRaceIds)
+      const stagesByRace = new Map<string, { stage_number: number; results_uploaded_at: string | null }[]>()
+      for (const s of stages ?? []) {
+        const rid = s.race_id as string
+        if (!stagesByRace.has(rid)) stagesByRace.set(rid, [])
+        stagesByRace.get(rid)!.push({
+          stage_number: s.stage_number as number,
+          results_uploaded_at: (s.results_uploaded_at as string | null) ?? null,
+        })
+      }
+      for (const sub of subBlocks) {
+        const sb = sub as { id: string; name?: string; parent_block_id: string }
+        const range = parseStageRange(sb.name)
+        if (!range) continue
+        const raceIds = parentRaceIdsByParent.get(sb.parent_block_id) ?? []
+        if (raceIds.length === 0) continue
+        const stagesAll = raceIds.flatMap((rid) => stagesByRace.get(rid) ?? [])
+        if (isSubBlockFinished(range, stagesAll)) {
+          await supabaseAdmin.from('cycling_blocks').update({ status: 'finished' }).eq('id', sb.id)
+          flipped++
+        }
+      }
+    }
+  }
+
   return flipped
 }
 
