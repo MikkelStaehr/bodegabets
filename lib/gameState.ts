@@ -15,6 +15,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase'
 import { getCurrentChampionshipSeason } from '@/lib/gamePageHelpers'
+import { findActiveSubBlock, parseStageRange } from '@/lib/cyclingBlocks'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -698,17 +699,17 @@ async function buildCyclingLeaderboard(
   gameId: number,
   members: { user_id: string; profiles: unknown }[],
 ): Promise<{ leaderboard: LeaderboardEntry[] }> {
-  // Hent alle top-level blocks for spilrummet (sub-blocks tæller ikke som
-  // egne 'blokke' i leaderboard-konteksten — de er konceptuelle inddelinger
-  // af et stage race)
+  // Hent ALLE blocks (top + sub). Top-blokke styrer historiske blok-sejre;
+  // sub-blokke (uger i et stage race) bruges til at finde "aktiv uge" så
+  // block_points afspejler regnskab pr. hviledag i en GT.
   const { data: cyclingBlocks } = await supabaseAdmin
     .from('cycling_blocks')
-    .select('id, block_order, status, parent_block_id')
+    .select('id, name, block_order, status, parent_block_id')
     .eq('game_id', gameId)
-    .is('parent_block_id', null)
     .order('block_order', { ascending: true })
 
-  const topBlocks = (cyclingBlocks ?? []) as { id: string; block_order: number; status: string; parent_block_id: string | null }[]
+  const allBlocks = (cyclingBlocks ?? []) as { id: string; name: string; block_order: number; status: string; parent_block_id: string | null }[]
+  const topBlocks = allBlocks.filter((b) => b.parent_block_id === null)
   const finishedBlockIds = new Set(
     topBlocks.filter((b) => b.status === 'finished').map((b) => b.id),
   )
@@ -738,10 +739,29 @@ async function buildCyclingLeaderboard(
       .map((gr) => gr.race_id as string),
   )
 
-  // Hent alle scores for spilrummet
+  // Find aktiv sub-blok under nuværende top-blok (hvis nogen). block_points
+  // afspejler så regnskab pr. uge (hviledag) i en Grand Tour.
+  const currentSubBlocks = currentBlockId
+    ? allBlocks.filter((b) => b.parent_block_id === currentBlockId)
+    : []
+  let activeSubBlockId: string | null = null
+  let activeSubBlockRange: { min: number; max: number } | null = null
+  if (currentSubBlocks.length > 0 && currentBlockRaceIds.size > 0) {
+    const { data: stagesData } = await supabaseAdmin
+      .from('cycling_stages')
+      .select('stage_number, results_uploaded_at, race_id')
+      .in('race_id', [...currentBlockRaceIds])
+    const active = findActiveSubBlock(currentSubBlocks, stagesData ?? [])
+    if (active) {
+      activeSubBlockId = active.id
+      activeSubBlockRange = parseStageRange(active.name)
+    }
+  }
+
+  // Hent alle scores for spilrummet — inkl. stage_number til sub-blok-filtrering.
   const { data: scores } = await supabaseAdmin
     .from('cycling_scores')
-    .select('stage_id, race_id, total_points, cycling_lineups!inner(squad_id, cycling_squads!inner(user_id, game_id))')
+    .select('stage_id, race_id, total_points, cycling_stages!inner(stage_number), cycling_lineups!inner(squad_id, cycling_squads!inner(user_id, game_id))')
     .eq('cycling_lineups.cycling_squads.game_id', gameId)
 
   // userData rummer KUN nuværende blok-data
@@ -752,6 +772,13 @@ async function buildCyclingLeaderboard(
 
   for (const s of scores ?? []) {
     if (!currentBlockRaceIds.has(s.race_id as string)) continue
+    // Hvis vi har en aktiv sub-blok (uge), kun tag scores hvis etape-nummeret
+    // ligger i ugens range — så block_points = "stilling i denne uge".
+    if (activeSubBlockRange) {
+      const stage = s.cycling_stages as unknown as { stage_number: number } | null
+      const sn = stage?.stage_number
+      if (sn == null || sn < activeSubBlockRange.min || sn > activeSubBlockRange.max) continue
+    }
     const lineup = s.cycling_lineups as unknown as { squad_id: string; cycling_squads: { user_id: string } }
     const userId = lineup?.cycling_squads?.user_id
     if (!userId) continue
@@ -762,7 +789,9 @@ async function buildCyclingLeaderboard(
     const pts = Number(s.total_points) || 0
     const stageId = s.stage_id as string
     ud.roundPoints.set(stageId, (ud.roundPoints.get(stageId) ?? 0) + pts)
-    if (currentBlockId) ud.blockPoints.set(currentBlockId, (ud.blockPoints.get(currentBlockId) ?? 0) + pts)
+    // Aggregér til aktiv sub-blok hvis findes, ellers top-blok
+    const aggregateBlockId = activeSubBlockId ?? currentBlockId
+    if (aggregateBlockId) ud.blockPoints.set(aggregateBlockId, (ud.blockPoints.get(aggregateBlockId) ?? 0) + pts)
   }
 
   // R. SEJR = stage-vindere i nuværende blok (alle scorede stages tæller)

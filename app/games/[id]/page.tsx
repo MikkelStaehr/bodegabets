@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { getEffectiveSquadRidersForSquads } from '@/lib/cyclingTransfers'
 import CyclingBlockStanding from '@/components/cycling/CyclingBlockStanding'
+import { findActiveSubBlock, shortSubBlockName } from '@/lib/cyclingBlocks'
 import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
@@ -325,6 +326,8 @@ export default async function GamePage({ params }: Props) {
   let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null; rest_days: string[] | null; cycling_block_id: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
+  // Visnings-navn for aktiv blok: aktiv sub-blok (uge) hvis findes, ellers top-blokken.
+  let cyclingActiveBlockDisplayName: string | null = null
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null }[] = []
   let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; results_uploaded_at: string | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupStartlists: Record<string, string[]> = {}
@@ -387,6 +390,7 @@ export default async function GamePage({ params }: Props) {
 
       if (fetchedBlock) {
         cyclingActiveBlock = fetchedBlock
+        cyclingActiveBlockDisplayName = fetchedBlock.name
       }
     }
 
@@ -398,6 +402,30 @@ export default async function GamePage({ params }: Props) {
       .order('block_order', { ascending: true })
 
     cyclingBlocks = (blocksData ?? []) as typeof cyclingBlocks
+
+    // Find aktiv SUB-blok (uge) under cyclingActiveBlock — bruges som overskrift
+    // på per-blok stillingen, så vi viser "Giro Uge X — stilling" i stedet for
+    // "Giro d'Italia — stilling". Hvis top-blokken ikke har sub-blokke (fx en
+    // klassiker-blok), falder vi tilbage til top-blokkens navn.
+    if (cyclingActiveBlock) {
+      const subs = cyclingBlocks.filter((b) => b.parent_block_id === cyclingActiveBlock.id)
+      if (subs.length > 0) {
+        const { data: gr } = await supabaseAdmin
+          .from('cycling_game_races')
+          .select('race_id')
+          .eq('game_id', gameId)
+          .eq('cycling_block_id', cyclingActiveBlock.id)
+        const raceIdsForActive = (gr ?? []).map((r) => r.race_id as string)
+        if (raceIdsForActive.length > 0) {
+          const { data: stagesForActive } = await supabaseAdmin
+            .from('cycling_stages')
+            .select('stage_number, results_uploaded_at')
+            .in('race_id', raceIdsForActive)
+          const active = findActiveSubBlock(subs, stagesForActive ?? [])
+          if (active) cyclingActiveBlockDisplayName = shortSubBlockName(active.name)
+        }
+      }
+    }
 
     // Beregn vinder for hver finished block (top point summe på tværs af blokkens stages)
     const finishedBlockIds = cyclingBlocks
@@ -1425,7 +1453,7 @@ export default async function GamePage({ params }: Props) {
               squadId={userSquad?.id ?? null}
               currentUserId={user.id}
             />
-            <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlock?.name ?? null} />
+            <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} />
             <Leaderboard gameId={gameId} />
             {typedGame.host_id === user.id && (
               <Link
