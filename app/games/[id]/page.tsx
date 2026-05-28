@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { getEffectiveSquadRidersForSquads } from '@/lib/cyclingTransfers'
+import CyclingBlockStanding from '@/components/cycling/CyclingBlockStanding'
 import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
@@ -1424,6 +1425,7 @@ export default async function GamePage({ params }: Props) {
               squadId={userSquad?.id ?? null}
               currentUserId={user.id}
             />
+            <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlock?.name ?? null} />
             <Leaderboard gameId={gameId} />
             {typedGame.host_id === user.id && (
               <Link
