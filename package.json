@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "build-game-rounds": "dotenv -e .env.local -- npx ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/build-game-rounds.ts",
-    "backfill-cycling-blocks": "dotenv -e .env.local -- npx ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/backfill-cycling-blocks.ts"
+    "backfill-cycling-blocks": "dotenv -e .env.local -- npx ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/backfill-cycling-blocks.ts",
+    "fix-giro-mtf-profiles": "dotenv -e .env.local -- npx ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/fix-giro-mtf-profiles.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.52.0",
