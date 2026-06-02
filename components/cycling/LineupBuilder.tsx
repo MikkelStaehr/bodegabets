@@ -1076,6 +1076,24 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                   <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, color: '#F2EDE4' }}>
                     {role.label}
                   </span>
+                  <a
+                    href={`/games/cycling-guide#${role.key.replace(/_\d+$/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Sådan scorer ${role.label} point`}
+                    style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 10, fontWeight: 700,
+                      color: '#C9A84C',
+                      background: 'rgba(201,168,76,0.12)',
+                      border: '1px solid rgba(201,168,76,0.3)',
+                      padding: '2px 7px', borderRadius: 999,
+                      textDecoration: 'none',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    ?
+                  </a>
                   {role.catRule && (
                     <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: '#8FABC4' }}>
                       (kun Kat {role.catRule.join(', ')})

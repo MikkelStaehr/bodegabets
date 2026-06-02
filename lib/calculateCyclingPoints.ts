@@ -64,59 +64,22 @@
 
 import { supabaseAdmin } from '@/lib/supabase'
 import { getBlockStageRange, isSubBlockFinished } from '@/lib/cyclingBlocks'
+import {
+  CAT_MULTIPLIER,
+  DNF_PENALTY_MIN,
+  DNF_PENALTY_PCT,
+  GC_MULTIPLIER,
+  JERSEY_POINTS,
+  NEW_SCORING_FROM,
+  WON_HOW_SPRINTER_BONUS,
+  getBasePoints,
+  getGrimpeurMultiplier,
+  getSprinterMultiplier,
+  getWonHowGrimpeurBonus,
+} from '@/lib/cyclingScoringConstants'
 
-// ── Point tables ────────────────────────────────────────────────────────────
-
-const POSITION_POINTS: [number, number][] = [
-  [1, 50],
-  [3, 30],
-  [5, 20],
-  [10, 10],
-  [20, 5],
-]
-
-const CAT_MULTIPLIER: Record<number, number> = {
-  1: 1.0,
-  2: 1.3,
-  3: 1.7,
-  4: 2.2,
-  5: 3.5,
-}
-
-// Jersey keys er race-agnostiske (leader/points/mountain/youth) — den faktiske
-// jersey-farve varierer per race (Tour=gul, Giro=pink, Vuelta=rød).
-const JERSEY_POINTS: Record<string, number> = {
-  leader: 8,
-  points: 5,
-  mountain: 5,
-  youth: 3,
-}
-
-// GC-multiplier: bonus for ryttere i top-10 sammenlagt efter etape (kun stage races)
-const GC_MULTIPLIER: Record<number, number> = {
-  1: 1.4,
-  2: 1.3, 3: 1.3,
-  4: 1.2, 5: 1.2,
-  6: 1.1, 7: 1.1, 8: 1.1, 9: 1.1, 10: 1.1,
-}
-
-const DNF_PENALTY_PCT = 0.5   // 50% of would-be score
-const DNF_PENALTY_MIN = -5    // minimum penalty even if no placement points
-
-// Nye regler (spurt-tog + cobbled ×1.2) gælder KUN for etaper der starter fra
-// denne dato og frem. Allerede-kørte Giro-etaper (sat under de gamle regler)
-// rescores ikke retroaktivt. Dynamiske roller er uanset hvad kun fremadrettede.
-const NEW_SCORING_FROM = '2026-05-27'
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function getBasePoints(position: number | null): number {
-  if (position == null || position <= 0) return 0
-  for (const [maxPos, pts] of POSITION_POINTS) {
-    if (position <= maxPos) return pts
-  }
-  return 0
-}
+// Konstanterne er nu i lib/cyclingScoringConstants.ts — én kilde til sandhed
+// for både scoring og reglebog.
 
 // Trøjebærere for en etape — udledt af klassement-placeringerne (position 1 =
 // fører), samme princip som klassement-visningen. Som på vejen bærer hver
@@ -154,40 +117,6 @@ function getGcMultiplier(gcPosition: number | null): number {
   return GC_MULTIPLIER[gcPosition] ?? 1.0
 }
 
-// ── Profile-based role multipliers ──────────────────────────────────────────
-
-// cobbled (brosten) behandles som 'hilly' (bakket) ×1.2 — men kun under de nye
-// regler. Før NEW_SCORING_FROM gav cobbled ×1.0 (uændret bagud).
-function getGrimpeurMultiplier(profile: string, newRules: boolean): number {
-  if (profile === 'mountain') return 1.8
-  if (profile === 'hilly') return 1.2
-  if (profile === 'cobbled') return newRules ? 1.2 : 1.0
-  return 1.0
-}
-
-function getSprinterMultiplier(profile: string, newRules: boolean): number {
-  if (profile === 'flat' || profile === 'mixed') return 1.8
-  if (profile === 'hilly') return 1.2
-  if (profile === 'cobbled') return newRules ? 1.2 : 1.0
-  return 1.0
-}
-
-const WON_HOW_SPRINTER_BONUS: Record<string, number> = {
-  'Bunch sprint': 20,
-  'Small group sprint': 25,
-  'Sprint a deux': 50,
-}
-
-function getWonHowGrimpeurBonus(wonHow: string): number {
-  if (wonHow === 'Sprint a deux') return 25
-  if (wonHow === 'Small group sprint') return 20
-  // "XX.xx km solo" → floor(km) bonus points + 50 base solo bonus
-  const soloMatch = wonHow.match(/^([\d.]+)\s*km\s+solo$/i)
-  if (soloMatch) return 50 + Math.floor(parseFloat(soloMatch[1]))
-  if (wonHow === 'Solo') return 50
-  return 0
-}
-
 // ── Types ───────────────────────────────────────────────────────────────────
 
 type RiderResult = {
@@ -220,6 +149,11 @@ type ScoreRow = {
   base_points: number
   role_multiplier: number
   gc_multiplier: number
+  // Breakdown af role_multiplier (typisk cat × profile × train). Gemt så
+  // UI'en kan vise "hvor kommer multiplikatoren fra" når man hover et point.
+  cat_multiplier: number
+  profile_multiplier: number
+  train_multiplier: number
   role_bonus: number
   jersey_points: number
   team_bonus: number
@@ -400,6 +334,12 @@ export async function calculateCyclingPoints(
       const base = getBasePoints(position)
       const gcMul = getGcMultiplier(result?.gc_position_after ?? null)
       let roleMul = 1.0
+      // Breakdown af roleMul — gemmes på score-rækken så tooltip kan vise
+      // hvor multiplikatoren kommer fra. Defaults til 1.0 for roller uden
+      // multiplikator (domestique/equipier/joker).
+      let usedCatMul = 1.0
+      let profileMul = 1.0
+      let usedTrainMul = 1.0
       let roleBonus = 0
       const jerseyKey = jerseyWearers.get(rider.rider_id)
       const jerseyPts = jerseyKey ? (JERSEY_POINTS[jerseyKey] ?? 0) : 0
@@ -409,19 +349,24 @@ export async function calculateCyclingPoints(
       // Role-specific calculation
       switch (rider.role) {
         case 'leader':
+          usedCatMul = catMul
           roleMul = catMul
           break
 
         case 'lieutenant':
+          usedCatMul = catMul
           if (position != null && position <= 10) {
-            roleMul = catMul * (leaderDnf ? 2.8 : 1.8)
+            profileMul = leaderDnf ? 2.8 : 1.8
+            roleMul = catMul * profileMul
           } else {
             roleMul = catMul
           }
           break
 
         case 'grimpeur':
-          roleMul = catMul * getGrimpeurMultiplier(profile, newRules)
+          usedCatMul = catMul
+          profileMul = getGrimpeurMultiplier(profile, newRules)
+          roleMul = catMul * profileMul
           if (wonHow && position != null && position <= 10) {
             roleBonus = getWonHowGrimpeurBonus(wonHow)
           }
@@ -429,7 +374,10 @@ export async function calculateCyclingPoints(
 
         case 'sprinter':
           // trainMul = ×1.0 uden tog; ×1.2–1.4 med 1-2 leadout-equipiers fra samme hold
-          roleMul = catMul * getSprinterMultiplier(profile, newRules) * trainMul
+          usedCatMul = catMul
+          profileMul = getSprinterMultiplier(profile, newRules)
+          usedTrainMul = trainMul
+          roleMul = catMul * profileMul * trainMul
           if (wonHow && position != null && position <= 10) {
             roleBonus = WON_HOW_SPRINTER_BONUS[wonHow] ?? 0
           }
@@ -460,6 +408,7 @@ export async function calculateCyclingPoints(
           break
 
         default:
+          usedCatMul = catMul
           roleMul = catMul
           break
       }
@@ -497,6 +446,9 @@ export async function calculateCyclingPoints(
         base_points: base,
         role_multiplier: roleMul,
         gc_multiplier: gcMul,
+        cat_multiplier: usedCatMul,
+        profile_multiplier: profileMul,
+        train_multiplier: usedTrainMul,
         role_bonus: roleBonus,
         jersey_points: jerseyPts,
         team_bonus: teamBonus,
