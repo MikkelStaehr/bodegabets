@@ -84,7 +84,10 @@ export default function DashboardGameCard({ row, logoUrls, leagueNames, top3, ac
             )}
             {activeBlock && (
               <p className="font-condensed text-[11px] mt-0.5" style={{ color: '#9E9486' }}>
-                {activeBlock.name} · {activeBlock.rounds_remaining} runde{activeBlock.rounds_remaining !== 1 ? 'r' : ''} tilbage
+                {activeBlock.name} · {activeBlock.rounds_remaining}{' '}
+                {game.sport_type === 'cycling'
+                  ? `etape${activeBlock.rounds_remaining !== 1 ? 'r' : ''}`
+                  : `runde${activeBlock.rounds_remaining !== 1 ? 'r' : ''}`} tilbage
               </p>
             )}
           </div>

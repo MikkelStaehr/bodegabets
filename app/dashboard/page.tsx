@@ -299,6 +299,88 @@ export default async function DashboardPage() {
     }
   }
 
+  // Cykel-spil: find aktiv (sub-)blok + resterende etaper.
+  // Bruges til at vise "Giro Uge 3 · 2 etaper tilbage" på dashboard-cards.
+  const cyclingGameIds = rawGames.filter((m) => m.game.sport === 'cycling').map((m) => m.game.id)
+  if (cyclingGameIds.length > 0) {
+    const { data: cyclingBlocks } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('id, game_id, name, parent_block_id, status, stage_number_min, stage_number_max, block_order')
+      .in('game_id', cyclingGameIds)
+      .order('block_order', { ascending: true })
+
+    // Find tilknyttede races + etaper for at tælle "tilbage"
+    const allCyclingBlockIds = (cyclingBlocks ?? []).map((b) => b.id as string)
+    const { data: cyclingLinks } = await supabaseAdmin
+      .from('cycling_game_races')
+      .select('cycling_block_id, race_id')
+      .in('cycling_block_id', allCyclingBlockIds)
+    const cyclingRacesByBlock = new Map<string, string[]>()
+    for (const l of cyclingLinks ?? []) {
+      const bid = l.cycling_block_id as string
+      if (!cyclingRacesByBlock.has(bid)) cyclingRacesByBlock.set(bid, [])
+      cyclingRacesByBlock.get(bid)!.push(l.race_id as string)
+    }
+    const allCyclingRaceIds = [...new Set([...cyclingRacesByBlock.values()].flat())]
+    const cyclingStagesByRace = new Map<string, { stage_number: number; results_uploaded_at: string | null }[]>()
+    if (allCyclingRaceIds.length > 0) {
+      const { data: cyclingStages } = await supabaseAdmin
+        .from('cycling_stages')
+        .select('race_id, stage_number, results_uploaded_at')
+        .in('race_id', allCyclingRaceIds)
+      for (const s of cyclingStages ?? []) {
+        const rid = s.race_id as string
+        if (!cyclingStagesByRace.has(rid)) cyclingStagesByRace.set(rid, [])
+        cyclingStagesByRace.get(rid)!.push({
+          stage_number: s.stage_number as number,
+          results_uploaded_at: (s.results_uploaded_at as string | null) ?? null,
+        })
+      }
+    }
+
+    // Pr. spil: find aktiv blok = laveste block_order der ikke er finished.
+    // Foretræk sub-blok hvis findes under en aktiv top-blok.
+    const cyclingBlocksByGame = new Map<number, typeof cyclingBlocks>()
+    for (const b of cyclingBlocks ?? []) {
+      const gid = b.game_id as number
+      if (!cyclingBlocksByGame.has(gid)) cyclingBlocksByGame.set(gid, [])
+      cyclingBlocksByGame.get(gid)!.push(b)
+    }
+
+    for (const gameId of cyclingGameIds) {
+      const blocks = cyclingBlocksByGame.get(gameId) ?? []
+      if (blocks.length === 0) continue
+
+      // Aktiv top-blok (eller første ikke-finished)
+      const topBlocks = blocks.filter((b) => b.parent_block_id == null)
+      const activeTop = topBlocks.find((b) => b.status === 'active') ?? topBlocks.find((b) => b.status !== 'finished')
+      if (!activeTop) continue
+
+      // Find aktiv sub-blok under activeTop hvis findes
+      const subs = blocks.filter((b) => b.parent_block_id === activeTop.id)
+      const activeSub = subs.find((b) => b.status === 'active')
+      const chosen = activeSub ?? activeTop
+
+      // Tæl resterende etaper i blokken
+      const raceIds = cyclingRacesByBlock.get(activeTop.id as string) ?? []
+      const stages = raceIds.flatMap((rid) => cyclingStagesByRace.get(rid) ?? [])
+      const stageMin = (chosen.stage_number_min as number | null) ?? null
+      const stageMax = (chosen.stage_number_max as number | null) ?? null
+      const inRange = stageMin != null && stageMax != null
+        ? stages.filter((s) => s.stage_number >= stageMin && s.stage_number <= stageMax)
+        : stages
+      const stagesRemaining = inRange.filter((s) => s.results_uploaded_at == null).length
+
+      // Pænere navn (strip "Etape A-B")
+      const displayName = (chosen.name as string).replace(/\s*\(Etape\s+\d+\s*-\s*\d+\)\s*$/i, '').trim()
+      activeBlockByGame.set(gameId, {
+        block_number: (chosen.block_order as number) ?? 0,
+        name: displayName,
+        rounds_remaining: stagesRemaining,
+      })
+    }
+  }
+
   // Build logo URLs + league names per game (multiple leagues possible)
   const logoUrlsByGame = new Map<number, string[]>()
   const leagueNamesByGame = new Map<number, string[]>()
