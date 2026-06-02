@@ -14,6 +14,10 @@ type Score = {
   role_bonus: number
   role_multiplier: number
   gc_multiplier: number
+  /** Breakdown af role_multiplier (cat × profile × train). 1.0 hvis ikke aktivt. */
+  cat_multiplier?: number | null
+  profile_multiplier?: number | null
+  train_multiplier?: number | null
   jersey_points: number
   team_bonus: number
   bench_penalty: number
@@ -148,42 +152,88 @@ function RiderPhoto({ rider }: { rider: Rider }) {
   )
 }
 
+function fmtMul(n: number): string {
+  // Pæn formatering: 1.8, 2.808, 1.2 — drop trailing 0
+  return `×${(Math.round(n * 1000) / 1000).toString()}`
+}
+
 function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolean }) {
   if (isJokerDnf) return null
 
-  const lines: { label: string; value: string }[] = [
+  // Breakdown: hvis de granulere felter er udfyldt (efter migration + re-score)
+  // viser vi cat × profile × train hver for sig. Falder tilbage til samlet
+  // role_multiplier hvis felterne ikke er sat (gamle scores før migration).
+  const catMul = score.cat_multiplier ?? null
+  const profileMul = score.profile_multiplier ?? null
+  const trainMul = score.train_multiplier ?? null
+  const hasBreakdown =
+    (catMul != null && catMul !== 1) ||
+    (profileMul != null && profileMul !== 1) ||
+    (trainMul != null && trainMul !== 1)
+
+  type Line = { label: string; value: string; highlight?: boolean; isTotal?: boolean }
+  const lines: Line[] = [
     { label: 'Basispoint', value: `${score.base_points}` },
   ]
   if (score.role_bonus > 0) lines.push({ label: 'Rolle-bonus', value: `+${score.role_bonus}` })
-  if (score.role_multiplier !== 1) lines.push({ label: 'Rolle-multiplikator', value: `×${score.role_multiplier}` })
-  if (score.gc_multiplier && score.gc_multiplier !== 1) lines.push({ label: 'GC-multiplikator', value: `×${score.gc_multiplier}` })
+
+  if (hasBreakdown) {
+    if (catMul != null && catMul !== 1) lines.push({ label: 'Kategori', value: fmtMul(catMul) })
+    if (profileMul != null && profileMul !== 1) lines.push({ label: 'Profil/rolle', value: fmtMul(profileMul) })
+    if (trainMul != null && trainMul !== 1) lines.push({ label: 'Spurt-tog', value: fmtMul(trainMul), highlight: true })
+  } else if (score.role_multiplier !== 1) {
+    lines.push({ label: 'Rolle-multiplikator', value: fmtMul(score.role_multiplier) })
+  }
+
+  if (score.gc_multiplier && score.gc_multiplier !== 1) lines.push({ label: 'GC-multiplikator', value: fmtMul(score.gc_multiplier) })
   if (score.jersey_points > 0) lines.push({ label: 'Jersey-point', value: `+${score.jersey_points}` })
   if (score.team_bonus > 0) lines.push({ label: 'Hold-bonus', value: `+${score.team_bonus}` })
   if (score.dnf_penalty < 0) lines.push({ label: 'DNF-straf', value: `${score.dnf_penalty}` })
   if (score.bench_penalty < 0) lines.push({ label: 'Bænk-straf', value: `${score.bench_penalty}` })
-  lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}` })
+  lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}`, isTotal: true })
+
+  const roleAnchor = score.role.replace(/_\d+$/, '')
 
   return (
     <div style={{
       position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
       background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 4,
-      padding: '8px 12px', minWidth: 160, whiteSpace: 'nowrap',
+      padding: '8px 12px', minWidth: 180, whiteSpace: 'nowrap',
     }}>
       {lines.map((line, i) => (
         <div key={i} style={{
           display: 'flex', justifyContent: 'space-between', gap: 16,
           fontFamily: "'Barlow Condensed', sans-serif",
           fontSize: 11,
-          fontWeight: line.label === 'Total' ? 700 : 400,
-          color: line.label === 'Total' ? '#F2EDE4' : 'rgba(255,255,255,0.6)',
-          borderTop: line.label === 'Total' ? '1px solid rgba(255,255,255,0.1)' : 'none',
-          paddingTop: line.label === 'Total' ? 4 : 0,
-          marginTop: line.label === 'Total' ? 4 : 0,
+          fontWeight: line.isTotal ? 700 : line.highlight ? 600 : 400,
+          color: line.isTotal
+            ? '#F2EDE4'
+            : line.highlight
+              ? '#FAC775'  // gold-ish for spurt-tog
+              : 'rgba(255,255,255,0.6)',
+          borderTop: line.isTotal ? '1px solid rgba(255,255,255,0.1)' : 'none',
+          paddingTop: line.isTotal ? 4 : 0,
+          marginTop: line.isTotal ? 4 : 0,
         }}>
           <span>{line.label}</span>
           <span>{line.value}</span>
         </div>
       ))}
+      <a
+        href={`/games/cycling-guide#${roleAnchor}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'block', marginTop: 6, paddingTop: 6,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: 10, fontWeight: 600,
+          color: '#C9A84C', textDecoration: 'none',
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+        }}
+      >
+        Sådan beregnes point →
+      </a>
     </div>
   )
 }
