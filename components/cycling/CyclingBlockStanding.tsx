@@ -7,6 +7,8 @@ type Props = {
   gameId: number
   /** Navn på den aktive blok (vises i overskriften). */
   blockName: string | null
+  /** Status på den aktive blok — styrer "Fører" (active) vs "Vinder" (finished). */
+  blockStatus?: 'upcoming' | 'active' | 'finished' | null
 }
 
 /**
@@ -14,8 +16,12 @@ type Props = {
  * (`block_points` på LeaderboardEntry). Bruges som supplement til den globale
  * Leaderboard, så man kan se "hvem fører i Giroen lige nu" uden at skulle
  * gætte fra de samlede earnings.
+ *
+ * Top-1 markeres med en label:
+ *   - active blok → "Fører" (gylden, spændingen er live)
+ *   - finished blok → "Vinder" (gylden + trofæ-ikon, blokken er afsluttet)
  */
-export default function CyclingBlockStanding({ gameId, blockName }: Props) {
+export default function CyclingBlockStanding({ gameId, blockName, blockStatus }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -49,6 +55,8 @@ export default function CyclingBlockStanding({ gameId, blockName }: Props) {
         <div>
           {ranked.map((entry, idx) => {
             const points = entry.block_points ?? 0
+            const isTop1 = idx === 0 && points > 0
+            const isFinished = blockStatus === 'finished'
             return (
               <div
                 key={entry.user_id}
@@ -60,8 +68,22 @@ export default function CyclingBlockStanding({ gameId, blockName }: Props) {
                 }`}>
                   {idx + 1}
                 </span>
-                <span className="font-condensed font-semibold text-sm text-ink truncate">
-                  {entry.username}
+                <span className="min-w-0 flex items-center gap-2">
+                  <span className="font-condensed font-semibold text-sm text-ink truncate">
+                    {entry.username}
+                  </span>
+                  {isTop1 && (
+                    <span
+                      className="font-condensed text-[10px] font-bold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{
+                        background: 'rgba(184,150,62,0.15)',
+                        color: '#8B6F1F',
+                        border: '1px solid rgba(184,150,62,0.35)',
+                      }}
+                    >
+                      {isFinished ? 'Vinder' : 'Fører'}
+                    </span>
+                  )}
                 </span>
                 <span className={`stat-number text-base ${points > 0 ? 'text-ink' : 'text-warm-gray'}`}>
                   {points > 0 ? `${points} pt` : '—'}

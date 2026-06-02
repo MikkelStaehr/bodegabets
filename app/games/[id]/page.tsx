@@ -328,6 +328,8 @@ export default async function GamePage({ params }: Props) {
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   // Visnings-navn for aktiv blok: aktiv sub-blok (uge) hvis findes, ellers top-blokken.
   let cyclingActiveBlockDisplayName: string | null = null
+  // Status på den vist-blok (kan være sub-blok). Styrer "Fører" vs "Vinder"-label i CyclingBlockStanding.
+  let cyclingActiveBlockStatus: 'upcoming' | 'active' | 'finished' | null = null
   let cyclingBlocks: { id: string; name: string; block_order: number; parent_block_id: string | null; lock_deadline: string; status?: string; winner_username?: string | null; winner_user_id?: string | null; stage_number_min?: number | null; stage_number_max?: number | null }[] = []
   let lineupStages: { id: string; race_id: string; stage_number: number; name: string; profile: string | null; profile_image_url: string | null; start_date: string; distance_km: number | null; departure: string | null; arrival: string | null; profile_score: number | null; vertical_meters: number | null; results_uploaded_at: string | null; race_name: string; race_type: string; race_profile_image_url: string | null; cycling_block_id: string | null }[] = []
   let lineupStartlists: Record<string, string[]> = {}
@@ -408,6 +410,10 @@ export default async function GamePage({ params }: Props) {
     // "Giro d'Italia — stilling". Hvis top-blokken ikke har sub-blokke (fx en
     // klassiker-blok), falder vi tilbage til top-blokkens navn.
     if (cyclingActiveBlock) {
+      // Default: brug top-blokkens status hvis ingen sub-blok findes
+      const topBlock = cyclingBlocks.find((b) => b.id === cyclingActiveBlock!.id)
+      cyclingActiveBlockStatus = (topBlock?.status as typeof cyclingActiveBlockStatus) ?? null
+
       const subs = cyclingBlocks.filter((b) => b.parent_block_id === cyclingActiveBlock.id)
       if (subs.length > 0) {
         const { data: gr } = await supabaseAdmin
@@ -422,7 +428,10 @@ export default async function GamePage({ params }: Props) {
             .select('stage_number, results_uploaded_at')
             .in('race_id', raceIdsForActive)
           const active = findActiveSubBlock(subs, stagesForActive ?? [])
-          if (active) cyclingActiveBlockDisplayName = shortSubBlockName(active.name)
+          if (active) {
+            cyclingActiveBlockDisplayName = shortSubBlockName(active.name)
+            cyclingActiveBlockStatus = (active.status as typeof cyclingActiveBlockStatus) ?? null
+          }
         }
       }
     }
@@ -1453,7 +1462,7 @@ export default async function GamePage({ params }: Props) {
               squadId={userSquad?.id ?? null}
               currentUserId={user.id}
             />
-            <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} />
+            <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} blockStatus={cyclingActiveBlockStatus} />
             <Leaderboard gameId={gameId} />
             {typedGame.host_id === user.id && (
               <Link

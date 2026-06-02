@@ -63,7 +63,8 @@
 */
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { getBlockStageRange, isSubBlockFinished } from '@/lib/cyclingBlocks'
+import { getBlockStageRange } from '@/lib/cyclingBlocks'
+import { computeBlockStandings, snapshotBlockResults } from '@/lib/cyclingBlockStandings'
 import {
   CAT_MULTIPLIER,
   DNF_PENALTY_MIN,
@@ -528,30 +529,50 @@ export async function calculateCyclingPoints(
   }
 }
 
-// ── Block status — flip 'active'/'upcoming' → 'finished' når alle løb er kørt
-// Idempotent: kalder den fra de samme cron-jobs der beregner points,
-// så block_wins begynder at tælle med så snart sidste race er finished.
+// ── Block lifecycle — upcoming → active → finished ─────────────────────────
+//
+// Kører fuld status-cyclus for alle blokke i et spil (eller alle spil).
+// Idempotent: trygt at kalde flere gange. Auto-finalize ved overgang til
+// 'finished' — beregner standings og snapshotter til cycling_block_results +
+// sætter winner_user_id/winner_points/finalized_at på blokken.
+//
+// Status-regler:
+//   upcoming → active:   første relevante etape har results_uploaded_at
+//   active → finished:   alle relevante etaper har results_uploaded_at
+//     - top-blok: alle etaper på tværs af alle tilknyttede races
+//     - sub-blok: alle etaper i stage_number-rangen for parent-races
+//   no-change:           hvis intet er ændret (idempotent)
+
+type BlockStatusRow = {
+  id: string
+  game_id: number
+  status: string
+  name: string
+  parent_block_id: string | null
+  stage_number_min: number | null
+  stage_number_max: number | null
+  winner_user_id: string | null
+  finalized_at: string | null
+}
 
 export async function updateCyclingBlockStatuses(gameId?: number): Promise<number> {
-  // Hent kandidat-blocks (ikke allerede finished). Hvis gameId er givet,
-  // begræns til det spilrum.
+  // Hent ALLE blokke (også finished — så vi kan reparere snapshots der mangler).
+  // Vi springer kun rene no-op-blokke over i selve flip-trinet.
   const blockQuery = supabaseAdmin
     .from('cycling_blocks')
-    .select('id, game_id, status, name, parent_block_id, stage_number_min, stage_number_max')
-    .neq('status', 'finished')
+    .select('id, game_id, status, name, parent_block_id, stage_number_min, stage_number_max, winner_user_id, finalized_at')
   if (gameId != null) blockQuery.eq('game_id', gameId)
-  const { data: blocks } = await blockQuery
+  const { data: blocksRaw } = await blockQuery
+  if (!blocksRaw?.length) return 0
 
-  if (!blocks?.length) return 0
+  const blocks = blocksRaw as BlockStatusRow[]
+  const blockIds = blocks.map((b) => b.id)
 
-  const blockIds = blocks.map((b) => b.id as string)
-
-  // Hent alle race-tilknytninger for disse blocks
+  // Race-links pr. blok (kun top-blokke har direkte links)
   const { data: links } = await supabaseAdmin
     .from('cycling_game_races')
     .select('cycling_block_id, race_id')
     .in('cycling_block_id', blockIds)
-
   const racesByBlock = new Map<string, string[]>()
   for (const l of links ?? []) {
     const bid = l.cycling_block_id as string
@@ -559,73 +580,98 @@ export async function updateCyclingBlockStatuses(gameId?: number): Promise<numbe
     racesByBlock.get(bid)!.push(l.race_id as string)
   }
 
-  // Hent status for alle relevante races i ét hug
-  const allRaceIds = [...new Set([...racesByBlock.values()].flat())]
+  // Etaper for alle relevante races (sub-blokkes parent-races inkluderet)
+  const parentRaceMap = new Map<string, string[]>()
+  for (const b of blocks) {
+    if (!b.parent_block_id) continue
+    const parentRaces = racesByBlock.get(b.parent_block_id) ?? []
+    parentRaceMap.set(b.id, parentRaces)
+  }
+  const allRaceIds = [...new Set([
+    ...racesByBlock.values(),
+    ...parentRaceMap.values(),
+  ].flat())]
   if (allRaceIds.length === 0) return 0
 
-  const { data: races } = await supabaseAdmin
-    .from('cycling_races')
-    .select('id, status')
-    .in('id', allRaceIds)
+  const { data: stages } = await supabaseAdmin
+    .from('cycling_stages')
+    .select('race_id, stage_number, results_uploaded_at')
+    .in('race_id', allRaceIds)
+  const stagesByRace = new Map<string, { stage_number: number; results_uploaded_at: string | null }[]>()
+  for (const s of stages ?? []) {
+    const rid = s.race_id as string
+    if (!stagesByRace.has(rid)) stagesByRace.set(rid, [])
+    stagesByRace.get(rid)!.push({
+      stage_number: s.stage_number as number,
+      results_uploaded_at: (s.results_uploaded_at as string | null) ?? null,
+    })
+  }
 
-  const raceStatusMap = new Map<string, string>()
-  for (const r of races ?? []) raceStatusMap.set(r.id as string, r.status as string)
+  // Hjælper: beregn ny status + relateret race-ids for blokken
+  function evaluateBlock(block: BlockStatusRow): {
+    expected: 'upcoming' | 'active' | 'finished'
+    raceIds: string[]
+    relevantStages: { stage_number: number; results_uploaded_at: string | null }[]
+  } | null {
+    const isSubBlock = !!block.parent_block_id
+    const raceIds = isSubBlock
+      ? (parentRaceMap.get(block.id) ?? [])
+      : (racesByBlock.get(block.id) ?? [])
+    if (raceIds.length === 0) return null
+
+    const allStages = raceIds.flatMap((rid) => stagesByRace.get(rid) ?? [])
+    const range = isSubBlock
+      ? getBlockStageRange(block)
+      : (block.stage_number_min != null && block.stage_number_max != null
+          ? { min: block.stage_number_min, max: block.stage_number_max }
+          : null)
+    const relevantStages = range
+      ? allStages.filter((s) => s.stage_number >= range.min && s.stage_number <= range.max)
+      : allStages
+    if (relevantStages.length === 0) return null
+
+    const uploaded = relevantStages.filter((s) => s.results_uploaded_at != null)
+    if (uploaded.length === 0) return { expected: 'upcoming', raceIds, relevantStages }
+    if (uploaded.length === relevantStages.length) return { expected: 'finished', raceIds, relevantStages }
+    return { expected: 'active', raceIds, relevantStages }
+  }
 
   let flipped = 0
   for (const block of blocks) {
-    const raceIds = racesByBlock.get(block.id as string) ?? []
-    if (raceIds.length === 0) continue
-    const allFinished = raceIds.every((rid) => raceStatusMap.get(rid) === 'finished')
-    if (!allFinished) continue
+    const evalResult = evaluateBlock(block)
+    if (!evalResult) continue
+    const { expected, raceIds } = evalResult
 
-    await supabaseAdmin
-      .from('cycling_blocks')
-      .update({ status: 'finished' })
-      .eq('id', block.id)
-    flipped++
-  }
+    const currentStatus = block.status ?? 'upcoming'
+    const statusChanged = currentStatus !== expected
+    const needsFinalize = expected === 'finished' &&
+      (block.winner_user_id == null || block.finalized_at == null)
 
-  // Sub-blok-pas: flip uger inden i et stage race når deres etaper er kørt.
-  // Sub-blokke har parent_block_id != null og ingen direkte race-links;
-  // deres stage_number-range parses fra navnet ("… Uge X (Etape A-B)").
-  const subBlocks = blocks.filter((b) => (b as { parent_block_id?: string | null }).parent_block_id != null)
-  if (subBlocks.length > 0) {
-    const parentIds = [...new Set(subBlocks.map((b) => (b as { parent_block_id: string }).parent_block_id))]
-    const parentRaceIdsByParent = new Map<string, string[]>()
-    for (const pid of parentIds) parentRaceIdsByParent.set(pid, racesByBlock.get(pid) ?? [])
-    const allParentRaceIds = [...new Set([...parentRaceIdsByParent.values()].flat())]
-    if (allParentRaceIds.length > 0) {
-      const { data: stages } = await supabaseAdmin
-        .from('cycling_stages')
-        .select('race_id, stage_number, results_uploaded_at')
-        .in('race_id', allParentRaceIds)
-      const stagesByRace = new Map<string, { stage_number: number; results_uploaded_at: string | null }[]>()
-      for (const s of stages ?? []) {
-        const rid = s.race_id as string
-        if (!stagesByRace.has(rid)) stagesByRace.set(rid, [])
-        stagesByRace.get(rid)!.push({
-          stage_number: s.stage_number as number,
-          results_uploaded_at: (s.results_uploaded_at as string | null) ?? null,
-        })
-      }
-      for (const sub of subBlocks) {
-        const sb = sub as {
-          id: string
-          name?: string
-          parent_block_id: string
-          stage_number_min?: number | null
-          stage_number_max?: number | null
-        }
-        const range = getBlockStageRange(sb)
-        if (!range) continue
-        const raceIds = parentRaceIdsByParent.get(sb.parent_block_id) ?? []
-        if (raceIds.length === 0) continue
-        const stagesAll = raceIds.flatMap((rid) => stagesByRace.get(rid) ?? [])
-        if (isSubBlockFinished(range, stagesAll)) {
-          await supabaseAdmin.from('cycling_blocks').update({ status: 'finished' }).eq('id', sb.id)
-          flipped++
+    if (!statusChanged && !needsFinalize) continue
+
+    // Beregn nyt patch
+    const patch: Record<string, unknown> = {}
+    if (statusChanged) patch.status = expected
+
+    // Auto-finalize ved overgang til finished (eller hvis snapshot mangler)
+    if (expected === 'finished' && needsFinalize) {
+      const stageMin = block.stage_number_min ?? evalResult.relevantStages[0]?.stage_number
+      const stageMax = block.stage_number_max ?? evalResult.relevantStages[evalResult.relevantStages.length - 1]?.stage_number
+      if (stageMin != null && stageMax != null) {
+        const standings = await computeBlockStandings(block.game_id, stageMin, stageMax, raceIds)
+        if (standings.length > 0) {
+          const winner = standings[0]
+          patch.winner_user_id = winner.user_id
+          patch.winner_points = winner.points
+          patch.finalized_at = new Date().toISOString()
+          await snapshotBlockResults(block.id, standings)
         }
       }
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await supabaseAdmin.from('cycling_blocks').update(patch).eq('id', block.id)
+      flipped++
     }
   }
 
