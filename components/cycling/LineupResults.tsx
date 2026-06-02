@@ -192,6 +192,8 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   if (score.bench_penalty < 0) lines.push({ label: 'Bænk-straf', value: `${score.bench_penalty}` })
   lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}`, isTotal: true })
 
+  const roleAnchor = score.role.replace(/_\d+$/, '')
+
   return (
     <div style={{
       position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
@@ -217,6 +219,21 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
           <span>{line.value}</span>
         </div>
       ))}
+      <a
+        href={`/games/cycling-guide#${roleAnchor}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'block', marginTop: 6, paddingTop: 6,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: 10, fontWeight: 600,
+          color: '#C9A84C', textDecoration: 'none',
+          letterSpacing: '0.06em', textTransform: 'uppercase',
+        }}
+      >
+        Sådan beregnes point →
+      </a>
     </div>
   )
 }
