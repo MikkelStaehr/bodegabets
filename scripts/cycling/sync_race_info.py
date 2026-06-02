@@ -35,11 +35,16 @@ from postgrest.exceptions import APIError
 
 from helpers import PCS_BASE, PCS_HEADERS, REQUEST_DELAY, init_supabase, pcs_get, _log, _warn
 
+# PCS bruger:
+#   p1 = flat, p2 = hilly, p3 = mountain (uden top-finish),
+#   p4 = mountain (med toppmålgang — MTF), p5 = ITT.
+# Brosten håndteres separat: race_type/slug match for klassikere som Paris-Roubaix
+# eller "cobble"-tekst i beskrivelsen — IKKE via p4.
 PROFILE_MAP = {
     "p1": "flat",
     "p2": "hilly",
     "p3": "mountain",
-    "p4": "cobbled",
+    "p4": "mountain",
     "p5": "itt",
 }
 

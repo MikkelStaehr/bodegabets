@@ -368,9 +368,13 @@ def _parse_stage_profile(soup: BeautifulSoup) -> str | None:
     PCS uses profile icon classes or text indicators:
     - 'p1' / 'flat' → flat
     - 'p2' / 'hills' / 'hilly' → hilly
-    - 'p3' / 'mountain' → mountain
-    - 'p4' / 'cobbles' / 'cobbled' → cobbled
+    - 'p3' / 'mountain' (uden top-finish) → mountain
+    - 'p4' / 'mountain' (med topfinish, MTF) → mountain
     - 'p5' / 'itt' / 'time trial' → itt
+
+    Brosten (cobbled) håndteres separat via tekstmatch — IKKE via p4-koden.
+    En tidligere version mappede p4 → cobbled, hvilket fejlklassificerede
+    bjerg-MTF i Giro (Blockhaus, Pila, Piani di Pezzè etc.) som brosten.
     """
     # Strategy 1: look for profile icon spans with classes like 'icon profile p1'
     for span in soup.find_all("span", class_=re.compile(r"profile")):
@@ -382,7 +386,7 @@ def _parse_stage_profile(soup: BeautifulSoup) -> str | None:
         if "p3" in classes:
             return "mountain"
         if "p4" in classes:
-            return "cobbled"
+            return "mountain"
         if "p5" in classes:
             return "itt"
 
