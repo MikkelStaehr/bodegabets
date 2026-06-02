@@ -220,6 +220,11 @@ type ScoreRow = {
   base_points: number
   role_multiplier: number
   gc_multiplier: number
+  // Breakdown af role_multiplier (typisk cat × profile × train). Gemt så
+  // UI'en kan vise "hvor kommer multiplikatoren fra" når man hover et point.
+  cat_multiplier: number
+  profile_multiplier: number
+  train_multiplier: number
   role_bonus: number
   jersey_points: number
   team_bonus: number
@@ -400,6 +405,12 @@ export async function calculateCyclingPoints(
       const base = getBasePoints(position)
       const gcMul = getGcMultiplier(result?.gc_position_after ?? null)
       let roleMul = 1.0
+      // Breakdown af roleMul — gemmes på score-rækken så tooltip kan vise
+      // hvor multiplikatoren kommer fra. Defaults til 1.0 for roller uden
+      // multiplikator (domestique/equipier/joker).
+      let usedCatMul = 1.0
+      let profileMul = 1.0
+      let usedTrainMul = 1.0
       let roleBonus = 0
       const jerseyKey = jerseyWearers.get(rider.rider_id)
       const jerseyPts = jerseyKey ? (JERSEY_POINTS[jerseyKey] ?? 0) : 0
@@ -409,19 +420,24 @@ export async function calculateCyclingPoints(
       // Role-specific calculation
       switch (rider.role) {
         case 'leader':
+          usedCatMul = catMul
           roleMul = catMul
           break
 
         case 'lieutenant':
+          usedCatMul = catMul
           if (position != null && position <= 10) {
-            roleMul = catMul * (leaderDnf ? 2.8 : 1.8)
+            profileMul = leaderDnf ? 2.8 : 1.8
+            roleMul = catMul * profileMul
           } else {
             roleMul = catMul
           }
           break
 
         case 'grimpeur':
-          roleMul = catMul * getGrimpeurMultiplier(profile, newRules)
+          usedCatMul = catMul
+          profileMul = getGrimpeurMultiplier(profile, newRules)
+          roleMul = catMul * profileMul
           if (wonHow && position != null && position <= 10) {
             roleBonus = getWonHowGrimpeurBonus(wonHow)
           }
@@ -429,7 +445,10 @@ export async function calculateCyclingPoints(
 
         case 'sprinter':
           // trainMul = ×1.0 uden tog; ×1.2–1.4 med 1-2 leadout-equipiers fra samme hold
-          roleMul = catMul * getSprinterMultiplier(profile, newRules) * trainMul
+          usedCatMul = catMul
+          profileMul = getSprinterMultiplier(profile, newRules)
+          usedTrainMul = trainMul
+          roleMul = catMul * profileMul * trainMul
           if (wonHow && position != null && position <= 10) {
             roleBonus = WON_HOW_SPRINTER_BONUS[wonHow] ?? 0
           }
@@ -460,6 +479,7 @@ export async function calculateCyclingPoints(
           break
 
         default:
+          usedCatMul = catMul
           roleMul = catMul
           break
       }
@@ -497,6 +517,9 @@ export async function calculateCyclingPoints(
         base_points: base,
         role_multiplier: roleMul,
         gc_multiplier: gcMul,
+        cat_multiplier: usedCatMul,
+        profile_multiplier: profileMul,
+        train_multiplier: usedTrainMul,
         role_bonus: roleBonus,
         jersey_points: jerseyPts,
         team_bonus: teamBonus,
