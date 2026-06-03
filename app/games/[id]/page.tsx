@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { getEffectiveSquadRidersForSquads } from '@/lib/cyclingTransfers'
 import CyclingBlockStanding from '@/components/cycling/CyclingBlockStanding'
+import CyclingSeasonOverview from '@/components/cycling/CyclingSeasonOverview'
 import { findActiveSubBlock, shortSubBlockName } from '@/lib/cyclingBlocks'
 import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
@@ -1497,6 +1498,7 @@ export default async function GamePage({ params }: Props) {
               squadId={userSquad?.id ?? null}
               currentUserId={user.id}
             />
+            <CyclingSeasonOverview gameId={gameId} />
             <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} blockStatus={cyclingActiveBlockStatus} />
             <Leaderboard gameId={gameId} />
             {typedGame.host_id === user.id && (

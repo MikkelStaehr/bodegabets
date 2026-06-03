@@ -72,6 +72,8 @@ export type LeaderboardEntry = {
   round_points: number
   block_wins: number
   block_points: number
+  /** Sammenlagt point på tværs af ALLE blokke i spillet (kun cykling). */
+  total_points: number
 }
 
 export type BlockStandingRow = {
@@ -774,27 +776,33 @@ async function buildCyclingLeaderboard(
   for (const m of members) {
     userData.set(m.user_id, { roundPoints: new Map(), blockPoints: new Map() })
   }
+  // Sammenlagt point på tværs af ALLE blokke — bruges af sæson-overblik.
+  // Beregnes fra samme scores-loop, bare uden current-block-filter.
+  const totalPointsByUser = new Map<string, number>()
+  for (const m of members) totalPointsByUser.set(m.user_id, 0)
 
   for (const s of scores ?? []) {
+    const lineup = s.cycling_lineups as unknown as { squad_id: string; cycling_squads: { user_id: string } }
+    const userId = lineup?.cycling_squads?.user_id
+    if (!userId) continue
+    const pts = Number(s.total_points) || 0
+
+    // Sæson-total: tæller scores fra alle blokke
+    totalPointsByUser.set(userId, (totalPointsByUser.get(userId) ?? 0) + pts)
+
+    // Nuværende blok / sub-blok — filtrér til kun aktive blok-races
     if (!currentBlockRaceIds.has(s.race_id as string)) continue
-    // Hvis vi har en aktiv sub-blok (uge), kun tag scores hvis etape-nummeret
-    // ligger i ugens range — så block_points = "stilling i denne uge".
     if (activeSubBlockRange) {
       const stage = s.cycling_stages as unknown as { stage_number: number } | null
       const sn = stage?.stage_number
       if (sn == null || sn < activeSubBlockRange.min || sn > activeSubBlockRange.max) continue
     }
-    const lineup = s.cycling_lineups as unknown as { squad_id: string; cycling_squads: { user_id: string } }
-    const userId = lineup?.cycling_squads?.user_id
-    if (!userId) continue
 
     const ud = userData.get(userId)
     if (!ud) continue
 
-    const pts = Number(s.total_points) || 0
     const stageId = s.stage_id as string
     ud.roundPoints.set(stageId, (ud.roundPoints.get(stageId) ?? 0) + pts)
-    // Aggregér til aktiv sub-blok hvis findes, ellers top-blok
     const aggregateBlockId = activeSubBlockId ?? currentBlockId
     if (aggregateBlockId) ud.blockPoints.set(aggregateBlockId, (ud.blockPoints.get(aggregateBlockId) ?? 0) + pts)
   }
@@ -814,7 +822,7 @@ async function buildCyclingLeaderboard(
     blockWins.set(b.winner_user_id, (blockWins.get(b.winner_user_id) ?? 0) + 1)
   }
 
-  return { leaderboard: buildEntries(members, userData, roundWins, blockWins) }
+  return { leaderboard: buildEntries(members, userData, roundWins, blockWins, totalPointsByUser) }
 }
 
 // ─── getActiveBlockStandings ────────────────────────────────────────────────
@@ -983,6 +991,7 @@ function buildEntries(
   userData: Map<string, { roundPoints: Map<unknown, number>; blockPoints: Map<unknown, number> }>,
   roundWins: Map<string, number>,
   blockWins: Map<string, number>,
+  totalPointsByUser?: Map<string, number>,
 ): LeaderboardEntry[] {
   const entries: LeaderboardEntry[] = members.map((m) => {
     const profile = m.profiles as { username: string; avatar_url: string | null }
@@ -994,6 +1003,10 @@ function buildEntries(
     let totalBlockPoints = 0
     if (ud) for (const pts of ud.blockPoints.values()) totalBlockPoints += pts
 
+    // Hvis totalPointsByUser ikke er sat (fodbold), brug summen over nuværende
+    // blok som approksimation. Sæson-overblik for cykling kalder med kortet sat.
+    const totalPoints = totalPointsByUser?.get(m.user_id) ?? totalBlockPoints
+
     return {
       user_id: m.user_id,
       username: profile?.username ?? 'Anonym',
@@ -1002,6 +1015,7 @@ function buildEntries(
       round_points: Math.round(totalRoundPoints * 10) / 10,
       block_wins: blockWins.get(m.user_id) ?? 0,
       block_points: Math.round(totalBlockPoints * 10) / 10,
+      total_points: Math.round(totalPoints * 10) / 10,
     }
   })
   // Sortér: B. SEJR (historiske trofæer) → B. PT i nuværende blok → R. PT
