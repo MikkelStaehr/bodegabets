@@ -102,13 +102,13 @@ const ALL_ROLES: { key: string; label: string }[] = [
 
 
 const ROLE_TOOLTIPS: Record<string, string> = {
-  leader: 'Point = placering × kat-multiplikator. +5 holdbonus hvis vinderhold. DNF: -50% af score (min -5)',
-  lieutenant: 'Top 10 → ×1.8 (×2.8 hvis Leader DNF). +5 holdbonus. Kun Kat 2-3',
-  grimpeur: 'Mountain ×1.8, Hilly/Cobbled ×1.2. Won how bonus: Solo +50 (+1/km), Sprint a deux +25, Small group +20. Kun Kat 3-5',
-  sprinter: 'Flat/Mixed ×1.8, Hilly/Cobbled ×1.2. Forstærkes af leadout-tog (equipier fra samme hold) hvis top-3. Kun Kat 1-3',
-  domestique: '+8p hvis top 40 OG Leader top 10. Ingen multiplikator. Kun Kat 4',
-  equipier: '+7p hvis samme hold som vinder. Fungerer som leadout for en spurter på samme hold. Ingen multiplikator',
-  joker: '+7p hvis vinderhold. Immun mod DNF-straf og minuspoint',
+  leader: 'Point = placering × kategori. +5 holdbonus hvis vinderens hold. Alle kategorier.',
+  lieutenant: 'Top 10 → ×1.8 (×2.8 hvis Leader udgår). +5 holdbonus. Kun Kat 2–3.',
+  grimpeur: 'Bjerg ×1.8, bakket/brosten ×1.2. Won-how-bonus: Solo +50 (+1/km), Sprint à deux +25, Small group +20. Kun Kat 3–5.',
+  sprinter: 'Flad ×1.8, bakket/brosten ×1.2. Forstærkes af leadout-tog (équipier fra samme hold) hvis top-3. Kun Kat 1–3.',
+  domestique: '+8 hvis top 40 OG Leader top 10. Ingen multiplikator. Kun Kat 4.',
+  equipier: '+7 hvis samme hold som vinder. Fungerer som leadout for en sprinter på samme hold. Ingen multiplikator.',
+  joker: '+7 hvis vinderens hold. Ingen multiplikator.',
 }
 
 const POSITION_COLORS: Record<number, string> = {
