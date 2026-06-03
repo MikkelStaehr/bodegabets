@@ -405,6 +405,28 @@ export default async function GamePage({ params }: Props) {
 
     cyclingBlocks = (blocksData ?? []) as typeof cyclingBlocks
 
+    // Hvis brugerens squad peger på en allerede-finished blok (fx Giro er
+    // slut og brugeren har sin squad i Giro-blokken), så ryk visningen til
+    // næste ikke-finished top-blok. Klassement og standings skal afspejle
+    // den aktive blok, ikke en historisk afsluttet.
+    if (cyclingActiveBlock) {
+      const currentInList = cyclingBlocks.find((b) => b.id === cyclingActiveBlock!.id)
+      if (currentInList && currentInList.status === 'finished') {
+        const nextActive = cyclingBlocks.find(
+          (b) => b.parent_block_id === null && b.status !== 'finished',
+        )
+        if (nextActive) {
+          cyclingActiveBlock = {
+            id: nextActive.id,
+            name: nextActive.name,
+            block_order: nextActive.block_order,
+            lock_deadline: nextActive.lock_deadline ?? null,
+          }
+          cyclingActiveBlockDisplayName = nextActive.name
+        }
+      }
+    }
+
     // Find aktiv SUB-blok (uge) under cyclingActiveBlock — bruges som overskrift
     // på per-blok stillingen, så vi viser "Giro Uge X — stilling" i stedet for
     // "Giro d'Italia — stilling". Hvis top-blokken ikke har sub-blokke (fx en
@@ -1438,14 +1460,27 @@ export default async function GamePage({ params }: Props) {
         {/* Cykling sektion — trup + lineup overview + builder */}
         {typedGame.sport === 'cycling' && (
           <>
-            <CyclingGameroom
-              gameId={gameId}
-              squadId={userSquad?.id ?? null}
-              activeBlock={cyclingActiveBlock}
-              races={lineupRaces}
-              squadRiders={lineupSquadRiders}
-              classements={lineupClassements}
-            />
+            {/* Klassement vises kun for løb i den AKTIVE blok — ellers ser
+                spillerne stadig fx Giro-klassementet efter Giro er lukket.
+                Hvis ingen aktiv blok findes (alt færdigt), vis alle. */}
+            {(() => {
+              const activeRaceIds = cyclingActiveBlock
+                ? new Set(lineupRaces.filter((r) => r.cycling_block_id === cyclingActiveBlock!.id).map((r) => r.id))
+                : null
+              const filteredClassements = activeRaceIds
+                ? Object.fromEntries(Object.entries(lineupClassements).filter(([raceId]) => activeRaceIds.has(raceId)))
+                : lineupClassements
+              return (
+                <CyclingGameroom
+                  gameId={gameId}
+                  squadId={userSquad?.id ?? null}
+                  activeBlock={cyclingActiveBlock}
+                  races={lineupRaces}
+                  squadRiders={lineupSquadRiders}
+                  classements={filteredClassements}
+                />
+              )
+            })()}
             <LineupBuilder
               gameId={gameId}
               blockSquadMap={blockSquadMap}
