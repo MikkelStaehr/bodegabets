@@ -1,66 +1,8 @@
-/*
-  SQL — kør manuelt i Supabase før deploy:
-
-  ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS jersey text;
-  ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS abandon_type text;
-
-  -- Vigtig: UNIQUE constraint på cycling_results forhindrer duplicates
-  -- når sync_results.py kører upsert med on_conflict="race_id,rider_id,stage_number"
-  ALTER TABLE cycling_results
-    ADD CONSTRAINT cycling_results_unique UNIQUE (race_id, rider_id, stage_number);
-
-  CREATE TABLE IF NOT EXISTS cycling_scores (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    lineup_id uuid NOT NULL REFERENCES cycling_lineups(id) ON DELETE CASCADE,
-    rider_id uuid NOT NULL,
-    race_id uuid NOT NULL,
-    stage_id uuid NOT NULL REFERENCES cycling_stages(id) ON DELETE CASCADE,
-    game_id int NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-    role text NOT NULL,
-    is_bench boolean NOT NULL DEFAULT false,
-    base_points numeric NOT NULL DEFAULT 0,
-    role_multiplier numeric NOT NULL DEFAULT 1,
-    role_bonus numeric NOT NULL DEFAULT 0,
-    jersey_points numeric NOT NULL DEFAULT 0,
-    team_bonus numeric NOT NULL DEFAULT 0,
-    bench_penalty numeric NOT NULL DEFAULT 0,
-    dnf_penalty numeric NOT NULL DEFAULT 0,
-    calculated_at timestamptz DEFAULT now(),
-    UNIQUE (lineup_id, rider_id, stage_id),
-    -- total_points er en generated column (DB beregner automatisk)
-    total_points numeric GENERATED ALWAYS AS (
-      (base_points * role_multiplier) + role_bonus + jersey_points + team_bonus + bench_penalty + dnf_penalty
-    ) STORED
-  );
-
-  -- Hvis tabellen allerede findes med forkert total_points formel, ret den:
-  --   ALTER TABLE cycling_scores DROP COLUMN total_points;
-  --   ALTER TABLE cycling_scores ADD COLUMN total_points NUMERIC GENERATED ALWAYS AS (
-  --     (base_points * role_multiplier) + role_bonus + jersey_points + team_bonus + bench_penalty + dnf_penalty
-  --   ) STORED;
-  --
-  -- NB: bench_penalty og dnf_penalty lagres som NEGATIVE tal af koden.
-
-  ALTER TABLE cycling_scores ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "Public read" ON cycling_scores FOR SELECT USING (true);
-
-  -- Jersey rename (2026-04-17): migrér legacy color values til role-based keys
-  UPDATE cycling_results SET jersey = REPLACE(REPLACE(REPLACE(REPLACE(
-    jersey, 'yellow', 'leader'), 'green', 'points'), 'polka', 'mountain'), 'white', 'youth')
-    WHERE jersey IS NOT NULL;
-
-  -- Block status (2026-04-27): tilføj status til cycling_blocks så B. SEJR kan tildeles
-  ALTER TABLE cycling_blocks ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
-
-  -- GC multiplier (2026-04-17): bonus for ryttere i top-10 sammenlagt efter etape
-  ALTER TABLE cycling_results ADD COLUMN IF NOT EXISTS gc_position_after int;
-  ALTER TABLE cycling_scores ADD COLUMN IF NOT EXISTS gc_multiplier numeric NOT NULL DEFAULT 1.0;
-  -- Drop + gen-column er ikke idempotent — kør kun første gang:
-  ALTER TABLE cycling_scores DROP COLUMN IF EXISTS total_points;
-  ALTER TABLE cycling_scores ADD COLUMN total_points numeric GENERATED ALWAYS AS (
-    (base_points * role_multiplier * gc_multiplier) + role_bonus + jersey_points + team_bonus + bench_penalty + dnf_penalty
-  ) STORED;
-*/
+// Skema-historik er flyttet til supabase/migrations/. Aktuel total_points-
+// formel beregnes af DB som:
+//   (base_points * role_multiplier * gc_multiplier)
+//     + role_bonus + jersey_points + team_bonus
+// Ingen straffe — bench_penalty og dnf_penalty er fjernet i 20260603.
 
 import { supabaseAdmin } from '@/lib/supabase'
 import { getBlockStageRange } from '@/lib/cyclingBlocks'
@@ -156,8 +98,6 @@ type ScoreRow = {
   role_bonus: number
   jersey_points: number
   team_bonus: number
-  bench_penalty: number
-  dnf_penalty: number
   calculated_at: string
   // total_points er generated i DB — må ikke insertes
 }
@@ -439,10 +379,6 @@ export async function calculateCyclingPoints(
         role_bonus: roleBonus,
         jersey_points: jerseyPts,
         team_bonus: teamBonus,
-        // bench_penalty og dnf_penalty bevares som kolonner i skemaet for
-        // bagudkompatibilitet, men sættes altid til 0 — ingen straffe i spillet.
-        bench_penalty: 0,
-        dnf_penalty: 0,
         calculated_at: now,
       })
     }

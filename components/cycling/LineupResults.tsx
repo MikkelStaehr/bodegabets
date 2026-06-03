@@ -20,8 +20,6 @@ type Score = {
   train_multiplier?: number | null
   jersey_points: number
   team_bonus: number
-  bench_penalty: number
-  dnf_penalty: number
   total_points: number
 }
 
@@ -188,8 +186,6 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   if (score.gc_multiplier && score.gc_multiplier !== 1) lines.push({ label: 'GC-multiplikator', value: fmtMul(score.gc_multiplier) })
   if (score.jersey_points > 0) lines.push({ label: 'Jersey-point', value: `+${score.jersey_points}` })
   if (score.team_bonus > 0) lines.push({ label: 'Hold-bonus', value: `+${score.team_bonus}` })
-  if (score.dnf_penalty < 0) lines.push({ label: 'DNF-straf', value: `${score.dnf_penalty}` })
-  if (score.bench_penalty < 0) lines.push({ label: 'Bænk-straf', value: `${score.bench_penalty}` })
   lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}`, isTotal: true })
 
   const roleAnchor = score.role.replace(/_\d+$/, '')
@@ -238,39 +234,11 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   )
 }
 
-function BenchTooltip({ benchScores, riders }: { benchScores: Score[]; riders: Map<string, Rider> }) {
-  const penalties = benchScores.filter((s) => s.bench_penalty < 0)
-  if (penalties.length === 0) return null
-
-  return (
-    <div style={{
-      position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
-      background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 4,
-      padding: '8px 12px', minWidth: 180, whiteSpace: 'nowrap',
-    }}>
-      {penalties.map((s) => {
-        const r = riders.get(s.rider_id)
-        return (
-          <div key={s.rider_id} style={{
-            display: 'flex', justifyContent: 'space-between', gap: 16,
-            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
-            color: 'rgba(255,255,255,0.6)',
-          }}>
-            <span>{r ? `${r.last_name}` : '?'}</span>
-            <span style={{ color: '#ff6b6b' }}>{s.bench_penalty}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function LineupResults({ race, stageFinished, slots, scores, results, riders, standings, onEditRole, slotKeys }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
-  const [hoveredBench, setHoveredBench] = useState(false)
 
   // Dynamiske roller: brug de medsendte slot-keys (afhænger af profil), ellers
   // det fulde faste sæt. Label udledes fra base-rollen (equipier_N → Équipier).
@@ -302,7 +270,6 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
   const fmt = (n: number) => Math.round(n * 10) / 10
   const benchScores = hasScores ? scores.filter((s) => s.is_bench) : []
   const totalPoints = hasScores ? fmt(scores.reduce((sum, s) => sum + s.total_points, 0)) : 0
-  const benchPenaltyTotal = benchScores.reduce((sum, s) => sum + s.bench_penalty, 0)
 
   // canEdit baseret på stage-status (med race som fallback) — NÆG at lade en
   // user redigere et færdigt stages lineup bare fordi race'et stadig er active.
@@ -566,33 +533,16 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
       {/* ── Bench section ────────────────────────────────────── */}
       {benchScores.length > 0 && (
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center',
           padding: '10px 14px',
           borderTop: '1px solid rgba(255,255,255,0.06)',
-          position: 'relative',
         }}>
           <span style={{
             fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
             fontWeight: 600, color: 'rgba(255,255,255,0.35)',
           }}>
-            Bænk — {benchScores.length} ryttere
+            Bænk — {benchScores.length} {benchScores.length === 1 ? 'rytter' : 'ryttere'} uden point
           </span>
-          <div
-            style={{ position: 'relative', cursor: 'default' }}
-            onMouseEnter={() => setHoveredBench(true)}
-            onMouseLeave={() => setHoveredBench(false)}
-          >
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
-              fontWeight: 700,
-              color: benchPenaltyTotal < 0 ? '#ff6b6b' : 'rgba(255,255,255,0.35)',
-            }}>
-              {benchPenaltyTotal < 0 ? `${Math.round(benchPenaltyTotal * 10) / 10} pt` : '0 pt'}
-            </span>
-            {hoveredBench && (
-              <BenchTooltip benchScores={benchScores} riders={riderMap} />
-            )}
-          </div>
         </div>
       )}
     </div>
