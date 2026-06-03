@@ -94,7 +94,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Fetch scores for all lineups
   const { data: allScores } = await supabaseAdmin
     .from('cycling_scores')
-    .select('lineup_id, rider_id, race_id, role, is_bench, base_points, role_bonus, role_multiplier, gc_multiplier, cat_multiplier, profile_multiplier, train_multiplier, jersey_points, team_bonus, bench_penalty, dnf_penalty, total_points')
+    .select('lineup_id, rider_id, race_id, role, is_bench, base_points, role_bonus, role_multiplier, gc_multiplier, cat_multiplier, profile_multiplier, train_multiplier, jersey_points, team_bonus, total_points')
     .in('lineup_id', lineupIds)
 
   const scoresByLineup = new Map<string, typeof allScores>()
@@ -177,8 +177,6 @@ export async function GET(req: NextRequest, { params }: Props) {
       gc_multiplier: Number(s.gc_multiplier ?? 1),
       jersey_points: Number(s.jersey_points),
       team_bonus: Number(s.team_bonus),
-      bench_penalty: Number(s.bench_penalty),
-      dnf_penalty: Number(s.dnf_penalty),
       total_points: Number(s.total_points),
     }))
 

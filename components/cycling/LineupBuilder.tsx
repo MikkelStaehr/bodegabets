@@ -215,7 +215,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
   // Scores & results per race (for finished races)
-  type ScoreEntry = { rider_id: string; role: string; is_bench: boolean; base_points: number; role_bonus: number; role_multiplier: number; gc_multiplier: number; jersey_points: number; team_bonus: number; bench_penalty: number; dnf_penalty: number; total_points: number }
+  type ScoreEntry = { rider_id: string; role: string; is_bench: boolean; base_points: number; role_bonus: number; role_multiplier: number; gc_multiplier: number; jersey_points: number; team_bonus: number; total_points: number }
   type ResultEntry = { rider_id: string; position: number | null; dnf: boolean; abandon_type: string | null; jersey: string | null }
   type LineupEntry = { rider_id: string; role: string; slot_index: number }
   const [raceScores, setRaceScores] = useState<Record<string, ScoreEntry[]>>({})

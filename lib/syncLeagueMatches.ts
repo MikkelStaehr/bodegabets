@@ -691,9 +691,6 @@ export async function buildLeagueRounds(seasonId: number): Promise<BuildLeagueRo
   }
 }
 
-/** @deprecated Brug buildLeagueRounds(seasonId) i stedet */
-export const buildGameRounds = (_gameId: number, seasonId: number) => buildLeagueRounds(seasonId)
-
 // ─── Daglig cron: synkroniser alle sæsoner ──────────────────────────────────
 
 export async function runLeagueSync(): Promise<SyncResult[]> {
