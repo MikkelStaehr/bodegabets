@@ -2,8 +2,6 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
 import {
   CAT_MULTIPLIER,
-  DNF_PENALTY_MIN,
-  DNF_PENALTY_PCT,
   DOMESTIQUE_BONUS,
   EQUIPIER_TEAM_BONUS,
   GC_MULTIPLIER_DISPLAY,
@@ -17,6 +15,12 @@ import {
   TRAIN_MAX_LEADOUTS,
   WON_HOW_SPRINTER_BONUS,
 } from '@/lib/cyclingScoringConstants'
+
+// Runder point-resultater til 1 decimal — fjerner float-precision-fejl som
+// at 50 × 1.7 × 2.8 vises som "237.99999999999997" i stedet for "238".
+function pt(n: number): string {
+  return `${Math.round(n * 10) / 10} pt`
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +52,7 @@ export default async function CyclingGuidePage() {
               Basispoint × Kategori × Profil × Spurt-tog + bonus − straf
             </p>
             <p className="font-body text-[11px] text-cream/60 leading-relaxed mt-2">
-              Forskellige roller bruger forskellige led. En spurter bruger dem alle. En domestique bruger næsten ingen.
+              Forskellige roller bruger forskellige led. En sprinter bruger dem alle. En domestique bruger næsten ingen.
             </p>
           </div>
         </div>
@@ -82,7 +86,7 @@ export default async function CyclingGuidePage() {
 
         <SubCard title="Spurt-tog (leadout)" highlighted>
           <P>
-            Hvis din <B>spurter</B> ender top-3 OG du har én eller flere <B>équipiers fra samme hold som spurteren</B>, får spurteren ekstra point.
+            Hvis din <B>sprinter</B> ender top-3 OG du har én eller flere <B>équipiers fra samme hold som sprinteren</B>, får sprinteren ekstra point.
           </P>
           <PointTable rows={[
             ['Ingen équipier samme hold', '×1.0'],
@@ -90,12 +94,12 @@ export default async function CyclingGuidePage() {
             [`${TRAIN_MAX_LEADOUTS}+ équipiers samme hold`, `×${1 + TRAIN_BONUS_PER_LEADOUT * TRAIN_MAX_LEADOUTS} (+${Math.round(TRAIN_BONUS_PER_LEADOUT * TRAIN_MAX_LEADOUTS * 100)} %)`],
           ]} />
           <Callout type="example">
-            Kat 2 spurter vinder en flad etape.<br />
+            Kat 2 sprinter vinder en flad etape.<br />
             Uden leadout: 50 × 1.3 × 1.8 = <B>117 pt</B><br />
             Med 1 équipier fra samme hold: 50 × 1.3 × 1.8 × 1.2 = <B>140,4 pt</B>
           </Callout>
           <P>
-            Hvis spurteren ikke ender top-3, sker ingenting — équipieren har optaget en plads forgæves. Det er en satsning.
+            Hvis sprinteren ikke ender top-3, sker ingenting — équipieren har optaget en plads forgæves. Det er en satsning.
           </P>
         </SubCard>
 
@@ -117,12 +121,6 @@ export default async function CyclingGuidePage() {
         <SubCard title="Klassement-bonus (stage races)">
           <P>Ekstra point hvis rytteren er top-10 sammenlagt efter etapen.</P>
           <PointTable rows={GC_MULTIPLIER_DISPLAY.map((p) => [p.label, p.value])} />
-        </SubCard>
-
-        <SubCard title="DNF-straf">
-          <P>
-            En rytter der udgår koster <B>{Math.round(DNF_PENALTY_PCT * 100)} %</B> af forventet score, mindst <B>{DNF_PENALTY_MIN} point</B>. Joker er undtaget.
-          </P>
         </SubCard>
 
         <SubCard title="Bænk-ryttere">
@@ -188,12 +186,11 @@ const ROLES: RoleData[] = [
       ]},
     ],
     examples: [
-      { title: 'Kat 1 leder vinder', calculation: `50 × ${CAT_MULTIPLIER[1]}`, result: `${50 * CAT_MULTIPLIER[1]} pt` },
-      { title: 'Kat 3 leder vinder', calculation: `50 × ${CAT_MULTIPLIER[3]}`, result: `${50 * CAT_MULTIPLIER[3]} pt`, highlight: true },
-      { title: 'Kat 1 leder, 5. plads', calculation: `20 × ${CAT_MULTIPLIER[1]}`, result: `${20 * CAT_MULTIPLIER[1]} pt` },
+      { title: 'Kat 1 leder vinder', calculation: `50 × ${CAT_MULTIPLIER[1]}`, result: pt(50 * CAT_MULTIPLIER[1]) },
+      { title: 'Kat 3 leder vinder', calculation: `50 × ${CAT_MULTIPLIER[3]}`, result: pt(50 * CAT_MULTIPLIER[3]), highlight: true },
+      { title: 'Kat 1 leder, 5. plads', calculation: `20 × ${CAT_MULTIPLIER[1]}`, result: pt(20 * CAT_MULTIPLIER[1]) },
     ],
     bonuses: [`+${TEAM_BONUS_DEFAULT} hvis vinderens hold`, 'Trøje-point hvis fører klassement', 'Klassement-bonus hvis top-10 sammenlagt'],
-    penalties: [`DNF: -${Math.round(DNF_PENALTY_PCT * 100)}% (min ${DNF_PENALTY_MIN})`],
     strategy: 'Højere kategori = højere risiko, højere udbytte. En kat 3 leder der leverer giver væsentligt mere end en kat 1.',
   },
   {
@@ -211,12 +208,11 @@ const ROLES: RoleData[] = [
       ]},
     ],
     examples: [
-      { title: 'Kat 2 lieutenant, 5. plads', calculation: `20 × ${CAT_MULTIPLIER[2]} × ${LIEUTENANT_MULTIPLIER_NORMAL}`, result: `${(20 * CAT_MULTIPLIER[2] * LIEUTENANT_MULTIPLIER_NORMAL).toFixed(1)} pt` },
-      { title: 'Kat 3 lieutenant vinder, Leader udgår', calculation: `50 × ${CAT_MULTIPLIER[3]} × ${LIEUTENANT_MULTIPLIER_LEADER_DNF}`, result: `${50 * CAT_MULTIPLIER[3] * LIEUTENANT_MULTIPLIER_LEADER_DNF} pt`, highlight: true },
-      { title: 'Kat 2 lieutenant, 15. plads', calculation: `5 × ${CAT_MULTIPLIER[2]}`, result: `${5 * CAT_MULTIPLIER[2]} pt` },
+      { title: 'Kat 2 lieutenant, 5. plads', calculation: `20 × ${CAT_MULTIPLIER[2]} × ${LIEUTENANT_MULTIPLIER_NORMAL}`, result: pt(20 * CAT_MULTIPLIER[2] * LIEUTENANT_MULTIPLIER_NORMAL) },
+      { title: 'Kat 3 lieutenant vinder, Leader udgår', calculation: `50 × ${CAT_MULTIPLIER[3]} × ${LIEUTENANT_MULTIPLIER_LEADER_DNF}`, result: pt(50 * CAT_MULTIPLIER[3] * LIEUTENANT_MULTIPLIER_LEADER_DNF), highlight: true },
+      { title: 'Kat 2 lieutenant, 15. plads', calculation: `5 × ${CAT_MULTIPLIER[2]}`, result: pt(5 * CAT_MULTIPLIER[2]) },
     ],
     bonuses: [`+${TEAM_BONUS_DEFAULT} hvis vinderens hold`, 'Trøje-point hvis fører klassement'],
-    penalties: [`DNF: -${Math.round(DNF_PENALTY_PCT * 100)}%`],
     strategy: 'Forsikring hvis Leader fejler. Vælg en der oftest ender top-15.',
   },
   {
@@ -241,18 +237,17 @@ const ROLES: RoleData[] = [
       ]},
     ],
     examples: [
-      { title: 'Kat 4 grimpeur vinder bjerg', calculation: `50 × ${CAT_MULTIPLIER[4]} × 1.8`, result: `${(50 * CAT_MULTIPLIER[4] * 1.8).toFixed(1)} pt` },
-      { title: 'Samme + 4 km solo', calculation: `50 × ${CAT_MULTIPLIER[4]} × 1.8 + 54`, result: `${(50 * CAT_MULTIPLIER[4] * 1.8 + 54).toFixed(1)} pt`, highlight: true },
-      { title: 'Kat 5 grimpeur, 3. plads bjerg', calculation: `30 × ${CAT_MULTIPLIER[5]} × 1.8`, result: `${(30 * CAT_MULTIPLIER[5] * 1.8).toFixed(1)} pt` },
+      { title: 'Kat 4 grimpeur vinder bjerg', calculation: `50 × ${CAT_MULTIPLIER[4]} × 1.8`, result: pt(50 * CAT_MULTIPLIER[4] * 1.8) },
+      { title: 'Samme + 4 km solo', calculation: `50 × ${CAT_MULTIPLIER[4]} × 1.8 + 54`, result: pt(50 * CAT_MULTIPLIER[4] * 1.8 + 54), highlight: true },
+      { title: 'Kat 5 grimpeur, 3. plads bjerg', calculation: `30 × ${CAT_MULTIPLIER[5]} × 1.8`, result: pt(30 * CAT_MULTIPLIER[5] * 1.8) },
     ],
     bonuses: [`+${TEAM_BONUS_DEFAULT} hvis vinderens hold`, 'Trøje-point (oftest bjergtrøje)'],
-    penalties: [`DNF: -${Math.round(DNF_PENALTY_PCT * 100)}%`],
     strategy: 'Lav kategori i bjergene er en lotto-billet — sjælden succes, men store udbytter.',
   },
   {
     key: 'sprinter',
     name: 'Sprinter',
-    tagline: 'Spurter — forstærkes af spurt-tog',
+    tagline: 'Sprinter — forstærkes af spurt-tog',
     desc: 'Stærk på flade etaper. Den eneste rolle der forstærkes hvis du også har holdkammerater (équipiers) fra samme hold som leadout.',
     category: 'Kategori 1–3',
     formulaLabel: 'Basispoint × Kategori × Profil × Spurt-tog + Bonus',
@@ -275,12 +270,11 @@ const ROLES: RoleData[] = [
       ]},
     ],
     examples: [
-      { title: 'Kat 2 spurter vinder flad — alene', calculation: `50 × ${CAT_MULTIPLIER[2]} × 1.8`, result: `${(50 * CAT_MULTIPLIER[2] * 1.8).toFixed(1)} pt` },
-      { title: 'Samme — med 1 équipier fra samme hold', calculation: `50 × ${CAT_MULTIPLIER[2]} × 1.8 × ${1 + TRAIN_BONUS_PER_LEADOUT}`, result: `${(50 * CAT_MULTIPLIER[2] * 1.8 * (1 + TRAIN_BONUS_PER_LEADOUT)).toFixed(1)} pt`, highlight: true },
-      { title: 'Kat 2 spurter, 4. plads (ikke top-3 = intet spurt-tog)', calculation: `20 × ${CAT_MULTIPLIER[2]} × 1.8`, result: `${(20 * CAT_MULTIPLIER[2] * 1.8).toFixed(1)} pt` },
+      { title: 'Kat 2 sprinter vinder flad — alene', calculation: `50 × ${CAT_MULTIPLIER[2]} × 1.8`, result: pt(50 * CAT_MULTIPLIER[2] * 1.8) },
+      { title: 'Samme — med 1 équipier fra samme hold', calculation: `50 × ${CAT_MULTIPLIER[2]} × 1.8 × ${1 + TRAIN_BONUS_PER_LEADOUT}`, result: pt(50 * CAT_MULTIPLIER[2] * 1.8 * (1 + TRAIN_BONUS_PER_LEADOUT)), highlight: true },
+      { title: 'Kat 2 sprinter, 4. plads (ikke top-3 = intet spurt-tog)', calculation: `20 × ${CAT_MULTIPLIER[2]} × 1.8`, result: pt(20 * CAT_MULTIPLIER[2] * 1.8) },
     ],
     bonuses: [`+${TEAM_BONUS_DEFAULT} hvis vinderens hold`, 'Trøje-point (oftest pointtrøje)'],
-    penalties: [`DNF: -${Math.round(DNF_PENALTY_PCT * 100)}%`],
     strategy: 'Tror du sprinteren vinder? Tag en équipier fra samme hold med — det giver 20–40 % oven på.',
   },
   {
@@ -301,7 +295,6 @@ const ROLES: RoleData[] = [
       { title: 'Domestique 10. plads, Leader vinder', calculation: `10 + ${DOMESTIQUE_BONUS}`, result: `${10 + DOMESTIQUE_BONUS} pt`, highlight: true },
       { title: 'Domestique 50. plads', calculation: '0', result: '0 pt' },
     ],
-    penalties: [`DNF: -${Math.round(DNF_PENALTY_PCT * 100)}%`],
     strategy: 'Sikre småpoint hvis din Leader-strategi virker.',
   },
   {
@@ -324,27 +317,26 @@ const ROLES: RoleData[] = [
       { title: 'Équipier på vinderens hold, 30. plads', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
       { title: 'Équipier på Sprinters hold (Sprinter får ×1.2)', calculation: 'eget point uændret', result: 'Sprinter får boost', highlight: true },
     ],
-    penalties: ['Ingen DNF-straf (rolle uden multiplier)'],
     strategy: 'Den taktiske rolle: bruges som leadout for din Sprinter eller som ekstra holdbonus-jagt.',
   },
   {
     key: 'joker',
     name: 'Joker',
-    tagline: 'Wildcard — kan ikke give minus',
-    desc: `Får +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Tæller ALDRIG minus — DNF og alle straffe ignoreres.`,
+    tagline: 'Wildcard',
+    desc: `Får +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Ingen multiplier.`,
     category: 'Alle kategorier',
     formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold)`,
     scoring: [
       { label: 'Bonus', rows: [
         ['Samme hold som vinder', `+${EQUIPIER_TEAM_BONUS}`],
-        ['DNF / minus', 'Ignoreres helt'],
+        ['Ellers', 'Kun basispoint'],
       ]},
     ],
     examples: [
       { title: 'Joker på vinderens hold, 50. plads', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
-      { title: 'Joker udgår (DNF)', calculation: 'Ignoreres', result: '0 pt', highlight: true },
+      { title: 'Joker uden for top-20, vinderens hold', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
     ],
-    strategy: 'Forsikring mod en stjerne der kan udgå — eller bare en risikabel rytter du tror på.',
+    strategy: 'Et frit valg uden bindinger til kategori eller profil — godt sted til en risikabel rytter du tror på.',
   },
 ]
 
