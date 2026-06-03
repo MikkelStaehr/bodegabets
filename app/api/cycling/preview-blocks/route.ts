@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import { computeSubBlockRanges } from '@/lib/cyclingBlocks'
+import { computeSubBlockRanges, GRAND_TOUR_MIN_STAGES } from '@/lib/cyclingBlocks'
 
 export type PreviewBlock = {
   race_id: string | null
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
     const stages = stagesByRace.get(r.id as string) ?? []
     const restDays = (r.rest_days as string[] | null) ?? null
     const hasRestDays = !!restDays && restDays.length > 0
-    const isGT = stages.length >= 14 // tre-uger eller mere
+    const isGT = stages.length >= GRAND_TOUR_MIN_STAGES // tre-uger eller mere
 
     let subRanges = computeSubBlockRanges(stages, restDays)
     let fallbackUsed = false
