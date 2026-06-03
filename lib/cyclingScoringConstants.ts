@@ -91,10 +91,9 @@ export const GC_MULTIPLIER_DISPLAY: { label: string; value: string }[] = [
   { label: 'Sammenlagt #11+', value: '×1.0' },
 ]
 
-// ── DNF-straf ──────────────────────────────────────────────────────────────
-
-export const DNF_PENALTY_PCT = 0.5
-export const DNF_PENALTY_MIN = -5
+// Ingen minus-point: vi har ingen DNF-straf, ingen bænk-straf og ingen
+// andre fradrag. En rytter der udgår eller placerer sig dårligt får
+// bare 0 placerings-point, men ikke negative point.
 
 // ── Spurt-tog ──────────────────────────────────────────────────────────────
 
