@@ -67,8 +67,6 @@ import { getBlockStageRange } from '@/lib/cyclingBlocks'
 import { computeBlockStandings, snapshotBlockResults } from '@/lib/cyclingBlockStandings'
 import {
   CAT_MULTIPLIER,
-  DNF_PENALTY_MIN,
-  DNF_PENALTY_PCT,
   GC_MULTIPLIER,
   JERSEY_POINTS,
   NEW_SCORING_FROM,
@@ -325,11 +323,11 @@ export async function calculateCyclingPoints(
     const trainMul = (newRules && sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
 
     // ── A. Active riders ──────────────────────────────────────
+    // Ingen minus-point: ryttere der udgår eller placerer sig dårligt får
+    // bare 0 placerings-point. DNF og bænk er IKKE straffe — kun fraværende point.
     for (const rider of activeRiders) {
       const result = resultMap.get(rider.rider_id)
       const position = result?.position ?? null
-      const isDnf = result?.dnf ?? false
-      const isJoker = rider.role === 'joker'
 
       const catMul = CAT_MULTIPLIER[rider.category] ?? 1.0
       const base = getBasePoints(position)
@@ -345,7 +343,6 @@ export async function calculateCyclingPoints(
       const jerseyKey = jerseyWearers.get(rider.rider_id)
       const jerseyPts = jerseyKey ? (JERSEY_POINTS[jerseyKey] ?? 0) : 0
       let teamBonus = 0
-      let dnfPen = 0
 
       // Role-specific calculation
       switch (rider.role) {
@@ -421,20 +418,9 @@ export async function calculateCyclingPoints(
         }
       }
 
-      // Total for active rider (before DNF) — gc_multiplier stacks oven på role_multiplier
-      // for placering-point. Role-bonus, jersey, team_bonus skaleres ikke af GC.
-      const rolePoints = (rider.role === 'domestique' || rider.role === 'equipier' || rider.role === 'joker')
-        ? base + roleBonus
-        : Math.round(base * roleMul * gcMul * 10) / 10 + roleBonus
-
-      // DNF penalty: -50% of would-be score, minimum -5
-      if (isDnf && !isJoker) {
-        const wouldScore = rolePoints + jerseyPts + teamBonus
-        dnfPen = wouldScore > 0
-          ? -Math.round(wouldScore * DNF_PENALTY_PCT * 10) / 10
-          : DNF_PENALTY_MIN
-        dnfPen = Math.min(dnfPen, DNF_PENALTY_MIN)
-      }
+      // total_points er en generated kolonne i DB; den beregnes automatisk fra
+      // base_points * role_multiplier * gc_multiplier + bonusser. Vi indsætter
+      // bare komponenterne.
 
       allScores.push({
         lineup_id: lineup.id,
@@ -453,8 +439,10 @@ export async function calculateCyclingPoints(
         role_bonus: roleBonus,
         jersey_points: jerseyPts,
         team_bonus: teamBonus,
+        // bench_penalty og dnf_penalty bevares som kolonner i skemaet for
+        // bagudkompatibilitet, men sættes altid til 0 — ingen straffe i spillet.
         bench_penalty: 0,
-        dnf_penalty: dnfPen,
+        dnf_penalty: 0,
         calculated_at: now,
       })
     }
