@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import CyclingBlocksPreview from '@/components/cycling/CyclingBlocksPreview'
 
 type Race = {
   id: string
@@ -662,6 +663,13 @@ export default function NewCyclingGameForm({ races }: Props) {
 
         {/* ── Sæsonkalender ────────────────────────────────── */}
         <SeasonCalendar races={races} selectedRaceIds={selectedRaceIds} />
+
+        {/* ── Blok-forhåndsvisning ────────────────────────── */}
+        {selectedRaceIds.size > 0 && (
+          <div className="my-4">
+            <CyclingBlocksPreview raceIds={[...selectedRaceIds]} />
+          </div>
+        )}
 
         <Connector />
 

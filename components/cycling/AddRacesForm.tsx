@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import CyclingBlocksPreview from '@/components/cycling/CyclingBlocksPreview'
 import { useRouter } from 'next/navigation'
 
 type Race = {
@@ -121,6 +122,10 @@ export default function AddRacesForm({ gameId, races }: Props) {
           onToggle={toggle}
           disabled
         />
+      )}
+
+      {selected.size > 0 && (
+        <CyclingBlocksPreview raceIds={[...selected]} />
       )}
 
       {error && (
