@@ -77,15 +77,27 @@ export function shortSubBlockName(name: string): string {
 }
 
 /**
- * Beregn sub-blok-grænser ud fra hviledage.
+ * Minimum antal etaper for at et stage race regnes som Grand Tour og deles
+ * i sub-blokke. Sat så det rammer Giro/Tour/Vuelta (~21 etaper) men IKKE
+ * uger-lange stage races som Dauphiné, Paris-Nice, Tour de Suisse (5-8 etaper).
+ */
+export const GRAND_TOUR_MIN_STAGES = 14
+
+/**
+ * Beregn sub-blok-grænser for et stage race.
+ *
+ * Kun ægte Grand Tours (≥ {@link GRAND_TOUR_MIN_STAGES} etaper) deles i
+ * sub-blokke. Mindre stage races (Dauphiné 8, Paris-Nice 8, Tour de Suisse 8)
+ * scorer som én samlet blok — for kort til ugentligt regnskab.
  *
  * `restDays` er ISO-datoer (cycling_races.rest_days date[]). For hver hviledag
  * splitter vi etaperne: den sidste etape FØR hviledagen lukker en uge, den
  * første etape EFTER starter den næste.
  *
- * Returnerer en liste af [min, max]-ranges (inkl.) — én pr. uge.
- * Hvis ingen hviledage findes → fald tilbage til "3 lige uger" baseret på
- * antal etaper (bagudkompatibilitet for løb hvor rest_days mangler i DB).
+ * Returnerer:
+ *   - [] hvis stage race er for kort til sub-blokke
+ *   - [{Uge 1 …}, {Uge 2 …}, …] hvis Grand Tour med rest_days
+ *   - 3 lige uger som fallback hvis Grand Tour uden rest_days
  *
  * Pure function — ingen DB-kald — så den kan bruges fra både server-runtime
  * og engangs-scripts uden at trække supabaseAdmin-klienten med.
@@ -99,6 +111,10 @@ export function computeSubBlockRanges(
 
   const minStage = sorted[0].stage_number
   const maxStage = sorted[sorted.length - 1].stage_number
+  const totalStages = maxStage - minStage + 1
+
+  // Mindre stage races (Dauphiné, Paris-Nice, Tour de Suisse osv.) deles ikke.
+  if (totalStages < GRAND_TOUR_MIN_STAGES) return []
 
   // Med rest_days: split ved hver hviledag
   if (restDays && restDays.length > 0) {
@@ -128,11 +144,7 @@ export function computeSubBlockRanges(
     if (ranges.length >= 2) return ranges
   }
 
-  // Fallback: 3 lige uger over [minStage, maxStage]
-  const totalStages = maxStage - minStage + 1
-  if (totalStages < 4) {
-    return [{ label: 'Uge 1', range: [minStage, maxStage] }]
-  }
+  // Fallback for Grand Tour uden rest_days: 3 lige uger over [minStage, maxStage]
   const a = Math.ceil(totalStages / 3)
   const b = Math.ceil(((totalStages - a) / 2))
   const week1End = minStage + a - 1
