@@ -813,12 +813,14 @@ async function buildCyclingLeaderboard(
 
   const roundWins = countWins(userData, 'roundPoints', stageIdsInCurrent)
 
-  // B. SEJR = antal blokke (top + sub) hvor user_id er gemt som winner_user_id.
-  // Vi læser direkte fra det persistede felt (sat når blokken lukker), så
-  // sub-blok-sejre (Giro Uge 1, Uge 2 osv.) tæller hver for sig.
+  // B. SEJR = antal TOP-blokke (samlede sejre / "løb-vinder") hvor user_id
+  // er gemt som winner_user_id. Sub-blokke (uger) tæller IKKE — ellers ville
+  // en GT-vinder blive talt 4 gange (1 samlet + 3 uger). Uge-sejre vises
+  // separat via CyclingBlockStanding.
   const blockWins = new Map<string, number>()
   for (const b of allBlocks) {
     if (!b.winner_user_id) continue
+    if (b.parent_block_id != null) continue  // skip sub-blokke
     blockWins.set(b.winner_user_id, (blockWins.get(b.winner_user_id) ?? 0) + 1)
   }
 

@@ -292,4 +292,72 @@ export async function generateCyclingBlocks(
       blockOrder++
     }
   }
+
+  // Resortér block_order kronologisk efter starts_at — så Dauphiné (juni)
+  // havner mellem Giro (maj) og Tour (juli) selv om den blev tilføjet sidst.
+  await renumberCyclingBlocksByDate(gameId)
+}
+
+/**
+ * Renumberer block_order for alle blokke i et spil så top-blokke sorteres
+ * efter starts_at (kronologisk) og sub-blokke følger deres parent og deres
+ * eget stage_number_min. Idempotent.
+ *
+ * Eksporteret så add-races-flowet (og evt. en admin-knap) kan kalde den
+ * efter manuel ompusning.
+ */
+export async function renumberCyclingBlocksByDate(gameId: number): Promise<void> {
+  const { data: blocks } = await supabaseAdmin
+    .from('cycling_blocks')
+    .select('id, parent_block_id, starts_at, stage_number_min, block_order')
+    .eq('game_id', gameId)
+
+  if (!blocks?.length) return
+
+  type B = {
+    id: string
+    parent_block_id: string | null
+    starts_at: string | null
+    stage_number_min: number | null
+    block_order: number
+  }
+  const all = blocks as B[]
+  const topBlocks = all.filter((b) => b.parent_block_id == null)
+  const subsByParent = new Map<string, B[]>()
+  for (const b of all) {
+    if (!b.parent_block_id) continue
+    if (!subsByParent.has(b.parent_block_id)) subsByParent.set(b.parent_block_id, [])
+    subsByParent.get(b.parent_block_id)!.push(b)
+  }
+
+  // Top-blokke sorteres efter starts_at; fall-back til eksisterende block_order
+  // hvis starts_at mangler (bagudkompatibilitet for blokke uden datofelter).
+  topBlocks.sort((a, b) => {
+    const aDate = a.starts_at ?? ''
+    const bDate = b.starts_at ?? ''
+    if (aDate && bDate) return aDate.localeCompare(bDate)
+    if (aDate) return -1
+    if (bDate) return 1
+    return a.block_order - b.block_order
+  })
+
+  // Tildel nye block_order værdier — top-blok først, dens sub-blokke umiddelbart
+  // efter (sorteret efter stage_number_min så uger forbliver i rækkefølge).
+  let order = 1
+  const updates: { id: string; block_order: number }[] = []
+  for (const top of topBlocks) {
+    if (top.block_order !== order) updates.push({ id: top.id, block_order: order })
+    order++
+    const subs = subsByParent.get(top.id) ?? []
+    subs.sort((a, b) => (a.stage_number_min ?? 0) - (b.stage_number_min ?? 0))
+    for (const sub of subs) {
+      if (sub.block_order !== order) updates.push({ id: sub.id, block_order: order })
+      order++
+    }
+  }
+
+  // Skriv kun de blokke der reelt skifter — sparer round-trips.
+  for (const u of updates) {
+    await supabaseAdmin.from('cycling_blocks').update({ block_order: u.block_order }).eq('id', u.id)
+  }
 }
