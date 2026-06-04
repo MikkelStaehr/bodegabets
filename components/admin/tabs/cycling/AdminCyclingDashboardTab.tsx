@@ -36,6 +36,8 @@ export function AdminCyclingDashboardTab() {
   const [lockMsg, setLockMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [backfillLoading, setBackfillLoading] = useState(false)
   const [backfillMsg, setBackfillMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [startlistsLoading, setStartlistsLoading] = useState(false)
+  const [startlistsMsg, setStartlistsMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const authHeader = {
     'Content-Type': 'application/json',
@@ -134,6 +136,29 @@ export function AdminCyclingDashboardTab() {
     }
   }
 
+  async function handleSyncStartlists() {
+    setStartlistsLoading(true)
+    setStartlistsMsg(null)
+    try {
+      const res = await fetch('/api/admin/cycling/sync-startlists', {
+        method: 'POST',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setStartlistsMsg({ type: 'ok', text: data.message ?? 'Startlister synket' })
+      } else {
+        setStartlistsMsg({ type: 'err', text: data.error ?? 'Sync fejlede' })
+      }
+    } catch {
+      setStartlistsMsg({ type: 'err', text: 'Netværksfejl' })
+    } finally {
+      setStartlistsLoading(false)
+      setTimeout(() => setStartlistsMsg(null), 8000)
+    }
+  }
+
   async function handleLockLineups() {
     setLockLoading(true)
     setLockMsg(null)
@@ -219,6 +244,18 @@ export function AdminCyclingDashboardTab() {
             {backfillLoading ? 'Backfiller...' : 'Backfill stages'}
           </button>
           {backfillMsg && <span className={`font-body text-[12px] ${backfillMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{backfillMsg.text}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+          <button
+            onClick={handleSyncStartlists}
+            disabled={startlistsLoading}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 font-condensed text-[13px] sm:text-[12px] font-semibold text-forest px-4 py-3 sm:py-2 border border-warm-border active:bg-cream-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ borderRadius: '2px' }}
+            title="Hent startlister fra PCS for alle upcoming/active løb"
+          >
+            {startlistsLoading ? 'Synker...' : 'Sync startlister'}
+          </button>
+          {startlistsMsg && <span className={`font-body text-[12px] ${startlistsMsg.type === 'ok' ? 'text-forest' : 'text-vintage-red'}`}>{startlistsMsg.text}</span>}
           </div>
           <div className="flex flex-col gap-1">
           <button
