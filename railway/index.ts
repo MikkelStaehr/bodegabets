@@ -12,6 +12,7 @@
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /calculate-points  — safety net (primær trigger er nu i syncMatchScores)
  *   GET /sync-cycling-startlists — dagligt 06:00 (PCS startlister for upcoming løb)
+ *   GET /football-archive-check — dagligt 08:10 (arkivér fodbold-gamerooms efter sidste runde)
  *   GET /health            — health check
  *
  * Environment:
@@ -777,6 +778,187 @@ app.get('/cycling-archive-check', async (_req, res) => {
   }
 })
 
+// ─── GET /football-archive-check ────────────────────────────────────────────
+// Auto-arkivér fodbold-gamerooms hvor sidste runde i sæsonen sluttede for
+// 14+ dage siden. Sender 7-dages varsel via push før arkivering.
+//
+// Logikken spejler cycling-archive-check: vi tjekker game_seasons → seasons →
+// rounds. Hvis ALLE runder for spillets season(er) er 'finished' og seneste
+// kamp er > 14 dage gammel → arkivér game.
+//
+// Bruger samme archive_warning_sent_at felt som cykel.
+
+app.get('/football-archive-check', async (_req, res) => {
+  try {
+    const now = new Date()
+    const ARCHIVE_DAYS = 14
+    const WARNING_DAYS = 7
+    const dayMs = 24 * 60 * 60 * 1000
+    const archiveCutoff = new Date(now.getTime() - ARCHIVE_DAYS * dayMs)
+    const warningCutoff = new Date(now.getTime() - WARNING_DAYS * dayMs)
+
+    const { data: activeGames } = await supabaseAdmin
+      .from('games')
+      .select('id, name, host_id, archive_warning_sent_at')
+      .eq('sport', 'football')
+      .eq('status', 'active')
+
+    if (!activeGames?.length) {
+      res.json({ ok: true, archived: 0, warned: 0 })
+      return
+    }
+
+    let archived = 0
+    let warned = 0
+
+    const vapidPublic = process.env.VAPID_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    const vapidPrivate = process.env.VAPID_PRIVATE_KEY
+    const pushReady = !!(vapidPublic && vapidPrivate)
+    if (pushReady) webpush.setVapidDetails('mailto:admin@bodega-bets.com', vapidPublic!, vapidPrivate!)
+
+    for (const game of activeGames) {
+      // 1) Find spillets sæson(er)
+      const { data: gameSeasons } = await supabaseAdmin
+        .from('game_seasons')
+        .select('season_id')
+        .eq('game_id', game.id)
+
+      const seasonIds = (gameSeasons ?? []).map((gs) => gs.season_id as number)
+      if (seasonIds.length === 0) continue
+
+      // 2) Hent alle runder for sæsonen — alle skal være 'finished' for at arkivere
+      const { data: rounds } = await supabaseAdmin
+        .from('rounds')
+        .select('id, status')
+        .in('season_id', seasonIds)
+
+      const allRounds = rounds ?? []
+      if (allRounds.length === 0) continue
+      const allFinished = allRounds.every((r) => r.status === 'finished')
+      if (!allFinished) continue
+
+      // 3) Find seneste kampdato — fallback til kickoff på en match
+      const { data: latestMatch } = await supabaseAdmin
+        .from('matches')
+        .select('kickoff')
+        .in('round_id', allRounds.map((r) => r.id))
+        .order('kickoff', { ascending: false })
+        .limit(1)
+
+      const lastKickoff = latestMatch?.[0]?.kickoff as string | undefined
+      if (!lastKickoff) continue
+      const lastEnd = new Date(lastKickoff)
+
+      // 4) Auto-arkivér hvis 14+ dage er gået
+      if (lastEnd <= archiveCutoff) {
+        await supabaseAdmin
+          .from('games')
+          .update({ status: 'finished' })
+          .eq('id', game.id)
+        archived++
+
+        if (pushReady) {
+          const { data: members } = await supabaseAdmin
+            .from('game_members')
+            .select('user_id')
+            .eq('game_id', game.id)
+
+          const memberIds = (members ?? []).map((m) => m.user_id as string)
+          if (memberIds.length > 0) {
+            const { data: subs } = await supabaseAdmin
+              .from('push_subscriptions')
+              .select('subscription, endpoint')
+              .in('user_id', memberIds)
+
+            const payload = JSON.stringify({
+              title: '🏁 Sæson afsluttet',
+              body: `${game.name} er arkiveret. Du kan stadig se historik og slut-placering.`,
+              url: `/games/${game.id}`,
+            })
+            for (const s of subs ?? []) {
+              try {
+                await webpush.sendNotification(s.subscription as webpush.PushSubscription, payload)
+              } catch (e: unknown) {
+                if (e && typeof e === 'object' && 'statusCode' in e && (e as { statusCode: number }).statusCode === 410) {
+                  await supabaseAdmin
+                    .from('push_subscriptions')
+                    .delete()
+                    .eq('endpoint', (s.subscription as { endpoint: string }).endpoint)
+                }
+              }
+            }
+          }
+        }
+        continue
+      }
+
+      // 5) 7-dages varsel
+      if (lastEnd <= warningCutoff && !game.archive_warning_sent_at && pushReady) {
+        const daysUntilArchive = Math.max(
+          1,
+          Math.ceil((lastEnd.getTime() + ARCHIVE_DAYS * dayMs - now.getTime()) / dayMs),
+        )
+
+        const { data: members } = await supabaseAdmin
+          .from('game_members')
+          .select('user_id')
+          .eq('game_id', game.id)
+
+        const memberIds = (members ?? []).map((m) => m.user_id as string)
+        if (memberIds.length > 0) {
+          const { data: subs } = await supabaseAdmin
+            .from('push_subscriptions')
+            .select('user_id, subscription')
+            .in('user_id', memberIds)
+
+          for (const s of subs ?? []) {
+            const targetIsHost = (s.user_id as string) === game.host_id
+            const body = targetIsHost
+              ? `Sidste runde i ${game.name} er kørt. Tilføj næste sæson via 'Tilføj sæson' — ellers arkiveres spilrummet om ${daysUntilArchive} dage.`
+              : `${game.name} arkiveres om ${daysUntilArchive} dage med mindre værten tilføjer næste sæson.`
+
+            try {
+              await webpush.sendNotification(
+                s.subscription as webpush.PushSubscription,
+                JSON.stringify({
+                  title: '⏳ Spilrum afsluttes snart',
+                  body,
+                  url: `/games/${game.id}`,
+                }),
+              )
+            } catch (e: unknown) {
+              if (e && typeof e === 'object' && 'statusCode' in e && (e as { statusCode: number }).statusCode === 410) {
+                await supabaseAdmin
+                  .from('push_subscriptions')
+                  .delete()
+                  .eq('endpoint', (s.subscription as { endpoint: string }).endpoint)
+              }
+            }
+          }
+        }
+
+        await supabaseAdmin
+          .from('games')
+          .update({ archive_warning_sent_at: now.toISOString() })
+          .eq('id', game.id)
+        warned++
+      }
+    }
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'football_archive',
+      status: archived > 0 || warned > 0 ? 'success' : 'info',
+      message: `football-archive-check: ${archived} arkiveret, ${warned} varslet`,
+      metadata: { archived, warned },
+    })
+
+    res.json({ ok: true, archived, warned })
+  } catch (err) {
+    console.error('[football-archive-check]', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── POST /api/cycling/calculate-points ─────────────────────────────────────
 
 app.post('/api/cycling/calculate-points', async (req, res) => {
@@ -1208,6 +1390,10 @@ app.listen(PORT, () => {
 
   // Dagligt kl. 08:00 UTC — auto-arkivér cycling gamerooms efter sidste løb
   cron.schedule('0 8 * * *', () => callEndpoint('/cycling-archive-check'))
+
+  // Dagligt kl. 08:10 UTC — auto-arkivér fodbold-gamerooms efter sidste runde
+  // i sæsonen (14+ dage efter sidste kamp). Værten får 7-dages varsel.
+  cron.schedule('10 8 * * *', () => callEndpoint('/football-archive-check'))
 
   // Dagligt kl. 06:00 UTC — pull startlister fra PCS for upcoming/active løb.
   // PCS opdaterer manuelt med hold-rosters op til løbsstart, så daglig
