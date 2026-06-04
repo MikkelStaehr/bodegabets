@@ -19,7 +19,7 @@ const PRODUCT_CARDS = [
     features: [
       '8 roller per rytter',
       'Alle Grand Tours og monumenter',
-      'Joker, hold-bonus, DNF-straffe',
+      'Joker, hold-bonus, spurt-tog',
       'Block-system per løb',
     ],
   },

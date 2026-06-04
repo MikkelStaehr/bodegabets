@@ -58,7 +58,7 @@ const ROLES = [
     bg: '#3C3489',
     cat: 'Alle',
     score: 'Ingen multiplier',
-    bonus: '+7 vinderhold · DNF-immun',
+    bonus: '+7 vinderhold',
   },
 ]
 

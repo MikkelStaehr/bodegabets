@@ -86,7 +86,7 @@ const ROLES: readonly RoleDef[] = [
   { key: 'grimpeur', label: 'Grimpeur', description: 'Bjergspecialist — 1.2× på bjerg', multiplier: 1.2 },
   { key: 'sprinter', label: 'Sprinter', description: 'Sprint-specialist — 1.2× på flad', multiplier: 1.2 },
   { key: 'domestique', label: 'Domestique', description: 'Workhorse — 1.1× point', multiplier: 1.1 },
-  { key: 'joker', label: 'Joker', description: '2× point — DNF koster dobbelt', multiplier: 2.0 },
+  { key: 'joker', label: 'Joker', description: '2× point — wildcard på etapen', multiplier: 2.0 },
   { key: 'equipier_0', label: 'Équipier', description: 'Standardrolle — 1.0× point', multiplier: 1.0 },
   { key: 'equipier_1', label: 'Équipier', description: 'Standardrolle — 1.0× point', multiplier: 1.0 },
 ] as const
@@ -926,9 +926,8 @@ function Step3RaceResult({
       const rider = SQUAD.find((r) => r.id === riderId)!
       const pos = RACE_RESULT.positions[riderId] ?? null
       const basePts = basePointsForPosition(pos)
-      // Joker DNF straffer dobbelt (negative point)
-      let total = basePts * role.multiplier
-      if (role.key === 'joker' && pos === null) total = -25
+      // Ingen straffe — DNF giver bare 0 point (basePts = 0)
+      const total = basePts * role.multiplier
       return { role, rider, pos, basePts, total: Math.round(total) }
     })
   }, [lineup])
@@ -948,7 +947,7 @@ function Step3RaceResult({
           Resultatet er inde.
         </h2>
         <p className="mt-2 font-body text-[14px] sm:text-[16px] text-warm-gray leading-relaxed">
-          Hver rytter giver point efter placering, ganget med rolle-multiplikator. Joker giver dobbelt — men koster, hvis han DNF&apos;er.
+          Hver rytter giver point efter placering, ganget med rolle-multiplikator. Joker giver dobbelt på sin etape.
         </p>
       </div>
 
