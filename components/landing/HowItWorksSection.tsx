@@ -10,7 +10,7 @@
 
 const FANTASY_STEPS = [
   { num: '01', title: 'Vælg din trup', desc: 'Samle ryttere før løbet starter. Roller, bonusser, joker.' },
-  { num: '02', title: 'Følg etapen live', desc: 'Bench-system, role-bonus og DNF-straffe afgøres undervejs.' },
+  { num: '02', title: 'Følg etapen live', desc: 'Trøje-bonus, spurt-tog og hold-bonusser afgøres undervejs.' },
   { num: '03', title: 'Score per etape', desc: 'Point opdateres efter hver etape — leaderboard kører i realtid.' },
 ] as const
 

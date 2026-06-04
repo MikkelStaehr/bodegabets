@@ -59,7 +59,7 @@ const SLIDES: readonly Slide[] = [
     headlinePrimary: 'Saml drømmeholdet.',
     headlineSecondary: 'Følg hele sæsonen.',
     subtitle:
-      'Byg dit fantasy-hold til Grand Tours og monumenter. Otte roller per rytter, joker når det gælder, hold-bonusser og DNF-straffe. Point efter hver etape, ligaer hele sæsonen igennem.',
+      'Byg dit fantasy-hold til Grand Tours og monumenter. Otte roller per rytter, joker når det gælder, spurt-tog og hold-bonusser. Point efter hver etape, ligaer hele sæsonen igennem.',
     subtitleShort:
       'Byg dit fantasy-hold til Grand Tours og monumenter. Point efter hver etape.',
     ctaText: 'Start en cykel-liga →',
