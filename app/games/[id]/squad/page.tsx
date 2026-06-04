@@ -98,6 +98,7 @@ export default async function SquadPage({ params, searchParams }: Props) {
             raceId: race.id,
             raceName: race.name,
             riderIds,
+            startDate: (race.start_date as string | null) ?? null,
           })
         }
       }

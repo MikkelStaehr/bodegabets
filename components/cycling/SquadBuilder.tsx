@@ -20,6 +20,8 @@ export type RaceStartlist = {
   raceId: string
   raceName: string
   riderIds: string[]
+  /** ISO start_date for racens første etape — bruges til banner-anbefaling. */
+  startDate?: string | null
 }
 
 export type SquadLimits = {
@@ -135,6 +137,33 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
     const filtered = blockSet ? raceStartlists.filter((sl) => blockSet.has(sl.raceId)) : raceStartlists
     return new Set(filtered.flatMap((sl) => sl.riderIds))
   }, [raceStartlists, blockRaceIds])
+
+  // Tidligste start_date blandt løb i den aktive blok — bruges til startlist-
+  // advarsel: hvis vi er > 24 timer fra første etape, viser vi en banner der
+  // beder brugeren vente med at lukke truppen ind.
+  const firstRaceStart = useMemo(() => {
+    const blockSet = blockRaceIds.length > 0 ? new Set(blockRaceIds) : null
+    const filtered = blockSet ? raceStartlists.filter((sl) => blockSet.has(sl.raceId)) : raceStartlists
+    const dates = filtered
+      .map((sl) => sl.startDate)
+      .filter((d): d is string => typeof d === 'string' && d.length > 0)
+      .sort()
+    return dates[0] ?? null
+  }, [raceStartlists, blockRaceIds])
+
+  const startlistUncertain = useMemo(() => {
+    if (!firstRaceStart) return false
+    const startMs = new Date(firstRaceStart).getTime()
+    const nowMs = Date.now()
+    const hoursUntilStart = (startMs - nowMs) / (1000 * 60 * 60)
+    return hoursUntilStart > 24
+  }, [firstRaceStart])
+
+  const firstRaceDateLabel = useMemo(() => {
+    if (!firstRaceStart) return ''
+    const d = new Date(firstRaceStart)
+    return d.toLocaleDateString('da-DK', { day: 'numeric', month: 'long' })
+  }, [firstRaceStart])
   const squadIds = useMemo(() => new Set(squad.map((r) => r.id)), [squad])
 
   // Category counts
@@ -221,6 +250,28 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
 
   return (
     <div>
+      {/* ── Startlist-status (når der er > 24 timer til første etape) ── */}
+      {startlistUncertain && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '12px 14px',
+            background: 'rgba(184,150,62,0.10)',
+            border: '1px solid rgba(184,150,62,0.35)',
+            borderRadius: 4,
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 12,
+            color: '#6B5318',
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ display: 'block', marginBottom: 4, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            Startlister er foreløbige
+          </strong>
+          PCS opdaterer rosters helt op til løbsstart — ryttere kan stadig blive tilføjet eller fjernet. Vi anbefaler at udtage din brutto trup tidligst <strong>24 timer før første etape{firstRaceDateLabel ? ` (${firstRaceDateLabel})` : ''}</strong>. Startlister synkes automatisk hver morgen.
+        </div>
+      )}
+
       {/* ── Ghost-rytter advarsel ───────────────────────────────────── */}
       {ghostCount > 0 && (
         <div
