@@ -11,6 +11,7 @@
  *   GET /update-bet-open   — dagligt 07:05 (opret round_members for åbne runder)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /calculate-points  — safety net (primær trigger er nu i syncMatchScores)
+ *   GET /sync-cycling-startlists — dagligt 06:00 (PCS startlister for upcoming løb)
  *   GET /health            — health check
  *
  * Environment:
@@ -32,6 +33,7 @@ import { calculateRoundPoints, calculateChampionshipRoundPoints, syncProfilesPoi
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
 import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage } from '@/lib/calculateCyclingPoints'
 import { syncCyclingResults } from '@/lib/syncCyclingResults'
+import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
 
 const app = express()
 app.use(express.json())
@@ -863,6 +865,34 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
   }
 })
 
+// ─── GET /sync-cycling-startlists ───────────────────────────────────────────
+// Synkroniserer startlister for upcoming/active cykel-løb fra PCS.
+// Kører dagligt — PCS opdaterer manuelt op til løbsstart, så daglig
+// re-sync sikrer at lineup-builder altid har seneste roster.
+
+app.get('/sync-cycling-startlists', async (_req, res) => {
+  try {
+    const result = await syncCyclingStartlists()
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_startlists_sync',
+      status: result.ok ? 'success' : 'error',
+      message: `sync-cycling-startlists: ${result.racesProcessed} races, ${result.entriesUpserted} entries, ${result.unmatched} unmatched`,
+      metadata: result as unknown as Record<string, unknown>,
+    })
+
+    res.json({ ok: result.ok, ...result })
+  } catch (err) {
+    console.error('[sync-cycling-startlists]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_startlists_sync',
+      status: 'error',
+      message: `sync-cycling-startlists failed: ${String(err)}`,
+    })
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /sync-cycling-results ──────────────────────────────────────────────
 // Henter etape-resultater fra PCS for aktive stage races og upserter dem til
 // cycling_results. Trigger derefter automatisk runCyclingPointsForStage for
@@ -1178,6 +1208,12 @@ app.listen(PORT, () => {
 
   // Dagligt kl. 08:00 UTC — auto-arkivér cycling gamerooms efter sidste løb
   cron.schedule('0 8 * * *', () => callEndpoint('/cycling-archive-check'))
+
+  // Dagligt kl. 06:00 UTC — pull startlister fra PCS for upcoming/active løb.
+  // PCS opdaterer manuelt med hold-rosters op til løbsstart, så daglig
+  // re-sync sikrer at lineup-builder altid har seneste version (ryttere
+  // tilføjes/fjernes når hold annoncerer).
+  cron.schedule('0 6 * * *', () => callEndpoint('/sync-cycling-startlists'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')
 })
