@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDateTime } from '@/lib/dateUtils'
 
+// SeasonRow fortæller admin-UI'et hvilke Bold-phases en sæson dækker.
+// bold_phase_ids er nu eneste kilde — kan rumme én ("24470") eller flere
+// komma-separerede ("22620,22621,22622") for multi-phase turneringer.
 export type SeasonRow = {
   id: number
-  bold_phase_id: number | null
   bold_phase_ids: string | null
   is_free_event: boolean
   match_count: number
@@ -65,8 +67,8 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
   const totalMatches = tournaments.reduce(
     (s, t) => s + t.seasons.reduce((ss, se) => ss + se.match_count, 0), 0
   )
-  const hasPhase = (s: SeasonRow) => s.bold_phase_id != null || s.bold_phase_ids != null
-  const phaseLabel = (s: SeasonRow) => s.bold_phase_ids ?? (s.bold_phase_id != null ? String(s.bold_phase_id) : null)
+  const hasPhase = (s: SeasonRow) => s.bold_phase_ids != null
+  const phaseLabel = (s: SeasonRow) => s.bold_phase_ids
   const totalSeasons = tournaments.reduce(
     (s, t) => s + t.seasons.filter(hasPhase).length, 0
   )
@@ -202,7 +204,7 @@ export default function LeagueHubClient({ tournaments, lastSync }: Props) {
       <div className="space-y-3">
         {tournaments.length === 0 && (
           <div className="border border-border rounded-sm bg-cream p-8 text-center font-body text-text-warm text-sm">
-            Ingen turneringer med bold_phase_id konfigureret
+            Ingen turneringer med bold_phase_ids konfigureret
           </div>
         )}
         {tournaments.map((tournament) => (
