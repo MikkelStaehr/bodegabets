@@ -28,10 +28,12 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
 
   if (loading) return null
 
-  // Tjek om alle har 0 point — viser empty state hvis konkurrencen ikke er startet
+  // Empty state KUN hvis ingen spillere overhovedet. Når der er medlemmer men
+  // ingen point endnu (sæson ikke startet), viser vi alligevel deltagerlisten
+  // så folk kan se hvem der er med — med en lille note øverst.
   const hasAnyScore = entries.some((e) => e.block_points > 0 || e.round_points > 0)
 
-  if (entries.length === 0 || !hasAnyScore) {
+  if (entries.length === 0) {
     return (
       <div>
         <div style={{ marginBottom: 10 }}>
@@ -53,9 +55,7 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
             fontFamily: "'Barlow', sans-serif", fontSize: 13,
             color: '#9E9486', lineHeight: 1.5, margin: 0,
           }}>
-            {entries.length === 0
-              ? 'Ingen spillere endnu'
-              : 'Konkurrencen starter når første kamp/etape er færdig'}
+            Ingen spillere endnu
           </p>
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
 
   return (
     <div>
-      <div style={{ marginBottom: 10 }}>
+      <div style={{ marginBottom: 10, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
         <span style={{
           fontFamily: "'Barlow Condensed', sans-serif",
           fontSize: 11, letterSpacing: '0.14em',
@@ -72,6 +72,16 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
         }}>
           Leaderboard
         </span>
+        {!hasAnyScore && (
+          <span style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 10, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: '#9E9486',
+            fontStyle: 'italic',
+          }}>
+            Konkurrencen starter snart
+          </span>
+        )}
       </div>
 
       <div style={{
