@@ -128,10 +128,10 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
         {items.map((t) => {
           const selected = isSelected(String(t.id))
           // Datakilde kan ligge på turnerings-niveau (bold_slug/bold_id) ELLER
-          // sæson-niveau (bold_phase_id/bold_phase_ids — fx VM 2026 oprettet
-          // direkte med phase_ids). Begge gør turneringen valgbar.
+          // sæson-niveau (bold_phase_ids — fx VM 2026 oprettet direkte med
+          // phase_ids). Begge gør turneringen valgbar.
           const season   = seasonMap[t.id]
-          const hasSrc   = !!t.bold_slug || !!t.bold_id || !!season?.bold_phase_id || !!season?.bold_phase_ids
+          const hasSrc   = !!t.bold_slug || !!t.bold_id || !!season?.bold_phase_ids
 
           return (
             <button

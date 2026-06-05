@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, name,
       seasons (
-        id, tournament_id, name, bold_phase_id, is_active, start_date, end_date
+        id, tournament_id, name, bold_phase_ids, is_active, start_date, end_date
       )
     `)
     .order('name')
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as {
     tournament_id?: number
     name?: string
-    bold_phase_id?: number | null
+    bold_phase_ids?: string | null
     is_active?: boolean
     start_date?: string | null
     end_date?: string | null
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     .insert({
       tournament_id: body.tournament_id,
       name: body.name.trim(),
-      bold_phase_id: body.bold_phase_id ?? null,
+      bold_phase_ids: body.bold_phase_ids ?? null,
       is_active: body.is_active ?? false,
       start_date: body.start_date ?? null,
       end_date: body.end_date ?? null,
