@@ -143,13 +143,15 @@ export default function RegisterPage() {
     const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ')
 
     // Opret auth-bruger — brugernavn sendes som metadata og oprettes via trigger.
-    // emailRedirectTo respekterer ?redirect= så fx VM-flow sender brugeren
-    // direkte ind i spilrummet efter email-bekræftelse.
+    // emailRedirectTo går via /auth/callback (PKCE-flow), der udveksler koden
+    // og redirecter videre. safeRedirect (?redirect=) respekteres så fx
+    // VM-flow sender brugeren direkte ind i spilrummet efter email-bekræftelse.
+    const finalRedirect = safeRedirect ?? '/dashboard'
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}${safeRedirect ?? '/dashboard'}`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(finalRedirect)}`,
         data: {
           username: trimmedUsername,
           ...(fullName ? { full_name: fullName } : {}),
