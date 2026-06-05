@@ -21,6 +21,7 @@ import LineupBuilder from '@/components/cycling/LineupBuilder'
 import CyclingGameroom from '@/components/cycling/CyclingGameroom'
 import RolesGuide from '@/components/cycling/RolesGuide'
 import Leaderboard from '@/components/games/Leaderboard'
+import ShoutBox from '@/components/games/ShoutBox'
 import FootballLiveSection from '@/components/games/FootballLiveSection'
 import FreeEventPitchBanner from '@/components/games/FreeEventPitchBanner'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
@@ -1501,6 +1502,12 @@ export default async function GamePage({ params }: Props) {
             <CyclingSeasonOverview gameId={gameId} />
             <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} blockStatus={cyclingActiveBlockStatus} />
             <Leaderboard gameId={gameId} />
+            <ShoutBox
+              gameId={gameId}
+              currentUserId={user.id}
+              hostId={typedGame.host_id}
+              members={members.map((m) => ({ user_id: m.user_id, username: m.profile?.username ?? 'Anonym' }))}
+            />
             {typedGame.host_id === user.id && (
               <Link
                 href={`/games/${gameId}/cycling/add-races`}
@@ -1527,6 +1534,15 @@ export default async function GamePage({ params }: Props) {
             currentUserId={user.id}
             initialState={initialGameState}
             theme={{ primary: theme.primary, primaryLight: theme.primaryLight }}
+          />
+        )}
+
+        {typedGame.sport !== 'cycling' && (
+          <ShoutBox
+            gameId={gameId}
+            currentUserId={user.id}
+            hostId={typedGame.host_id}
+            members={members.map((m) => ({ user_id: m.user_id, username: m.profile?.username ?? 'Anonym' }))}
           />
         )}
 
