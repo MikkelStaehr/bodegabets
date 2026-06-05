@@ -32,9 +32,48 @@ export default async function NewFootballGamePage() {
       .order('id', { ascending: false }),
   ])
 
+  // Skip afsluttede sæsoner. To kriterier — én fanger:
+  //   a) Alle runder er 'finished' (sidste kamp spillet + scoring kørt)
+  //   b) Sidste runde lukkede for > 30 dage siden (fanger sæsoner hvor
+  //      update-rounds-cron ikke har markeret status, men kalendermæssigt er
+  //      sæsonen forbi — fx Superligaen 25/26 sluttede maj 2026)
+  // Sæsoner uden runder (lige oprettet, venter på sync) tæller som ikke-afsluttet.
+  const STALE_AFTER_DAYS = 30
+  const staleCutoff = new Date(Date.now() - STALE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+  const seasonIds = (seasons ?? []).map((s) => s.id as number)
+  const finishedSeasonIds = new Set<number>()
+  if (seasonIds.length > 0) {
+    const { data: rounds } = await supabase
+      .from('rounds')
+      .select('season_id, status, betting_closes_at')
+      .in('season_id', seasonIds)
+    type Stat = { total: number; finished: number; latestClose: string | null }
+    const statsBySeason = new Map<number, Stat>()
+    for (const r of rounds ?? []) {
+      const sid = r.season_id as number
+      const s = statsBySeason.get(sid) ?? { total: 0, finished: 0, latestClose: null }
+      s.total++
+      if (r.status === 'finished') s.finished++
+      const close = r.betting_closes_at as string | null
+      if (close && (!s.latestClose || close > s.latestClose)) s.latestClose = close
+      statsBySeason.set(sid, s)
+    }
+    for (const [sid, s] of statsBySeason) {
+      if (s.total > 0 && s.finished === s.total) {
+        finishedSeasonIds.add(sid)
+      } else if (s.latestClose && s.latestClose < staleCutoff) {
+        finishedSeasonIds.add(sid)
+      }
+    }
+  }
+
   // Build map: tournament_id → latest season (first match since ordered desc)
+  // Spring afsluttede over så fx Superligaen 25/26 ikke fanges som "latest"
+  // når 26/27 allerede er oprettet.
   const seasonMap: Record<number, Season> = {}
   for (const s of seasons ?? []) {
+    if (finishedSeasonIds.has(s.id as number)) continue
     const tid = s.tournament_id as number
     if (!seasonMap[tid]) {
       seasonMap[tid] = s as Season
