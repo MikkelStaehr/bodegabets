@@ -1,14 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser'
 
 const supabase = createBrowserSupabaseClient()
 
+// Whitelist for ?next=-redirects efter login — kun interne paths,
+// så vi ikke kan misbruges som open-redirect.
+function safeNext(next: string | null): string {
+  if (!next) return '/dashboard'
+  if (!next.startsWith('/') || next.startsWith('//')) return '/dashboard'
+  return next
+}
+
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = safeNext(searchParams.get('next'))
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -86,7 +96,7 @@ export default function LoginPage() {
       }
 
       router.refresh()
-      router.push('/dashboard')
+      router.push(next)
     } finally {
       setLoading(false)
     }
@@ -122,7 +132,7 @@ export default function LoginPage() {
       }
 
       router.refresh()
-      router.push('/dashboard')
+      router.push(next)
     } catch {
       setError('Forbindelsen til 2FA-tjenesten svarer ikke. Prøv igen.')
       setMfaCode('')
