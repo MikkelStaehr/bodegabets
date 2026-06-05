@@ -17,8 +17,10 @@ export default function ForgotPasswordPage() {
     setSubmitting(true)
 
     const supabase = createBrowserSupabaseClient()
+    // PKCE-flow: Supabase sender link til /auth/callback der udveksler koden
+    // for en session og redirecter videre til /reset-password.
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
     })
 
     if (err) {
