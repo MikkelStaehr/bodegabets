@@ -28,7 +28,7 @@ export default async function NewFootballGamePage() {
       .order('name', { ascending: true }),
     supabase
       .from('seasons')
-      .select('id, tournament_id, name, bold_phase_id, bold_phase_ids, is_free_event')
+      .select('id, tournament_id, name, bold_phase_ids, is_free_event')
       .order('id', { ascending: false }),
   ])
 

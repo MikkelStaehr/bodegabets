@@ -17,7 +17,6 @@ export async function PATCH(
   }
 
   const body = await req.json().catch(() => ({})) as {
-    bold_phase_id?: number | null
     bold_phase_ids?: string | null
     is_active?: boolean
     is_free_event?: boolean
@@ -26,7 +25,6 @@ export async function PATCH(
   }
 
   const updates: Record<string, unknown> = {}
-  if ('bold_phase_id' in body) updates.bold_phase_id = body.bold_phase_id ?? null
   if ('bold_phase_ids' in body) updates.bold_phase_ids = body.bold_phase_ids ?? null
   if ('is_active' in body) updates.is_active = body.is_active
   if ('is_free_event' in body) updates.is_free_event = body.is_free_event

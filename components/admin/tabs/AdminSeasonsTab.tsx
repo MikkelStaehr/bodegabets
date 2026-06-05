@@ -7,7 +7,7 @@ type Season = {
   id: number
   tournament_id: number
   name: string
-  bold_phase_id: number | null
+  bold_phase_ids: string | null
   is_active: boolean
   start_date: string | null
   end_date: string | null
@@ -37,7 +37,7 @@ function Modal({
   onClose: () => void
   onSaved: (season: Season) => void
 }) {
-  const [boldPhaseId, setBoldPhaseId] = useState('')
+  const [boldPhaseIds, setBoldPhaseIds] = useState('')
   const [isActive, setIsActive] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -49,13 +49,13 @@ function Modal({
   useEffect(() => {
     if (!state) return
     if (state.mode === 'edit') {
-      setBoldPhaseId(state.season.bold_phase_id?.toString() ?? '')
+      setBoldPhaseIds(state.season.bold_phase_ids ?? '')
       setIsActive(state.season.is_active)
       setStartDate(state.season.start_date?.slice(0, 10) ?? '')
       setEndDate(state.season.end_date?.slice(0, 10) ?? '')
       setName(state.season.name)
     } else {
-      setBoldPhaseId('')
+      setBoldPhaseIds('')
       setIsActive(true)
       setStartDate('')
       setEndDate('')
@@ -85,7 +85,7 @@ function Modal({
           method: 'PATCH',
           headers,
           body: JSON.stringify({
-            bold_phase_id: boldPhaseId ? parseInt(boldPhaseId, 10) : null,
+            bold_phase_ids: boldPhaseIds.trim() || null,
             is_active: isActive,
             start_date: startDate || null,
             end_date: endDate || null,
@@ -98,7 +98,7 @@ function Modal({
           body: JSON.stringify({
             tournament_id: state!.tournament_id,
             name: name.trim(),
-            bold_phase_id: boldPhaseId ? parseInt(boldPhaseId, 10) : null,
+            bold_phase_ids: boldPhaseIds.trim() || null,
             is_active: isActive,
             start_date: startDate || null,
             end_date: endDate || null,
@@ -162,15 +162,14 @@ function Modal({
 
           <div>
             <label className="block font-condensed text-[11px] font-bold uppercase tracking-wide text-warm-gray mb-1">
-              Bold phase_id
+              Bold phase_ids
             </label>
             <input
               ref={state.mode === 'edit' ? firstInputRef : undefined}
-              type="number"
-              min={1}
-              value={boldPhaseId}
-              onChange={(e) => setBoldPhaseId(e.target.value)}
-              placeholder="fx 23844"
+              type="text"
+              value={boldPhaseIds}
+              onChange={(e) => setBoldPhaseIds(e.target.value)}
+              placeholder="fx 23844 eller 22620,22621,..."
               className="w-full border border-warm-border bg-white text-ink px-3 py-2 text-sm font-body focus:outline-none focus:border-forest"
               style={{ borderRadius: '2px' }}
             />
@@ -327,7 +326,7 @@ export function AdminSeasonsTab() {
                       <div className="min-w-0">
                         <p className="font-condensed font-semibold text-ink truncate">{season.name}</p>
                         <p className="font-body text-[11px] text-warm-taupe mt-0.5">
-                          {season.bold_phase_id != null ? `phase_id ${season.bold_phase_id}` : <span className="text-vintage-red/70">phase_id mangler</span>}
+                          {season.bold_phase_ids ? `phase_ids ${season.bold_phase_ids}` : <span className="text-vintage-red/70">phase_ids mangler</span>}
                         </p>
                         <p className="font-body text-[11px] text-warm-gray mt-0.5">
                           {season.start_date || season.end_date
@@ -361,7 +360,7 @@ export function AdminSeasonsTab() {
                 <thead>
                   <tr className="bg-cream-dark border-b border-warm-border">
                     <th className="text-left px-5 py-2.5 font-condensed text-[10px] font-bold uppercase tracking-wider text-warm-gray">Sæson</th>
-                    <th className="text-left px-4 py-2.5 font-condensed text-[10px] font-bold uppercase tracking-wider text-warm-gray">Bold phase_id</th>
+                    <th className="text-left px-4 py-2.5 font-condensed text-[10px] font-bold uppercase tracking-wider text-warm-gray">Bold phase_ids</th>
                     <th className="text-left px-4 py-2.5 font-condensed text-[10px] font-bold uppercase tracking-wider text-warm-gray">Status</th>
                     <th className="text-left px-4 py-2.5 font-condensed text-[10px] font-bold uppercase tracking-wider text-warm-gray">Periode</th>
                     <th className="text-right px-5 py-2.5 font-condensed text-[10px] font-bold uppercase tracking-wider text-warm-gray">Handling</th>
@@ -374,8 +373,8 @@ export function AdminSeasonsTab() {
                         {season.name}
                       </td>
                       <td className="px-4 py-3 font-condensed text-sm">
-                        {season.bold_phase_id != null ? (
-                          <span className="text-ink">{season.bold_phase_id}</span>
+                        {season.bold_phase_ids ? (
+                          <span className="text-ink">{season.bold_phase_ids}</span>
                         ) : (
                           <span className="text-vintage-red/70">mangler</span>
                         )}
