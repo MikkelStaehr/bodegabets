@@ -668,7 +668,21 @@ export async function syncSeasonViaBold(seasonId: number): Promise<{
     return { synced: 0, rounds_created: 0, matches_created: 0, matches_updated: 0, errors: [`Sæson ${seasonId} mangler bold_phase_ids`] }
   }
   const isMultiPhase = phaseIds.includes(',')
-  return syncBoldFixtures(seasonId, phaseIds, { splitRoundsByDate: isMultiPhase })
+  const result = await syncBoldFixtures(seasonId, phaseIds, { splitRoundsByDate: isMultiPhase })
+
+  // VM-specifik post-sync: omstrukturér til ~10-kamps gruppespils-runder +
+  // samlede knockout-faser. Bold-sync giver os én runde pr. kampdag (35),
+  // som vi grupperer ned til 14 til betting-overblik. Idempotent.
+  if (seasonId === 25) {
+    try {
+      const { restructureVmRounds } = await import('@/lib/restructureVmRounds')
+      await restructureVmRounds(seasonId)
+    } catch (err) {
+      result.errors.push(`VM-restructure failed: ${String(err)}`)
+    }
+  }
+
+  return result
 }
 
 // ─── buildLeagueRounds (compat wrapper) ─────────────────────────────────────
