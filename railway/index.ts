@@ -11,7 +11,7 @@
  *   GET /update-bet-open   — dagligt 07:05 (opret round_members for åbne runder)
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /calculate-points  — safety net (primær trigger er nu i syncMatchScores)
- *   GET /sync-cycling-startlists — dagligt 06:00 (PCS startlister for upcoming løb)
+ *   GET /sync-cycling-startlists — hver 3. time (PCS startlister for upcoming løb)
  *   GET /football-archive-check — dagligt 08:10 (arkivér fodbold-gamerooms efter sidste runde)
  *   GET /health            — health check
  *
@@ -1376,10 +1376,11 @@ app.listen(PORT, () => {
   // Hvert 15. minut — lås cycling lineups (kun 09:00–20:00 UTC / 10:00–21:00 DK)
   cron.schedule('*/15 9-20 * * *', () => callEndpoint('/cycling-lock-lineups'))
 
-  // Hver time fra 14:00–22:00 UTC (16:00–24:00 DK) — pull etape-resultater
-  // fra PCS. Etaper slutter typisk 14:30–17:30 UTC. Sync trigger derefter
-  // automatisk runCyclingPointsForStage internt, så vi får point straks.
-  cron.schedule('0 14-22 * * *', () => callEndpoint('/sync-cycling-results'))
+  // Hver 30. min fra 14:00–22:30 UTC (16:00–00:30 DK) — pull etape-resultater
+  // fra PCS. Etaper slutter typisk 14:30–17:30 UTC, så 30-min cadence sikrer
+  // at brugere får point indenfor ~30 min af målgang i stedet for op til en
+  // time. Sync trigger derefter automatisk runCyclingPointsForStage internt.
+  cron.schedule('*/30 14-22 * * *', () => callEndpoint('/sync-cycling-results'))
 
   // Hver 2. time — beregn cykling-point safety net (kun 14-22 UTC,
   // umiddelbart efter sync-cycling-results). Primær trigger ligger nu
@@ -1395,11 +1396,13 @@ app.listen(PORT, () => {
   // i sæsonen (14+ dage efter sidste kamp). Værten får 7-dages varsel.
   cron.schedule('10 8 * * *', () => callEndpoint('/football-archive-check'))
 
-  // Dagligt kl. 06:00 UTC — pull startlister fra PCS for upcoming/active løb.
-  // PCS opdaterer manuelt med hold-rosters op til løbsstart, så daglig
-  // re-sync sikrer at lineup-builder altid har seneste version (ryttere
-  // tilføjes/fjernes når hold annoncerer).
-  cron.schedule('0 6 * * *', () => callEndpoint('/sync-cycling-startlists'))
+  // Hver 3. time — pull startlister fra PCS for upcoming/active løb.
+  // PCS opdaterer rosters helt op til løbsstart (fx Pogačar trukket fra
+  // Dauphiné 7. juni morgen), så 1x daglig var for sjældent. 8x daglig
+  // sikrer at lineup-builder har seneste version indenfor 3 timer af
+  // PCS-update. Belastning på PCS er minimal: ~3-6 upcoming races × 1 sek
+  // delay = ~6-12 sek pr. sync run.
+  cron.schedule('0 */3 * * *', () => callEndpoint('/sync-cycling-startlists'))
 
   console.log('[bodegabets-cron] cron jobs scheduled')
 })
