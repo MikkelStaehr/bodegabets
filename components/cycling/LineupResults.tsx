@@ -465,10 +465,12 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
                     position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
                     background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
                     padding: '10px 14px',
-                    // Anchored i en smal flex-cell — uden width: max-content
-                    // ville tooltip shrink til bredeste enkelt-ord (~80px) og
-                    // brækkes til en ulæselig kolonne.
-                    width: 'max-content', minWidth: 220, maxWidth: 320,
+                    // Viewport-aware: aldrig bredere end skærmen minus 24px margin,
+                    // så tooltip aldrig kan klippes af iPhone-kant. På desktop
+                    // capper vi ved 320px så den ikke flyder for langt ud.
+                    width: 'max-content',
+                    minWidth: 220,
+                    maxWidth: 'min(320px, calc(100vw - 24px))',
                     fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
                     color: 'rgba(255,255,255,0.78)', lineHeight: 1.5,
                     whiteSpace: 'normal',

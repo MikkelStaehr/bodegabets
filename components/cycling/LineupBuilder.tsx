@@ -407,7 +407,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const deadlineStr = activeStage ? (getStageDeadline(activeStage.start_date)?.toISOString() ?? null) : (lockDeadline ?? null)
 
   return (
-    <div style={{ background: theme.bg, borderRadius: 2, overflow: 'hidden', transition: 'background 0.3s' }}>
+    <div style={{ background: theme.bg, borderRadius: 2, transition: 'background 0.3s' }}>
       {/* ── Stripes bar (VM, EM osv.) ────────────────────────── */}
       {theme.stripes && (
         <div style={{ display: 'flex', height: 4 }}>
