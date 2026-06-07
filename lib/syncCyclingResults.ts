@@ -188,6 +188,13 @@ type ClassificationSet = {
   points: Record<string, ClassificationEntry>  // points: rawValue = total points
   mountain: Record<string, ClassificationEntry>// mountain: rawValue = KOM points
   youth: Record<string, ClassificationEntry>   // youth: rawValue = tid-gap text
+  /** Stage-specifikke sprint-points scoret af hver rytter på denne etape
+   *  (sum af intermediate sprints + målspurt points). Fra "Today"-kolonnen
+   *  i points classification-tabellen. */
+  sprintPoints: Record<string, number>
+  /** Stage-specifikke KOM-points på denne etape. Fra "Today"-kolonnen i
+   *  mountain classification-tabellen. */
+  mountainPoints: Record<string, number>
 }
 
 // Convenience accessor — returns position if present, else null
@@ -211,7 +218,8 @@ function posOf(entry: ClassificationEntry | undefined): number | null {
 //
 // Verificeret mod Giro 2026 stage 4 (12 tables) og stage 5 (13 tables) —
 // "general"-filteret giver konsekvent de samme 6 hovedklassementer.
-const GENERAL_INDEX: Record<keyof ClassificationSet, number> = {
+type ClassificationKey = 'gc' | 'points' | 'mountain' | 'youth'
+const GENERAL_INDEX: Record<ClassificationKey, number> = {
   gc: 1,
   points: 2,
   mountain: 3,
@@ -219,7 +227,7 @@ const GENERAL_INDEX: Record<keyof ClassificationSet, number> = {
 }
 // Værdi-kolonnen findes via header-tekst INDEN FOR den valgte tabel (Time/Pnt
 // kan ligge i forskellige kolonne-indekser pga. UCI/Prev-kolonner mv.).
-const VALUE_HEADER: Record<keyof ClassificationSet, string> = {
+const VALUE_HEADER: Record<ClassificationKey, string> = {
   gc: 'time',
   points: 'pnt',
   mountain: 'pnt',
@@ -236,7 +244,10 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
     ? `${PCS_BASE}/race/${slug}/2026/prologue`
     : `${PCS_BASE}/race/${slug}/2026/stage-${stageNum}`
 
-  const out: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
+  const out: ClassificationSet = {
+    gc: {}, points: {}, mountain: {}, youth: {},
+    sprintPoints: {}, mountainPoints: {},
+  }
 
   const html = await pcsGet(`${base}-gc`)
   if (!html) return out
@@ -288,11 +299,26 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
           : cells[cells.length - 1]
         const rawValue = valCell ? $(valCell).text().trim() : null
         out[key][ridSlug] = { position: posNum, rawValue: rawValue || null }
+
+        // Stage-specifikke "Today"-points for points + mountain. Hvis tabellen
+        // har en "Today"-kolonne efter "Pnt", indeholder den hvor mange points
+        // rytteren scorede PÅ DENNE ETAPE (ikke sammenlagt).
+        if (key === 'points' || key === 'mountain') {
+          const todayColIdx = headerCells.findIndex((th) => $(th).text().trim().toLowerCase() === 'today')
+          if (todayColIdx >= 0 && todayColIdx < cells.length) {
+            const todayText = $(cells[todayColIdx]).text().trim()
+            const todayNum = parseInt(todayText.replace(/[^0-9]/g, ''), 10)
+            if (Number.isFinite(todayNum) && todayNum > 0) {
+              const target = key === 'points' ? out.sprintPoints : out.mountainPoints
+              target[ridSlug] = todayNum
+            }
+          }
+        }
       }
     })
   }
 
-  console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length}`)
+  console.log(`[scrapeClassifications] gc=${Object.keys(out.gc).length} pts=${Object.keys(out.points).length} mtn=${Object.keys(out.mountain).length} youth=${Object.keys(out.youth).length} sprintPts=${Object.keys(out.sprintPoints).length} mountainPts=${Object.keys(out.mountainPoints).length}`)
   return out
 }
 
@@ -443,7 +469,7 @@ export async function syncCyclingResults(): Promise<{
     // subside. PCS publicerer stage-resultatet ~15-30 min efter målgang, men
     // de fulde klassement-tabeller kan komme TIMER senere. Hvis vi rammer for
     // tidligt får vi tomme/delvise klassementer.
-    let classifications: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {} }
+    let classifications: ClassificationSet = { gc: {}, points: {}, mountain: {}, youth: {}, sprintPoints: {}, mountainPoints: {} }
     try {
       classifications = await scrapeClassifications(race.pcs_slug, stage.stage_number)
     } catch (err) {
@@ -491,6 +517,8 @@ export async function syncCyclingResults(): Promise<{
       mountain_value: number | null
       gc_gap_seconds: number | null
       youth_gap_seconds: number | null
+      sprint_points: number
+      mountain_points: number
     }> = []
     for (const r of parsed) {
       const riderId = riderIndex.get(r.pcs_slug)
@@ -527,6 +555,8 @@ export async function syncCyclingResults(): Promise<{
         youth_gap_seconds: slugClassifs.youth
           ? parseGapToSeconds(slugClassifs.youth.rawValue, slugClassifs.youth.position)
           : null,
+        sprint_points: classifications.sprintPoints[r.pcs_slug] ?? 0,
+        mountain_points: classifications.mountainPoints[r.pcs_slug] ?? 0,
       })
     }
     if (stageUnmatched > 0) {
