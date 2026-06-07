@@ -38,8 +38,11 @@ async function pcsGet(url: string): Promise<string | null> {
 
 type StartlistEntry = {
   pcs_slug: string
+  /** Rå navn fra PCS — typisk "LASTNAME Firstname". */
   name: string
   bib_number: number | null
+  /** Hold-navn fra parent team-li, fx "Tudor Pro Cycling Team (PRT)". */
+  team_name: string
 }
 
 type ParseResult = {
@@ -87,6 +90,7 @@ function parseStartlist(html: string): ParseResult {
   const seenSlugs = new Set<string>()
 
   teamLis.each((_, teamLi) => {
+    const teamName = $(teamLi).find('a.team').first().text().trim()
     // Dedupere per bib INDEN FOR holdet — behold første forekomst.
     const seenBibs = new Set<number>()
     $(teamLi).find('div.ridersCont > ul > li').each((_, li) => {
@@ -112,7 +116,7 @@ function parseStartlist(html: string): ParseResult {
       const name = anchor.text().trim().split(/\s+/).join(' ')
       if (!name) return
 
-      entries.push({ pcs_slug: pcsSlug, name, bib_number: bib })
+      entries.push({ pcs_slug: pcsSlug, name, bib_number: bib, team_name: teamName })
     })
   })
 
@@ -136,9 +140,31 @@ function parseFlat($: ReturnType<typeof cheerio.load>): StartlistEntry[] {
     const bibSpan = $(el).parent().find('span.bib').first()
     const bibTxt = bibSpan.text().trim()
     const bib = /^\d+$/.test(bibTxt) ? parseInt(bibTxt, 10) : null
-    entries.push({ pcs_slug: pcsSlug, name, bib_number: bib })
+    entries.push({ pcs_slug: pcsSlug, name, bib_number: bib, team_name: '' })
   })
   return entries
+}
+
+/**
+ * Spilt "LASTNAME Firstname" til to felter. PCS startlist bruger ALCAPS for
+ * efternavn og Mixed case for fornavn. Sammensatte efternavne (fx "VAN AERT
+ * Wout" eller "DEL TORO Isaac") opsamles alle UPPERCASE-ord som efternavn.
+ */
+function splitName(raw: string): { first: string; last: string } {
+  const parts = raw.trim().split(/\s+/)
+  const upper: string[] = []
+  const rest: string[] = []
+  for (const p of parts) {
+    if (p.length > 1 && p === p.toUpperCase() && /[A-ZÀ-ÖØ-Þ]/.test(p)) upper.push(p)
+    else rest.push(p)
+  }
+  if (upper.length > 0) {
+    return { last: upper.join(' '), first: rest.join(' ') }
+  }
+  return {
+    last: (parts[parts.length - 1] ?? '').toUpperCase(),
+    first: parts.slice(0, -1).join(' '),
+  }
 }
 
 export type SyncStartlistsResult = {
@@ -210,6 +236,40 @@ export async function syncCyclingStartlists(year: number = new Date().getFullYea
         )
         if (entries.length > expectedCount) {
           entries.length = expectedCount
+        }
+      }
+
+      // Auto-insert ryttere der mangler i cycling_riders. Sker når en ung/ny
+      // rytter er på startlisten men endnu ikke fanget af team-roster-sync
+      // (fx u23-ryttere på ProTeam-hold der ikke ligger i WT-listen). Vi har
+      // alle felter vi behøver fra startlist-strukturen.
+      const missingEntries = entries.filter((e) => !riderBySlug.has(e.pcs_slug))
+      if (missingEntries.length > 0) {
+        const nowIso = new Date().toISOString()
+        const newRows = missingEntries.map((e) => {
+          const { first, last } = splitName(e.name)
+          return {
+            pcs_slug: e.pcs_slug,
+            first_name: first,
+            last_name: last,
+            team_name: e.team_name || 'Ukendt hold',
+            category: 5,
+            is_active: true,
+            updated_at: nowIso,
+            last_synced_at: nowIso,
+          }
+        })
+        const { data: inserted, error: insertRiderErr } = await supabaseAdmin
+          .from('cycling_riders')
+          .upsert(newRows, { onConflict: 'pcs_slug' })
+          .select('id, pcs_slug')
+        if (insertRiderErr) {
+          console.warn(`[syncCyclingStartlists] ${race.name}: auto-insert ${missingEntries.length} ryttere fejlede — ${insertRiderErr.message}`)
+        } else {
+          for (const r of inserted ?? []) {
+            riderBySlug.set(r.pcs_slug as string, r.id as string)
+          }
+          console.log(`[syncCyclingStartlists] ${race.name}: auto-insertede ${inserted?.length ?? 0} ny(e) rytter(e): ${missingEntries.map((e) => e.name).join(', ')}`)
         }
       }
 
