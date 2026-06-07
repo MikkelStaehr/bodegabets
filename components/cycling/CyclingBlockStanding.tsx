@@ -9,6 +9,9 @@ type Props = {
   blockName: string | null
   /** Status på den aktive blok — styrer "Fører" (active) vs "Vinder" (finished). */
   blockStatus?: 'upcoming' | 'active' | 'finished' | null
+  /** Når true, fjernes ydre card og titel — komponenten flyder ind i en
+   *  parent-container (fx CyclingRanglister tabs). */
+  embedded?: boolean
 }
 
 /**
@@ -21,7 +24,7 @@ type Props = {
  *   - active blok → "Fører" (gylden, spændingen er live)
  *   - finished blok → "Vinder" (gylden + trofæ-ikon, blokken er afsluttet)
  */
-export default function CyclingBlockStanding({ gameId, blockName, blockStatus }: Props) {
+export default function CyclingBlockStanding({ gameId, blockName, blockStatus, embedded }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -41,15 +44,23 @@ export default function CyclingBlockStanding({ gameId, blockName, blockStatus }:
   const hasPoints = ranked.some((e) => (e.block_points ?? 0) > 0)
 
   return (
-    <div className="bg-cream-dark border border-warm-border rounded-sm p-4 sm:p-5">
-      <div className="flex items-baseline justify-between mb-3">
-        <p className="label-caps text-warm-taupe">
-          {(blockName ?? 'Aktiv blok')} <span className="text-warm-gray normal-case tracking-normal">— stilling</span>
+    <div className={embedded ? 'px-4 sm:px-5 py-3' : 'bg-cream-dark border border-warm-border rounded-sm p-4 sm:p-5'}>
+      {!embedded && (
+        <div className="flex items-baseline justify-between mb-3">
+          <p className="label-caps text-warm-taupe">
+            {(blockName ?? 'Aktiv blok')} <span className="text-warm-gray normal-case tracking-normal">— stilling</span>
+          </p>
+          {!hasPoints && (
+            <p className="font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray">Ingen point endnu</p>
+          )}
+        </div>
+      )}
+      {embedded && blockName && (
+        <p className="font-condensed text-[11px] uppercase tracking-[0.08em] text-warm-gray mb-2">
+          {blockName}
+          {!hasPoints && <span className="ml-2">— ingen point endnu</span>}
         </p>
-        {!hasPoints && (
-          <p className="font-condensed text-xs uppercase tracking-[0.08em] text-warm-gray">Ingen point endnu</p>
-        )}
-      </div>
+      )}
 
       {hasPoints && (
         <div>
