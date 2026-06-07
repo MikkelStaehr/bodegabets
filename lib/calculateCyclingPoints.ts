@@ -69,6 +69,8 @@ type RiderResult = {
   points_position_after: number | null
   mountain_position_after: number | null
   youth_position_after: number | null
+  sprint_points: number
+  mountain_points: number
 }
 
 type LineupRider = {
@@ -98,6 +100,7 @@ type ScoreRow = {
   role_bonus: number
   jersey_points: number
   team_bonus: number
+  intermediate_points: number
   calculated_at: string
   // total_points er generated i DB — må ikke insertes
 }
@@ -130,7 +133,7 @@ export async function calculateCyclingPoints(
   // 2. Fetch results for this stage
   const { data: resultsRaw } = await supabaseAdmin
     .from('cycling_results')
-    .select('rider_id, position, dnf, abandon_type, gc_position_after, points_position_after, mountain_position_after, youth_position_after')
+    .select('rider_id, position, dnf, abandon_type, gc_position_after, points_position_after, mountain_position_after, youth_position_after, sprint_points, mountain_points')
     .eq('race_id', raceId)
     .eq('stage_number', stageNumber)
 
@@ -362,6 +365,11 @@ export async function calculateCyclingPoints(
       // base_points * role_multiplier * gc_multiplier + bonusser. Vi indsætter
       // bare komponenterne.
 
+      // Sprint + KOM-points scoret på ETAPEN — 1:1 oveni resten af scoring,
+      // alle roller får dem hvis deres rytter har dem. Bevidst uden multiplier
+      // så feedback er forudsigelig ("PCS siger 15 = jeg får 15").
+      const intermediatePoints = (result?.sprint_points ?? 0) + (result?.mountain_points ?? 0)
+
       allScores.push({
         lineup_id: lineup.id,
         rider_id: rider.rider_id,
@@ -379,6 +387,7 @@ export async function calculateCyclingPoints(
         role_bonus: roleBonus,
         jersey_points: jerseyPts,
         team_bonus: teamBonus,
+        intermediate_points: intermediatePoints,
         calculated_at: now,
       })
     }
