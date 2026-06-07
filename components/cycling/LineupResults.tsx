@@ -6,6 +6,7 @@ import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
 import { getRoleStageBonus } from '@/lib/cyclingRoleStageBonus'
 import { analyzeLineupSynergy, worstStatus, type RiderSynergyCheck, type SynergyStatus } from '@/lib/cyclingLineupSynergy'
+import { useNarrowViewport } from '@/hooks/useNarrowViewport'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,7 @@ function SynergyBadge({
   onToggle: () => void
 }) {
   const [hovered, setHovered] = useState(false)
+  const narrow = useNarrowViewport(480)
   if (checks.length === 0) return null
   const worst = worstStatus(checks)
   if (!worst || worst === 'info') return null
@@ -152,66 +154,123 @@ function SynergyBadge({
   const Icon = worst === 'good' ? Check : worst === 'bad' ? XIcon : AlertTriangle
   const showPopover = open || hovered
 
+  // Mobile-first: på smal viewport rendrer vi popoveren som en bottom-sheet
+  // forankret til viewport-kanterne så hele teksten har plads og er læsbar
+  // uden ellipsis. På desktop bevares den kompakt absolut-positionerede
+  // boble ankret ved badge'en.
+  const popoverStyle: React.CSSProperties = narrow
+    ? {
+        position: 'fixed', left: 12, right: 12, bottom: 12,
+        zIndex: 50,
+        background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 6,
+        padding: '14px 16px',
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.6)',
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }
+    : {
+        position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 20,
+        background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 4,
+        padding: '10px 12px',
+        width: 'max-content', minWidth: 220,
+        maxWidth: 'min(300px, calc(100vw - 24px))',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+        display: 'flex', flexDirection: 'column', gap: 8,
+      }
+
+  // Mobile font sizing — comfortable læseafstand til finger-touch
+  const titleSize = narrow ? 13 : 12
+  const detailSize = narrow ? 13 : 12
+
   return (
-    <span
-      style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onToggle() }}
-        aria-label={`Synergi for rytter — ${checks.length} ${checks.length === 1 ? 'note' : 'noter'}`}
-        style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 16, height: 16, borderRadius: '50%',
-          background: c.bg, border: `1px solid ${c.ring}`,
-          color: c.fill, cursor: 'pointer', padding: 0,
-        }}
+    <>
+      <span
+        style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
-        <Icon size={9} strokeWidth={3} />
-      </button>
-      {showPopover && (
-        <div
-          onClick={(e) => e.stopPropagation()}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggle() }}
+          aria-label={`Synergi for rytter — ${checks.length} ${checks.length === 1 ? 'note' : 'noter'}`}
           style={{
-            position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 20,
-            background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 4,
-            padding: '8px 10px',
-            width: 'max-content', minWidth: 200,
-            maxWidth: 'min(280px, calc(100vw - 24px))',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-            display: 'flex', flexDirection: 'column', gap: 6,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 16, height: 16, borderRadius: '50%',
+            background: c.bg, border: `1px solid ${c.ring}`,
+            color: c.fill, cursor: 'pointer', padding: 0,
           }}
         >
-          {checks.map((check, i) => {
-            const cc = SYNERGY_COLORS[check.status]
-            return (
-              <div key={i} style={{
-                display: 'flex', flexDirection: 'column', gap: 1,
-                paddingBottom: i < checks.length - 1 ? 6 : 0,
-                borderBottom: i < checks.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-              }}>
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontSize: 11, fontWeight: 700, color: cc.fill,
-                  letterSpacing: '0.02em',
-                }}>
-                  {check.title}
-                </span>
-                <span style={{
-                  fontFamily: "'Barlow', sans-serif",
-                  fontSize: 11, lineHeight: 1.45,
-                  color: 'rgba(255,255,255,0.7)',
-                }}>
-                  {check.detail}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+          <Icon size={9} strokeWidth={3} />
+        </button>
+        {showPopover && !narrow && (
+          <div onClick={(e) => e.stopPropagation()} style={popoverStyle}>
+            <SynergyChecksList checks={checks} titleSize={titleSize} detailSize={detailSize} />
+          </div>
+        )}
+      </span>
+      {/* På mobile: bottom-sheet udenfor badge'ens normal flow + backdrop til at
+          lukke den ved tap udenfor. Bottom-sheet er pinned (åbnes ved klik
+          på badge) — hover er ikke relevant på touch. */}
+      {open && narrow && (
+        <>
+          <div
+            onClick={onToggle}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 49,
+              background: 'rgba(0,0,0,0.4)',
+            }}
+          />
+          <div onClick={(e) => e.stopPropagation()} style={popoverStyle}>
+            <SynergyChecksList checks={checks} titleSize={titleSize} detailSize={detailSize} />
+            <button
+              type="button"
+              onClick={onToggle}
+              style={{
+                marginTop: 4, padding: '8px 0',
+                background: 'transparent', border: '1px solid #2B4F7A', borderRadius: 4,
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 12, fontWeight: 700,
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                color: '#8FABC4', cursor: 'pointer',
+              }}
+            >
+              Luk
+            </button>
+          </div>
+        </>
       )}
-    </span>
+    </>
+  )
+}
+
+function SynergyChecksList({ checks, titleSize, detailSize }: { checks: RiderSynergyCheck[]; titleSize: number; detailSize: number }) {
+  return (
+    <>
+      {checks.map((check, i) => {
+        const cc = SYNERGY_COLORS[check.status]
+        return (
+          <div key={i} style={{
+            display: 'flex', flexDirection: 'column', gap: 3,
+            paddingBottom: i < checks.length - 1 ? 8 : 0,
+            borderBottom: i < checks.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+          }}>
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif",
+              fontSize: titleSize, fontWeight: 700, color: cc.fill,
+              letterSpacing: '0.02em',
+            }}>
+              {check.title}
+            </span>
+            <span style={{
+              fontFamily: "'Barlow', sans-serif",
+              fontSize: detailSize, lineHeight: 1.45,
+              color: 'rgba(255,255,255,0.78)',
+            }}>
+              {check.detail}
+            </span>
+          </div>
+        )
+      })}
+    </>
   )
 }
 
