@@ -134,7 +134,10 @@ export async function restructureVmRounds(seasonId: number): Promise<Restructure
   if (delErr) throw delErr
   const roundsDeleted = allSeasonRoundIds.length
 
-  // 6. Opret nye rounds — betting_closes_at = 30 minutter før første kamp i bundle
+  // 6. Opret nye rounds — betting_closes_at = 30 minutter før første kamp i bundle.
+  //    bet_open: true så runden er åben for betting med det samme. Uden den
+  //    flag dukkede runder ikke op i ActiveRounds-listen og brugere så
+  //    "Ingen åbne runder lige nu" selvom kampprogrammet var synligt.
   const newRoundRows = groups.map((g) => {
     const firstMs = new Date(g.firstKickoff).getTime()
     const closesAt = new Date(firstMs - 30 * 60 * 1000).toISOString()
@@ -143,6 +146,7 @@ export async function restructureVmRounds(seasonId: number): Promise<Restructure
       name: g.name,
       status: 'upcoming',
       betting_closes_at: closesAt,
+      bet_open: true,
     }
   })
 

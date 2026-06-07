@@ -15,7 +15,7 @@ export default function ActiveRoundLiveTicker() {
 
   if (isLoading) {
     return (
-      <div className="bg-[#1a3329] rounded-xl overflow-hidden mx-auto" style={{ maxWidth: 720, marginTop: 16 }}>
+      <div className="bg-[#1a3329] rounded-xl overflow-hidden" style={{ marginTop: 16 }}>
         <div className="px-4 py-3 flex justify-between items-center border-b border-white/10">
           <div className="h-4 w-32 rounded bg-[#2C4A3E] animate-pulse" />
           <div className="h-3 w-20 rounded bg-[#2C4A3E] animate-pulse" />
@@ -39,8 +39,7 @@ export default function ActiveRoundLiveTicker() {
 
   if (matches.length === 0) return (
     <div style={{
-      maxWidth: 720,
-      margin: '16px auto 0',
+      marginTop: 16,
       background: '#1a3329',
       borderRadius: 8,
       padding: '16px 20px',
@@ -55,17 +54,15 @@ export default function ActiveRoundLiveTicker() {
   )
 
   return (
-    // maxWidth holder cardet på en læselig bredde (~720px) selv når
-    // container er strakt til 1280px på desktop. Match-rækkerne har stadig
-    // god luft uden at hold-navne flyder ud i 400px+ whitespace.
+    // Ticker er nu placeret INDE i GameroomLayout main-kolonne (~712px på
+    // desktop), så den fylder kolonnens fulde bredde og integrerer pænt
+    // med ranglisten under. På narrow viewports stack'er den naturligt.
     <div style={{
       marginTop: 16,
       background: '#1a3329',
       borderRadius: 8,
       overflow: 'hidden',
       border: '1px solid rgba(255,255,255,0.08)',
-      maxWidth: 720,
-      margin: '16px auto 0',
     }}>
       <LiveMatchesTicker
         matches={matches}
