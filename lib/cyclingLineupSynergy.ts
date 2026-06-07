@@ -1,20 +1,21 @@
 /**
- * Analyserer et lineup for SYNERGI mellem valgte ryttere.
+ * Analyserer et lineup for SYNERGI — per rytter, ikke som globalt overblik.
  *
- * Forskellig fra StageStrategyCard som viser hvilke roller er stærke i dag.
- * Her vurderer vi om dit faktiske valg arbejder sammen: er Sprinter'ens
- * equipiers fra samme hold (= leadout-tog), har du flere ryttere fra
- * Leader's hold (= flere chancer for hold-bonus), er bænk-roller udnyttet.
+ * Hver rytter får 0-N checks der beskriver hvordan netop hans rolle og
+ * placering i lineup'en aktiverer (eller spilder) scoring-mekanismer.
+ * UI'et renderer worst-case ikon ud for rytter-rækken og viser detaljer
+ * på hover/tap.
  *
  * Holdes adskilt fra calculateCyclingPoints.ts så scoring-logikken forbliver
- * den autoritative kilde — vi kalder ikke beregneren her, vi peger blot på
- * de samme mekanismer.
+ * autoritativ kilde — vi peger blot på de samme mekanismer.
  */
 
-export type SynergyStatus = 'good' | 'warn' | 'info'
+export type SynergyStatus = 'good' | 'warn' | 'bad' | 'info'
 
-export type SynergyCheck = {
-  id: string
+/** Sort-rank — værst tilstand bestemmer rytterens samlede ikon. */
+const STATUS_RANK: Record<SynergyStatus, number> = { bad: 0, warn: 1, good: 2, info: 3 }
+
+export type RiderSynergyCheck = {
   status: SynergyStatus
   title: string
   detail: string
@@ -35,13 +36,13 @@ function getRider(slots: SlotMap, role: string, riders: Map<string, LineupRider>
   return riders.get(id) ?? null
 }
 
-function getEquipiers(slots: SlotMap, riders: Map<string, LineupRider>): LineupRider[] {
-  const out: LineupRider[] = []
+function getEquipiers(slots: SlotMap, riders: Map<string, LineupRider>): { key: string; rider: LineupRider }[] {
+  const out: { key: string; rider: LineupRider }[] = []
   for (const key of ['equipier_0', 'equipier_1', 'equipier_2']) {
     const id = slots[key]
     if (!id) continue
     const r = riders.get(id)
-    if (r) out.push(r)
+    if (r) out.push({ key, rider: r })
   }
   return out
 }
@@ -50,11 +51,16 @@ export function analyzeLineupSynergy(
   slots: SlotMap,
   ridersList: LineupRider[],
   profile: string | null,
-): SynergyCheck[] {
+): Map<string, RiderSynergyCheck[]> {
   const riders = new Map<string, LineupRider>()
   for (const r of ridersList) riders.set(r.id, r)
 
-  const checks: SynergyCheck[] = []
+  const byRider = new Map<string, RiderSynergyCheck[]>()
+  const push = (riderId: string, check: RiderSynergyCheck) => {
+    if (!byRider.has(riderId)) byRider.set(riderId, [])
+    byRider.get(riderId)!.push(check)
+  }
+
   const leader = getRider(slots, 'leader', riders)
   const lieutenant = getRider(slots, 'lieutenant', riders)
   const grimpeur = getRider(slots, 'grimpeur', riders)
@@ -63,140 +69,189 @@ export function analyzeLineupSynergy(
   const joker = getRider(slots, 'joker', riders)
   const equipiers = getEquipiers(slots, riders)
 
-  // ── R1: Sprinter + leadout-tog ────────────────────────────────
-  // Equipiers fra Sprinter's hold giver +20% pr. stk., cap 2 (= ×1.4).
-  // Kun aktivt på sprint-profil (flat/mixed/hilly/cobbled).
   const isSprintProfile = profile === 'flat' || profile === 'mixed' || profile === 'hilly' || profile === 'cobbled'
-  if (sprinter) {
-    const leadouts = equipiers.filter((e) => e.team_name === sprinter.team_name)
-    if (!isSprintProfile) {
-      checks.push({
-        id: 'sprinter-no-profile',
-        status: 'info',
-        title: `Sprinter passer ikke til profilen`,
-        detail: `${sprinter.last_name} får ingen sprint-profil-multiplikator i dag. Tog-bonus er irrelevant.`,
-      })
-    } else if (leadouts.length >= 2) {
-      checks.push({
-        id: 'sprinter-train-full',
+
+  // ── LEADER ────────────────────────────────────────────────────
+  if (leader) {
+    const teammates = [lieutenant, grimpeur, sprinter, domestique, ...equipiers.map((e) => e.rider), joker]
+      .filter((r): r is LineupRider => r !== null && r.team_name === leader.team_name)
+    if (teammates.length >= 3) {
+      push(leader.id, {
         status: 'good',
-        title: `Fuldt leadout-tog (+40%)`,
-        detail: `${sprinter.last_name} har 2 équipier(e) fra ${sprinter.team_name}. ×1.4 hvis Sprinter top-3.`,
-      })
-    } else if (leadouts.length === 1) {
-      checks.push({
-        id: 'sprinter-train-partial',
-        status: 'good',
-        title: `Leadout-tog (+20%)`,
-        detail: `${leadouts[0].last_name} kører for ${sprinter.last_name}. ×1.2 hvis Sprinter top-3. Tilføj én équipier mere fra ${sprinter.team_name} for fuld bonus.`,
+        title: `Stærk hold-stack (${teammates.length + 1} fra ${leader.team_name})`,
+        detail: `Vinder ${leader.team_name} etapen, får alle hold-bonus (+5/+7 pr. rytter).`,
       })
     } else {
-      checks.push({
-        id: 'sprinter-no-train',
-        status: 'warn',
-        title: `Sprinter uden leadout-tog`,
-        detail: `Ingen équipiers fra ${sprinter.team_name}. ${sprinter.last_name} kører solo — tog-bonus ikke aktiv.`,
-      })
-    }
-  }
-
-  // ── R2: Hold-koncentration omkring Leader ─────────────────────
-  // Flere ryttere fra Leader's hold = flere chancer for hold-bonus
-  // hvis Leader's hold vinder etapen.
-  if (leader) {
-    const sameTeam = [lieutenant, grimpeur, sprinter, domestique, ...equipiers, joker]
-      .filter((r): r is LineupRider => r !== null && r.team_name === leader.team_name)
-    if (sameTeam.length >= 3) {
-      checks.push({
-        id: 'leader-team-stack',
-        status: 'good',
-        title: `${sameTeam.length + 1} ryttere fra ${leader.team_name}`,
-        detail: `Stor satsning. Vinder ${leader.team_name} etapen, får alle hold-bonus (+5 / +7 pr. rytter).`,
-      })
-    } else if (sameTeam.length === 0) {
-      checks.push({
-        id: 'leader-team-solo',
+      push(leader.id, {
         status: 'info',
-        title: `Leader er ene fra ${leader.team_name}`,
-        detail: `Ingen øvrige fra hendes hold. Hold-bonus aktiveres kun for ${leader.last_name} hvis hendes hold vinder.`,
+        title: `Scorer placering × kategori × GC`,
+        detail: `Leader får ingen profil-multiplikator — han henter point på selve placeringen og evt. trøjer.`,
       })
     }
   }
 
-  // ── R3: Lieutenant backup-mekanisme ────────────────────────────
-  if (leader && lieutenant) {
-    checks.push({
-      id: 'lieutenant-backup',
-      status: 'good',
-      title: `Backup klar — Lieutenant`,
-      detail: `${lieutenant.last_name} giver ×1.8 hvis top-10 (×2.8 hvis ${leader.last_name} udgår).`,
-    })
-  } else if (leader && !lieutenant) {
-    checks.push({
-      id: 'lieutenant-missing',
-      status: 'warn',
-      title: `Ingen Lieutenant`,
-      detail: `Du har ingen backup hvis Leader udgår. Lieutenant ×1.8/×2.8 forspild.`,
-    })
+  // ── LIEUTENANT ────────────────────────────────────────────────
+  if (lieutenant) {
+    if (leader) {
+      push(lieutenant.id, {
+        status: 'good',
+        title: `Backup ×1.8`,
+        detail: `Hvis ${lieutenant.last_name} er top-10 får han ×1.8 (×2.8 hvis ${leader.last_name} udgår).`,
+      })
+    } else {
+      push(lieutenant.id, {
+        status: 'warn',
+        title: `Lieutenant uden Leader`,
+        detail: `Backup-mekanismen kræver en Leader at "backe up" — vælg en Leader for at aktivere ×2.8 ved DNF.`,
+      })
+    }
+    if (lieutenant.category > 3) {
+      push(lieutenant.id, {
+        status: 'bad',
+        title: `Kategori-konflikt`,
+        detail: `Lieutenant kræver Kat 2-3, men ${lieutenant.last_name} er Kat ${lieutenant.category}. Scorer ikke ×1.8.`,
+      })
+    }
   }
 
-  // ── R4: Domestique tilstedeværelse ─────────────────────────────
-  if (domestique && leader) {
-    checks.push({
-      id: 'domestique-armed',
-      status: 'good',
-      title: `Domestique-bonus klar`,
-      detail: `${domestique.last_name} +8 hvis top-40 OG ${leader.last_name} top-10.`,
-    })
-  } else if (!domestique) {
-    checks.push({
-      id: 'domestique-missing',
-      status: 'info',
-      title: `Ingen Domestique`,
-      detail: `Du springer +8 bonus over hvis Leader top-10. Kun Kat-4 ryttere kvalificerer.`,
-    })
-  }
-
-  // ── R5: Grimpeur match med bjerg-profil ────────────────────────
+  // ── GRIMPEUR ──────────────────────────────────────────────────
   if (grimpeur) {
     if (profile === 'mountain') {
-      checks.push({
-        id: 'grimpeur-mountain',
+      push(grimpeur.id, {
         status: 'good',
-        title: `Grimpeur i bjerget`,
-        detail: `${grimpeur.last_name} kører med ×1.8 profil-bonus + chance for KOM/breakaway-point.`,
+        title: `Bjerg-profil aktiveret ×1.8`,
+        detail: `${grimpeur.last_name} får ×1.8 profil-bonus + chance for KOM/breakaway-bonus.`,
       })
-    } else if (profile === 'flat') {
-      checks.push({
-        id: 'grimpeur-flat',
+    } else if (profile === 'hilly' || profile === 'cobbled') {
+      push(grimpeur.id, {
+        status: 'good',
+        title: `Bakke-profil ×1.2`,
+        detail: `${grimpeur.last_name} får ×1.2 profil-bonus i dag.`,
+      })
+    } else {
+      push(grimpeur.id, {
         status: 'warn',
-        title: `Grimpeur på flad etape`,
-        detail: `${grimpeur.last_name} har ingen profil-bonus i dag — overvej Sprinter i stedet næste gang.`,
+        title: `Ingen profil-bonus i dag`,
+        detail: `Grimpeur på flad/blandet etape får ingen profil-multiplikator. Overvej Sprinter i stedet.`,
       })
     }
   }
 
-  // ── R6: Joker tilstedeværelse ──────────────────────────────────
+  // ── SPRINTER ──────────────────────────────────────────────────
+  if (sprinter) {
+    if (profile === 'flat' || profile === 'mixed') {
+      push(sprinter.id, {
+        status: 'good',
+        title: `Flad-profil ×1.8`,
+        detail: `${sprinter.last_name} får ×1.8 profil-bonus — massespurt forventes.`,
+      })
+    } else if (profile === 'hilly' || profile === 'cobbled') {
+      push(sprinter.id, {
+        status: 'good',
+        title: `Hård spurt ×1.2`,
+        detail: `${sprinter.last_name} får ×1.2 profil-bonus i dag.`,
+      })
+    } else {
+      push(sprinter.id, {
+        status: 'warn',
+        title: `Ingen profil-bonus i dag`,
+        detail: `Sprinter på bjerg-etape får ingen profil-multiplikator.`,
+      })
+    }
+    // Leadout-tog: équipiers fra Sprinter's hold
+    const leadouts = equipiers.filter((e) => e.rider.team_name === sprinter.team_name)
+    if (isSprintProfile) {
+      if (leadouts.length >= 2) {
+        push(sprinter.id, {
+          status: 'good',
+          title: `Fuldt leadout-tog ×1.4`,
+          detail: `2 équipiers fra ${sprinter.team_name} kører for ${sprinter.last_name}. Tog-bonus aktiveres hvis top-3.`,
+        })
+      } else if (leadouts.length === 1) {
+        push(sprinter.id, {
+          status: 'good',
+          title: `1 leadout ×1.2`,
+          detail: `${leadouts[0].rider.last_name} kører for ${sprinter.last_name}. Tilføj én équipier mere fra ${sprinter.team_name} for fuld bonus.`,
+        })
+      } else {
+        push(sprinter.id, {
+          status: 'warn',
+          title: `Ingen leadout-tog`,
+          detail: `Ingen équipiers fra ${sprinter.team_name}. ${sprinter.last_name} kører solo i spurten.`,
+        })
+      }
+    }
+  }
+
+  // ── DOMESTIQUE ────────────────────────────────────────────────
+  if (domestique) {
+    if (leader) {
+      push(domestique.id, {
+        status: 'good',
+        title: `+8 hvis Leader top-10`,
+        detail: `${domestique.last_name} får +8 hvis han er top-40 OG ${leader.last_name} er top-10. Holdmatch er ikke krav.`,
+      })
+    } else {
+      push(domestique.id, {
+        status: 'warn',
+        title: `Domestique uden Leader`,
+        detail: `+8-bonus kræver Leader top-10 — uden Leader kan bonusen ikke aktiveres.`,
+      })
+    }
+    if (domestique.category !== 4) {
+      push(domestique.id, {
+        status: 'bad',
+        title: `Kategori-konflikt`,
+        detail: `Domestique kræver Kat 4, men ${domestique.last_name} er Kat ${domestique.category}.`,
+      })
+    }
+  }
+
+  // ── EQUIPIERS ─────────────────────────────────────────────────
+  for (const { rider } of equipiers) {
+    let hasGoodSynergy = false
+    // Leadout for Sprinter?
+    if (sprinter && rider.team_name === sprinter.team_name && isSprintProfile) {
+      push(rider.id, {
+        status: 'good',
+        title: `Leadout for ${sprinter.last_name}`,
+        detail: `Samme hold som Sprinter — bidrager til ×1.2/×1.4 tog-bonus hvis Sprinter top-3.`,
+      })
+      hasGoodSynergy = true
+    }
+    // Holdkammerat med Leader?
+    if (leader && rider.team_name === leader.team_name) {
+      push(rider.id, {
+        status: 'good',
+        title: `Holdkammerat med Leader`,
+        detail: `Samme hold som ${leader.last_name} — får hold-bonus (+7) hvis ${leader.team_name} vinder etapen.`,
+      })
+      hasGoodSynergy = true
+    }
+    if (!hasGoodSynergy) {
+      push(rider.id, {
+        status: 'info',
+        title: `+7 hvis hans hold vinder`,
+        detail: `${rider.last_name} har ingen tog- eller hold-synergi med dine andre roller. Han scorer kun via hold-bonus eller egen placering.`,
+      })
+    }
+  }
+
+  // ── JOKER ─────────────────────────────────────────────────────
   if (joker) {
-    checks.push({
-      id: 'joker-armed',
+    push(joker.id, {
       status: 'info',
-      title: `Joker valgt`,
-      detail: `${joker.last_name} scorer som normal rolle + 7 hvis hendes hold vinder. Immun mod DNF-straf.`,
+      title: `+7 hvis hans hold vinder`,
+      detail: `${joker.last_name} scorer som almindelig rolle og er immun mod DNF-tab.`,
     })
   }
 
-  // ── R7: Tomme slots ────────────────────────────────────────────
-  const slotKeys = ['leader', 'lieutenant', 'grimpeur', 'sprinter', 'domestique', 'equipier_0', 'equipier_1', 'equipier_2', 'joker']
-  const empties = slotKeys.filter((k) => !slots[k])
-  if (empties.length > 0) {
-    checks.push({
-      id: 'empty-slots',
-      status: 'warn',
-      title: `${empties.length} tomme slots`,
-      detail: `Hvert tomt slot er 0 point. Udfyld alle slots for fuldt potentiale.`,
-    })
-  }
+  return byRider
+}
 
-  return checks
+/** Den vigtigste status for en rytter — bestemmer hvilket ikon der vises. */
+export function worstStatus(checks: RiderSynergyCheck[]): SynergyStatus | null {
+  if (checks.length === 0) return null
+  return checks.reduce<SynergyStatus>((worst, c) =>
+    STATUS_RANK[c.status] < STATUS_RANK[worst] ? c.status : worst, 'info')
 }
