@@ -1498,6 +1498,8 @@ export default async function GamePage({ params }: Props) {
                 <CyclingNextStageCard
                   stages={lineupStages}
                   activeBlock={cyclingActiveBlock}
+                  gameId={gameId}
+                  currentUserId={user.id}
                 />
               }
               main={

@@ -251,7 +251,8 @@ export default function ShoutBox({ gameId, currentUserId, hostId, members }: Pro
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Skriv en besked… (@navn for mention)"
+            placeholder="Skriv en besked…"
+            title="Tip: skriv @navn for at nævne en spiller"
             maxLength={MAX_LENGTH}
             rows={1}
             className="flex-1 bg-white border border-warm-border rounded-sm px-3 py-2 font-body text-[13px] text-ink outline-none focus:border-forest resize-none"
