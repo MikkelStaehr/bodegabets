@@ -12,6 +12,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase'
 import * as cheerio from 'cheerio'
+import { enrichRiderFromPcs } from '@/lib/cyclingRiderEnrichment'
 
 const PCS_BASE = 'https://www.procyclingstats.com'
 const REQUEST_DELAY_MS = 1000
@@ -270,6 +271,21 @@ export async function syncCyclingStartlists(year: number = new Date().getFullYea
             riderBySlug.set(r.pcs_slug as string, r.id as string)
           }
           console.log(`[syncCyclingStartlists] ${race.name}: auto-insertede ${inserted?.length ?? 0} ny(e) rytter(e): ${missingEntries.map((e) => e.name).join(', ')}`)
+          // Berig nye ryttere med photo + team_logo fra PCS rider-page. Sker
+          // sekventielt med eksisterende REQUEST_DELAY så vi ikke overbelaster
+          // PCS — typisk kun 0-2 ryttere pr. sync run.
+          for (const e of missingEntries) {
+            await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS))
+            const enrich = await enrichRiderFromPcs(e.pcs_slug)
+            if (!enrich) continue
+            const patch: { photo_url?: string; team_logo_url?: string } = {}
+            if (enrich.photo_url) patch.photo_url = enrich.photo_url
+            if (enrich.team_logo_url) patch.team_logo_url = enrich.team_logo_url
+            if (Object.keys(patch).length === 0) continue
+            await supabaseAdmin
+              .from('cycling_riders').update(patch).eq('pcs_slug', e.pcs_slug)
+            console.log(`[syncCyclingStartlists] ${e.name}: beriget med ${Object.keys(patch).join(' + ')}`)
+          }
         }
       }
 
