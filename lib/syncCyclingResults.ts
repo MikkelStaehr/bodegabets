@@ -357,12 +357,16 @@ export async function syncCyclingResults(): Promise<{
   let totalUnmatched = 0
   const syncedStageIds: string[] = []
 
-  // 1) Aktive (eller netop finished) stage races med pcs_slug
+  // 1) Alle stage races. Vi filtrerer på stage-niveau via start_date i stedet
+  //    for race.status — race.status opdateres ikke automatisk fra upcoming
+  //    til active, så filteret missede aktive races der stadig stod som
+  //    upcoming. Stage-filteret (start_date <= today AND >= today - 3 dage)
+  //    er den autoritative gate.
   const { data: races, error: racesErr } = await supabaseAdmin
     .from('cycling_races')
     .select('id, name, pcs_slug, race_type, status')
-    .in('status', ['active', 'finished'])
     .eq('race_type', 'stage_race')
+    .neq('status', 'cancelled')
 
   if (racesErr) {
     errors.push(`Failed to fetch races: ${racesErr.message}`)
