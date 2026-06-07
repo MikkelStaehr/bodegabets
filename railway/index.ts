@@ -12,6 +12,7 @@
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /calculate-points  — safety net (primær trigger er nu i syncMatchScores)
  *   GET /sync-cycling-startlists — hver 3. time (PCS startlister for upcoming løb)
+ *   GET /refresh-cycling-riders — dagligt 03:00 (100 rytter-pages refresh til hold-skift)
  *   GET /football-archive-check — dagligt 08:10 (arkivér fodbold-gamerooms efter sidste runde)
  *   GET /health            — health check
  *
@@ -35,6 +36,7 @@ import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlock
 import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage } from '@/lib/calculateCyclingPoints'
 import { syncCyclingResults } from '@/lib/syncCyclingResults'
 import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
+import { refreshCyclingRiders } from '@/lib/refreshCyclingRiders'
 
 const app = express()
 app.use(express.json())
@@ -1075,6 +1077,36 @@ app.get('/sync-cycling-startlists', async (_req, res) => {
   }
 })
 
+// ─── GET /refresh-cycling-riders ───────────────────────────────────────────
+// Daglig batch-refresh af cycling_riders master-data fra PCS rider-pages.
+// Fanger hold-skift, foto-opdateringer og lignende der ikke ses af startlist-
+// eller results-sync. 100 ryttere pr. run, ældste last_synced_at først.
+// Hele DB'en gennemgås på ~10 dage hvilket er fint — hold-skift sker sjældent
+// og er ikke kritiske at fange indenfor minutter.
+
+app.get('/refresh-cycling-riders', async (_req, res) => {
+  try {
+    const result = await refreshCyclingRiders()
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_riders_refresh',
+      status: result.ok ? 'success' : 'error',
+      message: `refresh-cycling-riders: ${result.scanned} scannet, ${result.changed} opdateret (${result.teamChanges} hold-skift)`,
+      metadata: result as unknown as Record<string, unknown>,
+    })
+
+    res.json({ ok: result.ok, ...result })
+  } catch (err) {
+    console.error('[refresh-cycling-riders]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_riders_refresh',
+      status: 'error',
+      message: `refresh-cycling-riders failed: ${String(err)}`,
+    })
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /sync-cycling-results ──────────────────────────────────────────────
 // Henter etape-resultater fra PCS for aktive stage races og upserter dem til
 // cycling_results. Trigger derefter automatisk runCyclingPointsForStage for
@@ -1395,6 +1427,12 @@ app.listen(PORT, () => {
   // Dagligt kl. 08:10 UTC — auto-arkivér fodbold-gamerooms efter sidste runde
   // i sæsonen (14+ dage efter sidste kamp). Værten får 7-dages varsel.
   cron.schedule('10 8 * * *', () => callEndpoint('/football-archive-check'))
+
+  // Dagligt kl. 03:00 UTC — refresh batch af cycling_riders master-data
+  // fra PCS. 100 ryttere/dag, hele DB (~930) gennemgås på ~10 dage. Fanger
+  // hold-skift, foto-opdateringer, manglende team_logo osv. Kører om natten
+  // hvor der ikke er anden trafik.
+  cron.schedule('0 3 * * *', () => callEndpoint('/refresh-cycling-riders'))
 
   // Hver 3. time — pull startlister fra PCS for upcoming/active løb.
   // PCS opdaterer rosters helt op til løbsstart (fx Pogačar trukket fra
