@@ -30,6 +30,10 @@ type Props = {
    *  stage med data — bruges i picker til trøje + GC top-N badges + sort. */
   standings?: Record<string, Record<string, { jersey: string | null; gc_position: number | null }>>
   squadRiders: CyclingSquadRider[]
+  /** squad_id → rider_ids der tilhører den squad (med transfers anvendt). Bruges
+   *  i pickeren til at filtrere brutto-truppen ned til den AKTIVE bloks squad,
+   *  så fx Giro-ryttere ikke vises som valgbare i Dauphiné-pickeren. */
+  squadRiderIdsBySquad?: Record<string, string[]>
   blocks: CyclingBlock[]
   defaultBlockId?: string | null
   lockDeadline?: string | null
@@ -127,7 +131,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, squadRiderIdsBySquad, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -231,6 +235,16 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   // Derive current squad from active block
   const currentSquadId = activeBlockId ? blockSquadMap[activeBlockId] ?? null : null
   const hasAnySquad = Object.keys(blockSquadMap).length > 0
+
+  // Ryttere der hører til den AKTIVE bloks squad (med transfers anvendt). Hvis
+  // ingen mapping er givet (legacy / squad-side bruger samme komponent), fald
+  // tilbage til hele truppen, så vi ikke gemmer alt væk.
+  const currentSquadRiders = useMemo(() => {
+    if (!currentSquadId || !squadRiderIdsBySquad) return squadRiders
+    const ids = new Set(squadRiderIdsBySquad[currentSquadId] ?? [])
+    if (ids.size === 0) return squadRiders
+    return squadRiders.filter((r) => ids.has(r.id))
+  }, [squadRiders, squadRiderIdsBySquad, currentSquadId])
 
   // Fetch existing lineups on mount (fetches all lineups across squads)
   useEffect(() => {
@@ -579,7 +593,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
               background: 'rgba(107,143,113,0.25)', color: '#6B8F71',
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
             }}>
-              {squadRiderCount ?? 0}/25 ryttere
+              {squadRiderIdsBySquad && currentSquadId
+                ? (squadRiderIdsBySquad[currentSquadId]?.length ?? 0)
+                : (squadRiderCount ?? 0)}/25 ryttere
             </span>
           </a>
         ) : (
@@ -1004,10 +1020,12 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         const abandonedMap = modalStage ? abandoned?.[modalStage.race_id] ?? {} : {}
 
         // Unik liste af hold til filter (respekter kategori-rule så
-        // dropdown'en kun viser hold med mulige valg for denne rolle)
+        // dropdown'en kun viser hold med mulige valg for denne rolle).
+        // Filtreret til den aktive bloks squad — undgår at fx en Giro-rytters
+        // hold dukker op som valg i Dauphiné-pickeren.
         const teamsForFilter = Array.from(
           new Set(
-            squadRiders
+            currentSquadRiders
               .filter((r) => !role.catRule || role.catRule.includes(r.category))
               .map((r) => r.team_name)
           )
@@ -1020,7 +1038,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         // Jersey-prioritet til sort: leader > points > mountain > youth
         const JERSEY_SORT: Record<string, number> = { leader: 4, points: 3, mountain: 2, youth: 1 }
 
-        const filteredRiders = squadRiders
+        const filteredRiders = currentSquadRiders
           .filter((r) => {
             if (role.catRule && !role.catRule.includes(r.category)) return false
             if (hasStartlist && showOnlyStarters && !startlistIds!.has(r.id)) return false
@@ -1106,7 +1124,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                       background: 'rgba(107,143,113,0.2)', color: '#8FBF8F',
                       letterSpacing: '0.04em',
                     }}>
-                      {squadRiders.filter((r) => startlistIds!.has(r.id)).length} starter
+                      {currentSquadRiders.filter((r) => startlistIds!.has(r.id)).length} starter
                     </span>
                   )}
                 </div>
