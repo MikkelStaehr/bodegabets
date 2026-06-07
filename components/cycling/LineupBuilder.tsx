@@ -3,12 +3,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Lock, Radio, Check, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import LineupResults from './LineupResults'
+import LineupPresetsBar from './LineupPresetsBar'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
 import AllLineups from './AllLineups'
 import TransferModal from './TransferModal'
 import { getBlockTheme } from '@/lib/cyclingBlockThemes'
-import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey } from '@/types/cycling'
+import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey, CyclingLineupPreset } from '@/types/cycling'
 import { formatCyclingDate, formatCyclingDeadline, shortRaceName, shortBlockName, PROFILE_LABELS, PROFILE_ICONS, RACE_TYPE_LABELS, CAT_LABELS, CAT_COLORS } from '@/lib/cyclingUtils'
 import { getStageDeadline, getStageStartTime, isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 
@@ -34,6 +35,9 @@ type Props = {
    *  i pickeren til at filtrere brutto-truppen ned til den AKTIVE bloks squad,
    *  så fx Giro-ryttere ikke vises som valgbare i Dauphiné-pickeren. */
   squadRiderIdsBySquad?: Record<string, string[]>
+  /** Gemte lineup-presets på tværs af brugerens squads. Filtreres til
+   *  aktive bloks squad i UI'et. */
+  presets?: CyclingLineupPreset[]
   blocks: CyclingBlock[]
   defaultBlockId?: string | null
   lockDeadline?: string | null
@@ -131,7 +135,8 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, squadRiderIdsBySquad, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, squadRiderIdsBySquad, presets: initialPresets, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
+  const [presets, setPresets] = useState<CyclingLineupPreset[]>(initialPresets ?? [])
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -879,6 +884,36 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           } : undefined}
         />
       )}
+
+      {/* ── Preset bar (kun før etape er låst/færdig) ──────── */}
+      {!noSquadForBlock && !isFinished && !isLocked && activeStage && currentSquadId && (() => {
+        const squadIds = squadRiderIdsBySquad?.[currentSquadId] ?? null
+        const squadIdSet = squadIds ? new Set(squadIds) : new Set(squadRiders.map((r) => r.id))
+        const abandonedMap = abandoned?.[activeStage.race_id] ?? {}
+        const abandonedSet = new Set(Object.keys(abandonedMap))
+        const startlistIds = startlists?.[activeStage.race_id]
+        const startlistSet = startlistIds && startlistIds.length > 0 ? new Set(startlistIds) : null
+        return (
+          <LineupPresetsBar
+            gameId={gameId}
+            squadId={currentSquadId}
+            presets={presets}
+            currentSlots={slots}
+            squadRiderIds={squadIdSet}
+            riderMap={riderMap}
+            abandonedSet={abandonedSet}
+            startlistSet={startlistSet}
+            onApply={(presetSlots) => {
+              const merged: Record<CyclingRoleKey, string | null> = { ...EMPTY_SLOTS }
+              for (const k of Object.keys(merged) as CyclingRoleKey[]) {
+                merged[k] = presetSlots[k] ?? null
+              }
+              setLineups((prev) => ({ ...prev, [activeStage.id]: merged }))
+            }}
+            onPresetsChange={setPresets}
+          />
+        )
+      })()}
 
       {/* ── Save button ──────────────────────────────────────── */}
       {!noSquadForBlock && !isFinished && activeStage && (<>
