@@ -98,6 +98,21 @@ export function analyzeLineupSynergy(
         title: `Backup ×1.8`,
         detail: `Hvis ${lieutenant.last_name} er top-10 får han ×1.8 (×2.8 hvis ${leader.last_name} udgår).`,
       })
+      // Klassisk er Lieutenant fra Leader's hold — andre hold scorer
+      // stadig ×1.8, men det er taktisk svagere.
+      if (lieutenant.team_name === leader.team_name) {
+        push(lieutenant.id, {
+          status: 'good',
+          title: `Holdkammerat med Leader`,
+          detail: `${lieutenant.last_name} og ${leader.last_name} er på samme hold — klassisk backup-rolle.`,
+        })
+      } else {
+        push(lieutenant.id, {
+          status: 'warn',
+          title: `Lieutenant fra andet hold`,
+          detail: `${lieutenant.last_name} (${lieutenant.team_name}) er ikke holdkammerat med ${leader.last_name} (${leader.team_name}). Scoring kræver ikke match, men en Lieutenant fra Leader's hold er taktisk stærkere.`,
+        })
+      }
     } else {
       push(lieutenant.id, {
         status: 'warn',
@@ -134,6 +149,17 @@ export function analyzeLineupSynergy(
         title: `Ingen profil-bonus i dag`,
         detail: `Grimpeur på flad/blandet etape får ingen profil-multiplikator. Overvej Sprinter i stedet.`,
       })
+    }
+    // Team-relation til Leader. Grimpeur har sin egen profil-bonus, så
+    // mismatch er ikke kritisk — men hold-stack giver dobbelt team-bonus.
+    if (leader) {
+      if (grimpeur.team_name === leader.team_name) {
+        push(grimpeur.id, {
+          status: 'good',
+          title: `Holdkammerat med Leader`,
+          detail: `${grimpeur.last_name} på samme hold som ${leader.last_name} — dobbelt hold-bonus hvis ${leader.team_name} vinder.`,
+        })
+      }
     }
   }
 
@@ -180,6 +206,16 @@ export function analyzeLineupSynergy(
           detail: `Ingen équipiers fra ${sprinter.team_name}. ${sprinter.last_name} kører solo i spurten.`,
         })
       }
+    }
+    // Team-relation til Leader. Sprinter har sin egen leadout-mekanisme,
+    // så mismatch er typisk forventet (sprintere er ofte fra spritere-
+    // specialiserede hold). Match er en bonus-koincidens.
+    if (leader && sprinter.team_name === leader.team_name) {
+      push(sprinter.id, {
+        status: 'good',
+        title: `Holdkammerat med Leader`,
+        detail: `${sprinter.last_name} på samme hold som ${leader.last_name} — alle équipiers fra holdet bidrager til både leadout og team-bonus.`,
+      })
     }
   }
 
@@ -251,11 +287,19 @@ export function analyzeLineupSynergy(
 
   // ── JOKER ─────────────────────────────────────────────────────
   if (joker) {
-    push(joker.id, {
-      status: 'info',
-      title: `+7 hvis hans hold vinder`,
-      detail: `${joker.last_name} scorer som almindelig rolle og er immun mod DNF-tab.`,
-    })
+    if (leader && joker.team_name === leader.team_name) {
+      push(joker.id, {
+        status: 'good',
+        title: `Joker fra Leader's hold`,
+        detail: `${joker.last_name} på samme hold som ${leader.last_name}. Hvis ${leader.team_name} vinder, dobbelt team-bonus + Joker er immun mod DNF.`,
+      })
+    } else {
+      push(joker.id, {
+        status: 'info',
+        title: `+7 hvis hans hold vinder`,
+        detail: `${joker.last_name} scorer som almindelig rolle og er immun mod DNF-tab.`,
+      })
+    }
   }
 
   return byRider
