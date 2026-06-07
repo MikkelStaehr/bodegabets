@@ -112,12 +112,27 @@ export async function restructureVmRounds(seasonId: number): Promise<Restructure
   }
 
   // 5. Slet eksisterende rounds for sæsonen.
-  //    Vi sætter matches.round_id = null først for at undgå FK-konflikt
-  //    (afhænger af om constraint har ON DELETE SET NULL eller ej).
+  //    Tre FK-relationer skal håndteres først:
+  //    - matches.round_id (CASCADE / SET NULL er ikke garanteret) → unbind
+  //    - round_members.round_id (oprettes af /update-bet-open daglig cron) → cascade-delete
+  //    - round_bets.round_id (brugernes bets) → cascade-delete
+  //
+  //    VIGTIGT: vi sletter for ALLE rounds i sæsonen, ikke kun dem med
+  //    matches. Tidligere bug: existingRoundIds kom kun fra matches' round_ids
+  //    så ghost-rounds (oprettet af tidligere restructure men hvor matches
+  //    var flyttet til nye date-baserede rounds) blev ikke fanget. FK fejlede,
+  //    restructure crashed, batch-sync føjede flere date-rounds.
   await supabaseAdmin.from('matches').update({ round_id: null }).eq('season_id', seasonId).throwOnError()
+  const allSeasonRoundIds = (existingRounds ?? []).map((r) => r.id as number)
+  if (allSeasonRoundIds.length > 0) {
+    // bets er match_id-baseret, ikke round_id, så de mister ikke deres
+    // forbindelse til kampe når rounds genskabes. Kun round_members har
+    // FK på round_id og skal cleanes.
+    await supabaseAdmin.from('round_members').delete().in('round_id', allSeasonRoundIds).throwOnError()
+  }
   const { error: delErr } = await supabaseAdmin.from('rounds').delete().eq('season_id', seasonId)
   if (delErr) throw delErr
-  const roundsDeleted = existingRoundIds.length
+  const roundsDeleted = allSeasonRoundIds.length
 
   // 6. Opret nye rounds — betting_closes_at = 30 minutter før første kamp i bundle
   const newRoundRows = groups.map((g) => {
