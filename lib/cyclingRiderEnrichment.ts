@@ -24,6 +24,9 @@ const HEADERS = {
 export type RiderEnrichment = {
   photo_url: string | null
   team_logo_url: string | null
+  /** Aktuel team-tekst fra PCS rider-page (".page-title" indeholder
+   *  "Navn»Team Name"). Bruges til at detektere hold-skift. */
+  team_name: string | null
 }
 
 export async function enrichRiderFromPcs(pcsSlug: string): Promise<RiderEnrichment | null> {
@@ -53,8 +56,20 @@ export async function enrichRiderFromPcs(pcsSlug: string): Promise<RiderEnrichme
       teamLogo = shirtSrc.startsWith('http') ? shirtSrc : `${PCS_BASE}/${shirtSrc}`
     }
 
-    if (!photo && !teamLogo) return null
-    return { photo_url: photo, team_logo_url: teamLogo }
+    // Team-navn: ".page-title" format er "Lennart Jasch»Tudor Pro Cycling Team".
+    // Split på » og tag højre side. Fallback til første team-link hvis ikke fundet.
+    let teamName: string | null = null
+    const pageTitle = $('.page-title').first().text().trim()
+    if (pageTitle.includes('»')) {
+      teamName = pageTitle.split('»')[1]?.trim() || null
+    }
+    if (!teamName) {
+      const teamLink = $('a[href^="team/"]').first().text().trim()
+      if (teamLink) teamName = teamLink
+    }
+
+    if (!photo && !teamLogo && !teamName) return null
+    return { photo_url: photo, team_logo_url: teamLogo, team_name: teamName }
   } catch (err) {
     console.warn(`[enrichRider] ${pcsSlug}: ${String(err)}`)
     return null
