@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
+import { getRoleStageBonus } from '@/lib/cyclingRoleStageBonus'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -239,6 +240,9 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
 export default function LineupResults({ race, stageFinished, slots, scores, results, riders, standings, onEditRole, slotKeys }: Props) {
   const [hoveredRider, setHoveredRider] = useState<string | null>(null)
   const [hoveredRole, setHoveredRole] = useState<string | null>(null)
+  // pinnedRole holder rolle-popover åben på klik (til mobile / persistent læsning).
+  // Bruges parallelt med hoveredRole — den ene viser hvis den anden ikke gør.
+  const [pinnedRole, setPinnedRole] = useState<string | null>(null)
 
   // Dynamiske roller: brug de medsendte slot-keys (afhænger af profil), ellers
   // det fulde faste sæt. Label udledes fra base-rollen (equipier_N → Équipier).
@@ -417,20 +421,46 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
                 })()}
               </span>
 
-              <div style={{ position: 'relative' }}>
+              <div
+                style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}
+                onMouseEnter={() => { if (ROLE_TOOLTIPS[baseRole]) setHoveredRole(roleSlot.key) }}
+                onMouseLeave={() => setHoveredRole(null)}
+              >
                 <span
+                  onClick={(e) => {
+                    if (!ROLE_TOOLTIPS[baseRole]) return
+                    e.stopPropagation()
+                    setPinnedRole((curr) => curr === roleSlot.key ? null : roleSlot.key)
+                  }}
                   style={{
                     fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
                     color: 'rgba(255,255,255,0.5)', textAlign: 'right',
-                    cursor: ROLE_TOOLTIPS[baseRole] ? 'help' : 'default',
+                    cursor: ROLE_TOOLTIPS[baseRole] ? 'pointer' : 'default',
                     whiteSpace: 'nowrap',
+                    borderBottom: ROLE_TOOLTIPS[baseRole] ? '1px dotted rgba(255,255,255,0.18)' : 'none',
                   }}
-                  onMouseEnter={() => { if (ROLE_TOOLTIPS[baseRole]) setHoveredRole(roleSlot.key) }}
-                  onMouseLeave={() => setHoveredRole(null)}
                 >
                   {roleSlot.label}
                 </span>
-                {hoveredRole === roleSlot.key && ROLE_TOOLTIPS[baseRole] && (
+                {(() => {
+                  const sb = getRoleStageBonus(baseRole, race.profile)
+                  if (!sb.pillLabel) return null
+                  const isHigh = sb.strength === 'high'
+                  return (
+                    <span style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 9, fontWeight: 700,
+                      letterSpacing: '0.06em',
+                      padding: '1px 5px', borderRadius: 2,
+                      background: isHigh ? 'rgba(107,143,113,0.22)' : 'rgba(143,171,196,0.15)',
+                      color: isHigh ? '#9FE1CB' : '#8FABC4',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {sb.pillLabel}
+                    </span>
+                  )
+                })()}
+                {(hoveredRole === roleSlot.key || pinnedRole === roleSlot.key) && ROLE_TOOLTIPS[baseRole] && (
                   <div style={{
                     position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
                     background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 8,
@@ -513,12 +543,31 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
               Vælg rytter
             </span>
 
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
-              color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap',
-            }}>
-              {roleSlot.label}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+                color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap',
+              }}>
+                {roleSlot.label}
+              </span>
+              {(() => {
+                const sb = getRoleStageBonus(baseRole, race.profile)
+                if (!sb.pillLabel) return null
+                const isHigh = sb.strength === 'high'
+                return (
+                  <span style={{
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+                    padding: '1px 5px', borderRadius: 2,
+                    background: isHigh ? 'rgba(107,143,113,0.18)' : 'rgba(143,171,196,0.12)',
+                    color: isHigh ? '#9FE1CB' : '#8FABC4',
+                    opacity: 0.85, whiteSpace: 'nowrap',
+                  }}>
+                    {sb.pillLabel}
+                  </span>
+                )
+              })()}
+            </div>
 
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,

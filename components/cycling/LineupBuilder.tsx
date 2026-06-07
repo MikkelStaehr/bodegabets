@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Lock, Radio, Check, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react'
 import LineupResults from './LineupResults'
 import LineupPresetsBar from './LineupPresetsBar'
+import StageStrategyCard from './StageStrategyCard'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
 import AllLineups from './AllLineups'
@@ -863,6 +864,11 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             Udtag brutto trup
           </a>
         </div>
+      )}
+
+      {/* ── Stage-strategi briefing (vises kun før etape er færdig) ─ */}
+      {!noSquadForBlock && !isFinished && activeStage && (
+        <StageStrategyCard profile={activeStage.profile} slotKeys={activeSlotKeys} />
       )}
 
       {/* ── Lineup results view ──────────────────────────────── */}
