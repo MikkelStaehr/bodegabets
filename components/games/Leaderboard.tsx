@@ -8,9 +8,12 @@ type Props = {
   entries?: LeaderboardEntry[]
   /** Bruges kun hvis entries ikke er givet. */
   gameId?: number
+  /** Compact-mode: kun rank + navn + B.point (til smal sidebar). Skjuler
+   *  R.sejr/R.point/B.sejr-kolonnerne så navn-kolonnen har plads. */
+  compact?: boolean
 }
 
-export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
+export default function Leaderboard({ entries: entriesProp, gameId, compact }: Props) {
   const [fetchedEntries, setFetchedEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(entriesProp === undefined)
 
@@ -91,12 +94,12 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
         {/* Header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '32px 1fr 56px 64px 56px 64px',
+          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 56px' : '32px 1fr 56px 64px 56px 64px',
           padding: '8px 12px',
           borderBottom: '1px solid #E8E0D3',
           gap: 4,
         }}>
-          {['#', '', 'R. sejr', 'R. point', 'B. sejr', 'B. point'].map((h, i) => (
+          {(compact ? ['#', '', 'Point'] : ['#', '', 'R. sejr', 'R. point', 'B. sejr', 'B. point']).map((h, i) => (
             <span key={i} style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 9, fontWeight: 700,
@@ -115,7 +118,7 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
             key={entry.user_id}
             style={{
               display: 'grid',
-              gridTemplateColumns: '32px 1fr 56px 64px 56px 64px',
+              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 56px' : '32px 1fr 56px 64px 56px 64px',
               padding: '10px 12px',
               borderBottom: idx < entries.length - 1 ? '1px solid #E8E0D3' : 'none',
               gap: 4,
@@ -136,36 +139,43 @@ export default function Leaderboard({ entries: entriesProp, gameId }: Props) {
               fontSize: 13, fontWeight: 600,
               color: '#1a1a1a',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              minWidth: 0,
             }}>
               {entry.username}
             </span>
 
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 12, fontWeight: 600,
-              color: entry.round_wins > 0 ? '#B8963E' : '#ccc',
-              textAlign: 'right',
-            }}>
-              {entry.round_wins > 0 ? entry.round_wins : '-'}
-            </span>
+            {!compact && (
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 12, fontWeight: 600,
+                color: entry.round_wins > 0 ? '#B8963E' : '#ccc',
+                textAlign: 'right',
+              }}>
+                {entry.round_wins > 0 ? entry.round_wins : '-'}
+              </span>
+            )}
 
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 12, fontWeight: 600,
-              color: entry.round_points > 0 ? '#1a1a1a' : '#ccc',
-              textAlign: 'right',
-            }}>
-              {entry.round_points > 0 ? entry.round_points : '-'}
-            </span>
+            {!compact && (
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 12, fontWeight: 600,
+                color: entry.round_points > 0 ? '#1a1a1a' : '#ccc',
+                textAlign: 'right',
+              }}>
+                {entry.round_points > 0 ? entry.round_points : '-'}
+              </span>
+            )}
 
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 12, fontWeight: 600,
-              color: entry.block_wins > 0 ? '#B8963E' : '#ccc',
-              textAlign: 'right',
-            }}>
-              {entry.block_wins > 0 ? entry.block_wins : '-'}
-            </span>
+            {!compact && (
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 12, fontWeight: 600,
+                color: entry.block_wins > 0 ? '#B8963E' : '#ccc',
+                textAlign: 'right',
+              }}>
+                {entry.block_wins > 0 ? entry.block_wins : '-'}
+              </span>
+            )}
 
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
