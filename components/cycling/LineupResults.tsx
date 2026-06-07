@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, AlertTriangle, X as XIcon } from 'lucide-react'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
@@ -147,39 +148,65 @@ function SynergyBadge({
 }) {
   const [hovered, setHovered] = useState(false)
   const narrow = useNarrowViewport(480)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  // Popoverens position beregnes ud fra badge's bounding-box hver gang den
+  // åbnes — så uanset hvor badge sidder i rytter-rækken er popoveren
+  // garanteret inden for viewport.
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  const showPopover = open || hovered
+
+  useLayoutEffect(() => {
+    if (!showPopover || !buttonRef.current || narrow) return
+    const rect = buttonRef.current.getBoundingClientRect()
+    const margin = 12
+    const vw = window.innerWidth
+    // På desktop er popoveren bound af viewport-bredde minus 2×12 margin.
+    const popoverWidth = Math.min(320, vw - margin * 2)
+    // Ideal-position: align venstre kant med badge. Clamp til viewport-margin.
+    const idealLeft = rect.left
+    const maxLeft = vw - popoverWidth - margin
+    const left = Math.max(margin, Math.min(idealLeft, maxLeft))
+    const top = rect.bottom + 6
+    setPopoverPos({ top, left, width: popoverWidth })
+  }, [showPopover, narrow])
+
   if (checks.length === 0) return null
   const worst = worstStatus(checks)
   if (!worst || worst === 'info') return null
   const c = SYNERGY_COLORS[worst]
   const Icon = worst === 'good' ? Check : worst === 'bad' ? XIcon : AlertTriangle
-  const showPopover = open || hovered
 
-  // Mobile-first: på smal viewport rendrer vi popoveren som en bottom-sheet
-  // forankret til viewport-kanterne så hele teksten har plads og er læsbar
-  // uden ellipsis. På desktop bevares den kompakt absolut-positionerede
-  // boble ankret ved badge'en.
-  const popoverStyle: React.CSSProperties = narrow
+  const titleSize = narrow ? 13 : 12
+  const detailSize = narrow ? 13 : 12
+
+  // Mobile bottom-sheet style — viewport-locked
+  const mobileSheetStyle: React.CSSProperties = {
+    position: 'fixed', left: 12, right: 12, bottom: 12,
+    zIndex: 50,
+    background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 6,
+    padding: '14px 16px',
+    boxShadow: '0 -4px 20px rgba(0,0,0,0.6)',
+    display: 'flex', flexDirection: 'column', gap: 10,
+  }
+
+  // Desktop popover style — clamped position via portal
+  const desktopPopoverStyle: React.CSSProperties | null = popoverPos
     ? {
-        position: 'fixed', left: 12, right: 12, bottom: 12,
+        position: 'fixed',
+        top: popoverPos.top,
+        left: popoverPos.left,
+        width: popoverPos.width,
         zIndex: 50,
-        background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 6,
-        padding: '14px 16px',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.6)',
-        display: 'flex', flexDirection: 'column', gap: 10,
-      }
-    : {
-        position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 20,
         background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 4,
         padding: '10px 12px',
-        width: 'max-content', minWidth: 220,
-        maxWidth: 'min(300px, calc(100vw - 24px))',
         boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
         display: 'flex', flexDirection: 'column', gap: 8,
       }
-
-  // Mobile font sizing — comfortable læseafstand til finger-touch
-  const titleSize = narrow ? 13 : 12
-  const detailSize = narrow ? 13 : 12
+    : null
 
   return (
     <>
@@ -189,6 +216,7 @@ function SynergyBadge({
         onMouseLeave={() => setHovered(false)}
       >
         <button
+          ref={buttonRef}
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggle() }}
           aria-label={`Synergi for rytter — ${checks.length} ${checks.length === 1 ? 'note' : 'noter'}`}
@@ -201,16 +229,20 @@ function SynergyBadge({
         >
           <Icon size={9} strokeWidth={3} />
         </button>
-        {showPopover && !narrow && (
-          <div onClick={(e) => e.stopPropagation()} style={popoverStyle}>
-            <SynergyChecksList checks={checks} titleSize={titleSize} detailSize={detailSize} />
-          </div>
-        )}
       </span>
-      {/* På mobile: bottom-sheet udenfor badge'ens normal flow + backdrop til at
-          lukke den ved tap udenfor. Bottom-sheet er pinned (åbnes ved klik
-          på badge) — hover er ikke relevant på touch. */}
-      {open && narrow && (
+
+      {/* Portal til document.body — escaper alle ancestor overflow/transform.
+          Renderes kun client-side efter mount så vi undgår hydration mismatch. */}
+      {mounted && showPopover && !narrow && desktopPopoverStyle && createPortal(
+        <div onClick={(e) => e.stopPropagation()} style={desktopPopoverStyle}>
+          <SynergyChecksList checks={checks} titleSize={titleSize} detailSize={detailSize} />
+        </div>,
+        document.body,
+      )}
+
+      {/* Mobile: bottom-sheet med backdrop. Pinned (åbnes ved klik) —
+          hover er irrelevant på touch. */}
+      {mounted && open && narrow && createPortal(
         <>
           <div
             onClick={onToggle}
@@ -219,7 +251,7 @@ function SynergyBadge({
               background: 'rgba(0,0,0,0.4)',
             }}
           />
-          <div onClick={(e) => e.stopPropagation()} style={popoverStyle}>
+          <div onClick={(e) => e.stopPropagation()} style={mobileSheetStyle}>
             <SynergyChecksList checks={checks} titleSize={titleSize} detailSize={detailSize} />
             <button
               type="button"
@@ -236,7 +268,8 @@ function SynergyBadge({
               Luk
             </button>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </>
   )
