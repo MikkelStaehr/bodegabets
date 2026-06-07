@@ -12,6 +12,7 @@
  *   GET /send-reminders    — dagligt 10:00 (send push-notifikationer)
  *   GET /calculate-points  — safety net (primær trigger er nu i syncMatchScores)
  *   GET /sync-cycling-startlists — hver 3. time (PCS startlister for upcoming løb)
+ *   GET /sync-cycling-stage-times — dagligt 05:30 (PCS stage-startidspunkter)
  *   GET /refresh-cycling-riders — dagligt 03:00 (100 rytter-pages refresh til hold-skift)
  *   GET /discover-bold-seasons — ugentligt mandag 04:00 (auto-opret nye sæsoner)
  *   GET /football-archive-check — dagligt 08:10 (arkivér fodbold-gamerooms efter sidste runde)
@@ -37,6 +38,7 @@ import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlock
 import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage } from '@/lib/calculateCyclingPoints'
 import { syncCyclingResults } from '@/lib/syncCyclingResults'
 import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
+import { syncCyclingStageTimes } from '@/lib/syncCyclingStageTimes'
 import { refreshCyclingRiders } from '@/lib/refreshCyclingRiders'
 import { discoverBoldSeasons } from '@/lib/discoverBoldSeasons'
 
@@ -1079,6 +1081,35 @@ app.get('/sync-cycling-startlists', async (_req, res) => {
   }
 })
 
+// ─── GET /sync-cycling-stage-times ─────────────────────────────────────────
+// Scrape PCS for hver upcoming stage's nøjagtige starttidspunkt og opdater
+// cycling_stages.start_time_utc. Lineup-deadline beregnes som start - 30 min,
+// så det er kritisk at vi har den faktiske tid (typisk 11:15-14:00 CEST)
+// frem for vores 13:00 UTC default.
+
+app.get('/sync-cycling-stage-times', async (_req, res) => {
+  try {
+    const result = await syncCyclingStageTimes()
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_stage_times_sync',
+      status: result.ok ? 'success' : 'error',
+      message: `sync-cycling-stage-times: ${result.stagesScanned} scannet, ${result.stagesUpdated} opdateret`,
+      metadata: result as unknown as Record<string, unknown>,
+    })
+
+    res.json({ ok: result.ok, ...result })
+  } catch (err) {
+    console.error('[sync-cycling-stage-times]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_stage_times_sync',
+      status: 'error',
+      message: `sync-cycling-stage-times failed: ${String(err)}`,
+    })
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /discover-bold-seasons ────────────────────────────────────────────
 // Ugentlig scan af Bold for nye sæsoner. Når Bold offentliggør fx Premier
 // League 26/27 (typisk juni-juli) bliver en ny season-row automatisk oprettet
@@ -1470,6 +1501,12 @@ app.listen(PORT, () => {
   // hold-skift, foto-opdateringer, manglende team_logo osv. Kører om natten
   // hvor der ikke er anden trafik.
   cron.schedule('0 3 * * *', () => callEndpoint('/refresh-cycling-riders'))
+
+  // Dagligt kl. 05:30 UTC — scrape PCS for hver upcoming stage's nøjagtige
+  // starttidspunkt. Lineup-deadline beregnes som start - 30 min, så det er
+  // kritisk at have rigtig tid frem for vores 13:00 UTC default. PCS opdaterer
+  // sjældent tider efter første publicering, så daglig sync er nok.
+  cron.schedule('30 5 * * *', () => callEndpoint('/sync-cycling-stage-times'))
 
   // Hver 3. time — pull startlister fra PCS for upcoming/active løb.
   // PCS opdaterer rosters helt op til løbsstart (fx Pogačar trukket fra

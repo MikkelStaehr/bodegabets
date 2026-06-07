@@ -33,6 +33,9 @@ export type CyclingStage = {
   profile: string | null
   profile_image_url: string | null
   start_date: string
+  /** Nøjagtigt PCS-starttidspunkt i UTC, hvis kendt. Bruges af deadline-
+   *  beregningen til at lukke lineup-redigering 30 min før reel start. */
+  start_time_utc: string | null
   distance_km: number | null
   departure: string | null
   arrival: string | null

@@ -243,7 +243,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Tjek deadline — find stage → race → block lock_deadline, eller stage start - 30 min
   const { data: stageData } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, race_id, start_date, profile')
+    .select('id, race_id, start_date, start_time_utc, profile')
     .eq('id', stage_id)
     .single()
 
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest, { params }: Props) {
       error: 'Etape-data mangler — kontakt admin'
     }, { status: 500 })
   }
-  if (isStageDeadlinePassed(stageData.start_date)) {
+  if (isStageDeadlinePassed(stageData.start_date, undefined, stageData.start_time_utc as string | null)) {
     return NextResponse.json({ error: 'Deadline er passeret — lineup kan ikke ændres' }, { status: 400 })
   }
 

@@ -408,8 +408,8 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const filledCount = Object.values(slots).filter((v) => v !== null).length
   const profileLabel = activeStage ? (PROFILE_LABELS[activeStage.profile ?? ''] ?? 'Endagsløb') : ''
 
-  // Lock deadline: stage start_date - 30min (helper håndterer dato-only / midnat UTC)
-  const deadlineStr = activeStage ? (getStageDeadline(activeStage.start_date)?.toISOString() ?? null) : (lockDeadline ?? null)
+  // Lock deadline: foretrukket PCS-tid, fallback til 13:00 UTC default
+  const deadlineStr = activeStage ? (getStageDeadline(activeStage.start_date, activeStage.start_time_utc)?.toISOString() ?? null) : (lockDeadline ?? null)
 
   return (
     <div style={{ background: theme.bg, borderRadius: 2, transition: 'background 0.3s' }}>
@@ -499,7 +499,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           // alle 21 Giro-etaper live når kun stage 1 faktisk var i gang). 12-timers
           // vinduet beskytter også mod manglende sync — gamle stages der aldrig blev
           // markeret som uploaded vises ikke som 'live' for evigt.
-          const stageStart = getStageStartTime(stage.start_date)
+          const stageStart = getStageStartTime(stage.start_date, stage.start_time_utc)
           const hasStarted = stageStart != null && stageStart <= new Date()
           const startedRecently = stageStart != null
             && stageStart.getTime() >= new Date().getTime() - 12 * 60 * 60 * 1000
@@ -644,7 +644,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             .filter((s) => s.race_id === activeRace.id && s.start_date > rd)
             .sort((a, b) => a.start_date.localeCompare(b.start_date))[0]
           if (!next) return false
-          const deadline = getStageDeadline(next.start_date)
+          const deadline = getStageDeadline(next.start_date, next.start_time_utc)
           return deadline != null && deadline > new Date()
         })
         if (relevantRestDays.length === 0) return null
@@ -934,7 +934,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
       {(() => {
         const earlierEmpty = blockStages.filter((s) => {
           if (s.stage_number >= activeStage.stage_number) return false
-          if (isStageDeadlinePassed(s.start_date)) return false
+          if (isStageDeadlinePassed(s.start_date, undefined, s.start_time_utc)) return false
           const slots = lineups[s.id]
           const filled = slots ? Object.values(slots).some((v) => v !== null) : false
           return !filled
@@ -982,7 +982,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             // Ekstra confirm hvis der er en tidligere etape uden lineup
             const earlierEmpty = blockStages.filter((s) => {
               if (s.stage_number >= activeStage.stage_number) return false
-              if (isStageDeadlinePassed(s.start_date)) return false
+              if (isStageDeadlinePassed(s.start_date, undefined, s.start_time_utc)) return false
               const slots = lineups[s.id]
               const filled = slots ? Object.values(slots).some((v) => v !== null) : false
               return !filled
@@ -1030,7 +1030,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
       </>)}
 
       {/* ── Alle lineups (vises når lineup er låst / race er live/finished) ─── */}
-      {activeStage && currentUserId && (isLocked || isFinished || isStageDeadlinePassed(activeStage.start_date)) && (
+      {activeStage && currentUserId && (isLocked || isFinished || isStageDeadlinePassed(activeStage.start_date, undefined, activeStage.start_time_utc)) && (
         <div style={{ padding: '0 14px 14px' }}>
           <AllLineups gameId={gameId} stageId={activeStage.id} currentUserId={currentUserId} />
         </div>
