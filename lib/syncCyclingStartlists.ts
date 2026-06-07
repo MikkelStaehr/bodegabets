@@ -68,12 +68,20 @@ function parseStartlist(html: string): StartlistEntry[] {
     if (!name) return
     seen.add(pcsSlug)
 
-    // Bib-nummer: text-node lige før <a> i samme parent (fx "1POGAČAR Tadej")
-    const prev = (el as { prev?: { type: string; data?: string } }).prev
+    // Bib-nummer: <span class="bib">N</span> i samme <li>-parent (PCS v4-layout).
+    // Fallback til text-node lige før <a> for ældre layouts.
     let bib: number | null = null
-    if (prev && prev.type === 'text' && typeof prev.data === 'string') {
-      const txt = prev.data.trim()
+    const bibSpan = $(el).parent().find('span.bib').first()
+    if (bibSpan.length > 0) {
+      const txt = bibSpan.text().trim()
       if (/^\d+$/.test(txt)) bib = parseInt(txt, 10)
+    }
+    if (bib === null) {
+      const prev = (el as { prev?: { type: string; data?: string } }).prev
+      if (prev && prev.type === 'text' && typeof prev.data === 'string') {
+        const txt = prev.data.trim()
+        if (/^\d+$/.test(txt)) bib = parseInt(txt, 10)
+      }
     }
 
     entries.push({ pcs_slug: pcsSlug, name, bib_number: bib })
