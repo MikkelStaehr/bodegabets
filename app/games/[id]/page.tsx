@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import { getEffectiveSquadRidersForSquads } from '@/lib/cyclingTransfers'
+import { getEffectiveSquadRidersForSquads, getEffectiveRidersBySquad } from '@/lib/cyclingTransfers'
 import CyclingBlockStanding from '@/components/cycling/CyclingBlockStanding'
 import CyclingSeasonOverview from '@/components/cycling/CyclingSeasonOverview'
 import { findActiveSubBlock, shortSubBlockName } from '@/lib/cyclingBlocks'
@@ -327,6 +327,9 @@ export default async function GamePage({ params }: Props) {
   let userSquad: { id: string } | null = null
   let lineupRaces: { id: string; name: string; start_date: string; status: string; race_type: string; profile: string | null; profile_image_url: string | null; logo_url: string | null; race_photo_url: string | null; rest_days: string[] | null; cycling_block_id: string | null }[] = []
   let lineupSquadRiders: { id: string; first_name: string; last_name: string; team_name: string; category: number; team_logo_url: string | null; photo_url: string | null }[] = []
+  // Rider-ids per squad (med transfers anvendt) — bruges af LineupBuilder til at
+  // filtrere brutto-truppen til den AKTIVE bloks squad i pickeren.
+  let lineupRiderIdsBySquad: Record<string, string[]> = {}
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   // Visnings-navn for aktiv blok: aktiv sub-blok (uge) hvis findes, ellers top-blokken.
   let cyclingActiveBlockDisplayName: string | null = null
@@ -808,7 +811,11 @@ export default async function GamePage({ params }: Props) {
     // ryttere også vises i truppen — ikke kun den oprindelige squad.
     const allSquadIds = (userSquads ?? []).map((sq) => sq.id)
     if (allSquadIds.length > 0) {
-      const effRiders = await getEffectiveSquadRidersForSquads(allSquadIds)
+      const [effRiders, ridersBySquad] = await Promise.all([
+        getEffectiveSquadRidersForSquads(allSquadIds),
+        getEffectiveRidersBySquad(allSquadIds),
+      ])
+      lineupRiderIdsBySquad = ridersBySquad
       if (effRiders.length > 0) {
         const catById = new Map(effRiders.map((e) => [e.rider_id, e.category_slot]))
         const { data: rd } = await supabaseAdmin
@@ -1492,6 +1499,7 @@ export default async function GamePage({ params }: Props) {
               abandoned={lineupAbandoned}
               standings={lineupStandings}
               squadRiders={lineupSquadRiders}
+              squadRiderIdsBySquad={lineupRiderIdsBySquad}
               blocks={cyclingBlocks}
               defaultBlockId={cyclingActiveBlock?.id ?? null}
               lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}

@@ -129,3 +129,41 @@ export async function getEffectiveSquadRidersForSquads(
 
   return [...byRider.entries()].map(([rider_id, category_slot]) => ({ rider_id, category_slot }))
 }
+
+/**
+ * Per-squad oversigt over effektive rider_ids (med transfers anvendt) — bruges
+ * i lineup-pickeren til at filtrere brutto-truppen til den AKTIVE bloks squad,
+ * så en Giro-rytter ikke dukker op i Dauphiné-pickeren.
+ */
+export async function getEffectiveRidersBySquad(
+  squadIds: string[],
+): Promise<Record<string, string[]>> {
+  if (squadIds.length === 0) return {}
+  const [{ data: base }, { data: transfers }] = await Promise.all([
+    supabaseAdmin
+      .from('cycling_squad_riders')
+      .select('squad_id, rider_id')
+      .in('squad_id', squadIds),
+    supabaseAdmin
+      .from('cycling_squad_transfers')
+      .select('squad_id, rider_out_id, rider_in_id')
+      .in('squad_id', squadIds),
+  ])
+
+  const out: Record<string, Set<string>> = {}
+  for (const sq of squadIds) out[sq] = new Set()
+  const removed: Record<string, Set<string>> = {}
+  for (const sq of squadIds) removed[sq] = new Set()
+  for (const t of transfers ?? []) removed[t.squad_id as string]?.add(t.rider_out_id as string)
+  for (const r of base ?? []) {
+    const sq = r.squad_id as string
+    const rid = r.rider_id as string
+    if (removed[sq]?.has(rid)) continue
+    out[sq]?.add(rid)
+  }
+  for (const t of transfers ?? []) out[t.squad_id as string]?.add(t.rider_in_id as string)
+
+  const result: Record<string, string[]> = {}
+  for (const sq of squadIds) result[sq] = [...(out[sq] ?? [])]
+  return result
+}
