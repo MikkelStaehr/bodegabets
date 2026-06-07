@@ -2,8 +2,8 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { getEffectiveSquadRidersForSquads, getEffectiveRidersBySquad } from '@/lib/cyclingTransfers'
-import CyclingBlockStanding from '@/components/cycling/CyclingBlockStanding'
-import CyclingSeasonOverview from '@/components/cycling/CyclingSeasonOverview'
+// CyclingBlockStanding og CyclingSeasonOverview bruges nu kun internt af
+// CyclingRanglister (importeret nedenfor).
 import { findActiveSubBlock, shortSubBlockName } from '@/lib/cyclingBlocks'
 import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
@@ -24,6 +24,7 @@ import Leaderboard from '@/components/games/Leaderboard'
 import ShoutBox from '@/components/games/ShoutBox'
 import CyclingNextStageCard from '@/components/cycling/CyclingNextStageCard'
 import GameroomLayout from '@/components/cycling/GameroomLayout'
+import CyclingRanglister from '@/components/cycling/CyclingRanglister'
 import FootballLiveSection from '@/components/games/FootballLiveSection'
 import FreeEventPitchBanner from '@/components/games/FreeEventPitchBanner'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
@@ -1530,8 +1531,11 @@ export default async function GamePage({ params }: Props) {
                     squadId={userSquad?.id ?? null}
                     currentUserId={user.id}
                   />
-                  <CyclingSeasonOverview gameId={gameId} />
-                  <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} blockStatus={cyclingActiveBlockStatus} />
+                  <CyclingRanglister
+                    gameId={gameId}
+                    activeBlockName={cyclingActiveBlockDisplayName}
+                    activeBlockStatus={cyclingActiveBlockStatus}
+                  />
                 </>
               }
               right={

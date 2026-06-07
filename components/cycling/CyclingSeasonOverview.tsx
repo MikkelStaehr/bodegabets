@@ -5,6 +5,9 @@ import type { LeaderboardEntry } from '@/lib/gameState'
 
 type Props = {
   gameId: number
+  /** Når true, fjernes ydre card og titel — komponenten flyder ind i en
+   *  parent-container (fx CyclingRanglister tabs). */
+  embedded?: boolean
 }
 
 /**
@@ -13,7 +16,7 @@ type Props = {
  * (CyclingBlockStanding) og den almindelige Leaderboard for at give spillere
  * et 'season-trophy'-overblik der ikke skifter når en ny uge eller blok starter.
  */
-export default function CyclingSeasonOverview({ gameId }: Props) {
+export default function CyclingSeasonOverview({ gameId, embedded }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -39,8 +42,8 @@ export default function CyclingSeasonOverview({ gameId }: Props) {
   if (!hasAnyPoints) return null
 
   return (
-    <div className="bg-cream-dark border border-warm-border rounded-sm p-4 sm:p-5 mb-4">
-      <p className="label-caps text-warm-taupe mb-3">Sæson-overblik</p>
+    <div className={embedded ? 'px-4 sm:px-5 py-3' : 'bg-cream-dark border border-warm-border rounded-sm p-4 sm:p-5 mb-4'}>
+      {!embedded && <p className="label-caps text-warm-taupe mb-3">Sæson-overblik</p>}
 
       {/* Header */}
       <div className="grid grid-cols-[28px_1fr_56px_80px] gap-3 items-center pb-2 mb-1 border-b border-warm-border/60">
