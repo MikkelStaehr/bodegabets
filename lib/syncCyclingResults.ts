@@ -176,6 +176,24 @@ async function scrapeStageResults(slug: string, stageNum: number): Promise<Parse
   return results
 }
 
+/**
+ * Scrape "Won how" fra stage-page. PCS rendrer det som "<li>Won how: 28.6 km solo</li>"
+ * eller "Won how: Bunch sprint" osv. Bruges af scoring til Grimpeur won-how bonus
+ * (Solo +50 +1/km, Sprint à deux +25, Small group +20) og Sprinter bonus
+ * (Bunch sprint +20, Small group +25, Sprint à deux +50).
+ */
+async function scrapeWonHow(slug: string, stageNum: number): Promise<string | null> {
+  const base = stageNum === 0
+    ? `${PCS_BASE}/race/${slug}/2026/prologue`
+    : `${PCS_BASE}/race/${slug}/2026/stage-${stageNum}`
+  const html = await pcsGet(base)
+  if (!html) return null
+  const $ = cheerio.load(html)
+  const match = $('body').text().match(/Won how:\s*([^\n<]+?)(?:\s*(?:Avg|Profile|Vertical|$))/i)
+  if (!match) return null
+  return match[1].trim() || null
+}
+
 // ─── Classification scraper (dedikerede subsider) ──────────────────────────
 
 type ClassificationEntry = {
@@ -582,11 +600,25 @@ export async function syncCyclingResults(): Promise<{
       if (stageUpserted > 0) {
         totalUpserted += stageUpserted
         if (shouldMarkUploaded) {
+          // Won-how (Solo / Bunch sprint / Sprint a deux / Small group) — bruges
+          // af Grimpeur og Sprinter scoring til won-how bonus. Hentes inden vi
+          // markerer stagen færdig så scoring kan tilgå den med det samme.
+          let wonHow: string | null = null
+          try {
+            wonHow = await scrapeWonHow(race.pcs_slug, stage.stage_number)
+            if (wonHow) console.log(`[syncCyclingResults]   won_how: "${wonHow}"`)
+          } catch (err) {
+            console.warn(`[syncCyclingResults]   won_how scrape failed: ${err}`)
+          }
+
           // Mark stage as uploaded — klassementer er komplette (eller stagen
           // er gammel nok til at vi accepterer delvise data)
           await supabaseAdmin
             .from('cycling_stages')
-            .update({ results_uploaded_at: new Date().toISOString() })
+            .update({
+              results_uploaded_at: new Date().toISOString(),
+              ...(wonHow ? { won_how: wonHow } : {}),
+            })
             .eq('id', stage.id)
 
           syncedStageIds.push(stage.id)
