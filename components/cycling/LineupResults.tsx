@@ -130,9 +130,9 @@ const SYNERGY_COLORS: Record<SynergyStatus, { fill: string; bg: string; ring: st
 }
 
 /**
- * Lille klikbar status-badge ved rytter-navn der opsummerer rytterens
- * synergi-tilstand. Klik viser popover med detaljer. Hvis rytteren ikke
- * har nogen checks (= ingen synergi-info), vises intet.
+ * Lille status-badge ved rytter-navn der opsummerer rytterens synergi-
+ * tilstand. Hover åbner popover (desktop), klik pin'er den åben (mobil og
+ * persistent læsning). Hvis rytteren ikke har checks vises intet.
  */
 function SynergyBadge({
   checks, open, onToggle,
@@ -142,18 +142,23 @@ function SynergyBadge({
   open: boolean
   onToggle: () => void
 }) {
+  const [hovered, setHovered] = useState(false)
   if (checks.length === 0) return null
   const worst = worstStatus(checks)
   if (!worst) return null
   const c = SYNERGY_COLORS[worst]
   const Icon = worst === 'good' ? Check : worst === 'bad' ? XIcon : worst === 'warn' ? AlertTriangle : Check
+  const showPopover = open || hovered
 
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+    <span
+      style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggle() }}
-        title="Synergi-detalje"
         aria-label={`Synergi for rytter — ${checks.length} ${checks.length === 1 ? 'note' : 'noter'}`}
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -164,7 +169,7 @@ function SynergyBadge({
       >
         <Icon size={9} strokeWidth={3} />
       </button>
-      {open && (
+      {showPopover && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
