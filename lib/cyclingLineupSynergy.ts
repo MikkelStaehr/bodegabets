@@ -186,11 +186,23 @@ export function analyzeLineupSynergy(
   // ── DOMESTIQUE ────────────────────────────────────────────────
   if (domestique) {
     if (leader) {
-      push(domestique.id, {
-        status: 'good',
-        title: `+8 hvis Leader top-10`,
-        detail: `${domestique.last_name} får +8 hvis han er top-40 OG ${leader.last_name} er top-10. Holdmatch er ikke krav.`,
-      })
+      // Scoring kræver ikke team-match for +8, men i praksis er det sværere
+      // for en Domestique fra et andet hold at sikre top-40 koordineret med
+      // Leader top-10. Hvis Domestique er fra Leader's hold er det taktisk
+      // den klassiske rolle (hjælper sin kaptajn frem).
+      if (domestique.team_name === leader.team_name) {
+        push(domestique.id, {
+          status: 'good',
+          title: `Domestique fra Leader's hold`,
+          detail: `${domestique.last_name} kører for ${leader.last_name}. +8 hvis han er top-40 OG ${leader.last_name} er top-10.`,
+        })
+      } else {
+        push(domestique.id, {
+          status: 'warn',
+          title: `Domestique fra andet hold`,
+          detail: `${domestique.last_name} (${domestique.team_name}) er ikke holdkammerat med ${leader.last_name} (${leader.team_name}). Scoring kræver ikke team-match, men en Domestique fra Leader's hold er taktisk stærkere.`,
+        })
+      }
     } else {
       push(domestique.id, {
         status: 'warn',
