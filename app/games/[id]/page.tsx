@@ -1435,56 +1435,10 @@ export default async function GamePage({ params }: Props) {
           </div>
         )}
 
-        <section className="border-t border-b border-[#d4cec4] py-0">
-          {typedGame.sport === 'cycling' ? (
-            <CyclingCalendarSlider events={cyclingEvents} sportColor={theme.primary} />
-          ) : (
-            <>
-              <CalendarSlider
-                matches={allMatches}
-                rounds={(typedGame.championship_mode
-                  ? championshipRounds.filter((cr) => cr.status === 'active' || (cr.betting_closes_at && new Date(cr.betting_closes_at) > new Date()) || cr.championship_round_matches.length > 0).map((cr) => {
-                      const now2 = new Date()
-                      const status = cr.status === 'finished' ? 'finished' as const
-                        : cr.betting_closes_at && new Date(cr.betting_closes_at) > now2 ? 'open' as const
-                        : cr.status === 'active' ? 'active' as const
-                        : 'upcoming' as const
-                      return {
-                        id: cr.id,
-                        name: cr.name,
-                        season_id: 0,
-                        computedStatus: status,
-                        betting_closes_at: cr.betting_closes_at,
-                        leagueAbbr: 'BBR',
-                        leagueType: 'cup' as const,
-                        logo_url: null,
-                        block_id: null,
-                        block_number: null,
-                      }
-                    })
-                  : roundsWithBlock.map((r) => ({
-                      id: r.id,
-                      name: r.name,
-                      season_id: r.season_id ?? 0,
-                      computedStatus: r.computedStatus,
-                      betting_closes_at: r.betting_closes_at,
-                      leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
-                      leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
-                      logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
-                      block_id: r.block_id ?? null,
-                      block_number: r.block_id != null ? (blockById.get(r.block_id)?.block_number ?? null) : null,
-                    }))
-                ) as CalendarRound[]}
-                gameId={gameId}
-                betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
-                activeRoundId={activeRound?.id ?? null}
-                activeBlockId={activeBlock?.id ?? null}
-                sportColor={theme.primary}
-              />
-              <ActiveRoundLiveTicker />
-            </>
-          )}
-        </section>
+        {/* Kalender + runde-ticker er FLYTTET ind i GameroomLayout's main-
+            slot nedenfor, så de fysisk hænger sammen med resten af main-
+            content i 3-kolonne layout. Tidligere brød de rytmen ved at
+            ligge i deres egen fuld-bredde section. */}
 
         {/* Cykling sektion — 3-kolonne på desktop, stack på mobile/tablet */}
         {typedGame.sport === 'cycling' && (() => {
@@ -1506,6 +1460,9 @@ export default async function GamePage({ params }: Props) {
               }
               main={
                 <>
+                  <div className="border-t border-b border-[#d4cec4]">
+                    <CyclingCalendarSlider events={cyclingEvents} sportColor={theme.primary} />
+                  </div>
                   <CyclingGameroom
                     gameId={gameId}
                     squadId={userSquad?.id ?? null}
@@ -1582,6 +1539,41 @@ export default async function GamePage({ params }: Props) {
             }
             main={
               <>
+                <div className="border-t border-b border-[#d4cec4]">
+                  <CalendarSlider
+                    matches={allMatches}
+                    rounds={(typedGame.championship_mode
+                      ? championshipRounds.filter((cr) => cr.status === 'active' || (cr.betting_closes_at && new Date(cr.betting_closes_at) > new Date()) || cr.championship_round_matches.length > 0).map((cr) => {
+                          const now2 = new Date()
+                          const status = cr.status === 'finished' ? 'finished' as const
+                            : cr.betting_closes_at && new Date(cr.betting_closes_at) > now2 ? 'open' as const
+                            : cr.status === 'active' ? 'active' as const
+                            : 'upcoming' as const
+                          return {
+                            id: cr.id, name: cr.name, season_id: 0,
+                            computedStatus: status, betting_closes_at: cr.betting_closes_at,
+                            leagueAbbr: 'BBR', leagueType: 'cup' as const,
+                            logo_url: null, block_id: null, block_number: null,
+                          }
+                        })
+                      : roundsWithBlock.map((r) => ({
+                          id: r.id, name: r.name, season_id: r.season_id ?? 0,
+                          computedStatus: r.computedStatus, betting_closes_at: r.betting_closes_at,
+                          leagueAbbr: (r.season_id ? seasonLeagueMap.get(r.season_id)?.abbr : undefined) ?? leagueInfo.abbr,
+                          leagueType: (r.season_id ? seasonLeagueMap.get(r.season_id)?.type : undefined) ?? leagueInfo.type,
+                          logo_url: (r.season_id ? seasonLeagueMap.get(r.season_id)?.logo_url : undefined) ?? null,
+                          block_id: r.block_id ?? null,
+                          block_number: r.block_id != null ? (blockById.get(r.block_id)?.block_number ?? null) : null,
+                        }))
+                    ) as CalendarRound[]}
+                    gameId={gameId}
+                    betsCount={roundBets?.filter((b) => b.user_id === user.id)?.length ?? 0}
+                    activeRoundId={activeRound?.id ?? null}
+                    activeBlockId={activeBlock?.id ?? null}
+                    sportColor={theme.primary}
+                  />
+                  <ActiveRoundLiveTicker />
+                </div>
                 {initialGameState && (
                   <FootballLiveSection
                     gameId={gameId}
