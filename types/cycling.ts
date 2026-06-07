@@ -56,3 +56,17 @@ export type CyclingSquadRider = {
 }
 
 export type CyclingRoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' | 'equipier_0' | 'equipier_1' | 'equipier_2' | 'joker'
+
+/**
+ * Gemt rolle-rytter template pr. squad. Brugeren har typisk 2-3 "playbooks"
+ * (Sprint, Bjerg, Tempo) klar og anvender dem på matchende etaper for at
+ * undgå 9 klik × 21 etaper. slots følger samme shape som UI'ets LineupState.
+ */
+export type CyclingLineupPreset = {
+  id: string
+  squad_id: string
+  name: string
+  slot_index: number
+  slots: Partial<Record<CyclingRoleKey, string | null>>
+  updated_at: string
+}

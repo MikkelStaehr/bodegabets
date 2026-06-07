@@ -330,6 +330,9 @@ export default async function GamePage({ params }: Props) {
   // Rider-ids per squad (med transfers anvendt) — bruges af LineupBuilder til at
   // filtrere brutto-truppen til den AKTIVE bloks squad i pickeren.
   let lineupRiderIdsBySquad: Record<string, string[]> = {}
+  // Brugerens gemte lineup-presets pr. squad (Sprint/Bjerg/Tempo osv.)
+  type LineupPresetRow = { id: string; squad_id: string; name: string; slot_index: number; slots: Record<string, string | null>; updated_at: string }
+  let lineupPresets: LineupPresetRow[] = []
   let cyclingActiveBlock: { id: string; name: string; block_order: number; lock_deadline?: string | null } | null = null
   // Visnings-navn for aktiv blok: aktiv sub-blok (uge) hvis findes, ellers top-blokken.
   let cyclingActiveBlockDisplayName: string | null = null
@@ -811,11 +814,17 @@ export default async function GamePage({ params }: Props) {
     // ryttere også vises i truppen — ikke kun den oprindelige squad.
     const allSquadIds = (userSquads ?? []).map((sq) => sq.id)
     if (allSquadIds.length > 0) {
-      const [effRiders, ridersBySquad] = await Promise.all([
+      const [effRiders, ridersBySquad, { data: presetsData }] = await Promise.all([
         getEffectiveSquadRidersForSquads(allSquadIds),
         getEffectiveRidersBySquad(allSquadIds),
+        supabaseAdmin
+          .from('cycling_lineup_presets')
+          .select('id, squad_id, name, slot_index, slots, updated_at')
+          .in('squad_id', allSquadIds)
+          .order('slot_index', { ascending: true }),
       ])
       lineupRiderIdsBySquad = ridersBySquad
+      lineupPresets = (presetsData ?? []) as LineupPresetRow[]
       if (effRiders.length > 0) {
         const catById = new Map(effRiders.map((e) => [e.rider_id, e.category_slot]))
         const { data: rd } = await supabaseAdmin
@@ -1500,6 +1509,7 @@ export default async function GamePage({ params }: Props) {
               standings={lineupStandings}
               squadRiders={lineupSquadRiders}
               squadRiderIdsBySquad={lineupRiderIdsBySquad}
+              presets={lineupPresets}
               blocks={cyclingBlocks}
               defaultBlockId={cyclingActiveBlock?.id ?? null}
               lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
