@@ -13,6 +13,7 @@ import { getBlockTheme } from '@/lib/cyclingBlockThemes'
 import type { CyclingRace, CyclingBlock, CyclingSquadRider, CyclingStage, CyclingRoleKey, CyclingLineupPreset } from '@/types/cycling'
 import { formatCyclingDate, formatCyclingDeadline, shortRaceName, shortBlockName, PROFILE_LABELS, PROFILE_ICONS, RACE_TYPE_LABELS, CAT_LABELS, CAT_COLORS } from '@/lib/cyclingUtils'
 import { getStageDeadline, getStageStartTime, isStageDeadlinePassed } from '@/lib/cyclingDeadline'
+import { useNarrowViewport } from '@/hooks/useNarrowViewport'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,10 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, squadRiderIdsBySquad, presets: initialPresets, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
   const [presets, setPresets] = useState<CyclingLineupPreset[]>(initialPresets ?? [])
+  // På mobile undgår vi autoFocus i picker-modalen — det åbnede keyboard'et
+  // automatisk hver gang man klikkede et rolle-slot, hvilket lagde sig over
+  // rytter-listen og krævede et ekstra tap for at lukke.
+  const isNarrow = useNarrowViewport(640)
   const sortedBlocks = useMemo(() =>
     [...blocks]
       .filter((b) => b.parent_block_id === null)
@@ -1181,7 +1186,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
               <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input
                   type="text" value={modalSearch} onChange={(e) => setModalSearch(e.target.value)}
-                  placeholder="Søg rytter eller hold..." autoFocus
+                  placeholder="Søg rytter eller hold..." autoFocus={!isNarrow}
                   style={{
                     width: '100%', padding: '8px 12px',
                     border: '1px solid #2B4F7A', borderRadius: 2,
