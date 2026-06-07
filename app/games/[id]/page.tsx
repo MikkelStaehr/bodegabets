@@ -25,6 +25,7 @@ import ShoutBox from '@/components/games/ShoutBox'
 import CyclingNextStageCard from '@/components/cycling/CyclingNextStageCard'
 import GameroomLayout from '@/components/cycling/GameroomLayout'
 import CyclingRanglister from '@/components/cycling/CyclingRanglister'
+import FootballNextRoundCard from '@/components/games/FootballNextRoundCard'
 import FootballLiveSection from '@/components/games/FootballLiveSection'
 import FreeEventPitchBanner from '@/components/games/FreeEventPitchBanner'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
@@ -1373,11 +1374,11 @@ export default async function GamePage({ params }: Props) {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      {/* Desktop udvider container til 1280px når der er cykling 3-col layout.
-          Fodbold-sektion forbliver klemt i 680px (gameroom-layout kan udvides
-          senere). Mobile/tablet bruger fuld bredde minus padding. */}
+      {/* Desktop udvider container til 1280px for begge sport-grene så
+          GameroomLayout kan bruge 3-kolonner. Mobile/tablet bruger fuld
+          bredde minus padding (GameroomLayout stack'er automatisk). */}
       <div style={{
-        maxWidth: typedGame.sport === 'cycling' ? 1280 : 680,
+        maxWidth: 1280,
         margin: '0 auto', padding: '20px 16px 80px',
         display: 'flex', flexDirection: 'column', gap: 24,
       }}>
@@ -1573,35 +1574,51 @@ export default async function GamePage({ params }: Props) {
           </>
         )}
 
-        {/* Live fodbold-sektion: block-leaderboard + leaderboard polles via useGameState */}
-        {typedGame.sport !== 'cycling' && initialGameState && (
-          <FootballLiveSection
-            gameId={gameId}
-            currentUserId={user.id}
-            initialState={initialGameState}
-            theme={{ primary: theme.primary, primaryLight: theme.primaryLight }}
-          />
-        )}
-
+        {/* Fodbold gameroom 3-kolonne på desktop, stack på mobile */}
         {typedGame.sport !== 'cycling' && (
-          <ShoutBox
-            gameId={gameId}
-            currentUserId={user.id}
-            hostId={typedGame.host_id}
-            members={members.map((m) => ({ user_id: m.user_id, username: m.profile?.username ?? 'Anonym' }))}
+          <GameroomLayout
+            left={
+              <FootballNextRoundCard rounds={activeRoundRows} />
+            }
+            main={
+              <>
+                {initialGameState && (
+                  <FootballLiveSection
+                    gameId={gameId}
+                    currentUserId={user.id}
+                    initialState={initialGameState}
+                    theme={{ primary: theme.primary, primaryLight: theme.primaryLight }}
+                    variant="main-no-leaderboard"
+                  />
+                )}
+                <ActiveRounds rounds={activeRoundRows} gameId={gameId} />
+                {sortedRounds.length === 0 && (
+                  <div style={{ border: '1px dashed #C8BEA8', borderRadius: 2, padding: '48px 16px', textAlign: 'center', color: '#6b6b6b', fontFamily: "'Barlow', sans-serif", fontSize: 14 }}>
+                    Ingen runder oprettet endnu
+                  </div>
+                )}
+              </>
+            }
+            right={
+              <>
+                {initialGameState && (
+                  <FootballLiveSection
+                    gameId={gameId}
+                    currentUserId={user.id}
+                    initialState={initialGameState}
+                    theme={{ primary: theme.primary, primaryLight: theme.primaryLight }}
+                    variant="sidebar"
+                  />
+                )}
+                <ShoutBox
+                  gameId={gameId}
+                  currentUserId={user.id}
+                  hostId={typedGame.host_id}
+                  members={members.map((m) => ({ user_id: m.user_id, username: m.profile?.username ?? 'Anonym' }))}
+                />
+              </>
+            }
           />
-        )}
-
-        {/* Aktive betting runder — kun fodbold */}
-        {typedGame.sport !== 'cycling' && (
-          <>
-            <ActiveRounds rounds={activeRoundRows} gameId={gameId} />
-            {sortedRounds.length === 0 && (
-              <div style={{ border: '1px dashed #C8BEA8', borderRadius: 2, padding: '48px 16px', textAlign: 'center', color: '#6b6b6b', fontFamily: "'Barlow', sans-serif", fontSize: 14 }}>
-                Ingen runder oprettet endnu
-              </div>
-            )}
-          </>
         )}
 
         {/* Leaderboard for fodbold renderes af FootballLiveSection ovenfor */}
