@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Target } from 'lucide-react'
 import { getStageBriefing, profileLabel, type StageStrength } from '@/lib/cyclingRoleStageBonus'
+import { useNarrowViewport } from '@/hooks/useNarrowViewport'
 
 type Props = {
   profile: string | null
@@ -23,6 +24,7 @@ const STRENGTH_LABEL: Record<StageStrength, string> = {
 
 export default function StageStrategyCard({ profile, slotKeys }: Props) {
   const [open, setOpen] = useState(false)
+  const narrow = useNarrowViewport(480)
   const briefing = getStageBriefing(slotKeys, profile)
   if (briefing.length === 0) return null
 
@@ -85,34 +87,62 @@ export default function StageStrategyCard({ profile, slotKeys }: Props) {
                 key={entry.role}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '8px 90px 1fr auto',
-                  alignItems: 'center', gap: 8,
+                  // Narrow: dot + tekstcontent (rolle+forklaring stacker) + strength.
+                  // Wide: dot | rolle-label (fixed 90) | forklaring (1fr) | strength.
+                  gridTemplateColumns: narrow ? '8px minmax(0, 1fr) auto' : '8px 90px minmax(0, 1fr) auto',
+                  alignItems: narrow ? 'start' : 'center',
+                  gap: 8,
                   padding: '5px 0',
                 }}
               >
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: c.dot, justifySelf: 'center',
+                  background: c.dot,
+                  justifySelf: 'center',
+                  marginTop: narrow ? 5 : 0,
                 }} />
-                <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif",
-                  fontSize: 12, fontWeight: 700, color: c.text,
-                }}>
-                  {entry.label}
-                </span>
-                <span style={{
-                  fontFamily: "'Barlow', sans-serif",
-                  fontSize: 11, color: 'rgba(255,255,255,0.62)',
-                  lineHeight: 1.35,
-                }}>
-                  {entry.bonus.cardLine}
-                </span>
+                {narrow ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 12, fontWeight: 700, color: c.text,
+                    }}>
+                      {entry.label}
+                    </span>
+                    <span style={{
+                      fontFamily: "'Barlow', sans-serif",
+                      fontSize: 11, color: 'rgba(255,255,255,0.62)',
+                      lineHeight: 1.35,
+                    }}>
+                      {entry.bonus.cardLine}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{
+                      fontFamily: "'Barlow Condensed', sans-serif",
+                      fontSize: 12, fontWeight: 700, color: c.text,
+                    }}>
+                      {entry.label}
+                    </span>
+                    <span style={{
+                      fontFamily: "'Barlow', sans-serif",
+                      fontSize: 11, color: 'rgba(255,255,255,0.62)',
+                      lineHeight: 1.35,
+                    }}>
+                      {entry.bonus.cardLine}
+                    </span>
+                  </>
+                )}
                 <span style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontSize: 9, fontWeight: 700,
                   letterSpacing: '0.06em', color: c.text,
                   padding: '1px 6px', borderRadius: 2,
                   background: entry.bonus.strength === 'high' ? 'rgba(107,143,113,0.18)' : 'transparent',
+                  alignSelf: narrow ? 'start' : 'center',
+                  marginTop: narrow ? 1 : 0,
+                  whiteSpace: 'nowrap',
                 }}>
                   {STRENGTH_LABEL[entry.bonus.strength]}
                 </span>
