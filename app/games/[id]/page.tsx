@@ -1540,7 +1540,7 @@ export default async function GamePage({ params }: Props) {
               }
               right={
                 <>
-                  <Leaderboard gameId={gameId} />
+                  <Leaderboard gameId={gameId} compact />
                   <ShoutBox
                     gameId={gameId}
                     currentUserId={user.id}
