@@ -33,13 +33,13 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Tjek at deadline er passeret (eller lineup er låst for mindst én spiller)
   const { data: stage } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, start_date')
+    .select('id, start_date, start_time_utc')
     .eq('id', stageId)
     .single()
 
   if (!stage?.start_date) return NextResponse.json({ error: 'Stage ikke fundet' }, { status: 404 })
 
-  if (!isStageDeadlinePassed(stage.start_date)) {
+  if (!isStageDeadlinePassed(stage.start_date, undefined, stage.start_time_utc as string | null)) {
     return NextResponse.json({ error: 'Deadline er ikke passeret endnu', locked: false }, { status: 403 })
   }
 

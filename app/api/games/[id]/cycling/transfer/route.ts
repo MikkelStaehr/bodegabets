@@ -95,14 +95,14 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Tjek deadline: transfer window lukker når første etape EFTER restDay starter - 30 min
   const { data: nextStages } = await supabaseAdmin
     .from('cycling_stages')
-    .select('start_date')
+    .select('start_date, start_time_utc')
     .eq('race_id', raceId)
     .gt('start_date', restDay)
     .order('start_date', { ascending: true })
     .limit(1)
 
-  const nextStart = nextStages?.[0]?.start_date as string | undefined
-  if (nextStart && isStageDeadlinePassed(nextStart)) {
+  const nextStage = nextStages?.[0] as { start_date?: string; start_time_utc?: string | null } | undefined
+  if (nextStage?.start_date && isStageDeadlinePassed(nextStage.start_date, undefined, nextStage.start_time_utc)) {
     return NextResponse.json({ error: 'Transfer deadline er passeret' }, { status: 403 })
   }
 

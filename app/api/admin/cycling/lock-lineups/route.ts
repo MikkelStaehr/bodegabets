@@ -30,11 +30,11 @@ export async function POST(req: NextRequest) {
       if (raceIds.length > 0) {
         const { data: stages } = await supabaseAdmin
           .from('cycling_stages')
-          .select('id, start_date')
+          .select('id, start_date, start_time_utc')
           .in('race_id', raceIds)
 
         const expiredStageIds = (stages ?? [])
-          .filter((s) => isStageDeadlinePassed(s.start_date, now))
+          .filter((s) => isStageDeadlinePassed(s.start_date, now, s.start_time_utc as string | null))
           .map((s) => s.id)
 
         if (expiredStageIds.length > 0) {
@@ -53,12 +53,12 @@ export async function POST(req: NextRequest) {
     // 2. Fallback: lock via individual stage start_date - 30min
     const { data: allUnlocked } = await supabaseAdmin
       .from('cycling_lineups')
-      .select('id, stage_id, cycling_stages!inner(start_date)')
+      .select('id, stage_id, cycling_stages!inner(start_date, start_time_utc)')
       .eq('is_locked', false)
 
     for (const lineup of allUnlocked ?? []) {
-      const stage = lineup.cycling_stages as unknown as { start_date: string }
-      if (isStageDeadlinePassed(stage?.start_date, now)) {
+      const stage = lineup.cycling_stages as unknown as { start_date: string; start_time_utc: string | null }
+      if (isStageDeadlinePassed(stage?.start_date, now, stage?.start_time_utc)) {
         await supabaseAdmin.from('cycling_lineups').update({ is_locked: true }).eq('id', lineup.id)
         lockedCount++
       }

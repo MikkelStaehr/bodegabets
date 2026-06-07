@@ -1,11 +1,25 @@
 /**
  * Beregn deadline for en cycling-etape (start - 30 min).
  *
- * PCS-scraperen gemmer ofte kun datoen, hvilket gemmes som midnat UTC.
- * For at undgå at deadline lander dagen før (kl 23:30) bruger vi en
- * sensibel default på 13:00 UTC (~15:00 CEST) når tiden er præcis 00:00:00.
+ * Hvis stage har start_time_utc (faktisk PCS-tid) bruges den — det er det
+ * autoritative svar. Ellers falder vi tilbage til en sensibel default på
+ * 13:00 UTC (~15:00 CEST) baseret på start_date.
+ *
+ * startTimeUtc har FORRANG: hvis sat, bruges den uanset hvad start_date er.
  */
-export function getStageDeadline(startDate: string | null | undefined): Date | null {
+export function getStageDeadline(
+  startDate: string | null | undefined,
+  startTimeUtc?: string | null,
+): Date | null {
+  // Foretrukket: faktisk PCS-tid hvis sat
+  if (startTimeUtc) {
+    const t = new Date(startTimeUtc)
+    if (!isNaN(t.getTime())) return new Date(t.getTime() - 30 * 60 * 1000)
+  }
+  return fallbackDeadlineFromDate(startDate)
+}
+
+function fallbackDeadlineFromDate(startDate: string | null | undefined): Date | null {
   if (!startDate) return null
 
   // Hvis det er en ren YYYY-MM-DD streng → tilføj default tid
@@ -32,17 +46,32 @@ export function getStageDeadline(startDate: string | null | undefined): Date | n
 }
 
 /** Helper: er deadline passeret? */
-export function isStageDeadlinePassed(startDate: string | null | undefined, now: Date = new Date()): boolean {
-  const deadline = getStageDeadline(startDate)
+export function isStageDeadlinePassed(
+  startDate: string | null | undefined,
+  now: Date = new Date(),
+  startTimeUtc?: string | null,
+): boolean {
+  const deadline = getStageDeadline(startDate, startTimeUtc)
   if (!deadline) return false
   return deadline < now
 }
 
 /**
- * Faktisk start-tidspunkt for en etape (ikke deadline).
- * Bruges til at afgøre om en etape er live.
+ * Faktisk start-tidspunkt for en etape (ikke deadline). Bruges til at
+ * afgøre om en etape er live. Foretrækker start_time_utc når sat.
  */
-export function getStageStartTime(startDate: string | null | undefined): Date | null {
+export function getStageStartTime(
+  startDate: string | null | undefined,
+  startTimeUtc?: string | null,
+): Date | null {
+  if (startTimeUtc) {
+    const t = new Date(startTimeUtc)
+    if (!isNaN(t.getTime())) return t
+  }
+  return fallbackStartFromDate(startDate)
+}
+
+function fallbackStartFromDate(startDate: string | null | undefined): Date | null {
   if (!startDate) return null
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
