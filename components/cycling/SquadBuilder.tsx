@@ -197,13 +197,23 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
     return list
   }, [availableRiders, squadIds, catFilter, search, confirmedOnly, confirmedSet])
 
-  function canAdd(rider: Rider): { ok: boolean; reason?: string } {
-    if (squad.length >= MAX_TOTAL) return { ok: false, reason: `Max ${MAX_TOTAL} ryttere` }
+  function canAdd(rider: Rider): { ok: boolean; reason?: string; short?: string; kind?: 'total' | 'category' | 'team' } {
+    if (squad.length >= MAX_TOTAL) {
+      return { ok: false, kind: 'total', reason: `Max ${MAX_TOTAL} ryttere`, short: 'Trup fyldt' }
+    }
     if ((catCounts[rider.category] ?? 0) >= (CAT_LIMITS[rider.category] ?? 0)) {
-      return { ok: false, reason: `${CAT_LABELS[rider.category]} er fuld` }
+      return {
+        ok: false, kind: 'category',
+        reason: `${CAT_LABELS[rider.category]} er fuld`,
+        short: `${CAT_LABELS[rider.category]} fyldt`,
+      }
     }
     if ((teamCounts[rider.team_name] ?? 0) >= MAX_PER_TEAM) {
-      return { ok: false, reason: `Max ${MAX_PER_TEAM} fra ${rider.team_name}` }
+      return {
+        ok: false, kind: 'team',
+        reason: `Max ${MAX_PER_TEAM} fra ${rider.team_name}`,
+        short: `Max ${MAX_PER_TEAM} fra holdet`,
+      }
     }
     return { ok: true }
   }
@@ -668,7 +678,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     type="button"
                     onClick={() => addRider(rider)}
                     disabled={disabled}
-                    title={disabled ? check.reason : undefined}
+                    title={check.ok ? undefined : check.reason}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -682,7 +692,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                       borderBottomWidth: idx < filtered.length - 1 ? 1 : 0,
                       borderBottomColor: '#EDE8E0',
                       cursor: disabled ? 'not-allowed' : 'pointer',
-                      opacity: disabled ? 0.4 : 1,
+                      opacity: disabled ? 0.55 : 1,
                       textAlign: 'left',
                       transition: 'background 0.1s',
                     }}
@@ -757,18 +767,38 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                       </div>
                     )}
                     <CatBadge cat={rider.category} />
-                    <span
-                      style={{
-                        fontSize: 16,
-                        color: '#1E3A5F',
-                        fontWeight: 700,
-                        flexShrink: 0,
-                        width: 20,
-                        textAlign: 'center',
-                      }}
-                    >
-                      +
-                    </span>
+                    {!check.ok ? (
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          padding: '3px 7px',
+                          borderRadius: 2,
+                          background: '#F3E9D9',
+                          color: '#8A6B2A',
+                          fontFamily: "'Barlow Condensed', sans-serif",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: '0.05em',
+                          textTransform: 'uppercase',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {check.short}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 16,
+                          color: '#1E3A5F',
+                          fontWeight: 700,
+                          flexShrink: 0,
+                          width: 20,
+                          textAlign: 'center',
+                        }}
+                      >
+                        +
+                      </span>
+                    )}
                   </button>
                 )
               })
