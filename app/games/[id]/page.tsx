@@ -22,6 +22,8 @@ import CyclingGameroom from '@/components/cycling/CyclingGameroom'
 import RolesGuide from '@/components/cycling/RolesGuide'
 import Leaderboard from '@/components/games/Leaderboard'
 import ShoutBox from '@/components/games/ShoutBox'
+import CyclingNextStageCard from '@/components/cycling/CyclingNextStageCard'
+import GameroomLayout from '@/components/cycling/GameroomLayout'
 import FootballLiveSection from '@/components/games/FootballLiveSection'
 import FreeEventPitchBanner from '@/components/games/FreeEventPitchBanner'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
@@ -1370,7 +1372,14 @@ export default async function GamePage({ params }: Props) {
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 80px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Desktop udvider container til 1280px når der er cykling 3-col layout.
+          Fodbold-sektion forbliver klemt i 680px (gameroom-layout kan udvides
+          senere). Mobile/tablet bruger fuld bredde minus padding. */}
+      <div style={{
+        maxWidth: typedGame.sport === 'cycling' ? 1280 : 680,
+        margin: '0 auto', padding: '20px 16px 80px',
+        display: 'flex', flexDirection: 'column', gap: 24,
+      }}>
 
         {/* Kalender-slider */}
         {/* Arkiveret-banner */}
@@ -1475,57 +1484,70 @@ export default async function GamePage({ params }: Props) {
           )}
         </section>
 
-        {/* Cykling sektion — trup + lineup overview + builder */}
+        {/* Cykling sektion — 3-kolonne på desktop, stack på mobile/tablet */}
+        {typedGame.sport === 'cycling' && (() => {
+          const activeRaceIds = cyclingActiveBlock
+            ? new Set(lineupRaces.filter((r) => r.cycling_block_id === cyclingActiveBlock!.id).map((r) => r.id))
+            : null
+          const filteredClassements = activeRaceIds
+            ? Object.fromEntries(Object.entries(lineupClassements).filter(([raceId]) => activeRaceIds.has(raceId)))
+            : lineupClassements
+          return (
+            <GameroomLayout
+              left={
+                <CyclingNextStageCard
+                  stages={lineupStages}
+                  activeBlock={cyclingActiveBlock}
+                />
+              }
+              main={
+                <>
+                  <CyclingGameroom
+                    gameId={gameId}
+                    squadId={userSquad?.id ?? null}
+                    activeBlock={cyclingActiveBlock}
+                    races={lineupRaces}
+                    squadRiders={lineupSquadRiders}
+                    classements={filteredClassements}
+                  />
+                  <LineupBuilder
+                    gameId={gameId}
+                    blockSquadMap={blockSquadMap}
+                    races={lineupRaces}
+                    stages={lineupStages}
+                    startlists={lineupStartlists}
+                    abandoned={lineupAbandoned}
+                    standings={lineupStandings}
+                    squadRiders={lineupSquadRiders}
+                    squadRiderIdsBySquad={lineupRiderIdsBySquad}
+                    presets={lineupPresets}
+                    blocks={cyclingBlocks}
+                    defaultBlockId={cyclingActiveBlock?.id ?? null}
+                    lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
+                    squadRiderCount={lineupSquadRiders.length}
+                    squadId={userSquad?.id ?? null}
+                    currentUserId={user.id}
+                  />
+                  <CyclingSeasonOverview gameId={gameId} />
+                  <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} blockStatus={cyclingActiveBlockStatus} />
+                </>
+              }
+              right={
+                <>
+                  <Leaderboard gameId={gameId} />
+                  <ShoutBox
+                    gameId={gameId}
+                    currentUserId={user.id}
+                    hostId={typedGame.host_id}
+                    members={members.map((m) => ({ user_id: m.user_id, username: m.profile?.username ?? 'Anonym' }))}
+                  />
+                </>
+              }
+            />
+          )
+        })()}
         {typedGame.sport === 'cycling' && (
           <>
-            {/* Klassement vises kun for løb i den AKTIVE blok — ellers ser
-                spillerne stadig fx Giro-klassementet efter Giro er lukket.
-                Hvis ingen aktiv blok findes (alt færdigt), vis alle. */}
-            {(() => {
-              const activeRaceIds = cyclingActiveBlock
-                ? new Set(lineupRaces.filter((r) => r.cycling_block_id === cyclingActiveBlock!.id).map((r) => r.id))
-                : null
-              const filteredClassements = activeRaceIds
-                ? Object.fromEntries(Object.entries(lineupClassements).filter(([raceId]) => activeRaceIds.has(raceId)))
-                : lineupClassements
-              return (
-                <CyclingGameroom
-                  gameId={gameId}
-                  squadId={userSquad?.id ?? null}
-                  activeBlock={cyclingActiveBlock}
-                  races={lineupRaces}
-                  squadRiders={lineupSquadRiders}
-                  classements={filteredClassements}
-                />
-              )
-            })()}
-            <LineupBuilder
-              gameId={gameId}
-              blockSquadMap={blockSquadMap}
-              races={lineupRaces}
-              stages={lineupStages}
-              startlists={lineupStartlists}
-              abandoned={lineupAbandoned}
-              standings={lineupStandings}
-              squadRiders={lineupSquadRiders}
-              squadRiderIdsBySquad={lineupRiderIdsBySquad}
-              presets={lineupPresets}
-              blocks={cyclingBlocks}
-              defaultBlockId={cyclingActiveBlock?.id ?? null}
-              lockDeadline={cyclingActiveBlock?.lock_deadline ?? null}
-              squadRiderCount={lineupSquadRiders.length}
-              squadId={userSquad?.id ?? null}
-              currentUserId={user.id}
-            />
-            <CyclingSeasonOverview gameId={gameId} />
-            <CyclingBlockStanding gameId={gameId} blockName={cyclingActiveBlockDisplayName} blockStatus={cyclingActiveBlockStatus} />
-            <Leaderboard gameId={gameId} />
-            <ShoutBox
-              gameId={gameId}
-              currentUserId={user.id}
-              hostId={typedGame.host_id}
-              members={members.map((m) => ({ user_id: m.user_id, username: m.profile?.username ?? 'Anonym' }))}
-            />
             {typedGame.host_id === user.id && (
               <Link
                 href={`/games/${gameId}/cycling/add-races`}
