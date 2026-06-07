@@ -103,9 +103,12 @@ export default function CyclingCalendarSlider({
     const map = new Map<string, CyclingEvent[]>()
     for (const e of events) {
       if (!e.date) continue
-      const arr = map.get(e.date) ?? []
+      // Normaliser til YYYY-MM-DD så Map-keys matcher todayKey og så
+      // `new Date(key + 'T12:00:00')` aldrig får dobbelt tid på.
+      const dayKey = e.date.slice(0, 10)
+      const arr = map.get(dayKey) ?? []
       arr.push(e)
-      map.set(e.date, arr)
+      map.set(dayKey, arr)
     }
     return map
   }, [events])

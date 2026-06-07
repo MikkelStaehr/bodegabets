@@ -479,6 +479,11 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
 
       {/* ── Niveau 2: Stage-tabs + lineup content ──────────── */}
       {activeStage && (<>
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 30,
+        background: theme.bgDark,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      }}>
       <ScrollableTabs background={theme.bgDark}>
         <div style={{
           display: 'flex', gap: 0,
@@ -574,6 +579,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         })}
         </div>
       </ScrollableTabs>
+      </div>
 
       {/* ── Brutto trup bar (per blok) ────────────────────── */}
       {(() => {

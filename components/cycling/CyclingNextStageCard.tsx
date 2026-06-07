@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, AlertCircle, Mountain } from 'lucide-react'
+import { Clock, AlertCircle, Mountain, Radio, Trophy } from 'lucide-react'
 import { getStageDeadline, getStageStartTime, isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 import { PROFILE_LABELS, PROFILE_ICONS, shortBlockName } from '@/lib/cyclingUtils'
 
@@ -29,6 +29,10 @@ type Block = {
 type Props = {
   stages: Stage[]
   activeBlock: Block | null
+  /** Spil-id til at hente brugerens rank fra leaderboard. */
+  gameId: number
+  /** Brugerens ID til at finde egen rank. */
+  currentUserId: string
 }
 
 function formatCountdown(deadline: Date, now: Date): { text: string; urgent: boolean } {
@@ -59,16 +63,44 @@ function formatDate(stage: Stage): string {
   return new Intl.DateTimeFormat('da-DK', { day: 'numeric', month: 'short', timeZone: 'Europe/Copenhagen' }).format(d)
 }
 
-export default function CyclingNextStageCard({ stages, activeBlock }: Props) {
+export default function CyclingNextStageCard({ stages, activeBlock, gameId, currentUserId }: Props) {
   const [now, setNow] = useState(() => new Date())
+  const [userRank, setUserRank] = useState<number | null>(null)
+  const [totalPlayers, setTotalPlayers] = useState<number | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30 * 1000)
     return () => clearInterval(t)
   }, [])
 
-  // Find næste etape: ikke færdig OG deadline ikke passeret. Foretrukket fra
-  // aktive blok hvis sat.
+  // Hent rank fra leaderboard. Polles ikke — opdateres ved page navigation.
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/games/${gameId}/leaderboard`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return
+        const board = data.leaderboard ?? []
+        setTotalPlayers(board.length)
+        const idx = board.findIndex((e: { user_id: string }) => e.user_id === currentUserId)
+        if (idx >= 0) setUserRank(idx + 1)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [gameId, currentUserId])
+
+  // Find LIVE stage først: deadline passeret + ikke færdig + indenfor 12 timer
+  const liveStage = stages
+    .filter((s) => !s.results_uploaded_at)
+    .filter((s) => activeBlock ? s.cycling_block_id === activeBlock.id : true)
+    .find((s) => {
+      const start = getStageStartTime(s.start_date, s.start_time_utc)
+      if (!start) return false
+      const hoursSinceStart = (now.getTime() - start.getTime()) / (1000 * 60 * 60)
+      return hoursSinceStart >= 0 && hoursSinceStart < 12
+    })
+
+  // Find næste etape efter live stage: ikke færdig OG deadline ikke passeret
   const candidates = stages
     .filter((s) => !s.results_uploaded_at)
     .filter((s) => !isStageDeadlinePassed(s.start_date, now, s.start_time_utc))
@@ -128,6 +160,69 @@ export default function CyclingNextStageCard({ stages, activeBlock }: Props) {
             marginTop: 2,
           }}>
             {shortBlockName(activeBlock.name)}
+          </div>
+          {userRank != null && (
+            <div style={{
+              marginTop: 8, paddingTop: 8,
+              borderTop: '1px solid rgba(242,237,228,0.15)',
+              display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+            }}>
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: 'uppercase', color: 'rgba(242,237,228,0.55)',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}>
+                <Trophy size={9} strokeWidth={2.5} />
+                Din placering
+              </span>
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 14, fontWeight: 700, color: '#FAC775',
+              }}>
+                #{userRank}{totalPlayers ? ` / ${totalPlayers}` : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* LIVE-indikator: vises hvis en stage er igang */}
+      {liveStage && (
+        <div style={{
+          padding: '12px 14px',
+          background: 'linear-gradient(135deg, rgba(216,58,58,0.15), rgba(216,58,58,0.05))',
+          border: '1px solid rgba(216,58,58,0.4)',
+          borderRadius: 4,
+        }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            marginBottom: 6,
+          }}>
+            <Radio
+              size={11} color="#D83A3A" strokeWidth={2.6}
+              style={{ animation: 'pulse 1.5s ease-in-out infinite' }}
+            />
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif",
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
+              textTransform: 'uppercase', color: '#D83A3A',
+            }}>
+              Live nu
+            </span>
+          </div>
+          <div style={{
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 13, fontWeight: 700, color: '#1a1a1a',
+            lineHeight: 1.3,
+          }}>
+            {liveStage.stage_number === 0 ? 'Prolog' : `Etape ${liveStage.stage_number}`} ruller
+          </div>
+          <div style={{
+            fontFamily: "'Barlow', sans-serif", fontSize: 11,
+            color: '#6b6b6b', marginTop: 2, lineHeight: 1.3,
+          }}>
+            {liveStage.race_name}
           </div>
         </div>
       )}
