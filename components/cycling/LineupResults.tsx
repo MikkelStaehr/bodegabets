@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { Check, AlertTriangle, X as XIcon } from 'lucide-react'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
 import { getRoleStageBonus } from '@/lib/cyclingRoleStageBonus'
+import { analyzeLineupSynergy, worstStatus, type RiderSynergyCheck, type SynergyStatus } from '@/lib/cyclingLineupSynergy'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -119,6 +121,92 @@ const POSITION_COLORS: Record<number, string> = {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+const SYNERGY_COLORS: Record<SynergyStatus, { fill: string; bg: string; ring: string }> = {
+  good: { fill: '#9FE1CB', bg: 'rgba(107,143,113,0.25)', ring: 'rgba(159,225,203,0.5)' },
+  warn: { fill: '#FAC775', bg: 'rgba(218,165,32,0.22)', ring: 'rgba(250,199,117,0.5)' },
+  bad:  { fill: '#E26D5C', bg: 'rgba(200,57,43,0.22)',  ring: 'rgba(226,109,92,0.5)' },
+  info: { fill: '#8FABC4', bg: 'rgba(143,171,196,0.18)', ring: 'rgba(143,171,196,0.4)' },
+}
+
+/**
+ * Lille klikbar status-badge ved rytter-navn der opsummerer rytterens
+ * synergi-tilstand. Klik viser popover med detaljer. Hvis rytteren ikke
+ * har nogen checks (= ingen synergi-info), vises intet.
+ */
+function SynergyBadge({
+  checks, open, onToggle,
+}: {
+  riderId: string
+  checks: RiderSynergyCheck[]
+  open: boolean
+  onToggle: () => void
+}) {
+  if (checks.length === 0) return null
+  const worst = worstStatus(checks)
+  if (!worst) return null
+  const c = SYNERGY_COLORS[worst]
+  const Icon = worst === 'good' ? Check : worst === 'bad' ? XIcon : worst === 'warn' ? AlertTriangle : Check
+
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onToggle() }}
+        title="Synergi-detalje"
+        aria-label={`Synergi for rytter — ${checks.length} ${checks.length === 1 ? 'note' : 'noter'}`}
+        style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 16, height: 16, borderRadius: '50%',
+          background: c.bg, border: `1px solid ${c.ring}`,
+          color: c.fill, cursor: 'pointer', padding: 0,
+        }}
+      >
+        <Icon size={9} strokeWidth={3} />
+      </button>
+      {open && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: '100%', left: 0, marginTop: 6, zIndex: 20,
+            background: '#0F2137', border: '1px solid #2B4F7A', borderRadius: 4,
+            padding: '8px 10px',
+            width: 'max-content', minWidth: 200,
+            maxWidth: 'min(280px, calc(100vw - 24px))',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}
+        >
+          {checks.map((check, i) => {
+            const cc = SYNERGY_COLORS[check.status]
+            return (
+              <div key={i} style={{
+                display: 'flex', flexDirection: 'column', gap: 1,
+                paddingBottom: i < checks.length - 1 ? 6 : 0,
+                borderBottom: i < checks.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              }}>
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif",
+                  fontSize: 11, fontWeight: 700, color: cc.fill,
+                  letterSpacing: '0.02em',
+                }}>
+                  {check.title}
+                </span>
+                <span style={{
+                  fontFamily: "'Barlow', sans-serif",
+                  fontSize: 11, lineHeight: 1.45,
+                  color: 'rgba(255,255,255,0.7)',
+                }}>
+                  {check.detail}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </span>
+  )
+}
 
 function RiderPhoto({ rider }: { rider: Rider }) {
   const src = rider.photo_url ?? rider.team_logo_url
@@ -243,6 +331,16 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
   // pinnedRole holder rolle-popover åben på klik (til mobile / persistent læsning).
   // Bruges parallelt med hoveredRole — den ene viser hvis den anden ikke gør.
   const [pinnedRole, setPinnedRole] = useState<string | null>(null)
+  // Synergi-popover state — vises inline ved klik på status-ikon.
+  const [openSynergy, setOpenSynergy] = useState<string | null>(null)
+
+  // Per-rytter synergi-checks for det aktuelle lineup. Tomt map hvis stagen
+  // er færdig (synergi-info er ikke relevant når point er beregnet).
+  const stageDoneForSynergy = stageFinished ?? (race.status === 'finished')
+  const synergyByRider = useMemo(() => {
+    if (stageDoneForSynergy) return new Map<string, RiderSynergyCheck[]>()
+    return analyzeLineupSynergy(slots, riders, race.profile)
+  }, [slots, riders, race.profile, stageDoneForSynergy])
 
   // Dynamiske roller: brug de medsendte slot-keys (afhænger af profil), ellers
   // det fulde faste sæt. Label udledes fra base-rollen (equipier_N → Équipier).
@@ -386,11 +484,20 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
                 fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 minWidth: 0,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
               }}>
-                <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
-                {' '}{rider.first_name}
+                <SynergyBadge
+                  riderId={rider.id}
+                  checks={synergyByRider.get(rider.id) ?? []}
+                  open={openSynergy === rider.id}
+                  onToggle={() => setOpenSynergy((curr) => curr === rider.id ? null : rider.id)}
+                />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
+                  {' '}{rider.first_name}
+                </span>
                 {result?.jersey && result.jersey.split(',').map((j) => j.trim()).filter(Boolean).map((j) => (
-                  <span key={j} style={{ marginLeft: 4, display: 'inline-flex', verticalAlign: 'middle' }}>
+                  <span key={j} style={{ display: 'inline-flex', verticalAlign: 'middle', flexShrink: 0 }}>
                     <JerseyIcon jersey={j as JerseyKey} raceName={race.name} size={18} title={`Bærer ${j}-trøjen`} />
                   </span>
                 ))}

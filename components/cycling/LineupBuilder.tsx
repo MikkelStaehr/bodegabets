@@ -5,7 +5,6 @@ import { Lock, Radio, Check, ChevronLeft, ChevronRight, ArrowLeftRight } from 'l
 import LineupResults from './LineupResults'
 import LineupPresetsBar from './LineupPresetsBar'
 import StageStrategyCard from './StageStrategyCard'
-import LineupSynergyCard from './LineupSynergyCard'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
 import AllLineups from './AllLineups'
@@ -894,20 +893,6 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             setModalTeamFilter('')
             setModalSort('default')
           } : undefined}
-        />
-      )}
-
-      {/* ── Synergi-check (vises kun før etape er færdig, og kun hvis brugeren har valgt ryttere) ─ */}
-      {!noSquadForBlock && !isFinished && activeStage && Object.values(slots).some((v) => v) && (
-        <LineupSynergyCard
-          slots={slots}
-          riders={squadRiders.map((r) => ({
-            id: r.id,
-            last_name: r.last_name,
-            team_name: r.team_name,
-            category: r.category,
-          }))}
-          profile={activeStage.profile}
         />
       )}
 
