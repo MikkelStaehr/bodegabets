@@ -42,51 +42,102 @@ type StartlistEntry = {
   bib_number: number | null
 }
 
+type ParseResult = {
+  entries: StartlistEntry[]
+  /** Autoritativt count fra PCS' "X riders"-tekst i HTML, hvis fundet. */
+  expectedCount: number | null
+}
+
 /**
  * Scrape en enkelt races startliste fra PCS.
  * URL: /race/{slug}/{year}/startlist
- * Men-elite rosters ligger i <ul class="startlist_v4">.
+ *
+ * Men-elite rosters ligger i <ul class="startlist_v4">, hvor HVERT TOPNIVEAU-
+ * <li> repræsenterer ét hold. Hold-li'en indeholder en intern <ul> med ryttere.
+ *
+ * Vigtigt: PCS' HTML beholder begge entries når en rytter erstattes i et hold
+ * (fx Pogacar → Oliveira på bib 4 hos UAE). Browser-UI'et viser kun den første
+ * pr. bib, men HTML har dem begge. Derfor dedupere vi per (team-li, bib_number)
+ * og beholder den FØRSTE — det matcher hvad PCS reelt viser i deres UI.
+ *
+ * Dedup på pcs_slug på tværs af hele dokumentet er IKKE nok: bib-nummeret er
+ * det reelle "slot" og to ryttere med samme bib indenfor et hold er en
+ * forældet entry der ikke er ryddet af PCS.
+ *
+ * Som ekstra validering parser vi PCS' "X riders"-tekst (renderet i en lille
+ * <div.right.fs11>) og inkluderer det i resultatet til validering opstrøms.
  */
-function parseStartlist(html: string): StartlistEntry[] {
+function parseStartlist(html: string): ParseResult {
   const $ = cheerio.load(html)
-  const root = $('ul.startlist_v4').length > 0
-    ? $('ul.startlist_v4 a[href]')
-    : $('a[href]')
 
-  const riderRe = /^rider\/([\w-]+)$/
+  // Autoritativt count fra "X riders"-tekst, hvis vi kan finde det.
+  let expectedCount: number | null = null
+  const countMatch = $('body').text().match(/(\d+)\s+riders/i)
+  if (countMatch) {
+    const n = parseInt(countMatch[1], 10)
+    if (!Number.isNaN(n)) expectedCount = n
+  }
+
+  const teamLis = $('ul.startlist_v4 > li')
+  if (teamLis.length === 0) {
+    return { entries: parseFlat($), expectedCount }
+  }
+
   const entries: StartlistEntry[] = []
-  const seen = new Set<string>()
+  const seenSlugs = new Set<string>()
 
-  root.each((_, el) => {
+  teamLis.each((_, teamLi) => {
+    // Dedupere per bib INDEN FOR holdet — behold første forekomst.
+    const seenBibs = new Set<number>()
+    $(teamLi).find('div.ridersCont > ul > li').each((_, li) => {
+      const anchor = $(li).find('a[href^="rider/"]').first()
+      const href = anchor.attr('href') ?? ''
+      const slugMatch = href.match(/^rider\/([\w-]+)$/)
+      if (!slugMatch) return
+      const pcsSlug = slugMatch[1]
+
+      const bibTxt = $(li).find('span.bib').first().text().trim()
+      const bib = /^\d+$/.test(bibTxt) ? parseInt(bibTxt, 10) : null
+
+      // Hvis vi allerede har set denne bib i holdet, er det en duplikeret
+      // entry — den senere er typisk en udtrukket rytter PCS endnu ikke har
+      // ryddet ud af HTML'en. Skip.
+      if (bib !== null && seenBibs.has(bib)) return
+      if (bib !== null) seenBibs.add(bib)
+
+      // Cross-team dedup på slug: samme rytter kan ikke optræde på to hold.
+      if (seenSlugs.has(pcsSlug)) return
+      seenSlugs.add(pcsSlug)
+
+      const name = anchor.text().trim().split(/\s+/).join(' ')
+      if (!name) return
+
+      entries.push({ pcs_slug: pcsSlug, name, bib_number: bib })
+    })
+  })
+
+  return { entries, expectedCount }
+}
+
+/** Fallback når team-strukturen mangler — kun til legacy/uventede HTML. */
+function parseFlat($: ReturnType<typeof cheerio.load>): StartlistEntry[] {
+  const riderRe = /^rider\/([\w-]+)$/
+  const seen = new Set<string>()
+  const entries: StartlistEntry[] = []
+  $('a[href]').each((_, el) => {
     const href = $(el).attr('href') ?? ''
     const m = href.match(riderRe)
     if (!m) return
     const pcsSlug = m[1]
     if (seen.has(pcsSlug)) return
-
+    seen.add(pcsSlug)
     const name = $(el).text().trim().split(/\s+/).join(' ')
     if (!name) return
-    seen.add(pcsSlug)
-
-    // Bib-nummer: <span class="bib">N</span> i samme <li>-parent (PCS v4-layout).
-    // Fallback til text-node lige før <a> for ældre layouts.
-    let bib: number | null = null
     const bibSpan = $(el).parent().find('span.bib').first()
-    if (bibSpan.length > 0) {
-      const txt = bibSpan.text().trim()
-      if (/^\d+$/.test(txt)) bib = parseInt(txt, 10)
-    }
-    if (bib === null) {
-      const prev = (el as { prev?: { type: string; data?: string } }).prev
-      if (prev && prev.type === 'text' && typeof prev.data === 'string') {
-        const txt = prev.data.trim()
-        if (/^\d+$/.test(txt)) bib = parseInt(txt, 10)
-      }
-    }
-
+    const bibTxt = bibSpan.text().trim()
+    const bib = /^\d+$/.test(bibTxt) ? parseInt(bibTxt, 10) : null
     entries.push({ pcs_slug: pcsSlug, name, bib_number: bib })
   })
-
   return entries
 }
 
@@ -144,10 +195,22 @@ export async function syncCyclingStartlists(year: number = new Date().getFullYea
         continue
       }
 
-      const entries = parseStartlist(html)
+      const { entries, expectedCount } = parseStartlist(html)
       if (entries.length === 0) {
         result.errors.push(`${race.name}: ingen ryttere parset`)
         continue
+      }
+      // Sanity check: PCS' egen "X riders"-tekst skal matche parsen. Hvis ikke,
+      // har dedup'en (per-team-bib) ikke fanget alt — log advarsel, men gem
+      // ikke fejlbehæftet data: drop overskydende entries fra enden af listen.
+      if (expectedCount != null && entries.length !== expectedCount) {
+        console.warn(
+          `[syncCyclingStartlists] ${race.name}: parsed ${entries.length} ryttere, ` +
+          `PCS angiver ${expectedCount}. ${entries.length > expectedCount ? 'Trimmer overskydende.' : 'Mangler ryttere — sjælden case, ignorerer.'}`,
+        )
+        if (entries.length > expectedCount) {
+          entries.length = expectedCount
+        }
       }
 
       // Match + byg rows
