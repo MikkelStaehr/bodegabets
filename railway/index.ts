@@ -13,6 +13,7 @@
  *   GET /calculate-points  — safety net (primær trigger er nu i syncMatchScores)
  *   GET /sync-cycling-startlists — hver 3. time (PCS startlister for upcoming løb)
  *   GET /refresh-cycling-riders — dagligt 03:00 (100 rytter-pages refresh til hold-skift)
+ *   GET /discover-bold-seasons — ugentligt mandag 04:00 (auto-opret nye sæsoner)
  *   GET /football-archive-check — dagligt 08:10 (arkivér fodbold-gamerooms efter sidste runde)
  *   GET /health            — health check
  *
@@ -37,6 +38,7 @@ import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsFo
 import { syncCyclingResults } from '@/lib/syncCyclingResults'
 import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
 import { refreshCyclingRiders } from '@/lib/refreshCyclingRiders'
+import { discoverBoldSeasons } from '@/lib/discoverBoldSeasons'
 
 const app = express()
 app.use(express.json())
@@ -1077,6 +1079,35 @@ app.get('/sync-cycling-startlists', async (_req, res) => {
   }
 })
 
+// ─── GET /discover-bold-seasons ────────────────────────────────────────────
+// Ugentlig scan af Bold for nye sæsoner. Når Bold offentliggør fx Premier
+// League 26/27 (typisk juni-juli) bliver en ny season-row automatisk oprettet
+// så den dukker op i game-creation UI uden manuel intervention.
+
+app.get('/discover-bold-seasons', async (_req, res) => {
+  try {
+    const result = await discoverBoldSeasons()
+
+    const insertedCount = result.candidates.filter((c) => c.inserted).length
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'bold_seasons_discover',
+      status: result.ok ? 'success' : 'error',
+      message: `discover-bold-seasons: ${insertedCount} ny(e) sæsoner oprettet (${result.scanned} phase-id'er scannet)`,
+      metadata: result as unknown as Record<string, unknown>,
+    })
+
+    res.json({ ok: result.ok, ...result })
+  } catch (err) {
+    console.error('[discover-bold-seasons]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'bold_seasons_discover',
+      status: 'error',
+      message: `discover-bold-seasons failed: ${String(err)}`,
+    })
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /refresh-cycling-riders ───────────────────────────────────────────
 // Daglig batch-refresh af cycling_riders master-data fra PCS rider-pages.
 // Fanger hold-skift, foto-opdateringer og lignende der ikke ses af startlist-
@@ -1427,6 +1458,12 @@ app.listen(PORT, () => {
   // Dagligt kl. 08:10 UTC — auto-arkivér fodbold-gamerooms efter sidste runde
   // i sæsonen (14+ dage efter sidste kamp). Værten får 7-dages varsel.
   cron.schedule('10 8 * * *', () => callEndpoint('/football-archive-check'))
+
+  // Ugentligt mandag kl. 04:00 UTC — scan Bold for nye sæsoner. Nye phase_ids
+  // dukker op uregelmæssigt (Premier League ~juni, La Liga ~juli osv.), så
+  // én scan om ugen er rigeligt. Auto-opretter season-row med suggested name
+  // baseret på første kampdato.
+  cron.schedule('0 4 * * 1', () => callEndpoint('/discover-bold-seasons'))
 
   // Dagligt kl. 03:00 UTC — refresh batch af cycling_riders master-data
   // fra PCS. 100 ryttere/dag, hele DB (~930) gennemgås på ~10 dage. Fanger
