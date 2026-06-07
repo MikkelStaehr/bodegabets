@@ -132,7 +132,9 @@ const SYNERGY_COLORS: Record<SynergyStatus, { fill: string; bg: string; ring: st
 /**
  * Lille status-badge ved rytter-navn der opsummerer rytterens synergi-
  * tilstand. Hover åbner popover (desktop), klik pin'er den åben (mobil og
- * persistent læsning). Hvis rytteren ikke har checks vises intet.
+ * persistent læsning). Vises KUN for ægte status (good/warn/bad) — ryttere
+ * der kun har 'info' (= ingen særlig synergi, bare en oplysning) får intet
+ * ikon så badgen forbliver et meningsfuldt signal.
  */
 function SynergyBadge({
   checks, open, onToggle,
@@ -145,9 +147,9 @@ function SynergyBadge({
   const [hovered, setHovered] = useState(false)
   if (checks.length === 0) return null
   const worst = worstStatus(checks)
-  if (!worst) return null
+  if (!worst || worst === 'info') return null
   const c = SYNERGY_COLORS[worst]
-  const Icon = worst === 'good' ? Check : worst === 'bad' ? XIcon : worst === 'warn' ? AlertTriangle : Check
+  const Icon = worst === 'good' ? Check : worst === 'bad' ? XIcon : AlertTriangle
   const showPopover = open || hovered
 
   return (
@@ -487,9 +489,11 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
               <span style={{
                 fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13,
                 fontWeight: 500, color: '#F2EDE4', lineHeight: 1.2,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
                 minWidth: 0,
                 display: 'inline-flex', alignItems: 'center', gap: 4,
+                // Bevidst INGEN overflow:hidden her — det klippede SynergyBadge-
+                // popoveren væk. Indre last-name-span tager sig af ellipsis.
               }}>
                 <SynergyBadge
                   riderId={rider.id}
@@ -497,7 +501,10 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
                   open={openSynergy === rider.id}
                   onToggle={() => setOpenSynergy((curr) => curr === rider.id ? null : rider.id)}
                 />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span style={{
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap', minWidth: 0, flexShrink: 1,
+                }}>
                   <span style={{ textTransform: 'uppercase' }}>{rider.last_name}</span>
                   {' '}{rider.first_name}
                 </span>
