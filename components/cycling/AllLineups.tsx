@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Users, Eye, EyeOff } from 'lucide-react'
 import TeamLogo from './TeamLogo'
 import CatBadge from './CatBadge'
+import { getTaunt, shouldTaunt } from '@/lib/zeroPointTaunt'
 
 type RiderInLineup = {
   rider_id: string
@@ -169,6 +170,8 @@ export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
             >
               {lineups.map((entry) => {
                 const isMe = entry.user_id === currentUserId
+                const allTotals = lineups.map((l) => l.total_points)
+                const taunted = shouldTaunt(entry.total_points, allTotals)
                 return (
                   <div
                     key={entry.user_id}
@@ -199,6 +202,17 @@ export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
                           fontSize: 13, fontWeight: 700, color: '#F2EDE4',
                         }}>
                           {entry.username}{isMe && ' (dig)'}
+                          {taunted && (
+                            <span style={{
+                              fontStyle: 'italic',
+                              fontWeight: 400,
+                              color: 'rgba(242,237,228,0.55)',
+                              marginLeft: 6,
+                              fontSize: 11,
+                            }}>
+                              {getTaunt(`${entry.user_id}:stage`)}
+                            </span>
+                          )}
                         </span>
                       </div>
                       <span style={{
