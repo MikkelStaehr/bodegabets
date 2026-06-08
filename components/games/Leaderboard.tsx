@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { LeaderboardEntry } from '@/lib/gameState'
+import { getTaunt, shouldTaunt } from '@/lib/zeroPointTaunt'
 
 type Props = {
   /** Hvis entries er givet, render dem direkte (ingen fetch). Ellers fetch én gang. */
@@ -35,6 +36,9 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact }: P
   // ingen point endnu (sæson ikke startet), viser vi alligevel deltagerlisten
   // så folk kan se hvem der er med — med en lille note øverst.
   const hasAnyScore = entries.some((e) => e.block_points > 0 || e.round_points > 0)
+  // Bruges af zero-point taunten — vi vil kun mocke folk hvis runden faktisk
+  // ER scoret (nogen har > 0). Ellers er alle bare ikke kommet i gang endnu.
+  const allRoundPoints = entries.map((e) => e.round_points)
 
   if (entries.length === 0) {
     return (
@@ -142,6 +146,17 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact }: P
               minWidth: 0,
             }}>
               {entry.username}
+              {shouldTaunt(entry.round_points, allRoundPoints) && (
+                <span style={{
+                  fontStyle: 'italic',
+                  fontWeight: 400,
+                  color: '#9E9486',
+                  marginLeft: 6,
+                  fontSize: 11,
+                }}>
+                  {getTaunt(`${entry.user_id}:round`)}
+                </span>
+              )}
             </span>
 
             {!compact && (
