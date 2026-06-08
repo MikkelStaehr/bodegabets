@@ -166,6 +166,26 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Brug block_id fra body (squad page) eller fallback til auto-detekteret blok
   const cyclingBlockId = bodyBlockId ?? activeBlock?.id ?? null
 
+  // KRITISK: hvis brugeren sender et eksplicit block_id, verificér at DET
+  // bloks lock_deadline ikke er passeret. Tidligere kunne man ændre bruttotrup
+  // på en låst blok midt under løbet ved at sende dens block_id i body.
+  if (cyclingBlockId) {
+    const { data: targetBlock } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('id, name, lock_deadline')
+      .eq('id', cyclingBlockId)
+      .eq('game_id', Number(gameId))
+      .maybeSingle()
+    if (!targetBlock) {
+      return NextResponse.json({ error: 'Blok findes ikke i dette spil' }, { status: 400 })
+    }
+    if (targetBlock.lock_deadline && new Date(targetBlock.lock_deadline as string) < new Date()) {
+      return NextResponse.json({
+        error: `Brutto truppen for "${targetBlock.name}" er låst — deadline passeret`,
+      }, { status: 403 })
+    }
+  }
+
   // Upsert squad per blok
   const { data: squad, error: squadErr } = await supabaseAdmin
     .from('cycling_squads')
