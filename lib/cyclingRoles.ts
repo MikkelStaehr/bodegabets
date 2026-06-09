@@ -1,4 +1,5 @@
 import type { CyclingRoleKey } from '@/types/cycling'
+import { TTT_FULL_FROM } from '@/lib/cyclingScoringConstants'
 
 /**
  * Dynamiske roller: stage-profilen bestemmer hvilke 8 rolle-slots der vises.
@@ -17,10 +18,18 @@ const CLIMB: CyclingRoleKey[] = ['leader', 'lieutenant', 'grimpeur', 'domestique
 // ingen kategori-regel og lagres som base-rolle 'equipier' + slot_index.
 const TTT: CyclingRoleKey[] = ['equipier_0', 'equipier_1', 'equipier_2', 'equipier_3', 'equipier_4', 'equipier_5']
 
-export function slotsForProfile(profile: string | null | undefined): CyclingRoleKey[] {
+export function slotsForProfile(
+  profile: string | null | undefined,
+  startDate?: string | null,
+): CyclingRoleKey[] {
   switch (profile) {
     case 'ttt':
-      return TTT
+      // Den rolle-løse TTT-form (6 equipier-slots) gælder kun etaper bygget
+      // UNDER den form — dvs. fra TTT_FULL_FROM. Ældre TTT-etaper (fx Dauphiné
+      // st3, locked under den gamle 8-slot rolle-form) vises med normal form,
+      // så den allerede-fielded lineup renderer korrekt i stedet for som en
+      // 12-slot hybrid (6 tomme equipier + 6 gamle roller som extras).
+      return (startDate && startDate < TTT_FULL_FROM) ? BOTH : TTT
     case 'flat':
     case 'mixed':
       return SPRINT

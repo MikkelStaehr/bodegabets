@@ -259,7 +259,7 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   // Valider rolle-sammensætning mod den DYNAMISKE formation for etapens profil
   // (samme kilde som builderen). Flad/bjerg tillader 3 equipiers, bakket 2 osv.
-  const allowedSlots = slotsForProfile((stageData as { profile?: string | null }).profile)
+  const allowedSlots = slotsForProfile((stageData as { profile?: string | null }).profile, stageData.start_date)
   const roleLimits: Record<string, number> = {}
   for (const key of allowedSlots) {
     const base = key.startsWith('equipier_') ? 'equipier' : key
