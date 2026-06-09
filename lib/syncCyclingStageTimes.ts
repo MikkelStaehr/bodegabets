@@ -120,8 +120,10 @@ function extractProfileImageUrl($: cheerio.CheerioAPI): string | null {
     if (found) return
     const src = $(el).attr('src') ?? $(el).attr('data-src')
     if (!src) return
-    // PCS profil-billeder ligger under images/profiles/ og slutter på -profile.jpg
-    if (/images\/profiles\/.+profile\.(jpg|jpeg|png)/i.test(src)) {
+    // PCS profil-billeder ligger under images/profiles/. Filnavn-suffixet
+    // varierer (-profile.jpg på bjerg-etaper, -sprint.jpg på flade etaper),
+    // så vi matcher kun på stien + billede-extension, ikke suffixet.
+    if (/images\/profiles\/.+\.(jpg|jpeg|png)$/i.test(src)) {
       found = src.startsWith('http') ? src : `${PCS_BASE}/${src.replace(/^\/+/, '')}`
     }
   })
