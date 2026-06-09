@@ -56,21 +56,29 @@ export function europeanLocalToUtcIso(dateStr: string, timeHHMM: string): string
 
 export type StageClimb = {
   name: string
-  length_km: number
-  gradient_pct: number
-  km_from_start?: number
   category?: number
+  km_from_start?: number
+  length_km?: number
+  gradient_pct?: number
 }
 
 /**
  * Henter både start-tid OG klatringer fra samme PCS stage-page (sparer HTTP).
  *
- * Klatringer: PCS lister hver klatring i body-text i formatet
- *   "Col de Chatain\n7.9 Km - 6.2%"
- * (med valgfri kategori og altitude før/efter). Vi bruger en regex over body
- * text der finder alle "<navn>\n... X.X km - X.X%" mønstre. Km-fra-start
- * er sværere at parse pålideligt da PCS embed det i deres profile-graphic;
- * vi prøver men accepterer at det kan mangle.
+ * Klatringer scrapes med to strategier (verificeret mod Dauphiné 2026):
+ *
+ *  A) KOM-headers (afviklede etaper): PCS' resultattab indeholder <h4>'er som
+ *     "KOM Sprint (2) Col de Chatain (22.8 km)" → giver navn + kategori +
+ *     km-fra-start. Det er den bedste data (præcis position).
+ *
+ *  B) Climbs-liste (kommende etaper): under en "Climbs"-overskrift ligger en
+ *     <ul class="list circle"> med klatrings-navne i rute-rækkefølge — men
+ *     UDEN km, kategori eller gradient (de tal ligger kun i PCS' profil-
+ *     billede fra FlammeRouge, som vi ikke kan parse). Vi får altså kun navne.
+ *
+ * Strategi A foretrækkes når den findes (rigere data); ellers falder vi
+ * tilbage til B. Renderer'en håndterer begge: præcise spikes hvis km kendes,
+ * ellers jævnt fordelte navne-markører.
  */
 async function fetchStagePageData(
   raceSlug: string, year: number, stageNumber: number,
@@ -92,75 +100,58 @@ async function fetchStagePageData(
       startTime = t.length === 4 ? `0${t}` : t
     }
 
-    // Klatringer — bruger to strategier sekventielt:
-    // 1) Strukturet HTML: PCS embedder ofte profile-grafen som en .profile-elem
-    //    med children pr. klatring. Vi prøver først den semantiske tilgang.
-    // 2) Body-text regex fallback: matcher "<navn>X.X Km - X.X%"-mønstre.
-    const climbs = extractClimbs($, bodyText)
-
+    const climbs = extractClimbs($)
     return { startTime, climbs }
   } catch {
     return { startTime: null, climbs: [] }
   }
 }
 
-function extractClimbs($: cheerio.CheerioAPI, bodyText: string): StageClimb[] {
-  const climbs: StageClimb[] = []
-  const seen = new Set<string>()
-
-  // PCS lister klatringer i en sektion. Body-text format pr. klatring:
-  //   "<altitude>m\n<name>\n<length> Km - <gradient>%"
-  // Eller blot:
-  //   "<name>\n<length> Km - <gradient>%"
-  //
-  // Regex'en fanger:
-  //   group 1: navn (linje før length/gradient)
-  //   group 2: length km
-  //   group 3: gradient %
-  //
-  // Vi splitter body i linjer for at finde navnet på linjen FØR matchet —
-  // det giver mere kontrol end multi-line regex på lange tekster.
-  const lines = bodyText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-  // Match "7.9 Km - 6.2%" og varianter (en-dash, minus, store/små bogstaver)
-  const gradientLineRx = /^(\d+(?:\.\d+)?)\s*[Kk]m\s*[-–−]\s*(\d+(?:\.\d+)?)\s*%$/
-
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(gradientLineRx)
-    if (!m) continue
-    const lengthKm = parseFloat(m[1])
-    const gradientPct = parseFloat(m[2])
-    if (!Number.isFinite(lengthKm) || !Number.isFinite(gradientPct)) continue
-    if (lengthKm < 0.3 || lengthKm > 50) continue // sanitet
-    if (gradientPct < 1 || gradientPct > 20) continue
-
-    // Navn = forrige line der ikke selv ligner et tal/altitude
-    let name: string | null = null
-    for (let j = i - 1; j >= Math.max(0, i - 4); j--) {
-      const prev = lines[j]
-      if (!prev) continue
-      if (/^\d+\s*m$/i.test(prev)) continue // "687m"
-      if (/^\d/.test(prev)) continue // starter med tal — skip
-      if (prev.length < 3 || prev.length > 60) continue
-      if (prev.toLowerCase().includes('km') && prev.includes('%')) continue
-      name = prev
-      break
-    }
-    if (!name) continue
-
-    // Dedup på navn + længde — undgår at samme klatring optræder flere gange
-    // hvis PCS rendrer den i både hovedindhold og sidebar.
-    const key = `${name.toLowerCase()}|${lengthKm}`
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    climbs.push({
+function extractClimbs($: cheerio.CheerioAPI): StageClimb[] {
+  // ── Strategi A: KOM-headers med kategori + km-fra-start ──────────────────
+  // <h4>KOM Sprint (2) Col de Chatain (22.8 km)</h4>
+  const komClimbs: StageClimb[] = []
+  const seenKom = new Set<string>()
+  $('h4').each((_, el) => {
+    const t = $(el).text().trim()
+    const m = t.match(/\((\d)\)\s+(.+?)\s+\((\d+(?:\.\d+)?)\s*km\)/i)
+    if (!m) return
+    const category = parseInt(m[1], 10)
+    const name = m[2].trim()
+    const kmFromStart = parseFloat(m[3])
+    if (!name || name.length > 60) return
+    const key = name.toLowerCase()
+    if (seenKom.has(key)) return
+    seenKom.add(key)
+    komClimbs.push({
       name,
-      length_km: lengthKm,
-      gradient_pct: gradientPct,
+      category: Number.isFinite(category) ? category : undefined,
+      km_from_start: Number.isFinite(kmFromStart) ? kmFromStart : undefined,
     })
+  })
+  if (komClimbs.length > 0) {
+    // Sortér efter km så rækkefølgen er korrekt
+    komClimbs.sort((a, b) => (a.km_from_start ?? 0) - (b.km_from_start ?? 0))
+    return komClimbs
   }
 
-  return climbs
+  // ── Strategi B: navne-liste under "Climbs"-overskrift ───────────────────
+  // <h3>Climbs</h3><ul class="list circle"><li><div><a>...</a></div></li>...
+  const nameClimbs: StageClimb[] = []
+  const seenName = new Set<string>()
+  $('h2, h3, h4').each((_, el) => {
+    if ($(el).text().trim().toLowerCase() !== 'climbs') return
+    const $ul = $(el).nextAll('ul').first()
+    $ul.find('li').each((__, li) => {
+      const name = $(li).text().trim()
+      if (!name || name.length < 3 || name.length > 60) return
+      const key = name.toLowerCase()
+      if (seenName.has(key)) return
+      seenName.add(key)
+      nameClimbs.push({ name })
+    })
+  })
+  return nameClimbs
 }
 
 export type SyncStageTimesResult = {
