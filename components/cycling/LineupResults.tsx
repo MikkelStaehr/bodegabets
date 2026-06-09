@@ -436,16 +436,19 @@ export default function LineupResults({ race, stageFinished, slots, scores, resu
   // Per-rytter synergi-checks for det aktuelle lineup. Tomt map hvis stagen
   // er færdig (synergi-info er ikke relevant når point er beregnet).
   const stageDoneForSynergy = stageFinished ?? (race.status === 'finished')
+  const isTTT = race.profile === 'ttt'
   const synergyByRider = useMemo(() => {
-    if (stageDoneForSynergy) return new Map<string, RiderSynergyCheck[]>()
+    // Synergi (rolle-/hold-match) er irrelevant på TTT — ingen roller.
+    if (stageDoneForSynergy || isTTT) return new Map<string, RiderSynergyCheck[]>()
     return analyzeLineupSynergy(slots, riders, race.profile)
-  }, [slots, riders, race.profile, stageDoneForSynergy])
+  }, [slots, riders, race.profile, stageDoneForSynergy, isTTT])
 
   // Dynamiske roller: brug de medsendte slot-keys (afhænger af profil), ellers
   // det fulde faste sæt. Label udledes fra base-rollen (equipier_N → Équipier).
-  const roleSlots = (slotKeys && slotKeys.length > 0 ? slotKeys : ALL_ROLES.map((r) => r.key)).map((key) => ({
+  // På TTT er rollerne væk — alle slots vises neutralt som "Rytter".
+  const roleSlots = (slotKeys && slotKeys.length > 0 ? slotKeys : ALL_ROLES.map((r) => r.key)).map((key, i) => ({
     key,
-    label: ROLE_LABELS[key.startsWith('equipier_') ? 'equipier' : key] ?? key,
+    label: isTTT ? `Rytter ${i + 1}` : (ROLE_LABELS[key.startsWith('equipier_') ? 'equipier' : key] ?? key),
   }))
 
   const hasScores = scores.length > 0

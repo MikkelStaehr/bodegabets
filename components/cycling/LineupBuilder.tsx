@@ -60,12 +60,17 @@ const ROLES: { key: CyclingRoleKey; label: string; catRule: number[] | null }[] 
   { key: 'equipier_0',  label: 'Équipier',   catRule: null },
   { key: 'equipier_1',  label: 'Équipier',   catRule: null },
   { key: 'equipier_2',  label: 'Équipier',   catRule: null },
+  // equipier_3-5 bruges kun som TTT-slots (rolle-løse "Rytter"-pladser).
+  { key: 'equipier_3',  label: 'Équipier',   catRule: null },
+  { key: 'equipier_4',  label: 'Équipier',   catRule: null },
+  { key: 'equipier_5',  label: 'Équipier',   catRule: null },
   { key: 'joker',       label: 'Joker',      catRule: null },
 ]
 
 const EMPTY_SLOTS: Record<CyclingRoleKey, null> = {
   leader: null, lieutenant: null, grimpeur: null, sprinter: null,
-  domestique: null, equipier_0: null, equipier_1: null, equipier_2: null, joker: null,
+  domestique: null, equipier_0: null, equipier_1: null, equipier_2: null,
+  equipier_3: null, equipier_4: null, equipier_5: null, joker: null,
 }
 
 // Constants imported from @/lib/cyclingUtils
@@ -408,6 +413,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const isSaving = activeStage ? savingStage === activeStage.id : false
   const isSuccess = activeStage ? success === activeStage.id : false
   const filledCount = Object.values(slots).filter((v) => v !== null).length
+  const maxSlots = activeSlotKeys.length
   const profileLabel = activeStage ? (PROFILE_LABELS[activeStage.profile ?? ''] ?? 'Endagsløb') : ''
 
   // Lock deadline: foretrukket PCS-tid, fallback til 13:00 UTC default
@@ -514,6 +520,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           const stageLocked = lockedStages.has(stage.id)
           const stageSlots = lineups[stage.id]
           const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
+          const stageMaxSlots = slotsForProfile(stage.profile).length
           // Point vundet på etapen (sum af dine scores) — vises i fanen når kørt.
           const stageScores = raceScores[stage.id] ?? []
           const stagePoints = stageScores.reduce((sum, s) => sum + (s.total_points ?? 0), 0)
@@ -571,9 +578,9 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 <span style={{
                   fontFamily: "'Barlow Condensed', sans-serif",
                   fontSize: 9, fontWeight: 700,
-                  color: filled === 8 ? '#6B8F71' : 'rgba(255,255,255,0.3)',
+                  color: filled === stageMaxSlots ? '#6B8F71' : 'rgba(255,255,255,0.3)',
                 }}>
-                  {filled}/8
+                  {filled}/{stageMaxSlots}
                 </span>
               ) : null}
             </button>
@@ -761,10 +768,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
               padding: '2px 6px', borderRadius: 2, flexShrink: 0, marginLeft: 'auto',
-              background: filledCount === 8 ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
-              color: filledCount === 8 ? '#6B8F71' : 'rgba(255,255,255,0.4)',
+              background: filledCount === maxSlots ? 'rgba(107,143,113,0.25)' : 'rgba(255,255,255,0.08)',
+              color: filledCount === maxSlots ? '#6B8F71' : 'rgba(255,255,255,0.4)',
             }}>
-              {filledCount}/8
+              {filledCount}/{maxSlots}
             </span>
           </div>
           {/* ── Route line: departure → arrival ────────────── */}
@@ -813,7 +820,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 background: 'rgba(143,171,196,0.20)', color: '#9FB8CC',
                 border: '1px solid rgba(143,171,196,0.40)',
               }}>
-                👥 Holdtempo · alle på vinderholdet får 50 · ingen kategori/rolle · kun trøje-bonus oveni
+                👥 Holdtempo · 6 ryttere · max 2 pr. hold · alle på vinderholdet får 50 (+ trøje)
               </span>
             </div>
           )}
@@ -1096,7 +1103,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
       {/* ── Alle lineups (vises når lineup er låst / race er live/finished) ─── */}
       {activeStage && currentUserId && (isLocked || isFinished || isStageDeadlinePassed(activeStage.start_date, undefined, activeStage.start_time_utc)) && (
         <div style={{ padding: '0 14px 14px' }}>
-          <AllLineups gameId={gameId} stageId={activeStage.id} currentUserId={currentUserId} />
+          <AllLineups gameId={gameId} stageId={activeStage.id} currentUserId={currentUserId} profile={activeStage.profile} />
         </div>
       )}
 
@@ -1128,6 +1135,20 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         const startlistIds = modalStage && startlists?.[modalStage.race_id] ? new Set(startlists[modalStage.race_id]) : null
         const hasStartlist = startlistIds !== null && startlistIds.size > 0
         const abandonedMap = modalStage ? abandoned?.[modalStage.race_id] ?? {} : {}
+
+        // TTT: max 2 ryttere pr. hold. Tæl allerede-valgte ryttere pr. hold
+        // (ekskl. den slot vi redigerer) så vi kan disable ryttere fra hold der
+        // allerede har 2 — undgår en forvirrende server-fejl ved gem.
+        const modalIsTTT = modalStage?.profile === 'ttt'
+        const tttTeamCounts: Record<string, number> = {}
+        if (modalIsTTT) {
+          const curSlots = lineups[stageId] ?? {}
+          for (const [k, rid] of Object.entries(curSlots)) {
+            if (!rid || k === roleKey) continue
+            const team = currentSquadRiders.find((sr) => sr.id === rid)?.team_name
+            if (team) tttTeamCounts[team] = (tttTeamCounts[team] ?? 0) + 1
+          }
+        }
 
         // Unik liste af hold til filter (respekter kategori-rule så
         // dropdown'en kun viser hold med mulige valg for denne rolle).
@@ -1349,14 +1370,20 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                     const isOnStartlist = hasStartlist ? startlistIds!.has(rider.id) : null
                     const abandonType = abandonedMap[rider.id] ?? null
                     const isOut = !!abandonType
-                    const isDisabled = isOut
+                    // TTT: bloker hvis rytterens hold allerede har 2 valgt
+                    const teamBlocked = modalIsTTT
+                      && (tttTeamCounts[rider.team_name] ?? 0) >= 2
+                      && lineups[stageId]?.[roleKey] !== rider.id
+                    const isDisabled = isOut || teamBlocked
                     const tooltip = isOut
                       ? `Ude af løbet (${abandonType})`
-                      : alreadyUsed
-                        ? `Flyt fra ${otherRoleLabel} til ${role.label}`
-                        : hasStartlist && !isOnStartlist
-                          ? 'Starter ikke i dette løb'
-                          : undefined
+                      : teamBlocked
+                        ? `Max 2 fra ${rider.team_name} på en holdtempo-etape`
+                        : alreadyUsed
+                          ? `Flyt fra ${otherRoleLabel} til ${role.label}`
+                          : hasStartlist && !isOnStartlist
+                            ? 'Starter ikke i dette løb'
+                            : undefined
                     return (
                       <button
                         key={rider.id} type="button" disabled={isDisabled}
@@ -1368,7 +1395,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                           background: 'transparent', border: 'none',
                           borderBottom: idx < filteredRiders.length - 1 ? '1px solid #1E3A5F' : 'none',
                           cursor: isDisabled ? 'not-allowed' : 'pointer',
-                          opacity: isOut ? 0.3 : (hasStartlist && !isOnStartlist ? 0.5 : 1),
+                          opacity: isOut ? 0.3 : teamBlocked ? 0.4 : (hasStartlist && !isOnStartlist ? 0.5 : 1),
                           textAlign: 'left', transition: 'background 0.1s',
                         }}
                         onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = '#1E3A5F' }}

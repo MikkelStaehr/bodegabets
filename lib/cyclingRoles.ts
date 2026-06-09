@@ -12,9 +12,15 @@ import type { CyclingRoleKey } from '@/types/cycling'
 const BOTH: CyclingRoleKey[] = ['leader', 'lieutenant', 'grimpeur', 'sprinter', 'domestique', 'equipier_0', 'equipier_1', 'joker']
 const SPRINT: CyclingRoleKey[] = ['leader', 'lieutenant', 'sprinter', 'domestique', 'equipier_0', 'equipier_1', 'equipier_2', 'joker']
 const CLIMB: CyclingRoleKey[] = ['leader', 'lieutenant', 'grimpeur', 'domestique', 'equipier_0', 'equipier_1', 'equipier_2', 'joker']
+// TTT: rolle-løs holdetape. 6 generiske "Rytter"-slots (vist neutralt), max 2
+// pr. hold (valideres i lineup-API'et). Genbruger equipier-keys fordi de har
+// ingen kategori-regel og lagres som base-rolle 'equipier' + slot_index.
+const TTT: CyclingRoleKey[] = ['equipier_0', 'equipier_1', 'equipier_2', 'equipier_3', 'equipier_4', 'equipier_5']
 
 export function slotsForProfile(profile: string | null | undefined): CyclingRoleKey[] {
   switch (profile) {
+    case 'ttt':
+      return TTT
     case 'flat':
     case 'mixed':
       return SPRINT

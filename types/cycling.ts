@@ -75,7 +75,7 @@ export type CyclingSquadRider = {
   photo_url: string | null
 }
 
-export type CyclingRoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' | 'equipier_0' | 'equipier_1' | 'equipier_2' | 'joker'
+export type CyclingRoleKey = 'leader' | 'lieutenant' | 'grimpeur' | 'sprinter' | 'domestique' | 'equipier_0' | 'equipier_1' | 'equipier_2' | 'equipier_3' | 'equipier_4' | 'equipier_5' | 'joker'
 
 /**
  * Gemt rolle-rytter template pr. squad. Brugeren har typisk 2-3 "playbooks"
