@@ -35,6 +35,18 @@ const PADDING_Y_BOT = 6
 
 // ── Rigtige klatringer som spikes ─────────────────────────────────────────
 
+// Højde pr. klatrings-kategori (1 = hårdest/højest). HC = 0. Ukendt = medium.
+function categoryHeight(cat: number | undefined): number {
+  switch (cat) {
+    case 0: return 1.0   // HC / hors catégorie
+    case 1: return 0.92
+    case 2: return 0.72
+    case 3: return 0.52
+    case 4: return 0.38
+    default: return 0.58 // ukendt (navne-kun fra kommende etape)
+  }
+}
+
 function buildPathFromClimbs(climbs: CyclingStageClimb[], distanceKm: number | null): {
   path: string
   peaks: { x: number; y: number; name: string; gradient: number }[]
@@ -43,20 +55,16 @@ function buildPathFromClimbs(climbs: CyclingStageClimb[], distanceKm: number | n
   const inner = WIDTH - 2 * PADDING_X
   const usable = HEIGHT - PADDING_Y_TOP - PADDING_Y_BOT
 
-  // Sortér klatringer efter position (km_from_start hvis vi har, ellers indeks)
-  const sorted = [...climbs].sort((a, b) => {
-    const ax = a.km_from_start ?? -1
-    const bx = b.km_from_start ?? -1
-    if (ax >= 0 && bx >= 0) return ax - bx
-    return 0
-  })
+  // Sortér klatringer efter position (km_from_start hvis vi har, ellers bevar
+  // den rækkefølge PCS gav dem — det er rute-rækkefølgen).
+  const hasKm = climbs.some((c) => c.km_from_start != null && c.km_from_start > 0)
+  const sorted = hasKm
+    ? [...climbs].sort((a, b) => (a.km_from_start ?? 0) - (b.km_from_start ?? 0))
+    : climbs
 
-  // Beregn relativ "højde" pr. klatring = length × gradient (~højdemeter
-  // gained). Normalisér så største klatring = 1.0 amplitude.
-  const elevGains = sorted.map((c) => c.length_km * c.gradient_pct)
-  const maxGain = Math.max(...elevGains, 1)
-
-  // Klatringernes x-positioner
+  // Højde pr. klatring: kategori hvis kendt; ellers length×gradient hvis kendt;
+  // ellers medium (navne-kun). Normalisér ikke når vi bruger kategori — den er
+  // allerede en absolut skala.
   const positions: { x: number; peakHeight: number; name: string; gradient: number }[] = []
   for (let i = 0; i < sorted.length; i++) {
     const c = sorted[i]
@@ -64,17 +72,24 @@ function buildPathFromClimbs(climbs: CyclingStageClimb[], distanceKm: number | n
     if (c.km_from_start != null && c.km_from_start > 0) {
       xFrac = Math.min(0.98, c.km_from_start / totalKm)
     } else {
-      // Jævnt fordelt på [0.1, 0.9]
+      // Jævnt fordelt på [0.12, 0.88] i rute-rækkefølge
       xFrac = sorted.length > 1
-        ? 0.1 + 0.8 * (i / (sorted.length - 1))
+        ? 0.12 + 0.76 * (i / (sorted.length - 1))
         : 0.5
     }
-    const peakHeight = 0.25 + 0.7 * (elevGains[i] / maxGain)
+    let peakHeight: number
+    if (c.category != null) {
+      peakHeight = categoryHeight(c.category)
+    } else if (c.length_km != null && c.gradient_pct != null) {
+      peakHeight = Math.min(1, 0.25 + 0.7 * (c.length_km * c.gradient_pct) / 200)
+    } else {
+      peakHeight = categoryHeight(undefined)
+    }
     positions.push({
       x: xFrac * inner + PADDING_X,
       peakHeight,
       name: c.name,
-      gradient: c.gradient_pct,
+      gradient: c.gradient_pct ?? 0,
     })
   }
 
@@ -106,11 +121,11 @@ function buildPathFromClimbs(climbs: CyclingStageClimb[], distanceKm: number | n
   }
   const path = `M ${PADDING_X},${HEIGHT - PADDING_Y_BOT} L ${points.join(' L ')} L ${WIDTH - PADDING_X},${HEIGHT - PADDING_Y_BOT} Z`
 
-  // Beregn y for hvert peak til label-placering (kun de 3 største)
-  const peaksWithYRaw = positions.map((p, i) => ({
+  // Beregn y for hvert peak til label-placering (kun de 3 højeste)
+  const peaksWithYRaw = positions.map((p) => ({
     ...p,
     y: HEIGHT - PADDING_Y_BOT - yAtT((p.x - PADDING_X) / inner) * usable,
-    sortKey: elevGains[i],
+    sortKey: p.peakHeight,
   }))
   const peaks = peaksWithYRaw
     .sort((a, b) => b.sortKey - a.sortKey)
@@ -179,9 +194,15 @@ export default function StageProfileSilhouette({
   const ps = profileScore ?? 100
 
   const useRealClimbs = climbs && climbs.length > 0
+  // Har vi præcise positioner (afviklede etaper via KOM-data)? Hvis ja kan vi
+  // tegne en realistisk silhuet. Hvis kun navne (kommende etaper), tegner vi
+  // den procedurale silhuet og lister i stedet de RIGTIGE klatrings-navne
+  // nedenunder — så brugeren ser etapens faktiske bjerge uden falsk præcision.
+  const hasPositions = useRealClimbs && climbs!.some((c) => c.km_from_start != null && c.km_from_start > 0)
+
   let path: string
   let peaks: { x: number; y: number; name: string; gradient: number }[] = []
-  if (useRealClimbs) {
+  if (hasPositions) {
     const built = buildPathFromClimbs(climbs!, distanceKm)
     path = built.path
     peaks = built.peaks
@@ -192,6 +213,8 @@ export default function StageProfileSilhouette({
   const stats: string[] = []
   if (distanceKm != null && distanceKm > 0) stats.push(`${distanceKm} km`)
   if (verticalMeters != null && verticalMeters > 0) stats.push(`↑ ${verticalMeters.toLocaleString()} m`)
+
+  const climbNames = useRealClimbs ? climbs!.map((c) => c.name) : []
 
   return (
     <div style={{
@@ -251,8 +274,38 @@ export default function StageProfileSilhouette({
         color: 'rgba(255,255,255,0.32)', fontWeight: 600,
         letterSpacing: '0.1em', textTransform: 'uppercase',
       }}>
-        {useRealClimbs ? `PCS data · ${climbs!.length} klatringer` : 'Stiliseret silhuet'}
+        {hasPositions ? 'PCS profil-data' : 'Stiliseret silhuet'}
       </div>
+
+      {/* Rigtige klatrings-navne fra PCS — vist når vi har dem (også når
+          silhuetten kun er stiliseret, så brugeren ser etapens faktiske
+          bjerge). */}
+      {climbNames.length > 0 && (
+        <div style={{
+          padding: '7px 9px',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center',
+        }}>
+          <span style={{
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9,
+            color: 'rgba(255,255,255,0.4)', fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>
+            Stigninger
+          </span>
+          {climbNames.map((name, i) => (
+            <span key={i} style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11,
+              fontWeight: 600, color: 'rgba(255,255,255,0.8)',
+              padding: '1px 7px', borderRadius: 2,
+              background: 'rgba(143,171,196,0.14)',
+              border: '1px solid rgba(143,171,196,0.22)',
+            }}>
+              {climbs![i].category != null ? `${climbs![i].category}· ` : ''}{name}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

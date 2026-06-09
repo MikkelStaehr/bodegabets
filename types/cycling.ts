@@ -54,10 +54,15 @@ export type CyclingStage = {
 
 export type CyclingStageClimb = {
   name: string
-  length_km: number
-  gradient_pct: number
-  km_from_start?: number
+  /** Kategori 1-4 (1 = hårdest) eller 0 for HC/utenfor-kategori. Kun kendt
+   *  for afviklede etaper (fra PCS' KOM-resultattabel). */
   category?: number
+  /** Km fra start hvor klatringen toppe. Kun kendt for afviklede etaper. */
+  km_from_start?: number
+  /** Længde/gradient er sjældent tilgængelige fra PCS-tekst (ligger i
+   *  profil-grafikken) — bevares optional for fremtidig brug. */
+  length_km?: number
+  gradient_pct?: number
 }
 
 export type CyclingSquadRider = {
