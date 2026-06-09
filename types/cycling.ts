@@ -41,11 +41,23 @@ export type CyclingStage = {
   arrival: string | null
   profile_score: number | null
   vertical_meters: number | null
+  /** Scrapede klatringer fra PCS — bruges af StageProfileSilhouette til
+   *  at rendere en mere præcis profil-silhuet. Tom array hvis ikke scrapet
+   *  eller ingen klatringer. */
+  climbs: CyclingStageClimb[]
   results_uploaded_at: string | null
   race_name: string
   race_type: string
   race_profile_image_url: string | null
   cycling_block_id: string | null
+}
+
+export type CyclingStageClimb = {
+  name: string
+  length_km: number
+  gradient_pct: number
+  km_from_start?: number
+  category?: number
 }
 
 export type CyclingSquadRider = {

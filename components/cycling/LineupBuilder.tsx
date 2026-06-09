@@ -910,6 +910,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 distanceKm={activeStage.distance_km}
                 profileScore={activeStage.profile_score}
                 stageNumber={activeStage.stage_number}
+                climbs={activeStage.climbs}
               />
             </div>
           )}
