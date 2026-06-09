@@ -405,7 +405,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   // legacy-roller (fx en gemt grimpeur på en flad etape fra før) tilføjes til
   // sidst, så låste/gamle lineups stadig vises korrekt.
   const activeSlotKeys: CyclingRoleKey[] = (() => {
-    const base = slotsForProfile(activeStage?.profile)
+    const base = slotsForProfile(activeStage?.profile, activeStage?.start_date)
     const extra = (Object.keys(slots) as CyclingRoleKey[]).filter((k) => slots[k] && !base.includes(k))
     return [...base, ...extra]
   })()
@@ -520,7 +520,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           const stageLocked = lockedStages.has(stage.id)
           const stageSlots = lineups[stage.id]
           const filled = stageSlots ? Object.values(stageSlots).filter((v) => v !== null).length : 0
-          const stageMaxSlots = slotsForProfile(stage.profile).length
+          const stageMaxSlots = slotsForProfile(stage.profile, stage.start_date).length
           // Point vundet på etapen (sum af dine scores) — vises i fanen når kørt.
           const stageScores = raceScores[stage.id] ?? []
           const stagePoints = stageScores.reduce((sum, s) => sum + (s.total_points ?? 0), 0)
