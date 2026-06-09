@@ -39,25 +39,11 @@ export function getRoleStageBonus(role: string, profile: string | null): RoleSta
   const pName = profileLabel(profile)
   const pUp = pName.toUpperCase()
 
-  // TTT (hold-tempo): basispoint = holdets placering, delt af alle ryttere på
-  // holdet. Ingen klatre/spurt/lieutenant-bonus — det er en holdpræstation.
+  // TTT (hold-tempo): HELT flad holdscore. Basispoint = holdets placering, ens
+  // for alle ryttere på holdet — ingen kategori, ingen rolle, ingen GC. Kun
+  // trøje-point lægges oveni. Alle roller har derfor samme udfald.
   if (profile === 'ttt') {
-    switch (role) {
-      case 'leader':
-        return { multiplier: 1.0, pillLabel: 'HOLD ×kat', cardLine: 'Holdets placering × kategori', strength: 'high' }
-      case 'grimpeur':
-      case 'sprinter':
-      case 'lieutenant':
-        return { multiplier: 1.0, pillLabel: '', cardLine: 'Ingen rolle-bonus på holdtempo', strength: 'low' }
-      case 'domestique':
-        return { multiplier: 1.0, pillLabel: '', cardLine: 'Scorer holdets placering (+8 hvis Leader top-10)', strength: 'mid' }
-      case 'equipier':
-        return { multiplier: 1.0, pillLabel: '', cardLine: 'Scorer holdets placering + holdbonus', strength: 'mid' }
-      case 'joker':
-        return { multiplier: 1.0, pillLabel: '', cardLine: 'Scorer holdets placering + holdbonus', strength: 'mid' }
-      default:
-        return { multiplier: 1.0, pillLabel: '', cardLine: 'Holdets placering tæller', strength: 'mid' }
-    }
+    return { multiplier: 1.0, pillLabel: '', cardLine: 'Holdets placering — ens for alle på holdet (+ evt. trøje)', strength: 'mid' }
   }
 
   switch (role) {
