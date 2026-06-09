@@ -26,6 +26,34 @@ export function getBasePoints(position: number | null): number {
   return 0
 }
 
+// ── TTT holdrang → point ───────────────────────────────────────────────────
+// På holdtempo scores efter HOLDETS placering (alle ryttere på holdet får
+// samme). Egen finere skala end den individuelle, så hver holdplacering tæller
+// (1. og 2. hold skal ikke have det samme). Legacy-TTT halveres oveni (×0.5).
+const TTT_TEAM_POINTS: [number, number][] = [
+  [1, 50], [2, 40], [3, 30], [4, 22], [5, 16], [6, 12], [10, 8], [15, 4],
+]
+
+export function getTttTeamPoints(teamRank: number | null): number {
+  if (teamRank == null || teamRank <= 0) return 0
+  for (const [maxRank, pts] of TTT_TEAM_POINTS) {
+    if (teamRank <= maxRank) return pts
+  }
+  return 0
+}
+
+/** Vis-version til reglebog. */
+export const TTT_TEAM_POINTS_DISPLAY: { label: string; value: number }[] = [
+  { label: '1. hold', value: 50 },
+  { label: '2. hold', value: 40 },
+  { label: '3. hold', value: 30 },
+  { label: '4. hold', value: 22 },
+  { label: '5. hold', value: 16 },
+  { label: '6. hold', value: 12 },
+  { label: '7.-10. hold', value: 8 },
+  { label: '11.-15. hold', value: 4 },
+]
+
 /** Vis-version af basispoint-tabellen til reglebog. */
 export const POSITION_POINTS_DISPLAY: { label: string; value: number }[] = [
   { label: '1. plads', value: 50 },
