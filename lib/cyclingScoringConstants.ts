@@ -155,6 +155,16 @@ export const DOMESTIQUE_BONUS = 8        // Domestique top-40 hvis Leader top-10
 
 export const NEW_SCORING_FROM = '2026-05-27'
 
+// TTT-overgang: den dedikerede TTT-lineup-form (rolle-løs, max 6 ryttere, max
+// 2 pr. hold) blev deployet 2026-06-09 EFTER at Dauphiné etape 3's lineups var
+// låst. Den etape blev sat under den gamle form (op til 8 ryttere, intet
+// hold-loft), så fuld flad holdscore ville give oppustede haul (en der
+// stackede 4-5 vinderholds-ryttere = 200-250). TTT-etaper FØR denne dato
+// halveres derfor (×0.5) — det får legacy-loftet (~4 ryttere × 25 = 100) til
+// at matche den nye models loft (2 × 50 = 100). Etaper fra denne dato og frem
+// bygges under den nye form og scores med fuld flad model.
+export const TTT_FULL_FROM = '2026-06-10'
+
 // ── Rolle-konstanter ───────────────────────────────────────────────────────
 
 export type CyclingRoleKey =
