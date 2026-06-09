@@ -31,6 +31,8 @@ type Props = {
   gameId: number
   stageId: string
   currentUserId: string
+  /** Etape-profil — på 'ttt' vises rollerne neutralt som "Rytter". */
+  profile?: string | null
 }
 
 const ROLE_ORDER = ['leader', 'lieutenant', 'grimpeur', 'sprinter', 'domestique', 'equipier', 'joker']
@@ -64,7 +66,8 @@ function sortRiders(riders: RiderInLineup[]): RiderInLineup[] {
   })
 }
 
-export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
+export default function AllLineups({ gameId, stageId, currentUserId, profile }: Props) {
+  const isTTT = profile === 'ttt'
   const [lineups, setLineups] = useState<LineupEntry[] | null>(null)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -241,9 +244,9 @@ export default function AllLineups({ gameId, stageId, currentUserId }: Props) {
                             letterSpacing: '0.04em',
                           }}
                         >
-                          {/* Kort på mobil, fuld på sm+ */}
-                          <span className="sm:hidden">{ROLE_LABELS_SHORT[r.role] ?? r.role.slice(0, 3).toUpperCase()}</span>
-                          <span className="hidden sm:inline">{ROLE_LABELS[r.role] ?? r.role}</span>
+                          {/* Kort på mobil, fuld på sm+. På TTT er rollerne væk. */}
+                          <span className="sm:hidden">{isTTT ? 'RYT' : (ROLE_LABELS_SHORT[r.role] ?? r.role.slice(0, 3).toUpperCase())}</span>
+                          <span className="hidden sm:inline">{isTTT ? 'Rytter' : (ROLE_LABELS[r.role] ?? r.role)}</span>
                         </span>
                         <TeamLogo url={r.team_logo_url} team={r.team_name} />
                         <span style={{

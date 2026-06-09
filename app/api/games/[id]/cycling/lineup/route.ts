@@ -318,6 +318,26 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
+  // TTT: max 2 ryttere fra samme hold i lineup'et. På en holdetape vil nogle
+  // få hold typisk vinde, så uden et loft kunne man stacke vinderholdet. Med
+  // max 2 (og 6 slots) bliver det et spil om at ramme de rigtige hold.
+  if ((stageData as { profile?: string | null }).profile === 'ttt') {
+    const { data: riderTeams } = await supabaseAdmin
+      .from('cycling_riders')
+      .select('id, team_name')
+      .in('id', riders.map((r) => r.rider_id))
+    const teamById = new Map<string, string>()
+    for (const rt of riderTeams ?? []) teamById.set(rt.id as string, rt.team_name as string)
+    const teamCounts: Record<string, number> = {}
+    for (const r of riders) {
+      const team = teamById.get(r.rider_id) ?? '—'
+      teamCounts[team] = (teamCounts[team] ?? 0) + 1
+      if (teamCounts[team] > 2) {
+        return NextResponse.json({ error: `Max 2 ryttere fra samme hold på en holdtempo-etape (${team})` }, { status: 400 })
+      }
+    }
+  }
+
   // Upsert lineup
   const { data: lineup, error: lineupErr } = await supabaseAdmin
     .from('cycling_lineups')

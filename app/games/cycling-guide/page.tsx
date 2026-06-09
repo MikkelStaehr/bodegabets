@@ -60,7 +60,7 @@ export default async function CyclingGuidePage() {
               👥 Holdtempo (TTT)
             </p>
             <p className="font-body text-[12px] text-cream/75 leading-relaxed">
-              På hold-tempo-etaper scores efter <strong>holdets placering</strong>, ikke den enkelte rytters — helt fladt. Alle ryttere på samme hold får præcis samme point (vinderholdet = 50, hold 2-3 = 30, osv.), uanset rolle og kategori. Det handler udelukkende om at vælge det stærke TTT-hold. Kun trøje-point (gul/prikket/grøn) lægges oveni; kategori, roller og GC-multiplikator tæller ikke.
+              Hold-tempo-etaper er deres egen lineup-form: <strong>ingen roller</strong>, du vælger <strong>6 ryttere</strong> og <strong>max 2 fra samme hold</strong>. Der scores efter <strong>holdets placering</strong> — helt fladt. Alle ryttere på samme hold får præcis samme point (vinderholdet = 50, hold 2-3 = 30, osv.), uanset kategori. Det handler om at ramme de stærke TTT-hold. Kun trøje-point (gul/prikket/grøn) lægges oveni; kategori, roller og GC-multiplikator tæller ikke.
             </p>
           </div>
         </div>
