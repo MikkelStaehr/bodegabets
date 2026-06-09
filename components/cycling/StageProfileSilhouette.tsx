@@ -208,6 +208,11 @@ export default function StageProfileSilhouette({
         position: 'relative',
         background: '#fff',
         borderRadius: 4,
+        // Crop bunden af billedet (PCS-profilerne er 600×300). De nederste
+        // ~15px er FlammeRouge/PCS-attribution-striben — vi viser top 285/300
+        // via fast aspect-ratio + overflow, så km-akse-bjælken bevares men
+        // footer forsvinder. Billedet hotlinkes uændret; croppet er rent visuelt.
+        aspectRatio: '600 / 285',
         overflow: 'hidden',
         border: '1px solid rgba(255,255,255,0.06)',
       }}>
