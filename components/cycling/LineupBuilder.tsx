@@ -73,7 +73,7 @@ const EMPTY_SLOTS: Record<CyclingRoleKey, null> = {
 
 import CatBadge from './CatBadge'
 import TeamLogo from './TeamLogo'
-import { slotsForProfile } from '@/lib/cyclingRoles'
+import { slotsForProfile, remapSlotsToProfile } from '@/lib/cyclingRoles'
 
 // ── Scrollable tab bar ─────────────────────────────────────────────────────
 
@@ -921,10 +921,11 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
             abandonedSet={abandonedSet}
             startlistSet={startlistSet}
             onApply={(presetSlots) => {
-              const merged: Record<CyclingRoleKey, string | null> = { ...EMPTY_SLOTS }
-              for (const k of Object.keys(merged) as CyclingRoleKey[]) {
-                merged[k] = presetSlots[k] ?? null
-              }
+              // Smart remap: hvis preset er gemt for én profil (fx bjerg med
+              // equipier_2) og anvendes på en anden (fx kuperet uden equipier_2
+              // men med sprinter), flyttes orphan-ryttere til tomme slots i
+              // den aktive profil — ingen ryttere går tabt.
+              const merged = remapSlotsToProfile(presetSlots, activeStage.profile)
               setLineups((prev) => ({ ...prev, [activeStage.id]: merged }))
             }}
             onPresetsChange={setPresets}
