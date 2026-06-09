@@ -157,6 +157,34 @@ export async function calculateCyclingPoints(
     winnerTeam = winnerRider?.team_name ?? null
   }
 
+  // 3b. TTT (hold-tempo): basispoint kommer fra HOLDETS placering, ikke den
+  //     individuelle rank PCS tildeler inden for holdet. Vi grupperer alle
+  //     resultater på hold, finder hvert holds bedste (laveste) placering, og
+  //     rangerer holdene. Alle ryttere på vinder-holdet får dermed samme
+  //     basis (= som om holdet vandt), uden vilkårlig 1./2./3. internt.
+  const isTTT = profile === 'ttt'
+  const teamRankByName = new Map<string, number>()
+  if (isTTT) {
+    const resultRiderIds = [...resultMap.keys()]
+    const { data: riderTeams } = await supabaseAdmin
+      .from('cycling_riders')
+      .select('id, team_name')
+      .in('id', resultRiderIds)
+    const teamByRider = new Map<string, string>()
+    for (const rt of riderTeams ?? []) teamByRider.set(rt.id as string, rt.team_name as string)
+
+    const bestPosByTeam = new Map<string, number>()
+    for (const r of resultsRaw ?? []) {
+      if (r.dnf || r.position == null) continue
+      const team = teamByRider.get(r.rider_id)
+      if (!team) continue
+      const cur = bestPosByTeam.get(team)
+      if (cur == null || (r.position as number) < cur) bestPosByTeam.set(team, r.position as number)
+    }
+    const sortedTeams = [...bestPosByTeam.entries()].sort((a, b) => a[1] - b[1])
+    sortedTeams.forEach(([team], i) => teamRankByName.set(team, i + 1))
+  }
+
   // 4. Fetch all lineups for this race + game
   const { data: squads } = await supabaseAdmin
     .from('cycling_squads')
@@ -263,7 +291,8 @@ export async function calculateCyclingPoints(
     const leadoutCount = sprinterRider
       ? activeRiders.filter((r) => r.role === 'equipier' && r.team_name === sprinterRider.team_name).length
       : 0
-    const trainMul = (newRules && sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
+    // Spurt-tog gælder ikke på TTT (ingen spurt-dynamik — holdet kører samlet)
+    const trainMul = (!isTTT && newRules && sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
 
     // ── A. Active riders ──────────────────────────────────────
     // Ingen minus-point: ryttere der udgår eller placerer sig dårligt får
@@ -273,7 +302,11 @@ export async function calculateCyclingPoints(
       const position = result?.position ?? null
 
       const catMul = CAT_MULTIPLIER[rider.category] ?? 1.0
-      const base = getBasePoints(position)
+      // TTT: basis fra holdets placering (alle der gennemførte med holdet får
+      // samme basis). Almindelige etaper: individuel placering.
+      const base = isTTT
+        ? (position != null && !(result?.dnf) ? getBasePoints(teamRankByName.get(rider.team_name) ?? null) : 0)
+        : getBasePoints(position)
       const gcMul = getGcMultiplier(result?.gc_position_after ?? null)
       let roleMul = 1.0
       // Breakdown af roleMul — gemmes på score-rækken så tooltip kan vise
@@ -296,7 +329,9 @@ export async function calculateCyclingPoints(
 
         case 'lieutenant':
           usedCatMul = catMul
-          if (position != null && position <= 10) {
+          // På TTT neutraliseres lieutenant-bonussen — ingen individuel
+          // top-10-præstation at belønne, holdet kører samlet.
+          if (!isTTT && position != null && position <= 10) {
             profileMul = leaderDnf ? 2.8 : 1.8
             roleMul = catMul * profileMul
           } else {

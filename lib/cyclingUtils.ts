@@ -82,11 +82,11 @@ export function shortBlockName(name: string): string {
 
 export const PROFILE_LABELS: Record<string, string> = {
   cobbled: 'Brosten', mountain: 'Bjerg', hilly: 'Kuperet',
-  flat: 'Flad', itt: 'Enkeltstart', mixed: 'Blandet',
+  flat: 'Flad', itt: 'Enkeltstart', ttt: 'Holdtempo', mixed: 'Blandet',
 }
 
 export const PROFILE_ICONS: Record<string, string> = {
-  mountain: '⛰', hilly: '〜', cobbled: '⊞', flat: '—', itt: '⏱',
+  mountain: '⛰', hilly: '〜', cobbled: '⊞', flat: '—', itt: '⏱', ttt: '👥',
 }
 
 export const RACE_TYPE_LABELS: Record<string, string> = {

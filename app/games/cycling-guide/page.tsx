@@ -55,6 +55,14 @@ export default async function CyclingGuidePage() {
               Forskellige roller bruger forskellige led. En sprinter bruger dem alle. En domestique bruger næsten ingen.
             </p>
           </div>
+          <div className="bg-[#8FABC4]/10 border border-[#8FABC4]/25 rounded-sm p-3 mt-3">
+            <p className="font-condensed text-[11px] text-[#9FB8CC] font-bold tracking-[0.08em] uppercase mb-1">
+              👥 Holdtempo (TTT)
+            </p>
+            <p className="font-body text-[12px] text-cream/75 leading-relaxed">
+              På hold-tempo-etaper scores efter <strong>holdets placering</strong>, ikke den enkelte rytters. Alle ryttere på samme hold får samme basispoint (vinderholdet = 50, hold 2-3 = 30, osv.) — så det handler om at vælge det stærke TTT-hold. Klatre-, spurt- og lieutenant-bonus er slået fra; kategori og GC-multiplikator tæller stadig.
+            </p>
+          </div>
         </div>
 
         {/* Rolle-vælger */}

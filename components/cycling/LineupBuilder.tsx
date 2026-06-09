@@ -801,6 +801,22 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
               </span>
             ))}
           </div>
+          {/* ── TTT-note: holdresultat tæller, ingen rolle-bonus ──── */}
+          {activeStage.profile === 'ttt' && (
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 5,
+              alignItems: 'center', marginTop: 6,
+            }}>
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                padding: '2px 7px', borderRadius: 2,
+                background: 'rgba(143,171,196,0.20)', color: '#9FB8CC',
+                border: '1px solid rgba(143,171,196,0.40)',
+              }}>
+                👥 Holdtempo · alle på vinderholdet scorer ens · ingen klatre/spurt-bonus
+              </span>
+            </div>
+          )}
           {/* ── Profil-bonus til lineup-planlægning ────────── */}
           {(() => {
             const p = activeStage.profile

@@ -25,6 +25,7 @@ export function profileLabel(profile: string | null | undefined): string {
     case 'flat': return 'flad'
     case 'mixed': return 'blandet'
     case 'cobbled': return 'brosten'
+    case 'ttt': return 'holdtempo'
     default: return ''
   }
 }
@@ -37,6 +38,27 @@ export function profileLabel(profile: string | null | undefined): string {
 export function getRoleStageBonus(role: string, profile: string | null): RoleStageBonus {
   const pName = profileLabel(profile)
   const pUp = pName.toUpperCase()
+
+  // TTT (hold-tempo): basispoint = holdets placering, delt af alle ryttere på
+  // holdet. Ingen klatre/spurt/lieutenant-bonus — det er en holdpræstation.
+  if (profile === 'ttt') {
+    switch (role) {
+      case 'leader':
+        return { multiplier: 1.0, pillLabel: 'HOLD ×kat', cardLine: 'Holdets placering × kategori', strength: 'high' }
+      case 'grimpeur':
+      case 'sprinter':
+      case 'lieutenant':
+        return { multiplier: 1.0, pillLabel: '', cardLine: 'Ingen rolle-bonus på holdtempo', strength: 'low' }
+      case 'domestique':
+        return { multiplier: 1.0, pillLabel: '', cardLine: 'Scorer holdets placering (+8 hvis Leader top-10)', strength: 'mid' }
+      case 'equipier':
+        return { multiplier: 1.0, pillLabel: '', cardLine: 'Scorer holdets placering + holdbonus', strength: 'mid' }
+      case 'joker':
+        return { multiplier: 1.0, pillLabel: '', cardLine: 'Scorer holdets placering + holdbonus', strength: 'mid' }
+      default:
+        return { multiplier: 1.0, pillLabel: '', cardLine: 'Holdets placering tæller', strength: 'mid' }
+    }
+  }
 
   switch (role) {
     case 'grimpeur': {
