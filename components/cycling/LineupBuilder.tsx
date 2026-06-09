@@ -5,6 +5,7 @@ import { Lock, Radio, Check, ChevronLeft, ChevronRight, ArrowLeftRight } from 'l
 import LineupResults from './LineupResults'
 import LineupPresetsBar from './LineupPresetsBar'
 import StageStrategyCard from './StageStrategyCard'
+import StageProfileSilhouette from './StageProfileSilhouette'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
 import AllLineups from './AllLineups'
@@ -227,6 +228,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const [modalTeamFilter, setModalTeamFilter] = useState<string>('')
   const [modalSort, setModalSort] = useState<'default' | 'gc' | 'jersey'>('default')
   const [showOnlyStarters, setShowOnlyStarters] = useState(false)
+  const [showStageProfile, setShowStageProfile] = useState(false)
   const [initialLineups, setInitialLineups] = useState<LineupState>({})
 
   // Scores & results per race (for finished races)
@@ -874,6 +876,43 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
           >
             Udtag brutto trup
           </a>
+        </div>
+      )}
+
+      {/* ── Profil-silhuet toggle (vises hvis vi har data) ─────── */}
+      {!noSquadForBlock && activeStage && (activeStage.profile || activeStage.vertical_meters) && (
+        <div style={{
+          padding: '6px 14px 0',
+          background: theme.bgDark,
+        }}>
+          <button
+            onClick={() => setShowStageProfile((v) => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 2, padding: '4px 9px',
+              fontFamily: "'Barlow Condensed', sans-serif",
+              fontSize: 10, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              color: 'rgba(255,255,255,0.65)',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 8 }}>{showStageProfile ? '▾' : '▸'}</span>
+            {showStageProfile ? 'Skjul profil' : 'Se profil'}
+          </button>
+          {showStageProfile && (
+            <div style={{ marginTop: 6 }}>
+              <StageProfileSilhouette
+                profile={activeStage.profile}
+                verticalMeters={activeStage.vertical_meters}
+                distanceKm={activeStage.distance_km}
+                profileScore={activeStage.profile_score}
+                stageNumber={activeStage.stage_number}
+              />
+            </div>
+          )}
         </div>
       )}
 
