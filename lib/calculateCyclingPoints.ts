@@ -15,6 +15,7 @@ import {
   TTT_FULL_FROM,
   WON_HOW_SPRINTER_BONUS,
   getBasePoints,
+  getTttTeamPoints,
   getGrimpeurMultiplier,
   getSprinterMultiplier,
   getWonHowGrimpeurBonus,
@@ -117,7 +118,7 @@ export async function calculateCyclingPoints(
   // 1. Fetch stage profile (falls back to race profile)
   const { data: stage } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, profile, won_how, start_date')
+    .select('id, profile, won_how, start_date, ttt_team_order')
     .eq('id', stageId)
     .single()
 
@@ -166,24 +167,35 @@ export async function calculateCyclingPoints(
   const isTTT = profile === 'ttt'
   const teamRankByName = new Map<string, number>()
   if (isTTT) {
-    const resultRiderIds = [...resultMap.keys()]
-    const { data: riderTeams } = await supabaseAdmin
-      .from('cycling_riders')
-      .select('id, team_name')
-      .in('id', resultRiderIds)
-    const teamByRider = new Map<string, string>()
-    for (const rt of riderTeams ?? []) teamByRider.set(rt.id as string, rt.team_name as string)
+    // Primær kilde: den officielle holdtids-orden scrapet fra PCS' TeamTime-
+    // tabel (gemt på stagen). Den afspejler holdtempo-resultatet korrekt
+    // (Visma 1., INEOS 2. osv.) — i modsætning til individuelle placeringer
+    // (hvor en enkelt hurtig rytter kan løfte sit hold fejlagtigt).
+    const teamOrder = ((stage as { ttt_team_order?: unknown } | null)?.ttt_team_order ?? []) as string[]
+    if (Array.isArray(teamOrder) && teamOrder.length > 0) {
+      teamOrder.forEach((team, i) => teamRankByName.set(team, i + 1))
+    } else {
+      // Fallback (hvis holdorden ikke er scrapet): bedste individuelle
+      // placering pr. hold. Mindre præcist, men bedre end intet.
+      const resultRiderIds = [...resultMap.keys()]
+      const { data: riderTeams } = await supabaseAdmin
+        .from('cycling_riders')
+        .select('id, team_name')
+        .in('id', resultRiderIds)
+      const teamByRider = new Map<string, string>()
+      for (const rt of riderTeams ?? []) teamByRider.set(rt.id as string, rt.team_name as string)
 
-    const bestPosByTeam = new Map<string, number>()
-    for (const r of resultsRaw ?? []) {
-      if (r.dnf || r.position == null) continue
-      const team = teamByRider.get(r.rider_id)
-      if (!team) continue
-      const cur = bestPosByTeam.get(team)
-      if (cur == null || (r.position as number) < cur) bestPosByTeam.set(team, r.position as number)
+      const bestPosByTeam = new Map<string, number>()
+      for (const r of resultsRaw ?? []) {
+        if (r.dnf || r.position == null) continue
+        const team = teamByRider.get(r.rider_id)
+        if (!team) continue
+        const cur = bestPosByTeam.get(team)
+        if (cur == null || (r.position as number) < cur) bestPosByTeam.set(team, r.position as number)
+      }
+      const sortedTeams = [...bestPosByTeam.entries()].sort((a, b) => a[1] - b[1])
+      sortedTeams.forEach(([team], i) => teamRankByName.set(team, i + 1))
     }
-    const sortedTeams = [...bestPosByTeam.entries()].sort((a, b) => a[1] - b[1])
-    sortedTeams.forEach(([team], i) => teamRankByName.set(team, i + 1))
   }
 
   // 4. Fetch all lineups for this race + game
@@ -307,10 +319,11 @@ export async function calculateCyclingPoints(
       const position = result?.position ?? null
 
       const catMul = CAT_MULTIPLIER[rider.category] ?? 1.0
-      // TTT: basis fra holdets placering (alle der gennemførte med holdet får
-      // samme basis). Almindelige etaper: individuel placering.
+      // TTT: basis fra holdets placering via den finere TTT-skala (alle der
+      // gennemførte med holdet får samme). Almindelige etaper: individuel
+      // placering på standard-skalaen.
       const base = isTTT
-        ? (position != null && !(result?.dnf) ? getBasePoints(teamRankByName.get(rider.team_name) ?? null) : 0)
+        ? (position != null && !(result?.dnf) ? getTttTeamPoints(teamRankByName.get(rider.team_name) ?? null) : 0)
         : getBasePoints(position)
       // TTT scores HELT fladt: holdets placering, ens for alle på holdet. Ingen
       // kategori, ingen rolle, ingen GC-multiplikator. Kun trøje-point lægges

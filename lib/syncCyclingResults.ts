@@ -182,6 +182,54 @@ async function scrapeStageResults(slug: string, stageNum: number): Promise<Parse
  * (Solo +50 +1/km, Sprint à deux +25, Small group +20) og Sprinter bonus
  * (Bunch sprint +20, Small group +25, Sprint à deux +50).
  */
+/**
+ * Scrape den officielle TTT-holdorden fra stage-siden.
+ *
+ * PCS viser den stage-specifikke holdtids-tabel (parent class "today") hvor
+ * holdene er rangeret efter HOLDTID (1. plads = vinder af holdtempoet). Det
+ * adskiller sig fra den individuelle klassement (hvor fx EF's Baudin var
+ * hurtigst som enkeltperson selvom EF kun blev 3'er som hold).
+ *
+ * VIGTIGT: vi tager "today"-tabellen, IKKE den "general" teams-tabel (som er
+ * det KUMULATIVE hold-klassement og giver en helt anden orden).
+ *
+ * Returnerer ordnet array af holdnavne, eller [] hvis ikke fundet.
+ */
+async function scrapeTttTeamOrder(slug: string, stageNum: number): Promise<string[]> {
+  const base = stageNum === 0
+    ? `${PCS_BASE}/race/${slug}/2026/prologue`
+    : `${PCS_BASE}/race/${slug}/2026/stage-${stageNum}`
+  const html = await pcsGet(base)
+  if (!html) return []
+  const $ = cheerio.load(html)
+
+  // Find tabellen med hold-rækker (rank + team-link, ingen rytter-link) hvis
+  // parent har class "today" (stage-specifik). Vælg den med flest hold-rækker.
+  let best: { order: string[]; isToday: boolean } | null = null
+  $('table').each((_, t) => {
+    const parentClass = $(t).parent().attr('class') ?? ''
+    const order: string[] = []
+    $(t).find('tbody tr').each((__, tr) => {
+      const cells = $(tr).find('td').toArray()
+      if (!cells.length) return
+      const rank = $(cells[0]).text().trim()
+      const teamLink = $(tr).find('a[href^="team/"]').first()
+      const hasRider = $(tr).find('a[href^="rider/"]').length > 0
+      if (/^\d+$/.test(rank) && teamLink.length && !hasRider) {
+        order.push(teamLink.text().trim())
+      }
+    })
+    if (order.length < 5) return
+    const isToday = /\btoday\b/.test(parentClass)
+    // Foretræk "today"-tabellen (stage-resultat) over "general" (kumulativt)
+    if (!best || (isToday && !best.isToday)) best = { order, isToday }
+  })
+
+  return best && (best as { order: string[]; isToday: boolean }).isToday
+    ? (best as { order: string[]; isToday: boolean }).order
+    : []
+}
+
 async function scrapeWonHow(slug: string, stageNum: number): Promise<string | null> {
   const base = stageNum === 0
     ? `${PCS_BASE}/race/${slug}/2026/prologue`
@@ -452,7 +500,7 @@ export async function syncCyclingResults(): Promise<{
   const raceIds = races.map((r) => r.id)
   const { data: stages, error: stagesErr } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, race_id, stage_number, start_date')
+    .select('id, race_id, stage_number, start_date, profile')
     .in('race_id', raceIds)
     .is('results_uploaded_at', null)
     .gte('start_date', `${cutoffIso}T00:00:00Z`)
@@ -631,6 +679,19 @@ export async function syncCyclingResults(): Promise<{
             console.warn(`[syncCyclingResults]   won_how scrape failed: ${err}`)
           }
 
+          // TTT: scrape den officielle holdorden (holdtid) — scoringen kan ikke
+          // udlede den fra individuelle placeringer (de afspejler ikke holdtid).
+          let tttOrder: string[] = []
+          if ((stage as { profile?: string | null }).profile === 'ttt') {
+            try {
+              tttOrder = await scrapeTttTeamOrder(race.pcs_slug, stage.stage_number)
+              if (tttOrder.length) console.log(`[syncCyclingResults]   TTT-holdorden: ${tttOrder.slice(0, 3).join(', ')}...`)
+              else console.warn(`[syncCyclingResults]   TTT-holdorden ikke fundet`)
+            } catch (err) {
+              console.warn(`[syncCyclingResults]   TTT-team-order scrape failed: ${err}`)
+            }
+          }
+
           // Mark stage as uploaded — klassementer er komplette (eller stagen
           // er gammel nok til at vi accepterer delvise data)
           await supabaseAdmin
@@ -638,6 +699,7 @@ export async function syncCyclingResults(): Promise<{
             .update({
               results_uploaded_at: new Date().toISOString(),
               ...(wonHow ? { won_how: wonHow } : {}),
+              ...(tttOrder.length ? { ttt_team_order: tttOrder } : {}),
             })
             .eq('id', stage.id)
 
