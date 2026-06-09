@@ -237,12 +237,6 @@ function posOf(entry: ClassificationEntry | undefined): number | null {
 // Verificeret mod Giro 2026 stage 4 (12 tables) og stage 5 (13 tables) —
 // "general"-filteret giver konsekvent de samme 6 hovedklassementer.
 type ClassificationKey = 'gc' | 'points' | 'mountain' | 'youth'
-const GENERAL_INDEX: Record<ClassificationKey, number> = {
-  gc: 1,
-  points: 2,
-  mountain: 3,
-  youth: 4,
-}
 // Værdi-kolonnen findes via header-tekst INDEN FOR den valgte tabel (Time/Pnt
 // kan ligge i forskellige kolonne-indekser pga. UCI/Prev-kolonner mv.).
 const VALUE_HEADER: Record<ClassificationKey, string> = {
@@ -272,18 +266,44 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
 
   const $ = cheerio.load(html)
 
-  // Filtrér til de 6 "general"-tabeller (sammenlagte klassementer).
-  // Rækkefølge: [stage-resultat, GC, points, mountain, youth, teams].
-  const generalTables = $('table').toArray().filter((tbl) => $(tbl).parent().hasClass('general'))
-  if (generalTables.length < 5) {
-    console.warn(`[scrapeClassifications] kun ${generalTables.length} general-tabeller fundet — PCS-template ændret?`)
+  // Filtrér til de "general"-tabeller (sammenlagte klassementer).
+  //
+  // PCS' antal og rækkefølge af general-tabeller VARIERER pr. etape-type:
+  //   - Almindelig etape: [stage-resultat, GC, points, mountain, youth, teams] (6)
+  //   - TTT: stage-resultat-tabellen mangler → [GC, points, mountain, youth, teams] (5)
+  // Faste indekser brød derfor på TTT (GC blev læst som points → kun ~23
+  // ryttere → stagen blev aldrig markeret færdig → ingen scoring).
+  //
+  // Robust løsning: identificér hvert klassement efter header-INDHOLD frem for
+  // position. Points/bjerg har en "Pnt"-kolonne; GC/ungdom har "Time won/lost".
+  // Hold-tabellen har ingen rytter-links og springes over. Rækkefølgen inden
+  // for hver type er stabil: points før bjerg, og blandt time-tabellerne er
+  // GC næstsidst og ungdom sidst (stage-resultatet, hvis til stede, er først).
+  const allGeneral = $('table').toArray().filter((tbl) => $(tbl).parent().hasClass('general'))
+  const pntTables: typeof allGeneral = []
+  const timeTables: typeof allGeneral = []
+  for (const tbl of allGeneral) {
+    const hasRiderLinks = $(tbl).find('tbody tr a').toArray().some((a) => /^rider\/[\w-]+$/.test($(a).attr('href') ?? ''))
+    if (!hasRiderLinks) continue // hold-tabellen o.l.
+    const headerTxt = $(tbl).find('thead th').toArray().map((th) => $(th).text().trim().toLowerCase()).join('|')
+    if (headerTxt.includes('pnt')) pntTables.push(tbl)
+    else if (headerTxt.includes('time')) timeTables.push(tbl)
+  }
+  const tableFor: Record<ClassificationKey, (typeof allGeneral)[number] | undefined> = {
+    points: pntTables[0],
+    mountain: pntTables[1],
+    gc: timeTables.length >= 2 ? timeTables[timeTables.length - 2] : timeTables[0],
+    youth: timeTables[timeTables.length - 1],
+  }
+  if (!tableFor.gc) {
+    console.warn(`[scrapeClassifications] ingen GC-tabel fundet (pnt=${pntTables.length} time=${timeTables.length}) — PCS-template ændret?`)
     return out
   }
 
   for (const key of ['gc', 'points', 'mountain', 'youth'] as const) {
-    const table = generalTables[GENERAL_INDEX[key]]
+    const table = tableFor[key]
     if (!table) {
-      console.warn(`[scrapeClassifications] ${key}: general-index ${GENERAL_INDEX[key]} mangler`)
+      console.warn(`[scrapeClassifications] ${key}: tabel mangler (header-match)`)
       continue
     }
 
