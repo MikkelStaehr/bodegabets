@@ -307,7 +307,11 @@ export async function calculateCyclingPoints(
       const base = isTTT
         ? (position != null && !(result?.dnf) ? getBasePoints(teamRankByName.get(rider.team_name) ?? null) : 0)
         : getBasePoints(position)
-      const gcMul = getGcMultiplier(result?.gc_position_after ?? null)
+      // TTT scores HELT fladt: holdets placering, ens for alle på holdet. Ingen
+      // kategori, ingen rolle, ingen GC-multiplikator. Kun trøje-point lægges
+      // oveni (gul/prikket/grøn er en reel bedrift). På almindelige etaper
+      // gælder den fulde rolle/kat/GC-beregning nedenfor.
+      const gcMul = isTTT ? 1.0 : getGcMultiplier(result?.gc_position_after ?? null)
       let roleMul = 1.0
       // Breakdown af roleMul — gemmes på score-rækken så tooltip kan vise
       // hvor multiplikatoren kommer fra. Defaults til 1.0 for roller uden
@@ -320,7 +324,11 @@ export async function calculateCyclingPoints(
       const jerseyPts = jerseyKey ? (JERSEY_POINTS[jerseyKey] ?? 0) : 0
       let teamBonus = 0
 
-      // Role-specific calculation
+      // Role-specific calculation — springes HELT over på TTT (flad holdscore).
+      if (isTTT) {
+        // roleMul/usedCatMul/profileMul/usedTrainMul forbliver 1.0, roleBonus
+        // og teamBonus forbliver 0. total = base × 1 × 1 + jersey_points.
+      } else {
       switch (rider.role) {
         case 'leader':
           usedCatMul = catMul
@@ -389,12 +397,13 @@ export async function calculateCyclingPoints(
           break
       }
 
-      // Team bonus (non-equipier, non-joker)
+      // Team bonus (non-equipier, non-joker) — gælder ikke på TTT
       if (rider.role !== 'equipier' && rider.role !== 'joker' && rider.role !== 'domestique') {
         if (winnerTeam && rider.team_name === winnerTeam) {
           teamBonus = 5
         }
       }
+      } // ── slut !isTTT
 
       // total_points er en generated kolonne i DB; den beregnes automatisk fra
       // base_points * role_multiplier * gc_multiplier + bonusser. Vi indsætter
