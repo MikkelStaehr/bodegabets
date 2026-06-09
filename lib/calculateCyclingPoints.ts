@@ -12,6 +12,7 @@ import {
   GC_MULTIPLIER,
   JERSEY_POINTS,
   NEW_SCORING_FROM,
+  TTT_FULL_FROM,
   WON_HOW_SPRINTER_BONUS,
   getBasePoints,
   getGrimpeurMultiplier,
@@ -219,6 +220,10 @@ export async function calculateCyclingPoints(
   const stageStartDate = (stage as { start_date?: string } | null)?.start_date ?? '9999-12-31'
   // Nye scoring-regler (spurt-tog + cobbled ×1.2) kun for etaper fra denne dato.
   const newRules = stageStartDate >= NEW_SCORING_FROM
+  // Legacy-TTT: etaper låst under den gamle lineup-form (før TTT_FULL_FROM)
+  // halveres, så oppustede haul fra at stacke vinderholdet (op til 8 ryttere,
+  // intet hold-loft) bringes ned på niveau med den nye models loft.
+  const tttHalve = isTTT && stageStartDate < TTT_FULL_FROM
 
   const [{ data: squadCats }, { data: allTransfers }] = await Promise.all([
     supabaseAdmin
@@ -326,8 +331,11 @@ export async function calculateCyclingPoints(
 
       // Role-specific calculation — springes HELT over på TTT (flad holdscore).
       if (isTTT) {
-        // roleMul/usedCatMul/profileMul/usedTrainMul forbliver 1.0, roleBonus
-        // og teamBonus forbliver 0. total = base × 1 × 1 + jersey_points.
+        // Flad holdscore: roleMul/usedCatMul/profileMul/usedTrainMul forbliver
+        // 1.0, roleBonus og teamBonus forbliver 0. total = base × roleMul × 1
+        // + jersey_points. På legacy-TTT (før den nye lineup-form) halveres via
+        // role_multiplier = 0.5 — synligt i point-breakdown'en.
+        if (tttHalve) roleMul = 0.5
       } else {
       switch (rider.role) {
         case 'leader':
