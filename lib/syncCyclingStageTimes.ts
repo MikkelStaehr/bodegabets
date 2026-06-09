@@ -82,12 +82,12 @@ export type StageClimb = {
  */
 async function fetchStagePageData(
   raceSlug: string, year: number, stageNumber: number,
-): Promise<{ startTime: string | null; climbs: StageClimb[] }> {
+): Promise<{ startTime: string | null; climbs: StageClimb[]; profileImageUrl: string | null }> {
   const stagePath = stageNumber === 0 ? 'prologue' : `stage-${stageNumber}`
   const url = `${PCS_BASE}/race/${raceSlug}/${year}/${stagePath}`
   try {
     const res = await fetch(url, { headers: HEADERS })
-    if (!res.ok) return { startTime: null, climbs: [] }
+    if (!res.ok) return { startTime: null, climbs: [], profileImageUrl: null }
     const html = await res.text()
     const $ = cheerio.load(html)
     const bodyText = $('body').text()
@@ -101,10 +101,31 @@ async function fetchStagePageData(
     }
 
     const climbs = extractClimbs($)
-    return { startTime, climbs }
+    const profileImageUrl = extractProfileImageUrl($)
+    return { startTime, climbs, profileImageUrl }
   } catch {
-    return { startTime: null, climbs: [] }
+    return { startTime: null, climbs: [], profileImageUrl: null }
   }
+}
+
+/**
+ * Scrape PCS' rigtige profil-billede (FlammeRouge-genereret højdekurve).
+ * PCS rendrer det som <img src="images/profiles/xx/yy/<race>-stage-N-profile.jpg">.
+ * Vi hotlinker URL'en direkte (samme mønster som rytter-fotos), så vi behøver
+ * ikke selv hoste billedet. Returnerer absolut URL eller null.
+ */
+function extractProfileImageUrl($: cheerio.CheerioAPI): string | null {
+  let found: string | null = null
+  $('img').each((_, el) => {
+    if (found) return
+    const src = $(el).attr('src') ?? $(el).attr('data-src')
+    if (!src) return
+    // PCS profil-billeder ligger under images/profiles/ og slutter på -profile.jpg
+    if (/images\/profiles\/.+profile\.(jpg|jpeg|png)/i.test(src)) {
+      found = src.startsWith('http') ? src : `${PCS_BASE}/${src.replace(/^\/+/, '')}`
+    }
+  })
+  return found
 }
 
 function extractClimbs($: cheerio.CheerioAPI): StageClimb[] {
@@ -170,7 +191,7 @@ export async function syncCyclingStageTimes(): Promise<SyncStageTimesResult> {
   const today = new Date().toISOString().slice(0, 10)
   const { data: stages, error } = await supabaseAdmin
     .from('cycling_stages')
-    .select('id, stage_number, start_date, start_time_utc, cycling_races!inner(pcs_slug, status)')
+    .select('id, stage_number, start_date, start_time_utc, profile_image_url, cycling_races!inner(pcs_slug, status)')
     .is('results_uploaded_at', null)
     .gte('start_date', today)
     .in('cycling_races.status', ['upcoming', 'active'])
@@ -184,6 +205,7 @@ export async function syncCyclingStageTimes(): Promise<SyncStageTimesResult> {
 
   type StageRow = {
     id: string; stage_number: number; start_date: string; start_time_utc: string | null
+    profile_image_url: string | null
     cycling_races: { pcs_slug: string; status: string } | { pcs_slug: string; status: string }[]
   }
 
@@ -193,7 +215,7 @@ export async function syncCyclingStageTimes(): Promise<SyncStageTimesResult> {
     const dateStr = stage.start_date.slice(0, 10)
     const year = parseInt(dateStr.slice(0, 4), 10)
 
-    const { startTime: localTime, climbs } = await fetchStagePageData(race.pcs_slug, year, stage.stage_number)
+    const { startTime: localTime, climbs, profileImageUrl } = await fetchStagePageData(race.pcs_slug, year, stage.stage_number)
     await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS))
 
     const updates: Record<string, unknown> = {}
@@ -212,6 +234,11 @@ export async function syncCyclingStageTimes(): Promise<SyncStageTimesResult> {
     // hvis ruten justeres tæt på løb-start)
     if (climbs.length > 0) updates.climbs = climbs
 
+    // Profil-billede — kun opdater hvis ændret (idempotent)
+    if (profileImageUrl && profileImageUrl !== stage.profile_image_url) {
+      updates.profile_image_url = profileImageUrl
+    }
+
     if (Object.keys(updates).length === 0) continue
 
     const { error: updErr } = await supabaseAdmin
@@ -224,6 +251,7 @@ export async function syncCyclingStageTimes(): Promise<SyncStageTimesResult> {
     const parts: string[] = []
     if (updates.start_time_utc) parts.push(`${dateStr} ${localTime} CEST → ${updates.start_time_utc as string}`)
     if (updates.climbs) parts.push(`${climbs.length} klatringer`)
+    if (updates.profile_image_url) parts.push('profil-billede')
     console.log(`[syncStageTimes] ${race.pcs_slug} etape ${stage.stage_number}: ${parts.join(', ')}`)
   }
 

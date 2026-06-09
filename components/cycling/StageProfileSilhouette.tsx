@@ -25,6 +25,9 @@ type Props = {
   profileScore: number | null
   stageNumber: number
   climbs?: CyclingStageClimb[]
+  /** PCS' rigtige profil-billede (FlammeRouge-højdekurve). Når sat, vises det
+   *  i stedet for den genererede silhuet. */
+  imageUrl?: string | null
 }
 
 const WIDTH = 800
@@ -188,10 +191,45 @@ function buildProceduralPath(
 // ── Hovedkomponent ─────────────────────────────────────────────────────────
 
 export default function StageProfileSilhouette({
-  profile, verticalMeters, distanceKm, profileScore, stageNumber, climbs,
+  profile, verticalMeters, distanceKm, profileScore, stageNumber, climbs, imageUrl,
 }: Props) {
   const vm = verticalMeters ?? 1200
   const ps = profileScore ?? 100
+
+  // Hvis vi har PCS' rigtige profil-billede, vis det — det er præcis hvad
+  // brugerne bad om (ægte højdekurve til at planlægge trup). Silhuetten er
+  // kun fallback når billedet ikke er hentet endnu.
+  if (imageUrl) {
+    const stats: string[] = []
+    if (distanceKm != null && distanceKm > 0) stats.push(`${distanceKm} km`)
+    if (verticalMeters != null && verticalMeters > 0) stats.push(`↑ ${verticalMeters.toLocaleString()} m`)
+    return (
+      <div style={{
+        position: 'relative',
+        background: '#fff',
+        borderRadius: 4,
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={`Profil etape ${stageNumber}`}
+          style={{ width: '100%', height: 'auto', display: 'block' }}
+        />
+        {stats.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 5, right: 7,
+            fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
+            color: '#1a1a1a', fontWeight: 700,
+            background: 'rgba(255,255,255,0.85)', padding: '1px 6px', borderRadius: 2,
+          }}>
+            {stats.join(' · ')}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   const useRealClimbs = climbs && climbs.length > 0
   // Har vi præcise positioner (afviklede etaper via KOM-data)? Hvis ja kan vi

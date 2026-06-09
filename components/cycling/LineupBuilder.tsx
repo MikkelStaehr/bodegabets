@@ -880,7 +880,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
       )}
 
       {/* ── Profil-silhuet toggle (vises hvis vi har data) ─────── */}
-      {!noSquadForBlock && activeStage && (activeStage.profile || activeStage.vertical_meters) && (
+      {!noSquadForBlock && activeStage && (activeStage.profile || activeStage.vertical_meters || activeStage.profile_image_url) && (
         <div style={{
           padding: '6px 14px 0',
           background: theme.bgDark,
@@ -911,6 +911,7 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 profileScore={activeStage.profile_score}
                 stageNumber={activeStage.stage_number}
                 climbs={activeStage.climbs}
+                imageUrl={activeStage.profile_image_url}
               />
             </div>
           )}
