@@ -172,8 +172,17 @@ export default async function GamePage({ params }: Props) {
   }
   const defaultLeagueInfo = seasonLeagueMap.values().next().value ?? { abbr: '??', type: 'league' as const }
 
+  // En runde er åben at spille på når status='open' OG deadline ikke er
+  // passeret — SAMME betingelse som submit-bets-gaten (round.status==='open').
+  // Tidligere brugte vi round.bet_open, men det flag sættes kun som bivirkning
+  // når en kamp i runden låses (syncMatchScores) — så en runde hvis kampe alle
+  // er fremtidige fik aldrig bet_open=true og blev usynlig, selvom man godt
+  // kunne spille på den. Vi udleder nu åbenheden fra runde-livscyklussen.
+  const isRoundBettable = (r: { status: string; betting_closes_at: string | null }, nowMs: number) =>
+    r.status === 'open' && (r.betting_closes_at == null || new Date(r.betting_closes_at).getTime() > nowMs)
+  const nowMsEarly = Date.now()
   const activeRoundEarly =
-    typedRoundsEarly.find((r) => r.bet_open === true) ?? null
+    typedRoundsEarly.find((r) => isRoundBettable(r, nowMsEarly)) ?? null
   const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string; season_id: number } | null) ?? null
 
   const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
@@ -1062,7 +1071,7 @@ export default async function GamePage({ params }: Props) {
           .in('match_id', allMatchIds)
       : { data: [] as { id: number; match_id: number }[] }
 
-  const openRounds = sortedRounds.filter((r) => r.bet_open === true)
+  const openRounds = sortedRounds.filter((r) => isRoundBettable(r, Date.now()))
 
   const userBetsByRound: Record<number, number> = {}
   const seenMatchIds = new Set<number>()
