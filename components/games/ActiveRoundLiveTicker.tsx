@@ -3,6 +3,36 @@
 import { useGameStateContextOptional } from '@/hooks/useGameState'
 import { LiveMatchesTicker } from '@/components/games/LiveMatchesTicker'
 import type { LiveMatch, LiveSummary } from '@/hooks/useLiveMatches'
+import { useCalendarSelection } from '@/components/games/CalendarSelectionContext'
+import type { CalendarMatch } from '@/components/games/CalendarSlider'
+
+// Konvertér en kalender-kamp til live-ticker-formatet, så de valgte dags
+// kampe vises præcis som live-kampene (flag, score/tid, status). Ingen odds/
+// bets på fremtidige kampe — de felter er bevidst tomme.
+function toTickerMatch(m: CalendarMatch): LiveMatch {
+  return {
+    id: m.id,
+    home_team: m.home_team,
+    away_team: m.away_team,
+    home_team_logo: m.home_team_logo ?? null,
+    away_team_logo: m.away_team_logo ?? null,
+    home_score: m.home_score,
+    away_score: m.away_score,
+    status: m.status,
+    kickoff_at: m.kickoff_at,
+    tournamentLogo: null,
+    userPrediction: null,
+    bet_open: m.status === 'scheduled',
+    distribution: null,
+    isRivalry: m.isRivalry ?? false,
+    rivalryName: null,
+  } as unknown as LiveMatch
+}
+
+function dateLabel(dateKey: string): string {
+  const d = new Date(`${dateKey}T12:00:00`)
+  return d.toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
 export default function ActiveRoundLiveTicker() {
   const ctx = useGameStateContextOptional()
@@ -12,6 +42,19 @@ export default function ActiveRoundLiveTicker() {
   }
   const lastUpdate = ctx?.lastUpdate ?? null
   const isLoading = ctx?.isLoading ?? true
+
+  // Valgt kalender-dato (≠ i dag) med kampe → vises under live-kampene.
+  const sel = useCalendarSelection()
+  const picked = sel?.selection && !sel.selection.isToday && sel.selection.matches.length > 0
+    ? sel.selection
+    : null
+  const pickedMatches = picked ? picked.matches.map(toTickerMatch) : []
+  const pickedSummary: LiveSummary = {
+    live: 0, halftime: 0,
+    finished: pickedMatches.filter((m) => m.status === 'finished').length,
+    scheduled: pickedMatches.filter((m) => m.status === 'scheduled').length,
+    total: pickedMatches.length, roundName: null,
+  }
 
   if (isLoading) {
     return (
@@ -37,7 +80,10 @@ export default function ActiveRoundLiveTicker() {
     )
   }
 
-  if (matches.length === 0) return (
+  const hasLive = matches.length > 0
+
+  // Hverken live-kampe i dag eller en valgt dato → behold den enkle besked.
+  if (!hasLive && !picked) return (
     <div style={{
       marginTop: 16,
       background: '#1a3329',
@@ -54,9 +100,6 @@ export default function ActiveRoundLiveTicker() {
   )
 
   return (
-    // Ticker er nu placeret INDE i GameroomLayout main-kolonne (~712px på
-    // desktop), så den fylder kolonnens fulde bredde og integrerer pænt
-    // med ranglisten under. På narrow viewports stack'er den naturligt.
     <div style={{
       marginTop: 16,
       background: '#1a3329',
@@ -64,11 +107,31 @@ export default function ActiveRoundLiveTicker() {
       overflow: 'hidden',
       border: '1px solid rgba(255,255,255,0.08)',
     }}>
-      <LiveMatchesTicker
-        matches={matches}
-        summary={summary}
-        lastUpdate={lastUpdate}
-      />
+      {hasLive && (
+        <LiveMatchesTicker
+          matches={matches}
+          summary={summary}
+          lastUpdate={lastUpdate}
+        />
+      )}
+
+      {/* Valgt kalender-dato — vist under live-kampene, adskilt med en kraftig
+          linje, så man kan se kampene på en fremtidig (eller tidligere) dag. */}
+      {picked && (
+        <>
+          {hasLive && <div style={{ height: 3, background: 'rgba(0,0,0,0.25)' }} />}
+          <LiveMatchesTicker
+            matches={pickedMatches}
+            summary={pickedSummary}
+            lastUpdate={null}
+            headerTitle={
+              <span className="text-[11px] font-bold uppercase tracking-wider capitalize" style={{ color: '#F2EDE4' }}>
+                {dateLabel(picked.dateKey)}
+              </span>
+            }
+          />
+        </>
+      )}
     </div>
   )
 }

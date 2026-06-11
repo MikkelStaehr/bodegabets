@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { useCalendarSelection } from './CalendarSelectionContext'
 
 export type CalendarMatch = {
   id: number
@@ -10,6 +11,8 @@ export type CalendarMatch = {
   season_id: number
   home_team: string
   away_team: string
+  home_team_logo?: string | null
+  away_team_logo?: string | null
   home_score: number | null
   away_score: number | null
   isRivalry?: boolean
@@ -166,6 +169,20 @@ export default function CalendarSlider({
     }
     return days
   }, [viewMonth, matchesByDate, roundByName, todayKey])
+
+  // Rapportér den valgte dato (+ dens kampe) til live-kassen via context, så
+  // den kan vise dagens kampe under live-kampene. sel udelades bevidst fra
+  // deps — setSelection er stabil (useMemo i provideren), og at inkludere sel
+  // ville loope ved provider-re-render.
+  const sel = useCalendarSelection()
+  useEffect(() => {
+    sel?.setSelection({
+      dateKey: selectedDate,
+      isToday: selectedDate === todayKey,
+      matches: matchesByDate.get(selectedDate) ?? [],
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, todayKey, matchesByDate])
 
   useEffect(() => {
     selectedDayRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
