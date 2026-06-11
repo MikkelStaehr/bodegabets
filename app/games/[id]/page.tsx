@@ -8,6 +8,7 @@ import { findActiveSubBlock, shortSubBlockName } from '@/lib/cyclingBlocks'
 import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
+import { CalendarSelectionProvider } from '@/components/games/CalendarSelectionContext'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
 import CalendarSlider from '@/components/games/CalendarSlider'
 import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
@@ -970,8 +971,8 @@ export default async function GamePage({ params }: Props) {
     season_id: number
     home_score: number | null
     away_score: number | null
-    home_team: { id: number; name: string }
-    away_team: { id: number; name: string }
+    home_team: { id: number; name: string; logo_url: string | null }
+    away_team: { id: number; name: string; logo_url: string | null }
   }
   const { data: allMatchesRaw } =
     seasonIds.length > 0
@@ -981,8 +982,8 @@ export default async function GamePage({ params }: Props) {
             id, kickoff_at:kickoff, status, result,
             round_name, season_id,
             home_score, away_score,
-            home_team:teams!home_team_id(id, name),
-            away_team:teams!away_team_id(id, name)
+            home_team:teams!home_team_id(id, name, logo_url),
+            away_team:teams!away_team_id(id, name, logo_url)
           `)
           .in('season_id', seasonIds)
           .order('kickoff', { ascending: true })
@@ -1052,6 +1053,8 @@ export default async function GamePage({ params }: Props) {
     season_id: m.season_id,
     home_team: m.home_team?.name ?? '',
     away_team: m.away_team?.name ?? '',
+    home_team_logo: m.home_team?.logo_url ?? null,
+    away_team_logo: m.away_team?.logo_url ?? null,
     home_score: m.home_score,
     away_score: m.away_score,
     isRivalry: rivalryMatchIds.has(m.id),
@@ -1548,6 +1551,7 @@ export default async function GamePage({ params }: Props) {
             }
             main={
               <>
+                <CalendarSelectionProvider>
                 <div className="border-t border-b border-[#d4cec4]">
                   <CalendarSlider
                     matches={allMatches}
@@ -1583,6 +1587,7 @@ export default async function GamePage({ params }: Props) {
                   />
                   <ActiveRoundLiveTicker />
                 </div>
+                </CalendarSelectionProvider>
                 {initialGameState && (
                   <FootballLiveSection
                     gameId={gameId}
