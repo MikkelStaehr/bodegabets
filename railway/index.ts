@@ -218,19 +218,34 @@ app.get('/update-rounds', async (_req, res) => {
     }
 
     // 2) Åbn næste upcoming runde per season
+    //
+    // SELVHELENDE sekventiel åbning: tidligere blokerede en runde den næste
+    // indtil den var markeret 'finished' (alle kampe spillet). Hvis en runde
+    // satte sig fast (en kamp blev udsat/aldrig færdig) stoppede hele kæden →
+    // ingen åbne runder. Nu betragtes en runde KUN som blokerende mens dens
+    // betting-deadline er i fremtiden. Når deadline er passeret, blokerer den
+    // ikke længere — så næste runde åbner uanset om den forrige hænger fast.
+    // (Displayet skjuler alligevel runder med passeret deadline.)
+    const deadlinePassed = (rd: RoundRow) =>
+      rd.betting_closes_at != null && new Date(rd.betting_closes_at).getTime() < now.getTime()
     const toMarkOpen = rounds.filter((r) => {
       if (r.status !== 'upcoming') return false
       if (finishedIds.includes(r.id)) return false
       const seasonRounds = roundsBySeason.get(r.season_id) ?? []
       const effectiveStatus = (rd: RoundRow) => finishedIds.includes(rd.id) ? 'finished' : rd.status
+      // En runde blokerer kun hvis den er aktiv OG dens betting stadig er åben.
       const hasActiveRound = seasonRounds.some(
-        (rd) => rd.id !== r.id && (effectiveStatus(rd) === 'open' || effectiveStatus(rd) === 'closed')
+        (rd) => rd.id !== r.id
+          && (effectiveStatus(rd) === 'open' || effectiveStatus(rd) === 'closed')
+          && !deadlinePassed(rd)
       )
       if (hasActiveRound) return false
       const idx = seasonRounds.findIndex((rd) => rd.id === r.id)
       if (idx > 0) {
         const prev = seasonRounds[idx - 1]
-        if (effectiveStatus(prev) !== 'finished') return false
+        // Forrige runde må gerne åbne denne: enten færdig, ELLER dens betting
+        // er lukket (deadline passeret) — så en fastlåst forrige ikke blokerer.
+        if (effectiveStatus(prev) !== 'finished' && !deadlinePassed(prev)) return false
       }
       return true
     })
