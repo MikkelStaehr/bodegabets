@@ -90,6 +90,10 @@ type Props = {
   blockBudget?: number
   /** Allerede brugt i blokkens ANDRE runder (trækkes fra budgettet her). */
   blockSpentElsewhere?: number
+  /** True hvis ubrugte credits ruller videre til en senere runde i samme blok
+   *  (dvs. det er fair at gemme). Så bliver "ubrugt"-beskeden neutral i stedet
+   *  for en advarsel. */
+  creditsRollOver?: boolean
   submitApiPath?: string
 }
 
@@ -655,6 +659,7 @@ export default function AfgivBets({
   blockInfo,
   blockBudget = 1000,
   blockSpentElsewhere = 0,
+  creditsRollOver = false,
   submitApiPath,
 }: Props) {
   const router = useRouter()
@@ -1118,15 +1123,26 @@ export default function AfgivBets({
         {/* Mobile sticky footer */}
         {!isReadOnly && (
           <div className="fixed bottom-0 left-0 right-0 z-[90]">
-            {/* Ubrugte credits-nudge — ét tryk maxer ud */}
+            {/* Credits tilbage-nudge. I en blok (rollover) er det fair at gemme
+                til næste runde → neutral besked. Ellers: ubrugt = spildt. */}
             {!isOverBudget && selections.length > 0 && displayCredits > 0 && (
-              <button
-                type="button"
-                onClick={maxOut}
-                className="w-full bg-gold text-[var(--color-dark-green)] font-condensed text-[12px] font-bold tracking-wider py-2 px-4 flex items-center justify-center gap-1.5 active:opacity-85"
-              >
-                ⚡ {displayCredits} CREDITS UBRUGT — TRYK FOR AT MAXE UD
-              </button>
+              creditsRollOver ? (
+                <button
+                  type="button"
+                  onClick={maxOut}
+                  className="w-full bg-[#2C4A3E] text-[var(--color-cream)] font-condensed text-[12px] font-bold tracking-wider py-2 px-4 flex items-center justify-center gap-1.5 active:opacity-85"
+                >
+                  💡 {displayCredits} credits gemmes til blokkens næste runde · tryk for at bruge nu
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={maxOut}
+                  className="w-full bg-gold text-[var(--color-dark-green)] font-condensed text-[12px] font-bold tracking-wider py-2 px-4 flex items-center justify-center gap-1.5 active:opacity-85"
+                >
+                  ⚡ {displayCredits} CREDITS UBRUGT — TRYK FOR AT MAXE UD
+                </button>
+              )
             )}
             <div
               className={`border-t-2 transition-colors ${
@@ -1137,7 +1153,7 @@ export default function AfgivBets({
                 <div className="flex flex-col">
                   <span className="text-[9px] font-bold tracking-widest uppercase text-white/50">
                     {!isOverBudget && selections.length > 0 && displayCredits > 0
-                      ? 'Ubrugt'
+                      ? (creditsRollOver ? 'Tilbage til blokken' : 'Ubrugt')
                       : 'Dine credits'}
                   </span>
                   <span className={`font-condensed text-[20px] font-extrabold leading-none ${
@@ -1208,7 +1224,7 @@ export default function AfgivBets({
                 <div className="flex items-center justify-between">
                   <span className="text-[8px] font-bold tracking-widest text-[var(--color-warm-taupe)] uppercase">
                     {!isOverBudget && selections.length > 0 && displayCredits > 0
-                      ? 'Ubrugte credits'
+                      ? (creditsRollOver ? 'Tilbage til blokken' : 'Ubrugte credits')
                       : 'Dine credits'}
                   </span>
                   <span className={`font-condensed text-[18px] font-extrabold leading-none ${
@@ -1227,15 +1243,25 @@ export default function AfgivBets({
                     Blok-budget {blockBudget} · brugt i blokkens anden runde: {blockSpentElsewhere}
                   </p>
                 )}
-                {/* Maxe ud-knap når der er ubrugte credits */}
+                {/* Maxe ud / læg-i-spil-knap når der er credits tilbage */}
                 {!isOverBudget && selections.length > 0 && displayCredits > 0 && (
                   <button
                     type="button"
                     onClick={maxOut}
-                    className="mt-2 w-full h-[32px] rounded-sm bg-gold text-[var(--color-dark-green)] font-condensed text-[12px] font-bold tracking-widest hover:bg-[#d4aa55] transition-colors"
+                    className={`mt-2 w-full h-[32px] rounded-sm font-condensed text-[12px] font-bold tracking-widest transition-colors ${
+                      creditsRollOver
+                        ? 'border border-[#2C4A3E] text-[var(--color-dark-green)] hover:bg-[#2C4A3E]/5'
+                        : 'bg-gold text-[var(--color-dark-green)] hover:bg-[#d4aa55]'
+                    }`}
                   >
-                    ⚡ MAXE UD · BRUG {displayCredits} PT
+                    {creditsRollOver ? `⚡ LÆG RESTEN I SPIL · ${displayCredits} PT` : `⚡ MAXE UD · BRUG ${displayCredits} PT`}
                   </button>
+                )}
+                {/* I en blok: forklar at resten gemmes til næste runde */}
+                {creditsRollOver && !isOverBudget && selections.length > 0 && displayCredits > 0 && (
+                  <p className="mt-1.5 text-center text-[9px] text-[var(--color-warm-taupe)] leading-tight">
+                    Ellers gemmes de {displayCredits} til blokkens næste runde.
+                  </p>
                 )}
                 {selections.length > 0 && displayCredits === 0 && (
                   <p className="mt-1.5 text-center text-[10px] font-bold tracking-wider text-gold uppercase">
@@ -1426,8 +1452,13 @@ export default function AfgivBets({
               Du har {displayCredits} credits tilbage
             </h3>
             <p className="text-[13px] text-[var(--color-warm-taupe)] leading-relaxed mb-4">
-              Ubrugte credits giver <strong>ingen point</strong>. Vil du fordele dem på dine valg,
-              så du får mest muligt ud af dine odds?
+              {creditsRollOver ? (
+                <>I en blok deles dine credits over to runder. Du kan <strong>gemme</strong> resten
+                til blokkens næste runde, eller lægge dem i spil nu.</>
+              ) : (
+                <>Ubrugte credits giver <strong>ingen point</strong>. Vil du fordele dem på dine valg,
+                så du får mest muligt ud af dine odds?</>
+              )}
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -1438,7 +1469,7 @@ export default function AfgivBets({
                 }}
                 className="w-full h-[44px] rounded-sm bg-gold text-[var(--color-dark-green)] font-condensed text-[14px] font-bold tracking-widest hover:bg-[#d4aa55] transition-colors"
               >
-                ⚡ FORDEL RESTEN AUTOMATISK
+                {creditsRollOver ? '⚡ LÆG RESTEN I SPIL NU' : '⚡ FORDEL RESTEN AUTOMATISK'}
               </button>
               <button
                 type="button"
@@ -1446,7 +1477,7 @@ export default function AfgivBets({
                 disabled={isSubmitting}
                 className="w-full h-[44px] rounded-sm bg-[var(--color-dark-green)] text-white font-condensed text-[14px] font-bold tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {isSubmitting ? 'GEMMER…' : 'LÅS VALG ALLIGEVEL'}
+                {isSubmitting ? 'GEMMER…' : creditsRollOver ? 'GEM TIL NÆSTE RUNDE' : 'LÅS VALG ALLIGEVEL'}
               </button>
               <button
                 type="button"
