@@ -8,6 +8,7 @@ import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
 import { formatKickoff } from '@/lib/dateUtils'
 import GameTicker from '@/components/games/GameTicker'
+import BetSlipGuide from '@/components/games/BetSlipGuide'
 
 type MatchWithOptions = Match
 
@@ -1057,6 +1058,9 @@ export default function AfgivBets({
 
   return (
     <div className="min-h-screen bg-[var(--color-cream)]">
+      {/* Engangs-guide til kuponen — kun når man faktisk kan spille */}
+      {!isReadOnly && <BetSlipGuide />}
+
       {/* Ticker */}
       {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
 
