@@ -1343,11 +1343,15 @@ app.listen(PORT, () => {
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date()
-      const utcHour = now.getUTCHours()
       const minute = now.getMinutes()
 
-      // ── Nattepause: 00:00–11:00 UTC (01:00–12:00 DK) — ingen fodboldkampe ──
-      if (utcHour >= 0 && utcHour < 11) return
+      // INGEN tidsbaseret nattepause: VM 2026 spilles i USA, så kampene kører
+      // hen over den danske nat (typisk 02:00–05:00 UTC / 04:00–07:00 DK). En
+      // fast pause 00:00–11:00 UTC sprang live-sync over for de kampe og
+      // fastfrøs dem midt i halvlegen. Match-tjekkene nedenfor afgør selv
+      // frekvensen — hvert minut når en kamp er live/begyndt, hvert 30. minut
+      // når der intet er — så cost ved at køre 24/7 er minimal (lette,
+      // indekserede limit-1 opslag).
 
       const soon = new Date(now.getTime() + 30 * 60 * 1000).toISOString()
 
