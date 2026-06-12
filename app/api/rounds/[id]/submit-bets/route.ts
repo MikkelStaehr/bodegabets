@@ -97,6 +97,56 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'En eller flere kampe er lukket for bets' }, { status: 400 })
   }
 
+  // ── Budget-grundlag (1000 credits) ────────────────────────────────────────
+  // VM (credits_per_block): budgettet er pr. BLOK, delt over blokkens runder
+  // (ekskl. legacy-runde). Ellers pr. runde. Beregnes FØR write, så loftet kan
+  // håndhæves server-side (ikke kun i UI'et).
+  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175]
+  const roundBlockId = (round as { block_id?: number | null }).block_id ?? null
+  let creditsPerBlock = false
+  if (roundBlockId) {
+    const { data: seasonRow } = await supabaseAdmin
+      .from('seasons')
+      .select('credits_per_block')
+      .eq('id', round.season_id)
+      .single()
+    creditsPerBlock = (seasonRow as { credits_per_block?: boolean } | null)?.credits_per_block === true
+  }
+
+  let budgetRoundIds: number[] = [roundId]
+  if (creditsPerBlock && roundBlockId) {
+    const { data: blockRounds } = await supabaseAdmin
+      .from('rounds')
+      .select('id')
+      .eq('block_id', roundBlockId)
+    budgetRoundIds = (blockRounds ?? [])
+      .map((r) => r.id as number)
+      .filter((rid) => !LEGACY_PRE_BLOCK_ROUND_IDS.includes(rid))
+    if (!budgetRoundIds.includes(roundId)) budgetRoundIds.push(roundId)
+  }
+
+  // Håndhæv 1000-loftet: allerede-placerede indsatser i budgettet (på kampe der
+  // IKKE erstattes i denne submission) + de nye indsatser må ikke overstige 1000.
+  const newPayloadStake = bets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
+  const { data: existingBudgetBets } = await supabaseAdmin
+    .from('bets')
+    .select('stake, match_id')
+    .eq('user_id', user.id)
+    .eq('game_id', bodyGameId)
+    .in('round_id', budgetRoundIds)
+  const existingBudgetStake = (existingBudgetBets ?? [])
+    .filter((b) => !payloadMatchIds.includes(b.match_id as number))
+    .reduce((sum, b) => sum + (b.stake ?? 0), 0)
+  if (existingBudgetStake + newPayloadStake > 1000) {
+    const scope = creditsPerBlock ? 'blokken' : 'runden'
+    return NextResponse.json(
+      {
+        error: `Du kan højst bruge 1000 credits i ${scope}. Du har ${Math.max(0, 1000 - existingBudgetStake)} tilbage.`,
+      },
+      { status: 400 }
+    )
+  }
+
   // Slet kun eksisterende bets for de kampe der er med i denne submission
   if (payloadMatchIds.length > 0) {
     const { error: deleteError } = await supabaseAdmin
@@ -126,33 +176,8 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  // Opdater betting_balance. VM (credits_per_block): budgettet er pr. BLOK
-  // (1000 delt over blokkens runder) → summér stakes på tværs af blokkens
-  // runder (ekskl. legacy). Ellers pr. runde som hidtil.
-  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175]
-  const roundBlockId = (round as { block_id?: number | null }).block_id ?? null
-  let creditsPerBlock = false
-  if (roundBlockId) {
-    const { data: seasonRow } = await supabaseAdmin
-      .from('seasons')
-      .select('credits_per_block')
-      .eq('id', round.season_id)
-      .single()
-    creditsPerBlock = (seasonRow as { credits_per_block?: boolean } | null)?.credits_per_block === true
-  }
-
-  let budgetRoundIds: number[] = [roundId]
-  if (creditsPerBlock && roundBlockId) {
-    const { data: blockRounds } = await supabaseAdmin
-      .from('rounds')
-      .select('id')
-      .eq('block_id', roundBlockId)
-    budgetRoundIds = (blockRounds ?? [])
-      .map((r) => r.id as number)
-      .filter((rid) => !LEGACY_PRE_BLOCK_ROUND_IDS.includes(rid))
-    if (!budgetRoundIds.includes(roundId)) budgetRoundIds.push(roundId)
-  }
-
+  // Opdater betting_balance ud fra blokkens/rundens samlede forbrug
+  // (budgetRoundIds er beregnet ovenfor).
   const { data: allRoundBets, error: betsQueryError } = await supabaseAdmin
     .from('bets')
     .select('stake')
