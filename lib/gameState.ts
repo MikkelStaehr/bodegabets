@@ -579,13 +579,18 @@ async function buildFootballLeaderboard(
   for (const m of members) {
     userData.set(m.user_id, { roundPoints: new Map(), blockPoints: new Map() })
   }
+  // Spil UDEN blokke (fx VM): runderne har block_id=null → currentBlockId=null.
+  // Da samles alle runder under én "blok" (sentinel-nøgle 0), så block_points
+  // = sæsonens samlede point. Uden dette var blok-point altid 0 (det gamle
+  // `if (currentBlockId)` sprang akkumuleringen over) → leaderboardet viste "—".
+  const blockKey = currentBlockId ?? 0
   for (const s of scores ?? []) {
     if (!currentBlockRoundIds.has(s.round_id as number)) continue
     const ud = userData.get(s.user_id)
     if (!ud) continue
     const pts = Number(s.earnings_delta) || 0
     ud.roundPoints.set(s.round_id, (ud.roundPoints.get(s.round_id) ?? 0) + pts)
-    if (currentBlockId) ud.blockPoints.set(currentBlockId, (ud.blockPoints.get(currentBlockId) ?? 0) + pts)
+    ud.blockPoints.set(blockKey, (ud.blockPoints.get(blockKey) ?? 0) + pts)
   }
 
   // R. SEJR = wins i nuværende bloks finished rounds.
