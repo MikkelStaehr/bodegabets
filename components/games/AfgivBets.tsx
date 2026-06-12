@@ -656,6 +656,7 @@ export default function AfgivBets({
   const [selections, setSelections] = useState<BetEntry[]>(() => initSelections(matches, existingBets))
   const [editingMatchIds, setEditingMatchIds] = useState<Set<number>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showUnusedWarning, setShowUnusedWarning] = useState(false)
 
   const isReadOnly = round.status === 'finished'
 
@@ -748,6 +749,52 @@ export default function AfgivBets({
     )
   }
 
+  // "Maxe ud": skalér alle aktive indsatser (match_result + ekstra) proportionalt,
+  // så de tilsammen bruger ALLE resterende credits. Eksisterende, allerede-betalte
+  // bets røres ikke — der skaleres kun op til (1000 − allerede brugt).
+  const maxOut = useCallback(() => {
+    const existingStake = existingBets
+      .filter((b) => !selections.some((s) => s.matchId === b.match_id))
+      .reduce((sum, b) => sum + (b.stake ?? 0), 0)
+    const available = 1000 - existingStake
+    if (available <= 0 || selections.length === 0) return
+
+    // Flad liste over alle aktive indsats-poster
+    type Flat = { matchId: number; kind: 'main' | ExtraBetType; points: number }
+    const flat: Flat[] = []
+    for (const s of selections) {
+      flat.push({ matchId: s.matchId, kind: 'main', points: s.points })
+      for (const eb of s.extraBets) flat.push({ matchId: s.matchId, kind: eb.type, points: eb.points })
+    }
+    const currentNew = flat.reduce((sum, e) => sum + e.points, 0)
+    if (currentNew <= 0) return
+
+    const factor = available / currentNew
+    const scaled = flat.map((e) => ({ ...e, points: Math.max(10, Math.round(e.points * factor)) }))
+
+    // Ret afrundings-rest af, så summen rammer præcis `available` — læg den på
+    // den største post (langt over 10, så min-grænsen brydes ikke).
+    const diff = available - scaled.reduce((sum, e) => sum + e.points, 0)
+    if (diff !== 0) {
+      const idx = scaled.reduce((maxI, e, i, arr) => (e.points > arr[maxI].points ? i : maxI), 0)
+      scaled[idx] = { ...scaled[idx], points: Math.max(10, scaled[idx].points + diff) }
+    }
+
+    setSelections((prev) =>
+      prev.map((s) => {
+        const main = scaled.find((e) => e.matchId === s.matchId && e.kind === 'main')
+        return {
+          ...s,
+          points: main ? main.points : s.points,
+          extraBets: s.extraBets.map((eb) => {
+            const sc = scaled.find((e) => e.matchId === s.matchId && e.kind === eb.type)
+            return sc ? { ...eb, points: sc.points } : eb
+          }),
+        }
+      })
+    )
+  }, [existingBets, selections])
+
   const toggleExtra = (matchId: number, key: ExtraBetType, value: string) => {
     setSelections((prev) =>
       prev.map((s) => {
@@ -839,12 +886,23 @@ export default function AfgivBets({
     setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
   }
 
-  async function handleSubmit() {
-    if (selections.length === 0) return
+  function handleSubmit() {
+    if (selections.length === 0 || isSubmitting) return
     if (isOverBudget) {
       toast(`Ikke nok credits. Du har ${displayCredits} pt tilbage.`, 'error')
       return
     }
+    // Nudge: hvis spilleren ikke har maxet sine credits ud, så spørg først.
+    if (displayCredits > 0) {
+      setShowUnusedWarning(true)
+      return
+    }
+    doSubmit()
+  }
+
+  async function doSubmit() {
+    setShowUnusedWarning(false)
+    if (selections.length === 0) return
 
     const payload = {
       game_id: gameId,
@@ -1043,36 +1101,50 @@ export default function AfgivBets({
 
         {/* Mobile sticky footer */}
         {!isReadOnly && (
-          <div
-            className={`fixed bottom-0 left-0 right-0 z-[90] border-t-2 transition-colors ${
-              isOverBudget ? 'bg-[#c0392b] border-[#c0392b]' : 'bg-[var(--color-dark-green)] border-[#1a3329]'
-            }`}
-          >
-            <div className="max-w-[680px] mx-auto px-4 py-3 flex items-center justify-between gap-3">
-              <div className="flex flex-col">
-                <span className="text-[9px] font-bold tracking-widest uppercase text-white/50">
-                  Dine credits
-                </span>
-                <span className={`font-condensed text-[20px] font-extrabold leading-none ${
-                  isOverBudget ? 'text-white' : 'text-gold'
-                }`}>
-                  {displayCredits} pt
-                </span>
-              </div>
+          <div className="fixed bottom-0 left-0 right-0 z-[90]">
+            {/* Ubrugte credits-nudge — ét tryk maxer ud */}
+            {!isOverBudget && selections.length > 0 && displayCredits > 0 && (
               <button
                 type="button"
-                onClick={handleSubmit}
-                disabled={selections.length === 0 || isSubmitting || isOverBudget}
-                className={`h-[42px] px-5 rounded-sm font-condensed text-[14px] font-bold tracking-wider transition-all ${
-                  isOverBudget || selections.length === 0 || isSubmitting
-                    ? 'bg-white/20 text-white/40 cursor-not-allowed'
-                    : 'bg-gold text-[var(--color-dark-green)] hover:bg-[#d4aa55] hover:-translate-y-px'
-                }`}
+                onClick={maxOut}
+                className="w-full bg-gold text-[var(--color-dark-green)] font-condensed text-[12px] font-bold tracking-wider py-2 px-4 flex items-center justify-center gap-1.5 active:opacity-85"
               >
-                {isSubmitting
-                  ? 'Gemmer...'
-                  : `${selections.length} valg · ${totalPoints} pt · LÅS VALG →`}
+                ⚡ {displayCredits} CREDITS UBRUGT — TRYK FOR AT MAXE UD
               </button>
+            )}
+            <div
+              className={`border-t-2 transition-colors ${
+                isOverBudget ? 'bg-[#c0392b] border-[#c0392b]' : 'bg-[var(--color-dark-green)] border-[#1a3329]'
+              }`}
+            >
+              <div className="max-w-[680px] mx-auto px-4 py-3 flex items-center justify-between gap-3">
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-bold tracking-widest uppercase text-white/50">
+                    {!isOverBudget && selections.length > 0 && displayCredits > 0
+                      ? 'Ubrugt'
+                      : 'Dine credits'}
+                  </span>
+                  <span className={`font-condensed text-[20px] font-extrabold leading-none ${
+                    isOverBudget ? 'text-white' : 'text-gold'
+                  }`}>
+                    {displayCredits === 0 && selections.length > 0 ? '✓ Maxet' : `${displayCredits} pt`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={selections.length === 0 || isSubmitting || isOverBudget}
+                  className={`h-[42px] px-5 rounded-sm font-condensed text-[14px] font-bold tracking-wider transition-all ${
+                    isOverBudget || selections.length === 0 || isSubmitting
+                      ? 'bg-white/20 text-white/40 cursor-not-allowed'
+                      : 'bg-gold text-[var(--color-dark-green)] hover:bg-[#d4aa55] hover:-translate-y-px'
+                  }`}
+                >
+                  {isSubmitting
+                    ? 'Gemmer...'
+                    : `${selections.length} valg · ${totalPoints} pt · LÅS VALG →`}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1119,14 +1191,35 @@ export default function AfgivBets({
               <div className="px-3 py-2.5 border-b border-black/10 bg-[var(--color-cream)] shrink-0">
                 <div className="flex items-center justify-between">
                   <span className="text-[8px] font-bold tracking-widest text-[var(--color-warm-taupe)] uppercase">
-                    Dine credits
+                    {!isOverBudget && selections.length > 0 && displayCredits > 0
+                      ? 'Ubrugte credits'
+                      : 'Dine credits'}
                   </span>
                   <span className={`font-condensed text-[18px] font-extrabold leading-none ${
-                    isOverBudget ? 'text-[var(--color-red-dark)]' : 'text-[var(--color-dark-green)]'
+                    isOverBudget
+                      ? 'text-[var(--color-red-dark)]'
+                      : selections.length > 0 && displayCredits > 0
+                        ? 'text-gold'
+                        : 'text-[var(--color-dark-green)]'
                   }`}>
                     {displayCredits} pt
                   </span>
                 </div>
+                {/* Maxe ud-knap når der er ubrugte credits */}
+                {!isOverBudget && selections.length > 0 && displayCredits > 0 && (
+                  <button
+                    type="button"
+                    onClick={maxOut}
+                    className="mt-2 w-full h-[32px] rounded-sm bg-gold text-[var(--color-dark-green)] font-condensed text-[12px] font-bold tracking-widest hover:bg-[#d4aa55] transition-colors"
+                  >
+                    ⚡ MAXE UD · BRUG {displayCredits} PT
+                  </button>
+                )}
+                {selections.length > 0 && displayCredits === 0 && (
+                  <p className="mt-1.5 text-center text-[10px] font-bold tracking-wider text-gold uppercase">
+                    ✓ Alle credits i spil
+                  </p>
+                )}
               </div>
             )}
 
@@ -1295,6 +1388,55 @@ export default function AfgivBets({
           </div>
         </div>
       </div>
+
+      {/* Ubrugte credits — bekræft før lås */}
+      {showUnusedWarning && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-6"
+          onClick={() => setShowUnusedWarning(false)}
+        >
+          <div
+            className="bg-white rounded-sm border border-black/10 max-w-sm w-full p-5 shadow-xl"
+            style={{ animation: 'fadeSlideIn 0.2s ease' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-condensed text-[22px] font-extrabold text-[var(--color-dark-green)] leading-tight mb-1.5">
+              Du har {displayCredits} credits tilbage
+            </h3>
+            <p className="text-[13px] text-[var(--color-warm-taupe)] leading-relaxed mb-4">
+              Ubrugte credits giver <strong>ingen point</strong>. Vil du fordele dem på dine valg,
+              så du får mest muligt ud af dine odds?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  maxOut()
+                  setShowUnusedWarning(false)
+                }}
+                className="w-full h-[44px] rounded-sm bg-gold text-[var(--color-dark-green)] font-condensed text-[14px] font-bold tracking-widest hover:bg-[#d4aa55] transition-colors"
+              >
+                ⚡ FORDEL RESTEN AUTOMATISK
+              </button>
+              <button
+                type="button"
+                onClick={doSubmit}
+                disabled={isSubmitting}
+                className="w-full h-[44px] rounded-sm bg-[var(--color-dark-green)] text-white font-condensed text-[14px] font-bold tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {isSubmitting ? 'GEMMER…' : 'LÅS VALG ALLIGEVEL'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowUnusedWarning(false)}
+                className="w-full h-[38px] text-[var(--color-warm-taupe)] font-condensed text-[13px] font-bold tracking-wider hover:text-[var(--color-dark-green)] transition-colors"
+              >
+                TILBAGE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
