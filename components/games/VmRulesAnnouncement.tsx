@@ -10,7 +10,7 @@ import Link from 'next/link'
  *
  * Renderes kun for spil der kører blok-credit-modellen (gates i page.tsx).
  */
-const SEEN_KEY = 'bodega_vm_blokregler_seen_v1'
+const SEEN_KEY = 'bodega_vm_blokregler_seen_v2'
 
 export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }) {
   const [visible, setVisible] = useState(false)
@@ -54,6 +54,8 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
             Vi har hørt jer — credits-modellen er lavet om, så den matcher vores
             blok-DNA fra sæsonerne. Kort fortalt:
           </p>
+
+          <BlockIllustration />
 
           <ul className="space-y-2.5">
             <RuleItem icon="🧱" title="2 spillerunder = 1 blok">
@@ -106,5 +108,63 @@ function RuleItem({ icon, title, children }: { icon: string; title: string; chil
         <p className="font-body text-[12.5px] text-warm-gray leading-snug mt-0.5">{children}</p>
       </div>
     </li>
+  )
+}
+
+/**
+ * Skematisk illustration: to spillerunder samles i én blok med ét fælles
+ * 1000-credit-budget. Indbygget grafik (ingen billed-asset) — skarp på alle
+ * skærme og matcher design-systemet.
+ */
+function BlockIllustration() {
+  const blocks = [
+    { n: 1, rounds: [1, 2], current: true },
+    { n: 2, rounds: [3, 4], current: false },
+  ]
+  return (
+    <div className="bg-white border border-warm-border rounded-sm p-3">
+      <div className="flex items-stretch gap-2">
+        {blocks.map((b) => (
+          <div key={b.n} className="flex-1 flex flex-col items-center gap-1.5">
+            <span
+              className={`font-condensed text-[9px] font-bold tracking-[0.1em] uppercase ${
+                b.current ? 'text-gold-dark' : 'text-warm-gray'
+              }`}
+            >
+              Blok {b.n}{b.current ? ' · nu' : ''}
+            </span>
+            <div
+              className={`w-full flex gap-1 rounded-sm border p-1 ${
+                b.current ? 'border-gold bg-gold/10' : 'border-warm-border bg-cream'
+              }`}
+            >
+              {b.rounds.map((r) => (
+                <div
+                  key={r}
+                  className="flex-1 flex flex-col items-center justify-center rounded-sm bg-forest/[0.06] py-1.5"
+                >
+                  <span className="font-condensed text-[7px] font-bold tracking-[0.08em] uppercase text-warm-gray leading-none">
+                    Runde
+                  </span>
+                  <span className="font-condensed text-[15px] font-bold text-forest leading-none mt-0.5">
+                    {r}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <span className="font-condensed text-[10px] font-bold tracking-[0.04em] text-forest">
+              🎯 1000 credits
+            </span>
+          </div>
+        ))}
+        {/* Antydning af at mønstret fortsætter */}
+        <div className="flex items-center pl-0.5">
+          <span className="font-condensed text-[14px] font-bold text-warm-border">→</span>
+        </div>
+      </div>
+      <p className="font-body text-[10.5px] text-warm-gray text-center mt-2 leading-snug">
+        2 spillerunder = 1 blok · de 1000 credits deles i blokken
+      </p>
+    </div>
   )
 }
