@@ -1625,6 +1625,7 @@ export default async function GamePage({ params }: Props) {
                     initialState={initialGameState}
                     theme={{ primary: theme.primary, primaryLight: theme.primaryLight }}
                     variant="main-no-leaderboard"
+                    currentRoundName={activeRound?.name}
                   />
                 )}
                 <ActiveRounds rounds={activeRoundRows} gameId={gameId} />
