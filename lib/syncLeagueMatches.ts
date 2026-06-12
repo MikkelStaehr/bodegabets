@@ -83,14 +83,14 @@ function danishDateLabel(boldDate: string): string {
   return `${day}. ${DANISH_MONTHS[month - 1] ?? ''}`.trim()
 }
 
-// Matchdag-label til runde-gruppering. En "spillerunde" = alle kampe på samme
-// FOOTBALL-dag, ikke samme danske kalenderdag. For turneringer i andre tidszoner
-// (fx VM 2026 i USA) spiller en aftensession videre forbi dansk midnat — en kamp
-// kl. 04:00 dansk er stadig samme kampdag som aftenens kampe. Vi flytter derfor
-// kampe mellem 00:00–05:59 dansk tilbage til DAGEN FØR, så natkampe grupperes
-// med den foregående aftens runde. Grænsen kl. 06:00 er sikker: ingen turnering
-// har kampe i tidsrummet 06:00–18:00 dansk (USA sover), så den splitter aldrig
-// en kampdag. For europæiske turneringer (EM) er der ingen natkampe → ingen effekt.
+// Matchdag-label til runde-gruppering. En "spillerunde" defineres som tidsrummet
+// fra kl. 12:00 (dansk) til 11:59 dagen efter — så alle kampe i en football-aften
+// OG dens natkampe (der spiller forbi midnat for turneringer i fx USA) havner i
+// SAMME runde. Kampe mellem 00:00–11:59 dansk hører derfor til DAGEN FØR.
+// Grænsen kl. 12:00 er sikker: ingen turnering har kampe i tidsrummet ~06:00–18:00
+// dansk (USA sover), så den splitter aldrig en kampdag — og en runde starter
+// aldrig kl. 06:00 om morgenen (hvor folk ikke kan nå at spille). For europæiske
+// turneringer (EM) er der ingen natkampe → ingen effekt.
 function matchDayLabel(boldDate: string): string {
   const m = boldDate.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):/)
   if (!m) return danishDateLabel(boldDate)
@@ -98,7 +98,7 @@ function matchDayLabel(boldDate: string): string {
   let year = parseInt(m[1], 10)
   let month = parseInt(m[2], 10)
   let day = parseInt(m[3], 10)
-  if (hour < 6) {
+  if (hour < 12) {
     // Gå én kalenderdag tilbage (UTC-baseret aritmetik undgår lokal-TZ-skred)
     const dt = new Date(Date.UTC(year, month - 1, day))
     dt.setUTCDate(dt.getUTCDate() - 1)
