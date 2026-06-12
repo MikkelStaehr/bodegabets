@@ -66,6 +66,68 @@ export default async function VmGuidePage() {
           </Callout>
         </Section>
 
+        {/* Sådan udfylder du kuponen */}
+        <Section emoji="🎟️" title="Sådan udfylder du kuponen">
+          <div className="space-y-4">
+            <div>
+              <p className="font-condensed text-[14px] font-bold text-forest mb-1">1 · Vælg udfald</p>
+              <p className="mb-2">
+                Tryk <strong>1</strong> (hjemmesejr), <strong>X</strong> (uafgjort) eller{' '}
+                <strong>2</strong> (udesejr) på hver kamp.
+              </p>
+              <div className="flex gap-1 max-w-[220px]">
+                {(['1', 'X', '2'] as const).map((o) => (
+                  <div
+                    key={o}
+                    className={`flex-1 py-1.5 rounded-sm border-[1.5px] text-center font-condensed text-[16px] font-bold ${
+                      o === '1' ? 'bg-forest border-forest text-cream' : 'bg-white border-warm-border text-warm-gray'
+                    }`}
+                  >
+                    {o}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="font-condensed text-[14px] font-bold text-forest mb-1">2 · Justér din indsats</p>
+              <p className="mb-2">
+                Med <strong>−</strong> og <strong>+</strong> (eller skriv tallet) bestemmer du hvor
+                mange credits du satser. Højere indsats = flere point hvis du rammer.
+              </p>
+              <div className="flex items-center gap-1">
+                <div className="w-7 h-7 rounded-sm border border-warm-border bg-white text-forest font-bold flex items-center justify-center">−</div>
+                <div className="w-16 h-7 rounded-sm border border-warm-border bg-white flex items-center justify-center font-condensed text-[14px] font-bold text-forest">100</div>
+                <span className="text-[10px] text-warm-gray font-semibold">pt</span>
+                <div className="w-7 h-7 rounded-sm border border-warm-border bg-white text-forest font-bold flex items-center justify-center">+</div>
+              </div>
+            </div>
+
+            <div>
+              <p className="font-condensed text-[14px] font-bold text-forest mb-1">3 · Ekstra valg</p>
+              <p className="mb-2">
+                Tryk <strong>“+ Ekstra valg”</strong> på en kamp for at satse ekstra — hver med sine
+                egne odds (se næste afsnit):
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {['Clean sheet', 'Scorer 3+ mål', 'Vinder med 2+'].map((p) => (
+                  <span key={p} className="font-condensed text-[11px] font-semibold text-forest bg-forest/[0.07] border border-forest/15 rounded-sm px-2 py-1">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="font-condensed text-[14px] font-bold text-forest mb-1">4 · Maxe ud & lås</p>
+              <p>
+                Brug <strong>“Maxe ud”</strong> for at lægge resten af dine credits i spil, og tryk{' '}
+                <strong>“Lås dine valg”</strong> når du er klar.
+              </p>
+            </div>
+          </div>
+        </Section>
+
         {/* Point */}
         <Section emoji="💰" title="Sådan tjener du point">
           <p className="mb-3">
