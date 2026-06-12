@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // Tjek at runden stadig er åben
   const { data: round } = await supabaseAdmin
     .from('rounds')
-    .select('name, season_id, status')
+    .select('name, season_id, status, block_id')
     .eq('id', roundId)
     .single()
 
@@ -126,12 +126,38 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  // Opdater round_members.betting_balance = 1000 - alle aktive bets i runden
+  // Opdater betting_balance. VM (credits_per_block): budgettet er pr. BLOK
+  // (1000 delt over blokkens runder) → summér stakes på tværs af blokkens
+  // runder (ekskl. legacy). Ellers pr. runde som hidtil.
+  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175]
+  const roundBlockId = (round as { block_id?: number | null }).block_id ?? null
+  let creditsPerBlock = false
+  if (roundBlockId) {
+    const { data: seasonRow } = await supabaseAdmin
+      .from('seasons')
+      .select('credits_per_block')
+      .eq('id', round.season_id)
+      .single()
+    creditsPerBlock = (seasonRow as { credits_per_block?: boolean } | null)?.credits_per_block === true
+  }
+
+  let budgetRoundIds: number[] = [roundId]
+  if (creditsPerBlock && roundBlockId) {
+    const { data: blockRounds } = await supabaseAdmin
+      .from('rounds')
+      .select('id')
+      .eq('block_id', roundBlockId)
+    budgetRoundIds = (blockRounds ?? [])
+      .map((r) => r.id as number)
+      .filter((rid) => !LEGACY_PRE_BLOCK_ROUND_IDS.includes(rid))
+    if (!budgetRoundIds.includes(roundId)) budgetRoundIds.push(roundId)
+  }
+
   const { data: allRoundBets, error: betsQueryError } = await supabaseAdmin
     .from('bets')
     .select('stake')
     .eq('user_id', user.id)
-    .eq('round_id', roundId)
+    .in('round_id', budgetRoundIds)
     .eq('game_id', bodyGameId)
 
   if (betsQueryError) {

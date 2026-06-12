@@ -9,6 +9,7 @@ import { GameStateProvider } from '@/hooks/useGameState'
 import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
 import { CalendarSelectionProvider } from '@/components/games/CalendarSelectionContext'
+import VmRulesAnnouncement from '@/components/games/VmRulesAnnouncement'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
 import CalendarSlider from '@/components/games/CalendarSlider'
 import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
@@ -92,6 +93,18 @@ export default async function GamePage({ params }: Props) {
     .select('season_id')
     .eq('game_id', gameId)
   const seasonIds = (gameSeasons ?? []).map(gs => gs.season_id as number)
+
+  // Slutrunde-spil (credits_per_block) viser engangs-besked om de nye blok-regler.
+  let usesBlockCredits = false
+  if (seasonIds.length > 0) {
+    const { data: creditSeasons } = await supabase
+      .from('seasons')
+      .select('credits_per_block')
+      .in('id', seasonIds)
+    usesBlockCredits = (creditSeasons ?? []).some(
+      (s) => (s as { credits_per_block?: boolean }).credits_per_block === true
+    )
+  }
 
   const [
     { data: rawMembers },
@@ -1344,6 +1357,7 @@ export default async function GamePage({ params }: Props) {
   return (
     <GameStateProvider gameId={gameId} initialState={initialGameState}>
     <div className="min-h-screen" style={{ background: '#F2EDE4', fontFamily: "'Barlow', sans-serif" }}>
+      {usesBlockCredits && <VmRulesAnnouncement guideHref="/games/vm-guide" />}
       <NavbarSportTheme sport={typedGame.sport} />
       <GameTicker items={tickerItems} />
 
@@ -1382,6 +1396,22 @@ export default async function GamePage({ params }: Props) {
               </div>
             ))}
           </div>
+
+          {/* Link til reglebogen — kun slutrunde-spil */}
+          {usesBlockCredits && (
+            <Link
+              href="/games/vm-guide"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 16,
+                background: 'rgba(242,237,228,0.12)', border: '1px solid rgba(242,237,228,0.25)',
+                color: '#F2EDE4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12,
+                fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+                padding: '7px 12px', borderRadius: 2,
+              }}
+            >
+              📖 Sådan virker slutrunden
+            </Link>
+          )}
         </div>
       </div>
 
