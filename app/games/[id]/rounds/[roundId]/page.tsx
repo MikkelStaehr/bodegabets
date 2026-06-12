@@ -284,6 +284,7 @@ export default async function RoundPage({ params }: Props) {
       blockInfo={blockInfo}
       blockBudget={1000}
       blockSpentElsewhere={blockSpentElsewhere}
+      creditsRollOver={creditsPerBlock && blockInfo != null && !blockInfo.is_last_in_block}
     />
   )
 }
