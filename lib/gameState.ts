@@ -647,14 +647,17 @@ async function countHistoricalBlockWins(
     userMap.set(s.user_id, (userMap.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
   }
 
+  // Vinder = højeste samlede profit i blokken. Uafgjort → ALLE med max-profit
+  // (> 0) får hver en blok-sejr (matcher reglen i evaluateFinishedBlocks).
   const wins = new Map<string, number>()
   for (const [, userMap] of blockPoints) {
-    let topUid: string | null = null
     let topPts = -Infinity
-    for (const [uid, pts] of userMap) {
-      if (pts > topPts) { topPts = pts; topUid = uid }
+    for (const [, pts] of userMap) if (pts > topPts) topPts = pts
+    if (topPts > 0) {
+      for (const [uid, pts] of userMap) {
+        if (pts === topPts) wins.set(uid, (wins.get(uid) ?? 0) + 1)
+      }
     }
-    if (topUid && topPts > 0) wins.set(topUid, (wins.get(topUid) ?? 0) + 1)
   }
   return wins
 }

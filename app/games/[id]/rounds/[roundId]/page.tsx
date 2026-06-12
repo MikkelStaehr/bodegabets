@@ -56,9 +56,24 @@ export default async function RoundPage({ params }: Props) {
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
 
+  // Slutrunde-credit-model: 1000 credits PR. BLOK (delt over blokkens 2 runder)
+  // i stedet for pr. runde. Kun aktivt for sæsoner med credits_per_block (VM).
+  const roundSeasonId = (round as typeof round & { season_id: number }).season_id
+  const { data: seasonRow } = await supabaseAdmin
+    .from('seasons')
+    .select('credits_per_block')
+    .eq('id', roundSeasonId)
+    .single()
+  const creditsPerBlock = (seasonRow as { credits_per_block?: boolean } | null)?.credits_per_block === true
+
+  // Runder spillet under den GAMLE pr-runde-model tæller ikke mod blok-budgettet
+  // (VM: åbningskampen blev maxet under den gamle model, før blok-systemet).
+  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175]
+
   // Hent block info hvis runden er tilknyttet en block
   const roundBlockId = (round as typeof round & { block_id?: number | null }).block_id ?? null
   let blockInfo: { block_number: number; block_name: string; is_last_in_block: boolean } | null = null
+  let blockSpentElsewhere = 0
   if (roundBlockId) {
     const [{ data: block }, { data: blockRounds }] = await Promise.all([
       supabaseAdmin.from('blocks').select('id, block_number, name').eq('id', roundBlockId).single(),
@@ -68,6 +83,23 @@ export default async function RoundPage({ params }: Props) {
       const allBlockRoundIds = (blockRounds ?? []).map((r: { id: number }) => r.id)
       const isLast = allBlockRoundIds.length > 0 && allBlockRoundIds[allBlockRoundIds.length - 1] === roundIdNum
       blockInfo = { block_number: block.block_number, block_name: block.name, is_last_in_block: isLast }
+
+      // Hvad brugeren allerede har brugt i blokkens ANDRE runder (ekskl. denne
+      // runde og legacy-runder) — trækkes fra det fælles blok-budget.
+      if (creditsPerBlock) {
+        const otherRoundIds = allBlockRoundIds.filter(
+          (rid) => rid !== roundIdNum && !LEGACY_PRE_BLOCK_ROUND_IDS.includes(rid)
+        )
+        if (otherRoundIds.length > 0) {
+          const { data: otherBets } = await supabaseAdmin
+            .from('bets')
+            .select('stake')
+            .eq('game_id', gameId)
+            .eq('user_id', user.id)
+            .in('round_id', otherRoundIds)
+          blockSpentElsewhere = (otherBets ?? []).reduce((s, b) => s + (b.stake ?? 0), 0)
+        }
+      }
     }
   }
 
@@ -250,6 +282,8 @@ export default async function RoundPage({ params }: Props) {
       totalMatchesInRound={matches.length}
       betDistribution={betDistribution}
       blockInfo={blockInfo}
+      blockBudget={1000}
+      blockSpentElsewhere={blockSpentElsewhere}
     />
   )
 }

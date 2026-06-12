@@ -85,6 +85,10 @@ type Props = {
   totalMatchesInRound?: number
   betDistribution?: BetDistribution
   blockInfo?: { block_number: number; block_name: string; is_last_in_block: boolean } | null
+  /** Samlet credit-budget for blokken (VM: 1000 delt over blokkens 2 runder). */
+  blockBudget?: number
+  /** Allerede brugt i blokkens ANDRE runder (trækkes fra budgettet her). */
+  blockSpentElsewhere?: number
   submitApiPath?: string
 }
 
@@ -648,6 +652,8 @@ export default function AfgivBets({
   totalMatchesInRound,
   betDistribution,
   blockInfo,
+  blockBudget = 1000,
+  blockSpentElsewhere = 0,
   submitApiPath,
 }: Props) {
   const router = useRouter()
@@ -684,7 +690,12 @@ export default function AfgivBets({
 
     return existingStake + newStake
   }, [selections, existingBets])
-  const displayCredits = 1000 - totalPoints
+  // VM: budgettet er pr. BLOK (1000 delt over 2 runder). Det der allerede er
+  // brugt i blokkens anden runde trækkes fra, så denne rundes rådige credits
+  // = blockBudget − blockSpentElsewhere. For almindelige runder (uden blok)
+  // er blockBudget=1000 og blockSpentElsewhere=0 → samme som før.
+  const effectiveBudget = Math.max(0, blockBudget - blockSpentElsewhere)
+  const displayCredits = effectiveBudget - totalPoints
   const isOverBudget = displayCredits < 0
 
   const getSelection = (matchId: number) => selections.find((s) => s.matchId === matchId)
@@ -750,13 +761,14 @@ export default function AfgivBets({
   }
 
   // "Maxe ud": skalér alle aktive indsatser (match_result + ekstra) proportionalt,
-  // så de tilsammen bruger ALLE resterende credits. Eksisterende, allerede-betalte
-  // bets røres ikke — der skaleres kun op til (1000 − allerede brugt).
+  // så de tilsammen bruger ALLE resterende credits i blokken. Eksisterende,
+  // allerede-betalte bets røres ikke — der skaleres kun op til
+  // (effektivt budget − allerede brugt i denne runde).
   const maxOut = useCallback(() => {
     const existingStake = existingBets
       .filter((b) => !selections.some((s) => s.matchId === b.match_id))
       .reduce((sum, b) => sum + (b.stake ?? 0), 0)
-    const available = 1000 - existingStake
+    const available = effectiveBudget - existingStake
     if (available <= 0 || selections.length === 0) return
 
     // Flad liste over alle aktive indsats-poster
@@ -793,7 +805,7 @@ export default function AfgivBets({
         }
       })
     )
-  }, [existingBets, selections])
+  }, [existingBets, selections, effectiveBudget])
 
   const toggleExtra = (matchId: number, key: ExtraBetType, value: string) => {
     setSelections((prev) =>
@@ -1205,6 +1217,12 @@ export default function AfgivBets({
                     {displayCredits} pt
                   </span>
                 </div>
+                {/* Blok-kontekst: forklar at budgettet deles over blokkens 2 runder */}
+                {blockSpentElsewhere > 0 && (
+                  <p className="mt-1 text-[9px] text-[var(--color-warm-taupe)] leading-tight">
+                    Blok-budget {blockBudget} · brugt i blokkens anden runde: {blockSpentElsewhere}
+                  </p>
+                )}
                 {/* Maxe ud-knap når der er ubrugte credits */}
                 {!isOverBudget && selections.length > 0 && displayCredits > 0 && (
                   <button
