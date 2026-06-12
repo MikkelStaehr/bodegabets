@@ -1469,8 +1469,14 @@ app.listen(PORT, () => {
   // Hver 3. time — batch sync af alle kampe
   cron.schedule('0 */3 * * *', () => callEndpoint('/batch-sync'))
 
-  // Dagligt kl. 07:00 UTC — update rounds
-  cron.schedule('0 7 * * *', () => callEndpoint('/update-rounds'))
+  // Hvert 15. minut — update rounds (åbn/luk/finish + deadlines).
+  // TIDLIGERE kørte den kun dagligt kl. 07:00, men det var for sjældent: en
+  // rundes betting-vindue er [forrige rundes deadline → egen deadline], og
+  // hvis det vindue lå mellem to daglige kørsler (fx en VM-dag med tidlig
+  // kamp) blev runden aldrig åbnet i tide og fik intet betting-vindue. Den
+  // selvhelende opener åbner næste runde så snart den forriges deadline
+  // passerer — men kun hvis cron'en rent faktisk kører i det vindue.
+  cron.schedule('*/15 * * * *', () => callEndpoint('/update-rounds'))
 
   // Dagligt kl. 07:05 UTC — update bet-open (efter update-rounds)
   cron.schedule('5 7 * * *', () => callEndpoint('/update-bet-open'))
