@@ -83,6 +83,32 @@ function danishDateLabel(boldDate: string): string {
   return `${day}. ${DANISH_MONTHS[month - 1] ?? ''}`.trim()
 }
 
+// Matchdag-label til runde-gruppering. En "spillerunde" = alle kampe på samme
+// FOOTBALL-dag, ikke samme danske kalenderdag. For turneringer i andre tidszoner
+// (fx VM 2026 i USA) spiller en aftensession videre forbi dansk midnat — en kamp
+// kl. 04:00 dansk er stadig samme kampdag som aftenens kampe. Vi flytter derfor
+// kampe mellem 00:00–05:59 dansk tilbage til DAGEN FØR, så natkampe grupperes
+// med den foregående aftens runde. Grænsen kl. 06:00 er sikker: ingen turnering
+// har kampe i tidsrummet 06:00–18:00 dansk (USA sover), så den splitter aldrig
+// en kampdag. For europæiske turneringer (EM) er der ingen natkampe → ingen effekt.
+function matchDayLabel(boldDate: string): string {
+  const m = boldDate.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):/)
+  if (!m) return danishDateLabel(boldDate)
+  const hour = parseInt(m[4], 10)
+  let year = parseInt(m[1], 10)
+  let month = parseInt(m[2], 10)
+  let day = parseInt(m[3], 10)
+  if (hour < 6) {
+    // Gå én kalenderdag tilbage (UTC-baseret aritmetik undgår lokal-TZ-skred)
+    const dt = new Date(Date.UTC(year, month - 1, day))
+    dt.setUTCDate(dt.getUTCDate() - 1)
+    year = dt.getUTCFullYear()
+    month = dt.getUTCMonth() + 1
+    day = dt.getUTCDate()
+  }
+  return `${day}. ${DANISH_MONTHS[month - 1] ?? ''}`.trim()
+}
+
 // Normalisér Bolds rå round-felt ("1. runde", "Final. runde", "kvartfinale"
 // osv.) til pæne danske stage-navne + en rang (til at vælge dominerende stage
 // på blandede dage). Rækkefølgen er vigtig: knockout tjekkes før "final" og
@@ -409,7 +435,7 @@ export async function syncBoldFixtures(
     // fra dagens kampe. For normale ligaer bruges Bolds round-felt direkte.
     const baseRound = mt.round || 'Ukendt runde'
     const round_name = splitRoundsByDate
-      ? danishDateLabel(mt.date)
+      ? matchDayLabel(mt.date)
       : baseRound
 
     // Result (1, X, 2)
