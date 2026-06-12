@@ -12,9 +12,13 @@ type Props = {
   /** Compact-mode: kun rank + navn + B.point (til smal sidebar). Skjuler
    *  R.sejr/R.point/B.sejr-kolonnerne så navn-kolonnen har plads. */
   compact?: boolean
+  /** Overskrift (default "Leaderboard"). Fx "Samlet stilling". */
+  title?: string
+  /** Lille undertekst under titlen, fx hvad der afgør stillingen. */
+  subtitle?: string
 }
 
-export default function Leaderboard({ entries: entriesProp, gameId, compact }: Props) {
+export default function Leaderboard({ entries: entriesProp, gameId, compact, title = 'Leaderboard', subtitle }: Props) {
   const [fetchedEntries, setFetchedEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(entriesProp === undefined)
 
@@ -77,7 +81,12 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact }: P
           fontSize: 11, letterSpacing: '0.14em',
           textTransform: 'uppercase', color: '#6b6b6b',
         }}>
-          Leaderboard
+          {title}
+          {subtitle && (
+            <span style={{ letterSpacing: '0.06em', color: '#9E9486', fontWeight: 400, textTransform: 'none' }}>
+              {'  ·  '}{subtitle}
+            </span>
+          )}
         </span>
         {!hasAnyScore && (
           <span style={{
@@ -146,6 +155,13 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact }: P
               minWidth: 0,
             }}>
               {entry.username}
+              {compact && entry.block_wins > 0 && (
+                <span style={{
+                  marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#B8963E',
+                }}>
+                  🏅{entry.block_wins}
+                </span>
+              )}
               {shouldTaunt(entry.round_points, allRoundPoints) && (
                 <span style={{
                   fontStyle: 'italic',

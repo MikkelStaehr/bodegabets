@@ -18,6 +18,8 @@ type Props = {
    *  'main-no-leaderboard': kun BlockLeaderboard (til 3-col layout).
    *  'sidebar': kun compact Leaderboard (til sidebar i 3-col layout). */
   variant?: 'main' | 'main-no-leaderboard' | 'sidebar'
+  /** Navn på den aktive runde — vises som kontekst i blok-stillingen. */
+  currentRoundName?: string
 }
 
 /**
@@ -37,13 +39,21 @@ export default function FootballLiveSection({
   initialState,
   theme,
   variant = 'main',
+  currentRoundName,
 }: Props) {
   const { state } = useGameState(gameId, { initialState })
   const active = state ?? initialState
 
   if (variant === 'sidebar') {
     return active.leaderboard.length > 0
-      ? <Leaderboard entries={active.leaderboard} compact />
+      ? (
+        <Leaderboard
+          entries={active.leaderboard}
+          compact
+          title="Samlet stilling"
+          subtitle="blok-sejre afgør"
+        />
+      )
       : null
   }
 
@@ -54,10 +64,11 @@ export default function FootballLiveSection({
           standings={active.activeBlockStandings}
           currentUserId={currentUserId}
           theme={theme}
+          currentRoundName={currentRoundName}
         />
       )}
       {variant === 'main' && active.leaderboard.length > 0 && (
-        <Leaderboard entries={active.leaderboard} />
+        <Leaderboard entries={active.leaderboard} title="Samlet stilling" subtitle="blok-sejre afgør" />
       )}
     </>
   )

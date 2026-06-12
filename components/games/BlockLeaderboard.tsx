@@ -11,38 +11,53 @@ type Props = {
   standings: ActiveBlockStandings
   currentUserId: string
   theme: Theme
+  /** Navn på den runde der spilles nu (vises som kontekst i headeren). */
+  currentRoundName?: string
 }
 
 /**
  * Blok-stilling for aktiv blok. Data kommer fra useGameState via parent,
  * så rows opdateres live efter hver kamp færdiggøres.
  */
-export default function BlockLeaderboard({ standings, currentUserId, theme }: Props) {
+export default function BlockLeaderboard({ standings, currentUserId, theme, currentRoundName }: Props) {
   if (!standings || standings.rows.length === 0) return null
 
   const { block_name, rounds_remaining, rows } = standings
 
   return (
     <div>
+      {/* Eyebrow: hvem fører blokken */}
+      <p style={{
+        fontFamily: "'Barlow Condensed', sans-serif",
+        fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase',
+        color: '#B8963E', fontWeight: 700, margin: '0 0 2px',
+      }}>
+        🏅 Hvem fører blokken
+      </p>
       <div style={{
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 10, gap: 8,
       }}>
         <span style={{
           fontFamily: "'Barlow Condensed', sans-serif",
-          fontSize: 11, letterSpacing: '0.14em',
-          textTransform: 'uppercase', color: '#6b6b6b',
+          fontSize: 15, fontWeight: 700, letterSpacing: '0.02em',
+          color: '#1a1a1a',
         }}>
           {block_name}
+          {currentRoundName && (
+            <span style={{ fontSize: 11, fontWeight: 400, color: '#9E9486' }}>
+              {'  ·  '}{currentRoundName}
+            </span>
+          )}
         </span>
-        {rounds_remaining > 0 && (
-          <span style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontSize: 11, color: '#9E9486',
-          }}>
-            {rounds_remaining} runde{rounds_remaining !== 1 ? 'r' : ''} tilbage
-          </span>
-        )}
+        <span style={{
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontSize: 11, color: '#9E9486', whiteSpace: 'nowrap',
+        }}>
+          {rounds_remaining > 0
+            ? `${rounds_remaining} runde${rounds_remaining !== 1 ? 'r' : ''} tilbage`
+            : 'Blokken afgøres nu'}
+        </span>
       </div>
       <div style={{
         background: '#FDFAF5', border: '1px solid #C8BEA8',
