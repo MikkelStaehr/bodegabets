@@ -1164,6 +1164,11 @@ export type LbTabRow = {
   mvp_count: number
   block_wins: number
   won_latest_block: boolean
+  /** Afgjorte bets i scope (blok eller sæson). */
+  won_bets: number
+  lost_bets: number
+  /** Samlet satset (credits) i scope. */
+  staked: number
 }
 
 export type LeaderboardTabs = {
@@ -1205,14 +1210,23 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     if (!earnings.has(s.user_id)) earnings.set(s.user_id, new Map())
     earnings.get(s.user_id)!.set(s.round_id as number, Number(s.earnings_delta) || 0)
   }
-  // profit per (user, round) fra afgjorte bets
+  // profit / won / lost / staked per (user, round) fra afgjorte bets
   const betProfit = new Map<string, Map<number, number>>()
+  const wonMap = new Map<string, Map<number, number>>()
+  const lostMap = new Map<string, Map<number, number>>()
+  const stakedMap = new Map<string, Map<number, number>>()
+  const bump = (mp: Map<string, Map<number, number>>, uid: string, rid: number, val: number) => {
+    if (!mp.has(uid)) mp.set(uid, new Map())
+    const m = mp.get(uid)!
+    m.set(rid, (m.get(rid) ?? 0) + val)
+  }
   for (const b of bets ?? []) {
     if (b.result !== 'win' && b.result !== 'loss') continue
     const uid = b.user_id as string, rid = b.round_id as number
-    if (!betProfit.has(uid)) betProfit.set(uid, new Map())
-    const m = betProfit.get(uid)!
-    m.set(rid, (m.get(rid) ?? 0) + ((Number(b.points_earned) || 0) - (Number(b.stake) || 0)))
+    const stake = Number(b.stake) || 0
+    bump(betProfit, uid, rid, (Number(b.points_earned) || 0) - stake)
+    bump(stakedMap, uid, rid, stake)
+    bump(b.result === 'win' ? wonMap : lostMap, uid, rid, 1)
   }
 
   const sumOver = (map: Map<string, Map<number, number>>, uid: string, roundSet: Set<number>) => {
@@ -1297,6 +1311,9 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     mvp_count: mvpCount.get(u) ?? 0,
     block_wins: seasonWinsNow.get(u) ?? 0,
     won_latest_block: wonLatestBlock.has(u),
+    won_bets: sumOver(wonMap, u, finishedRoundIds),
+    lost_bets: sumOver(lostMap, u, finishedRoundIds),
+    staked: Math.round(sumOver(stakedMap, u, finishedRoundIds) * 10) / 10,
   }))
 
   // ── BLOK: aktiv blok ──
@@ -1321,6 +1338,9 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
       mvp_count: 0,
       block_wins: 0,
       won_latest_block: false,
+      won_bets: sumOver(wonMap, u, blockFinished),
+      lost_bets: sumOver(lostMap, u, blockFinished),
+      staked: Math.round(sumOver(stakedMap, u, blockFinished) * 10) / 10,
     }))
     block = {
       block_name: (activeBlock.name as string) ?? `Blok ${activeBlock.block_number}`,

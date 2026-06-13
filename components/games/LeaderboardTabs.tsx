@@ -74,7 +74,7 @@ function TabBtn({ label, sub, activeTab, disabled, onClick }: { label: string; s
 function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block' | 'season'; onSelect: (r: LbTabRow) => void }) {
   const cols = variant === 'season'
     ? '34px minmax(60px, 1fr) 80px 34px 34px'
-    : '34px minmax(60px, 1fr) 88px'
+    : '32px minmax(56px, 1fr) 30px 30px 46px 56px 86px'
   const headers = variant === 'season'
     ? [
         { l: '#', t: 'Placering — pilen viser bevægelse siden forrige spillede runde', a: 'left' as const },
@@ -86,7 +86,11 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
     : [
         { l: '#', t: 'Placering — pilen viser bevægelse siden forrige runde i blokken', a: 'left' as const },
         { l: 'Spiller', t: 'Spiller — tryk for fuld historik', a: 'left' as const },
-        { l: 'Point', t: 'Point i den nuværende blok (+/− netto-profit)', a: 'right' as const },
+        { l: '✓', t: 'Vundne bets i blokken', a: 'right' as const },
+        { l: '✗', t: 'Tabte bets i blokken', a: 'right' as const },
+        { l: 'Win%', t: 'Winrate — vundne bets ud af afgjorte bets i blokken', a: 'right' as const },
+        { l: 'Satset', t: 'Satset credit i blokken', a: 'right' as const },
+        { l: 'Point', t: 'Point i blokken (+/− netto-profit)', a: 'right' as const },
       ]
 
   if (rows.length === 0) {
@@ -94,7 +98,8 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
   }
 
   return (
-    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 2, overflow: 'visible' }}>
+    <div style={{ overflowX: variant === 'block' ? 'auto' : 'visible' }}>
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 2, minWidth: variant === 'block' ? 420 : undefined }}>
       {/* Header */}
       <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '7px 10px', borderBottom: `1px solid ${C.border}`, gap: 4 }}>
         {headers.map((h, i) => (
@@ -102,7 +107,22 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
         ))}
       </div>
       {/* Rows */}
-      {rows.map((r, idx) => (
+      {rows.map((r, idx) => {
+        const settled = r.won_bets + r.lost_bets
+        const winrate = settled > 0 ? Math.round((r.won_bets / settled) * 100) : null
+        const pointCell = (
+          <span style={{ textAlign: 'right', lineHeight: 1.05 }}>
+            <span style={{ fontFamily: FF, fontSize: 15, fontWeight: 800, color: r.points > 0 ? C.ink : '#ccc' }}>
+              {r.points > 0 ? r.points : '-'}
+            </span>
+            {r.profit !== 0 && (
+              <span style={{ fontFamily: FF, fontSize: 11, fontWeight: 700, marginLeft: 4, color: r.profit > 0 ? C.green : C.red }}>
+                ({profitStr(r.profit)})
+              </span>
+            )}
+          </span>
+        )
+        return (
         <div
           key={r.user_id}
           onClick={() => onSelect(r)}
@@ -124,20 +144,25 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
             {r.username}
             {variant === 'season' && r.won_latest_block && <span title="Vinder af seneste blok" style={{ marginLeft: 4, fontSize: 12 }}>🏅</span>}
           </span>
-          {/* Point (+/- profit) */}
-          <span style={{ textAlign: 'right', lineHeight: 1.05 }}>
-            <span style={{ fontFamily: FF, fontSize: 15, fontWeight: 800, color: r.points > 0 ? C.ink : '#ccc' }}>
-              {r.points > 0 ? r.points : '-'}
-            </span>
-            {r.profit !== 0 && (
-              <span style={{ fontFamily: FF, fontSize: 11, fontWeight: 700, marginLeft: 4, color: r.profit > 0 ? C.green : C.red }}>
-                ({profitStr(r.profit)})
-              </span>
-            )}
-          </span>
-          {/* Sæson: MoM + Blokke */}
-          {variant === 'season' && (
+          {variant === 'block' ? (
             <>
+              <span style={{ textAlign: 'right', fontFamily: FF, fontSize: 13, fontWeight: 700, color: r.won_bets > 0 ? C.green : '#ccc' }}>
+                {r.won_bets > 0 ? r.won_bets : '-'}
+              </span>
+              <span style={{ textAlign: 'right', fontFamily: FF, fontSize: 13, fontWeight: 700, color: r.lost_bets > 0 ? C.red : '#ccc' }}>
+                {r.lost_bets > 0 ? r.lost_bets : '-'}
+              </span>
+              <span style={{ textAlign: 'right', fontFamily: FF, fontSize: 13, fontWeight: 700, color: winrate == null ? '#ccc' : winrate >= 50 ? C.green : C.red }}>
+                {winrate == null ? '-' : `${winrate}%`}
+              </span>
+              <span style={{ textAlign: 'right', fontFamily: FF, fontSize: 13, fontWeight: 600, color: r.staked > 0 ? C.ink : '#ccc' }}>
+                {r.staked > 0 ? r.staked : '-'}
+              </span>
+              {pointCell}
+            </>
+          ) : (
+            <>
+              {pointCell}
               <span style={{ textAlign: 'right', fontFamily: FF, fontSize: 14, fontWeight: 700, color: r.mvp_count > 0 ? '#7a7060' : '#ccc' }}>
                 {r.mvp_count > 0 ? r.mvp_count : '-'}
               </span>
@@ -147,7 +172,9 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
             </>
           )}
         </div>
-      ))}
+        )
+      })}
+    </div>
     </div>
   )
 }
