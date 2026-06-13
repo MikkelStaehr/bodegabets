@@ -112,6 +112,7 @@ export type GameState = {
   summary: MatchSummary
   leaderboard: LeaderboardEntry[]
   activeBlockStandings: ActiveBlockStandings
+  leaderboardTabs: LeaderboardTabs
   updated_at: string
 }
 
@@ -1150,6 +1151,187 @@ export async function getPlayerHistory(gameId: number, userId: string): Promise<
   }
 }
 
+// ─── getLeaderboardTabs — blok- og sæson-tabel med bevægelse (rank-delta) ───
+
+export type LbTabRow = {
+  user_id: string
+  username: string
+  rank: number
+  /** Placeringer rykket siden forrige spillede runde: + op, − ned, 0 uændret. */
+  rank_delta: number
+  points: number
+  profit: number
+  mvp_count: number
+  block_wins: number
+  won_latest_block: boolean
+}
+
+export type LeaderboardTabs = {
+  block: { block_name: string; rounds_remaining: number; rows: LbTabRow[] } | null
+  season: { rows: LbTabRow[] }
+}
+
+export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTabs> {
+  const empty: LeaderboardTabs = { block: null, season: { rows: [] } }
+  const { data: gameSeasons } = await supabaseAdmin.from('game_seasons').select('season_id').eq('game_id', gameId)
+  const seasonIds = (gameSeasons ?? []).map((g) => g.season_id as number)
+  if (seasonIds.length === 0) return empty
+
+  const { data: members } = await supabaseAdmin
+    .from('game_members').select('user_id, profiles!inner(username)').eq('game_id', gameId)
+  if (!members?.length) return empty
+  const usernameById = new Map(members.map((m) => [m.user_id, (m.profiles as unknown as { username: string }).username ?? 'Anonym']))
+  const userIds = members.map((m) => m.user_id as string)
+
+  const { data: rounds } = await supabaseAdmin
+    .from('rounds').select('id, block_id, status').in('season_id', seasonIds)
+  const roundIds = (rounds ?? []).map((r) => r.id as number)
+  if (roundIds.length === 0) return empty
+  const finishedRoundIds = new Set((rounds ?? []).filter((r) => r.status === 'finished').map((r) => r.id as number))
+  const roundToBlock = new Map((rounds ?? []).map((r) => [r.id as number, r.block_id as number | null]))
+
+  const { data: blocks } = await supabaseAdmin
+    .from('blocks').select('id, block_number, name, status').in('season_id', seasonIds).order('block_number', { ascending: true })
+  const allBlocks = blocks ?? []
+
+  const { data: scores } = await supabaseAdmin
+    .from('round_scores').select('user_id, round_id, earnings_delta').eq('game_id', gameId).in('round_id', roundIds)
+  const { data: bets } = await supabaseAdmin
+    .from('bets').select('user_id, round_id, stake, points_earned, result').eq('game_id', gameId).in('round_id', roundIds)
+
+  // earnings[user][round]
+  const earnings = new Map<string, Map<number, number>>()
+  for (const s of scores ?? []) {
+    if (!earnings.has(s.user_id)) earnings.set(s.user_id, new Map())
+    earnings.get(s.user_id)!.set(s.round_id as number, Number(s.earnings_delta) || 0)
+  }
+  // profit per (user, round) fra afgjorte bets
+  const betProfit = new Map<string, Map<number, number>>()
+  for (const b of bets ?? []) {
+    if (b.result !== 'win' && b.result !== 'loss') continue
+    const uid = b.user_id as string, rid = b.round_id as number
+    if (!betProfit.has(uid)) betProfit.set(uid, new Map())
+    const m = betProfit.get(uid)!
+    m.set(rid, (m.get(rid) ?? 0) + ((Number(b.points_earned) || 0) - (Number(b.stake) || 0)))
+  }
+
+  const sumOver = (map: Map<string, Map<number, number>>, uid: string, roundSet: Set<number>) => {
+    let t = 0
+    const m = map.get(uid)
+    if (m) for (const [rid, v] of m) if (roundSet.has(rid)) t += v
+    return t
+  }
+
+  // mvp_count (alle afgjorte runder)
+  const mvpCount = new Map<string, number>()
+  const ptsByRound = new Map<number, Map<string, number>>()
+  for (const s of scores ?? []) {
+    const rid = s.round_id as number
+    if (!finishedRoundIds.has(rid)) continue
+    if (!ptsByRound.has(rid)) ptsByRound.set(rid, new Map())
+    ptsByRound.get(rid)!.set(s.user_id, (ptsByRound.get(rid)!.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
+  }
+  for (const [, up] of ptsByRound) {
+    let max = 0
+    for (const v of up.values()) if (v > max) max = v
+    if (max > 0) for (const [u, v] of up) if (v === max) mvpCount.set(u, (mvpCount.get(u) ?? 0) + 1)
+  }
+
+  // Blok-vindere for et givet sæt tællende runder (block = alle dens runder i sættet)
+  const blockWinsFor = (counted: Set<number>) => {
+    const wins = new Map<string, number>()
+    for (const b of allBlocks) {
+      const blockRounds = (rounds ?? []).filter((r) => r.block_id === b.id).map((r) => r.id as number)
+      if (blockRounds.length === 0 || !blockRounds.every((rid) => counted.has(rid))) continue
+      const tot = new Map<string, number>()
+      for (const uid of userIds) tot.set(uid, sumOver(earnings, uid, new Set(blockRounds)))
+      let max = 0
+      for (const v of tot.values()) if (v > max) max = v
+      if (max > 0) for (const [u, v] of tot) if (v === max) wins.set(u, (wins.get(u) ?? 0) + 1)
+    }
+    return wins
+  }
+
+  // Rangering → Map<user, rank> (1-baseret) givet sortértal
+  const rankBy = (score: (u: string) => [number, number]) => {
+    const sorted = [...userIds].sort((a, z) => {
+      const [a1, a2] = score(a), [z1, z2] = score(z)
+      return z1 - a1 || z2 - a2 || usernameById.get(a)!.localeCompare(usernameById.get(z)!)
+    })
+    const m = new Map<string, number>()
+    sorted.forEach((u, i) => m.set(u, i + 1))
+    return { sorted, rankMap: m }
+  }
+
+  const latestFinished = finishedRoundIds.size ? Math.max(...finishedRoundIds) : null
+  const prevFinished = new Set(finishedRoundIds)
+  if (latestFinished != null) prevFinished.delete(latestFinished)
+
+  // ── SÆSON: rangér efter blokke vundet, så samlet point ──
+  const seasonWinsNow = blockWinsFor(finishedRoundIds)
+  const seasonWinsPrev = blockWinsFor(prevFinished)
+  const seasonPts = (u: string, set: Set<number>) => sumOver(earnings, u, set)
+  const seasonNow = rankBy((u) => [seasonWinsNow.get(u) ?? 0, seasonPts(u, finishedRoundIds)])
+  const seasonPrev = rankBy((u) => [seasonWinsPrev.get(u) ?? 0, seasonPts(u, prevFinished)])
+
+  // seneste afgjorte blok → won_latest_block
+  const wonLatestBlock = new Set<string>()
+  const finishedBlocks = allBlocks.filter((b) => b.status === 'finished')
+  const latestBlock = finishedBlocks.length ? finishedBlocks[finishedBlocks.length - 1] : null
+  if (latestBlock) {
+    const brIds = new Set((rounds ?? []).filter((r) => r.block_id === latestBlock.id).map((r) => r.id as number))
+    const tot = new Map<string, number>()
+    for (const uid of userIds) tot.set(uid, sumOver(earnings, uid, brIds))
+    let max = 0
+    for (const v of tot.values()) if (v > max) max = v
+    if (max > 0) for (const [u, v] of tot) if (v === max) wonLatestBlock.add(u)
+  }
+
+  const seasonRows: LbTabRow[] = seasonNow.sorted.map((u) => ({
+    user_id: u,
+    username: usernameById.get(u)!,
+    rank: seasonNow.rankMap.get(u)!,
+    rank_delta: latestFinished != null ? (seasonPrev.rankMap.get(u)! - seasonNow.rankMap.get(u)!) : 0,
+    points: Math.round(seasonPts(u, finishedRoundIds) * 10) / 10,
+    profit: Math.round(sumOver(betProfit, u, finishedRoundIds) * 10) / 10,
+    mvp_count: mvpCount.get(u) ?? 0,
+    block_wins: seasonWinsNow.get(u) ?? 0,
+    won_latest_block: wonLatestBlock.has(u),
+  }))
+
+  // ── BLOK: aktiv blok ──
+  let block: LeaderboardTabs['block'] = null
+  const activeBlock = allBlocks.find((b) => b.status === 'active') ?? null
+  if (activeBlock) {
+    const blockRoundIds = (rounds ?? []).filter((r) => r.block_id === activeBlock.id).map((r) => r.id as number)
+    const blockFinished = new Set(blockRoundIds.filter((rid) => finishedRoundIds.has(rid)))
+    const latestInBlock = blockFinished.size ? Math.max(...blockFinished) : null
+    const blockPrevFinished = new Set(blockFinished)
+    if (latestInBlock != null) blockPrevFinished.delete(latestInBlock)
+
+    const bNow = rankBy((u) => [sumOver(earnings, u, blockFinished), 0])
+    const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevFinished), 0])
+    const rows: LbTabRow[] = bNow.sorted.map((u) => ({
+      user_id: u,
+      username: usernameById.get(u)!,
+      rank: bNow.rankMap.get(u)!,
+      rank_delta: latestInBlock != null ? (bPrev.rankMap.get(u)! - bNow.rankMap.get(u)!) : 0,
+      points: Math.round(sumOver(earnings, u, blockFinished) * 10) / 10,
+      profit: Math.round(sumOver(betProfit, u, blockFinished) * 10) / 10,
+      mvp_count: 0,
+      block_wins: 0,
+      won_latest_block: false,
+    }))
+    block = {
+      block_name: (activeBlock.name as string) ?? `Blok ${activeBlock.block_number}`,
+      rounds_remaining: blockRoundIds.length - blockFinished.size,
+      rows,
+    }
+  }
+
+  return { block, season: { rows: seasonRows } }
+}
+
 // ─── getGameState — kombineret state for /api/games/[id]/state ──────────────
 
 export async function getGameState(
@@ -1166,10 +1348,11 @@ export async function getGameState(
 
   const isFootballRegular = (game.sport ?? 'football') === 'football' && game.championship_mode !== true
 
-  const [matchesResult, leaderboardResult, blockStandings] = await Promise.all([
+  const [matchesResult, leaderboardResult, blockStandings, tabs] = await Promise.all([
     getGameMatches(gameId, userId),
     getGameLeaderboard(gameId),
     isFootballRegular ? getActiveBlockStandings(gameId) : Promise.resolve(null),
+    isFootballRegular ? getLeaderboardTabs(gameId) : Promise.resolve({ block: null, season: { rows: [] } } as LeaderboardTabs),
   ])
 
   return {
@@ -1183,6 +1366,7 @@ export async function getGameState(
     summary: matchesResult.summary,
     leaderboard: leaderboardResult.leaderboard,
     activeBlockStandings: blockStandings,
+    leaderboardTabs: tabs,
     updated_at: new Date().toISOString(),
   }
 }
