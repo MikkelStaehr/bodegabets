@@ -10,7 +10,7 @@ import Link from 'next/link'
  *
  * Renderes kun for spil der kører blok-modellen (gates i page.tsx).
  */
-const SEEN_KEY = 'bodega_vm_leaderboard_seen_v5'
+const SEEN_KEY = 'bodega_vm_leaderboard_seen_v6'
 const TOTAL_PAGES = 3
 
 export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }) {
@@ -34,7 +34,7 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
 
   if (!visible) return null
 
-  const title = page === 0 ? 'Sådan spiller du 🧱' : page === 1 ? 'Nyt leaderboard 📊' : 'Comeback & klovne 🍀🤡'
+  const title = page === 0 ? 'Sådan spiller du 🧱' : page === 1 ? 'Nyt leaderboard 📊' : 'Helte, comeback & klovne 🎯🍀🤡'
   const isLast = page === TOTAL_PAGES - 1
 
   return (
@@ -104,9 +104,14 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
           {page === 2 && (
             <>
               <p className="font-body text-[14px] text-ink leading-relaxed">
-                To krydderier — det ene hjælper, det andet driller:
+                Tre krydderier — ét belønner, ét hjælper, ét driller:
               </p>
               <ul className="space-y-3">
+                <RuleItem icon="🎯" title="Skarp runde = helte-navn">
+                  Rammer du <strong>4 kampe rigtigt i samme runde</strong>, bliver dit navn skiftet
+                  ud med et <strong>helte-navn</strong> i guld (fx 🎯 Skarpskytte-Søren). Den positive
+                  pendant til klovnen — den nulstilles næste runde.
+                </RuleItem>
                 <RuleItem icon="🍀" title="Losers Luck — comeback-hjælp">
                   De <strong>to nederste i sæson-stillingen</strong> får <strong>+20% på deres
                   gevinster</strong> i blokken, så ingen stikker af. Du ser 🍀 ved deres navn, og er

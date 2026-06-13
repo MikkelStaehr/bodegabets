@@ -1172,6 +1172,8 @@ export type LbTabRow = {
   staked: number
   /** Scorede 0 i seneste afgjorte runde (i scope), mens andre fik point → klovne-mærke. */
   latest_round_zero: boolean
+  /** Antal rigtige kamp-resultater i seneste afgjorte runde → helte-øgenavn ved ≥ 4. */
+  latest_round_match_wins: number
   /** 🍀 Losers Luck aktiv i nuværende blok (+20% på gevinster). */
   losers_luck: boolean
 }
@@ -1211,7 +1213,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   const { data: scores } = await supabaseAdmin
     .from('round_scores').select('user_id, round_id, earnings_delta').eq('game_id', gameId).in('round_id', roundIds)
   const { data: bets } = await supabaseAdmin
-    .from('bets').select('user_id, round_id, stake, points_earned, result').eq('game_id', gameId).in('round_id', roundIds)
+    .from('bets').select('user_id, round_id, stake, points_earned, result, bet_type').eq('game_id', gameId).in('round_id', roundIds)
 
   // earnings[user][round]
   const earnings = new Map<string, Map<number, number>>()
@@ -1304,6 +1306,19 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   }
   const seasonZero = zeroInRound(latestFinished)
 
+  // 🎯 Helte-øgenavn: antal rigtige kamp-resultater (match_result) i seneste
+  // afgjorte runde. Ved ≥ 4 (full house) får spilleren et helte-navn — den
+  // positive pendant til klovnen. Knyttet til samme runde i begge faner.
+  const matchWinsLatest = new Map<string, number>()
+  if (latestFinished != null) {
+    for (const b of bets ?? []) {
+      if (b.result !== 'win' || b.bet_type !== 'match_result') continue
+      if ((b.round_id as number) !== latestFinished) continue
+      const uid = b.user_id as string
+      matchWinsLatest.set(uid, (matchWinsLatest.get(uid) ?? 0) + 1)
+    }
+  }
+
   // ── SÆSON: rangér efter blokke vundet, så samlet point ──
   const seasonWinsNow = blockWinsFor(finishedRoundIds)
   const seasonWinsPrev = blockWinsFor(prevFinished)
@@ -1338,6 +1353,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     lost_bets: sumOver(lostMap, u, finishedRoundIds),
     staked: Math.round(sumOver(stakedMap, u, finishedRoundIds) * 10) / 10,
     latest_round_zero: seasonZero.has(u),
+    latest_round_match_wins: matchWinsLatest.get(u) ?? 0,
     losers_luck: losersLuckSet.has(u),
   }))
 
@@ -1368,6 +1384,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
       staked: Math.round(sumOver(stakedMap, u, blockFinished) * 10) / 10,
       // Klovne-navn = bombede seneste runde overordnet (samme i begge faner).
       latest_round_zero: seasonZero.has(u),
+      latest_round_match_wins: matchWinsLatest.get(u) ?? 0,
       losers_luck: losersLuckSet.has(u),
     }))
     block = {

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { LeaderboardTabs, LbTabRow } from '@/lib/gameState'
 import PlayerHistoryModal from './PlayerHistoryModal'
 import { getTaunt } from '@/lib/zeroPointTaunt'
+import { getHero, STREAK_THRESHOLD } from '@/lib/streakHero'
 
 type Props = {
   tabs: LeaderboardTabs
@@ -116,6 +117,7 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
         const settled = r.won_bets + r.lost_bets
         const winrate = settled > 0 ? Math.round((r.won_bets / settled) * 100) : null
         const taunt = r.latest_round_zero ? getTaunt(`${r.user_id}:round`) : null
+        const hero = !taunt && r.latest_round_match_wins >= STREAK_THRESHOLD ? getHero(`${r.user_id}:round`) : null
         const rowBg = idx === 0 ? C.highlight : C.bg
         const pointCell = (
           <span style={{ textAlign: 'right', lineHeight: 1.05, paddingRight: 10, boxSizing: 'border-box' }}>
@@ -153,6 +155,10 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
               {taunt ? (
                 <span title={`${r.username} — scorede 0 point i seneste runde 😅`} style={{ fontStyle: 'italic', color: '#7a7060', cursor: 'help' }}>
                   {taunt}
+                </span>
+              ) : hero ? (
+                <span title={`${r.username} — ramte ${r.latest_round_match_wins} kampe rigtigt i seneste runde 🎯`} style={{ fontStyle: 'italic', fontWeight: 700, color: C.gold, cursor: 'help' }}>
+                  {hero}
                 </span>
               ) : (
                 r.username
