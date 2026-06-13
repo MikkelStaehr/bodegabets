@@ -3,7 +3,6 @@
 import { useGameState, type GameState } from '@/hooks/useGameState'
 import Leaderboard from './Leaderboard'
 import BlockLeaderboard from './BlockLeaderboard'
-import FidusbamseStanding from './FidusbamseStanding'
 
 type Theme = {
   primary: string
@@ -45,10 +44,9 @@ export default function FootballLiveSection({
   const { state } = useGameState(gameId, { initialState })
   const active = state ?? initialState
 
-  // Sidebar: kun fidusbamse-sidekonkurrencen (det store leaderboard ligger i main).
+  // Sidebar: intet ekstra — leaderboardet (m. MoM- og Blokke-kolonner) ligger i main.
   if (variant === 'sidebar') {
-    if (active.leaderboard.length === 0) return null
-    return <FidusbamseStanding entries={active.leaderboard} />
+    return null
   }
 
   // Main: det STORE leaderboard er centrum — overblik over hele spillet — efterfulgt
