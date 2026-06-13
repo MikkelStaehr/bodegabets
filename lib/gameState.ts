@@ -78,6 +78,10 @@ export type LeaderboardEntry = {
   net_profit: number
   /** 🧸 Fidusbamser: antal runder hvor spilleren scorede flest point (Man of the Match). */
   mvp_count: number
+  /** Antal afgjorte bets vundet (alle runder). */
+  won_bets: number
+  /** Antal afgjorte bets tabt (alle runder). */
+  lost_bets: number
 }
 
 export type BlockStandingRow = {
@@ -621,10 +625,15 @@ async function buildFootballLeaderboard(
     .eq('game_id', gameId)
     .in('round_id', roundIds)
   const netByUser = new Map<string, number>()
+  const wonBetsByUser = new Map<string, number>()
+  const lostBetsByUser = new Map<string, number>()
   for (const b of betRows ?? []) {
     if (b.result !== 'win' && b.result !== 'loss') continue
+    const uid = b.user_id as string
     const delta = (Number(b.points_earned) || 0) - (Number(b.stake) || 0)
-    netByUser.set(b.user_id as string, (netByUser.get(b.user_id as string) ?? 0) + delta)
+    netByUser.set(uid, (netByUser.get(uid) ?? 0) + delta)
+    if (b.result === 'win') wonBetsByUser.set(uid, (wonBetsByUser.get(uid) ?? 0) + 1)
+    else lostBetsByUser.set(uid, (lostBetsByUser.get(uid) ?? 0) + 1)
   }
 
   // 🧸 Fidusbamser: pr. AFGJORT runde får topscoreren (flest point) en bamse.
@@ -644,7 +653,7 @@ async function buildFootballLeaderboard(
     if (max > 0) for (const [uid, v] of userPts) if (v === max) mvpByUser.set(uid, (mvpByUser.get(uid) ?? 0) + 1)
   }
 
-  return { leaderboard: buildEntries(members, userData, roundWins, blockWins, totalByUser, netByUser, mvpByUser) }
+  return { leaderboard: buildEntries(members, userData, roundWins, blockWins, totalByUser, netByUser, mvpByUser, wonBetsByUser, lostBetsByUser) }
 }
 
 // Tæl historiske blok-vindere ved at aggregere alle finished blocks separat.
@@ -1202,6 +1211,8 @@ function buildEntries(
   totalPointsByUser?: Map<string, number>,
   netProfitByUser?: Map<string, number>,
   mvpByUser?: Map<string, number>,
+  wonBetsByUser?: Map<string, number>,
+  lostBetsByUser?: Map<string, number>,
 ): LeaderboardEntry[] {
   const entries: LeaderboardEntry[] = members.map((m) => {
     const profile = m.profiles as { username: string; avatar_url: string | null }
@@ -1228,6 +1239,8 @@ function buildEntries(
       total_points: Math.round(totalPoints * 10) / 10,
       net_profit: Math.round((netProfitByUser?.get(m.user_id) ?? 0) * 10) / 10,
       mvp_count: mvpByUser?.get(m.user_id) ?? 0,
+      won_bets: wonBetsByUser?.get(m.user_id) ?? 0,
+      lost_bets: lostBetsByUser?.get(m.user_id) ?? 0,
     }
   })
   // Sortér: B. SEJR (historiske trofæer) → B. PT i nuværende blok → R. PT
