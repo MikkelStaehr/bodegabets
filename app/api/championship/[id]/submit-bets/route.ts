@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, { params }: Props) {
       return NextResponse.json({ error: 'Indsats kan ikke være negativ' }, { status: 400 })
     }
     if (bet.stake > 0 && bet.stake < 10) {
-      return NextResponse.json({ error: 'Minimum indsats er 10 pt' }, { status: 400 })
+      return NextResponse.json({ error: 'Minimum indsats er 10 credits' }, { status: 400 })
     }
   }
 

@@ -218,7 +218,7 @@ function InlineExtraBets({
                       }`}
                     />
                     <span className={`text-[10px] font-semibold ${isRivalry ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'}`}>
-                      pt
+                      credits
                     </span>
                     <button
                       type="button"
@@ -545,7 +545,7 @@ function MatchCard({
               }`}
             />
             <span className={`text-[10px] font-semibold ${isRivalry ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'}`}>
-              pt
+              credits
             </span>
             <button
               type="button"
@@ -570,7 +570,7 @@ function MatchCard({
           </span>
           <div className="flex items-center gap-2">
             <span className={`font-condensed text-[14px] font-bold ${isRivalry ? 'text-[var(--color-cream)]/70' : 'text-[var(--color-warm-taupe)]'}`}>
-              {matchResultBet.stake} pt
+              {matchResultBet.stake} credits
             </span>
             {!isReadOnly && (
               <button
@@ -600,7 +600,7 @@ function MatchCard({
             Stake
           </span>
           <span className="font-condensed text-[14px] font-bold text-[var(--color-warm-taupe)]">
-            {matchResultBet.stake} pt
+            {matchResultBet.stake} credits
           </span>
         </div>
       )}
@@ -919,7 +919,7 @@ export default function AfgivBets({
   function handleSubmit() {
     if (selections.length === 0 || isSubmitting) return
     if (isOverBudget) {
-      toast(`Ikke nok credits. Du har ${displayCredits} pt tilbage.`, 'error')
+      toast(`Ikke nok credits. Du har ${displayCredits} credits tilbage.`, 'error')
       return
     }
     // Advar kun om ubrugte credits hvis de reelt går tabt — dvs. på blokkens
@@ -1193,7 +1193,7 @@ export default function AfgivBets({
                   <span className={`font-condensed text-[20px] font-extrabold leading-none ${
                     isOverBudget ? 'text-white' : 'text-gold'
                   }`}>
-                    {displayCredits === 0 && selections.length > 0 ? '✓ Maxet' : `${displayCredits} pt`}
+                    {displayCredits === 0 && selections.length > 0 ? '✓ Maxet' : `${displayCredits} credits`}
                   </span>
                 </div>
                 <button
@@ -1208,7 +1208,7 @@ export default function AfgivBets({
                 >
                   {isSubmitting
                     ? 'Gemmer...'
-                    : `${selections.length} valg · ${totalPoints} pt · LÅS VALG →`}
+                    : `${selections.length} valg · ${totalPoints} credits · LÅS VALG →`}
                 </button>
               </div>
             </div>
@@ -1268,7 +1268,7 @@ export default function AfgivBets({
                         ? 'text-gold'
                         : 'text-[var(--color-dark-green)]'
                   }`}>
-                    {displayCredits} pt
+                    {displayCredits} credits
                   </span>
                 </div>
                 {/* Blok-kontekst: forklar at budgettet deles over blokkens 2 runder */}
@@ -1288,7 +1288,7 @@ export default function AfgivBets({
                         : 'bg-gold text-[var(--color-dark-green)] hover:bg-[#d4aa55]'
                     }`}
                   >
-                    {creditsRollOver ? `⚡ LÆG RESTEN I SPIL · ${displayCredits} PT` : `⚡ MAXE UD · BRUG ${displayCredits} PT`}
+                    {creditsRollOver ? `⚡ LÆG RESTEN I SPIL · ${displayCredits} CREDITS` : `⚡ MAXE UD · BRUG ${displayCredits} CREDITS`}
                   </button>
                 )}
                 {/* I en blok: forklar at resten gemmes til næste runde */}
@@ -1361,7 +1361,7 @@ export default function AfgivBets({
                             }
                             className="flex-1 text-center font-condensed text-[15px] font-bold text-[var(--color-dark-green)] border border-black/10 rounded bg-[var(--color-cream)] h-6"
                           />
-                          <span className="text-[10px] text-[var(--color-warm-taupe)] font-semibold">pt</span>
+                          <span className="text-[10px] text-[var(--color-warm-taupe)] font-semibold">credits</span>
                           <button
                             type="button"
                             onClick={() => adjustStake(entry.matchId, 50)}
@@ -1372,7 +1372,7 @@ export default function AfgivBets({
                         </div>
                       ) : (
                         <span className="font-condensed text-[15px] font-bold text-[var(--color-dark-green)]">
-                          {entry.points} pt
+                          {entry.points} credits
                         </span>
                       )}
                     </div>
@@ -1407,7 +1407,7 @@ export default function AfgivBets({
                                 onChange={(e) => setExtraStake(entry.matchId, eb.type as ExtraBetType, parseInt(e.target.value) || 10)}
                                 className="w-12 text-center font-condensed text-[12px] font-bold text-[var(--color-dark-green)] border border-black/10 rounded bg-[var(--color-cream)] h-5"
                               />
-                              <span className="text-[9px] text-[var(--color-warm-taupe)] font-semibold">pt</span>
+                              <span className="text-[9px] text-[var(--color-warm-taupe)] font-semibold">credits</span>
                               <button
                                 type="button"
                                 onClick={() => adjustExtraStake(entry.matchId, eb.type as ExtraBetType, 50)}
@@ -1434,9 +1434,9 @@ export default function AfgivBets({
                 </span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-[10px] text-[var(--color-warm-taupe)] font-semibold">Samlet point</span>
+                <span className="text-[10px] text-[var(--color-warm-taupe)] font-semibold">Samlet indsats</span>
                 <span className="font-condensed text-base font-bold text-gold">
-                  {totalPoints} pt
+                  {totalPoints} credits
                 </span>
               </div>
               <p
@@ -1444,7 +1444,7 @@ export default function AfgivBets({
                 style={{ color: selections.length === totalMatches ? '#B8963E' : '#7a7060' }}
               >
                 {selections.length === totalMatches
-                  ? '⭐ Full house! Du får +25 pt bonus.'
+                  ? '⭐ Full house! Du får +25 point bonus.'
                   : '🔒 Dine point-faktorer afsløres efter deadline.'}
               </p>
               <button
@@ -1462,7 +1462,7 @@ export default function AfgivBets({
               {selections.length > 0 && selections.length < totalMatches && (
                 <div className="flex items-center gap-1.5 mt-2 px-2 py-1.5 rounded border border-dashed border-gold/40 bg-gold/[0.07]">
                   <span className="text-[9px] text-gold font-semibold">
-                    ⭐ Vælg alle {totalMatches} kampe og få +25 pt bonus!
+                    ⭐ Vælg alle {totalMatches} kampe og få +25 point bonus!
                   </span>
                 </div>
               )}

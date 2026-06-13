@@ -64,13 +64,13 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Du er ikke med i dette spil' }, { status: 403 })
   }
 
-  // Valider indsatser (minimum 10 pt for side-bets; match_result har stake 0)
+  // Valider indsatser (minimum 10 credits for side-bets; match_result har stake 0)
   for (const bet of bets) {
     if (bet.stake < 0) {
       return NextResponse.json({ error: 'Indsats kan ikke være negativ' }, { status: 400 })
     }
     if (bet.stake > 0 && bet.stake < 10) {
-      return NextResponse.json({ error: 'Minimum indsats er 10 pt' }, { status: 400 })
+      return NextResponse.json({ error: 'Minimum indsats er 10 credits' }, { status: 400 })
     }
   }
 
