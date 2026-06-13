@@ -31,7 +31,8 @@ import FootballNextRoundCard from '@/components/games/FootballNextRoundCard'
 import FootballLiveSection from '@/components/games/FootballLiveSection'
 import FreeEventPitchBanner from '@/components/games/FreeEventPitchBanner'
 import NavbarSportTheme from '@/components/layout/NavbarSportTheme'
-import { getGameState } from '@/lib/gameState'
+import { getGameState, getBlockWinners } from '@/lib/gameState'
+import BlockWinnersHistory from '@/components/games/BlockWinnersHistory'
 import { getSportTheme, assignRanks, computeRoundStatus, getLeagueAbbr, getCurrentChampionshipSeason } from '@/lib/gamePageHelpers'
 
 export const dynamic = 'force-dynamic'
@@ -969,6 +970,11 @@ export default async function GamePage({ params }: Props) {
     ? await getGameState(gameId, user.id)
     : null
 
+  // Blok-vinder-historik (kun fodbold med blokke)
+  const blockWinners = typedGame.sport !== 'cycling'
+    ? await getBlockWinners(gameId)
+    : []
+
   // Seneste færdige runde
   const latestFinished = [...sortedRounds]
     .filter((r) => r.computedStatus === 'finished')
@@ -1647,6 +1653,7 @@ export default async function GamePage({ params }: Props) {
                     variant="sidebar"
                   />
                 )}
+                {blockWinners.length > 0 && <BlockWinnersHistory blocks={blockWinners} />}
                 <ShoutBox
                   gameId={gameId}
                   currentUserId={user.id}
