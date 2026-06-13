@@ -685,6 +685,15 @@ export default function AfgivBets({
   )
 
   const totalMatches = matches.length
+  // Spænder kuponens kampe over flere danske kalenderdage? (natkampe → "i morgen").
+  const spansMultipleDays = useMemo(() => {
+    const days = new Set(
+      matches
+        .filter((m) => m.kickoff_at)
+        .map((m) => new Date(m.kickoff_at).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen' }))
+    )
+    return days.size > 1
+  }, [matches])
   const totalPoints = useMemo(() => {
     // Eksisterende bets for kampe der IKKE er i aktive selections
     const existingStake = existingBets
@@ -1074,6 +1083,16 @@ export default function AfgivBets({
 
       {/* Ticker */}
       {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
+
+      {/* 📅 Kupon dækker flere dage (natkampe) — læg alle valg nu */}
+      {!isReadOnly && spansMultipleDays && (
+        <div className="w-full px-4 py-2.5 text-center" style={{ background: '#C9A84C' }}>
+          <span className="font-condensed text-[13px] font-bold tracking-[0.02em]" style={{ color: '#1a3329' }}>
+            📅 Denne kupon dækker BEGGE dage — også natkampene. Læg alle dine valg og brug dine credits nu;
+            du kan ikke vende tilbage efter deadline.
+          </span>
+        </div>
+      )}
 
       {/* 🍀 Losers Luck-banner — vises når spilleren er blandt de nederste */}
       {!isReadOnly && losersLuckActive && (
