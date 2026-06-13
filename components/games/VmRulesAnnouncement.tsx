@@ -112,10 +112,11 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
                   gevinster</strong> i blokken, så ingen stikker af. Du ser 🍀 ved deres navn, og er
                   du selv med, får du et banner på kuponen. Hvem der får det, låses ved blok-start.
                 </RuleItem>
-                <RuleItem icon="🤡" title="Nul-runde = klovne-mærke">
-                  Scorer du <strong>0 point i en runde</strong> mens andre får point, får du et lille
-                  klovne-mærke ved navnet (fx 🤡 Mr. Nullable). Det forsvinder igen, så snart du
-                  scorer i næste runde. Hold tungen lige i munden! 😄
+                <RuleItem icon="🤡" title="Nul-runde = nyt navn">
+                  Scorer du <strong>0 point i en runde</strong> mens andre får point, bliver dit
+                  navn i leaderboardet <strong>skiftet ud med et klovne-navn</strong> (fx 🤡 Mr.
+                  Nullable). Hold musen over for at se hvem det egentlig er. Det forsvinder igen,
+                  så snart du scorer. Hold tungen lige i munden! 😄
                 </RuleItem>
               </ul>
             </>

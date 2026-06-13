@@ -224,8 +224,9 @@ export default async function VmGuidePage() {
         {/* Nul-runde */}
         <Section emoji="🤡" title="Nul-runde">
           <p>
-            Scorer du <strong>0 point i en runde</strong> mens andre får point, får du et lille
-            klovne-mærke ved navnet (fx 🤡 Mr. Nullable). Det er for sjov — og det forsvinder
+            Scorer du <strong>0 point i en runde</strong> mens andre får point, bliver dit navn i
+            leaderboardet <strong>skiftet ud med et klovne-navn</strong> i kursiv (fx 🤡 Mr.
+            Nullable). Hold musen over navnet for at se hvem det er. Det er for sjov — og forsvinder
             igen, så snart du scorer i næste runde.
           </p>
         </Section>
