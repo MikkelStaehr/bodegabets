@@ -120,7 +120,7 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
           borderBottom: '1px solid #E8E0D3',
           gap: 4,
         }}>
-          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', '✓', '✗', 'Samlet', 'Profit', 'Blok']).map((h, i) => (
+          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', '✓', '✗', 'Samlet', 'Profit', 'Blok nu']).map((h, i) => (
             <span key={i} style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: compact ? 9 : 10, fontWeight: 700,
