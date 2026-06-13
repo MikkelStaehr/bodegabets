@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
+import { getLosersLuckUserIds } from '@/lib/losersLuck'
 import AfgivBets from '@/components/games/AfgivBets'
 import type { Match, Bet, Round } from '@/types'
 
@@ -102,6 +103,9 @@ export default async function RoundPage({ params }: Props) {
       }
     }
   }
+
+  // 🍀 Losers Luck: er den aktuelle spiller blandt de nederste (boost i blokken)?
+  const losersLuckActive = (await getLosersLuckUserIds(gameId, roundBlockId)).has(user.id)
 
   // Step 2: Hent matches via round_id med team joins
   const matchSelect = `
@@ -285,6 +289,7 @@ export default async function RoundPage({ params }: Props) {
       blockBudget={1000}
       blockSpentElsewhere={blockSpentElsewhere}
       creditsRollOver={creditsPerBlock && blockInfo != null && !blockInfo.is_last_in_block}
+      losersLuckActive={losersLuckActive}
     />
   )
 }

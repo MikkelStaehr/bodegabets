@@ -16,6 +16,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { getCurrentChampionshipSeason } from '@/lib/gamePageHelpers'
 import { findActiveSubBlock, getBlockStageRange } from '@/lib/cyclingBlocks'
+import { getLosersLuckUserIds } from '@/lib/losersLuck'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -1171,6 +1172,8 @@ export type LbTabRow = {
   staked: number
   /** Scorede 0 i seneste afgjorte runde (i scope), mens andre fik point → klovne-mærke. */
   latest_round_zero: boolean
+  /** 🍀 Losers Luck aktiv i nuværende blok (+20% på gevinster). */
+  losers_luck: boolean
 }
 
 export type LeaderboardTabs = {
@@ -1200,6 +1203,10 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   const { data: blocks } = await supabaseAdmin
     .from('blocks').select('id, block_number, name, status').in('season_id', seasonIds).order('block_number', { ascending: true })
   const allBlocks = blocks ?? []
+
+  // 🍀 Losers Luck-beneficienter for den nuværende aktive blok.
+  const activeBlockId = allBlocks.find((b) => b.status === 'active')?.id ?? null
+  const losersLuckSet = await getLosersLuckUserIds(gameId, activeBlockId)
 
   const { data: scores } = await supabaseAdmin
     .from('round_scores').select('user_id, round_id, earnings_delta').eq('game_id', gameId).in('round_id', roundIds)
@@ -1331,6 +1338,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     lost_bets: sumOver(lostMap, u, finishedRoundIds),
     staked: Math.round(sumOver(stakedMap, u, finishedRoundIds) * 10) / 10,
     latest_round_zero: seasonZero.has(u),
+    losers_luck: losersLuckSet.has(u),
   }))
 
   // ── BLOK: aktiv blok ──
@@ -1360,6 +1368,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
       lost_bets: sumOver(lostMap, u, blockFinished),
       staked: Math.round(sumOver(stakedMap, u, blockFinished) * 10) / 10,
       latest_round_zero: blockZero.has(u),
+      losers_luck: losersLuckSet.has(u),
     }))
     block = {
       block_name: (activeBlock.name as string) ?? `Blok ${activeBlock.block_number}`,

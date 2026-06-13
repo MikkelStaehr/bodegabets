@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { isBetCorrect } from './betUtils'
 import { evaluateAchievements } from '@/lib/evaluateAchievements'
+import { getLosersLuckUserIds, LOSERS_LUCK_BOOST } from '@/lib/losersLuck'
 
 /**
  * V1 — Simpel, idempotent pointberegning.
@@ -40,8 +41,15 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
     return
   }
 
+  // 🍀 Losers Luck: rundens blok afgør hvilke (nederste) spillere der får boost.
+  const { data: roundRow } = await supabaseAdmin
+    .from('rounds').select('block_id').eq('id', roundId).single()
+  const blockId = (roundRow as { block_id?: number | null } | null)?.block_id ?? null
+
   // 2. For hvert game: evaluer bets, beregn earnings, upsert round_scores
   for (const gameId of allGameIds) {
+    const losersLuck = await getLosersLuckUserIds(gameId, blockId)
+
     // 2a. Evaluer alle bets for alle finished matches i runden
     for (const match of matches) {
       if (match.home_score === null || match.away_score === null) continue
@@ -75,6 +83,10 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           // Ekstra bets: brug konsensus odds med fallback 2.0
           const odds = (bet as { odds?: number | null }).odds ?? 2.0
           pointsEarned = Math.round(stake * odds)
+        }
+        // 🍀 Losers Luck: +20% på vundne bets for de nederste i sæsonen.
+        if (correct && losersLuck.has(bet.user_id as string)) {
+          pointsEarned = Math.round(pointsEarned * LOSERS_LUCK_BOOST)
         }
         const result = correct ? 'win' : 'loss'
 

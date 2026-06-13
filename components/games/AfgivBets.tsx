@@ -94,6 +94,8 @@ type Props = {
    *  (dvs. det er fair at gemme). Så bliver "ubrugt"-beskeden neutral i stedet
    *  for en advarsel. */
   creditsRollOver?: boolean
+  /** 🍀 Spilleren er blandt de nederste → +20% på gevinster i denne blok. */
+  losersLuckActive?: boolean
   submitApiPath?: string
 }
 
@@ -660,6 +662,7 @@ export default function AfgivBets({
   blockBudget = 1000,
   blockSpentElsewhere = 0,
   creditsRollOver = false,
+  losersLuckActive = false,
   submitApiPath,
 }: Props) {
   const router = useRouter()
@@ -1071,6 +1074,15 @@ export default function AfgivBets({
 
       {/* Ticker */}
       {tickerItems.length > 0 && <GameTicker items={tickerItems} />}
+
+      {/* 🍀 Losers Luck-banner — vises når spilleren er blandt de nederste */}
+      {!isReadOnly && losersLuckActive && (
+        <div className="w-full px-4 py-2.5 text-center" style={{ background: '#2C4A3E' }}>
+          <span className="font-condensed text-[13px] font-bold tracking-[0.04em]" style={{ color: '#F2EDE4' }}>
+            🍀 Losers Luck aktiv — du får <span style={{ color: '#C9A84C' }}>+20% på dine gevinster</span> i denne blok
+          </span>
+        </div>
+      )}
 
       {/* Read-only banner */}
       {isReadOnly && (
