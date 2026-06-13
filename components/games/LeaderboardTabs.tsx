@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { LeaderboardTabs, LbTabRow } from '@/lib/gameState'
 import PlayerHistoryModal from './PlayerHistoryModal'
+import { getTaunt } from '@/lib/zeroPointTaunt'
 
 type Props = {
   tabs: LeaderboardTabs
@@ -114,6 +115,7 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
       {rows.map((r, idx) => {
         const settled = r.won_bets + r.lost_bets
         const winrate = settled > 0 ? Math.round((r.won_bets / settled) * 100) : null
+        const taunt = r.latest_round_zero ? getTaunt(`${r.user_id}:round`) : null
         const rowBg = idx === 0 ? C.highlight : C.bg
         const pointCell = (
           <span style={{ textAlign: 'right', lineHeight: 1.05, paddingRight: 10, boxSizing: 'border-box' }}>
@@ -150,6 +152,7 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
             <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
               {r.username}
               {variant === 'season' && r.won_latest_block && <span title="Vinder af seneste blok" style={{ marginLeft: 4, fontSize: 12 }}>🏅</span>}
+              {taunt && <span title={`${taunt} — 0 point i seneste runde`} style={{ marginLeft: 4, fontSize: 13, flexShrink: 0 }}>{taunt.split(' ')[0]}</span>}
             </span>
           </span>
           {variant === 'block' ? (
