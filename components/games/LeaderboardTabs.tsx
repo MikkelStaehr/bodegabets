@@ -150,10 +150,15 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
             </span>
             <Move delta={r.rank_delta} />
             <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-              {r.username}
+              {taunt ? (
+                <span title={`${r.username} — scorede 0 point i seneste runde 😅`} style={{ fontStyle: 'italic', color: '#7a7060', cursor: 'help' }}>
+                  {taunt}
+                </span>
+              ) : (
+                r.username
+              )}
               {variant === 'season' && r.won_latest_block && <span title="Vinder af seneste blok" style={{ marginLeft: 4, fontSize: 12 }}>🏅</span>}
               {r.losers_luck && <span title="🍀 Losers Luck — +20% på gevinster i denne blok" style={{ marginLeft: 4, fontSize: 12, flexShrink: 0 }}>🍀</span>}
-              {taunt && <span title={`${taunt} — 0 point i seneste runde`} style={{ marginLeft: 4, fontSize: 13, flexShrink: 0 }}>{taunt.split(' ')[0]}</span>}
             </span>
           </span>
           {variant === 'block' ? (
