@@ -910,8 +910,11 @@ export default function AfgivBets({
       toast(`Ikke nok credits. Du har ${displayCredits} pt tilbage.`, 'error')
       return
     }
-    // Nudge: hvis spilleren ikke har maxet sine credits ud, så spørg først.
-    if (displayCredits > 0) {
+    // Advar kun om ubrugte credits hvis de reelt går tabt — dvs. på blokkens
+    // SIDSTE runde (eller spil uden blok-budget). Ruller resten videre til en
+    // senere runde i blokken (creditsRollOver), er det en gyldig strategi at
+    // gemme, og vi låser uden at spørge.
+    if (displayCredits > 0 && !creditsRollOver) {
       setShowUnusedWarning(true)
       return
     }
