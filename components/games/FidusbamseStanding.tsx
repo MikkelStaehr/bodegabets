@@ -18,7 +18,7 @@ export default function FidusbamseStanding({ entries }: { entries: LeaderboardEn
         fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase',
         color: '#6b6b6b', marginBottom: 2,
       }}>
-        🧸 Fidusbamsen
+        🧸 Man of the Match
       </p>
       <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 10, color: '#9E9486', marginBottom: 10 }}>
         Flest point i en spillerunde
