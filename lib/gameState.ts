@@ -1353,7 +1353,6 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
 
     const bNow = rankBy((u) => [sumOver(earnings, u, blockFinished), 0])
     const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevFinished), 0])
-    const blockZero = zeroInRound(latestInBlock)
     const rows: LbTabRow[] = bNow.sorted.map((u) => ({
       user_id: u,
       username: usernameById.get(u)!,
@@ -1367,7 +1366,8 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
       won_bets: sumOver(wonMap, u, blockFinished),
       lost_bets: sumOver(lostMap, u, blockFinished),
       staked: Math.round(sumOver(stakedMap, u, blockFinished) * 10) / 10,
-      latest_round_zero: blockZero.has(u),
+      // Klovne-navn = bombede seneste runde overordnet (samme i begge faner).
+      latest_round_zero: seasonZero.has(u),
       losers_luck: losersLuckSet.has(u),
     }))
     block = {
