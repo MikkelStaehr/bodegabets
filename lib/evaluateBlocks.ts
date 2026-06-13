@@ -141,7 +141,7 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
             block_id: block.id,
             game_id: gameId,
             user_id: winner.user_id,
-            total_earnings: maxTotal,
+            points_in_block: maxTotal,
           })
 
         if (winnerError) {
