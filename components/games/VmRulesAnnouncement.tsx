@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 /**
- * Engangs-besked om de nye blok-regler i slutrunden (VM). Vises ÉN gang pr.
- * browser, første gang spilleren går ind i spilrummet efter rul-ud. Nøglen er
- * versioneret, så vi kan gen-annoncere hvis reglerne ændres igen.
+ * Engangs-besked der præsenterer det nye leaderboard. Vises ÉN gang pr. browser,
+ * første gang spilleren går ind i spilrummet efter rul-ud. Nøglen er versioneret,
+ * så vi kan gen-annoncere når noget ændres.
  *
- * Renderes kun for spil der kører blok-credit-modellen (gates i page.tsx).
+ * Renderes kun for spil der kører blok-modellen (gates i page.tsx).
  */
-const SEEN_KEY = 'bodega_vm_blokregler_seen_v2'
+const SEEN_KEY = 'bodega_vm_leaderboard_seen_v3'
 
 export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }) {
   const [visible, setVisible] = useState(false)
@@ -41,38 +41,38 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
         {/* Header */}
         <div className="bg-forest rounded-t-sm px-5 py-4">
           <p className="font-condensed text-[11px] font-bold tracking-[0.14em] uppercase text-gold">
-            Vigtigt · Nye regler
+            Nyt · Opdatering
           </p>
           <h2 className="font-display text-[24px] font-bold text-cream leading-tight mt-0.5">
-            Slutrunden kører nu i blokke 🏆
+            Nyt leaderboard 📊
           </h2>
         </div>
 
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
           <p className="font-body text-[14px] text-ink leading-relaxed">
-            Vi har hørt jer — credits-modellen er lavet om, så den matcher vores
-            blok-DNA fra sæsonerne. Kort fortalt:
+            Vi har bygget leaderboardet om til en rigtig ligatabel. Her er hvad du skal vide:
           </p>
 
-          <BlockIllustration />
+          <LeaderboardIllustration />
 
           <ul className="space-y-2.5">
-            <RuleItem icon="🧱" title="2 spillerunder = 1 blok">
-              Slutrunden deles op i blokke på to runder.
+            <RuleItem icon="📑" title="To faner: Blok & Sæson">
+              <strong>Blok</strong> viser den nuværende blok — er du ved at vinde den? (vundne/tabte
+              bets, winrate, satset, point). <strong>Sæson</strong> viser din samlede placering.
             </RuleItem>
-            <RuleItem icon="🎯" title="1000 credits pr. blok — ikke pr. runde">
-              Du fordeler dine 1000 credits hen over blokkens to runder. Brug
-              dem klogt: alt du gemmer til runde to, er stadig i spil.
+            <RuleItem icon="▲" title="Pile = bevægelse">
+              ▲ og ▼ viser hvor mange pladser du er rykket op eller ned siden forrige spillede runde.
             </RuleItem>
-            <RuleItem icon="🚫" title="Profit kan ikke spilles videre">
-              Alle starter hver blok med friske 1000. Ingen kan løbe fra feltet
-              på en tidlig gevinst — det holder det fair.
+            <RuleItem icon="💰" title="Point (+/− profit)">
+              Dine point med netto-profit i parentes — altså hvad du har vundet minus hvad du har satset.
             </RuleItem>
-            <RuleItem icon="🏅" title="Blok-vinderen får 1 blok-point">
-              Den med højest samlet profit i blokken vinder blokken. Står to
-              lige, får de begge et blok-point. Det er blok-point der afgør
-              stillingen.
+            <RuleItem icon="🏅" title="Blok-point afgør spillet">
+              Antal vundne blokke afgør hvem der fører. 🏅 ved navnet betyder vinder af seneste blok.
+            </RuleItem>
+            <RuleItem icon="👆" title="Tryk på en spiller">
+              Se hele deres historik runde for runde (kun afgjorte spil). MoM = Man of the Match,
+              flest point i en runde.
             </RuleItem>
           </ul>
         </div>
@@ -111,60 +111,42 @@ function RuleItem({ icon, title, children }: { icon: string; title: string; chil
   )
 }
 
-/**
- * Skematisk illustration: to spillerunder samles i én blok med ét fælles
- * 1000-credit-budget. Indbygget grafik (ingen billed-asset) — skarp på alle
- * skærme og matcher design-systemet.
- */
-function BlockIllustration() {
-  const blocks = [
-    { n: 1, rounds: [1, 2], current: true },
-    { n: 2, rounds: [3, 4], current: false },
+/** Lille mock af ligatabellen — viser pile, point(±profit) og blok-point. */
+function LeaderboardIllustration() {
+  const rows = [
+    { rank: 1, mv: '▲2', name: 'fredrp88', pts: '2140', profit: '+140', blok: '1', champ: true },
+    { rank: 2, mv: '▼1', name: 'Stæhr', pts: '1720', profit: '−380', blok: '–', champ: false },
   ]
   return (
-    <div className="bg-white border border-warm-border rounded-sm p-3">
-      <div className="flex items-stretch gap-2">
-        {blocks.map((b) => (
-          <div key={b.n} className="flex-1 flex flex-col items-center gap-1.5">
-            <span
-              className={`font-condensed text-[9px] font-bold tracking-[0.1em] uppercase ${
-                b.current ? 'text-gold-dark' : 'text-warm-gray'
-              }`}
-            >
-              Blok {b.n}{b.current ? ' · nu' : ''}
-            </span>
-            <div
-              className={`w-full flex gap-1 rounded-sm border p-1 ${
-                b.current ? 'border-gold bg-gold/10' : 'border-warm-border bg-cream'
-              }`}
-            >
-              {b.rounds.map((r) => (
-                <div
-                  key={r}
-                  className="flex-1 flex flex-col items-center justify-center rounded-sm bg-forest/[0.06] py-1.5"
-                >
-                  <span className="font-condensed text-[7px] font-bold tracking-[0.08em] uppercase text-warm-gray leading-none">
-                    Runde
-                  </span>
-                  <span className="font-condensed text-[15px] font-bold text-forest leading-none mt-0.5">
-                    {r}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <span className="font-condensed text-[10px] font-bold tracking-[0.04em] text-forest">
-              🎯 1000 credits
-            </span>
-          </div>
-        ))}
-        {/* Antydning af at mønstret fortsætter */}
-        <div className="flex items-center pl-0.5">
-          <span className="font-condensed text-[14px] font-bold text-warm-border">→</span>
-        </div>
+    <div className="bg-white border border-warm-border rounded-sm overflow-hidden">
+      {/* tabs */}
+      <div className="flex gap-1 px-2 pt-2">
+        <span className="font-condensed text-[9px] font-bold tracking-[0.08em] uppercase px-2 py-0.5 rounded-sm bg-forest text-cream">Blok</span>
+        <span className="font-condensed text-[9px] font-bold tracking-[0.08em] uppercase px-2 py-0.5 rounded-sm border border-warm-border text-warm-gray">Sæson</span>
       </div>
-      <p className="font-body text-[10.5px] text-warm-gray text-center mt-2 leading-snug">
-        2 spillerunder = 1 blok · de 1000 credits deles i blokken
-      </p>
+      {/* header */}
+      <div className="grid items-center px-2 pt-2 pb-1" style={{ gridTemplateColumns: '54px 1fr auto 30px', gap: 6 }}>
+        {['#', 'Spiller', 'Point', 'Blok'].map((h, i) => (
+          <span key={h} className="font-condensed text-[8px] font-bold tracking-[0.08em] uppercase text-warm-gray" style={{ textAlign: i >= 2 ? 'right' : 'left' }}>{h}</span>
+        ))}
+      </div>
+      {/* rows */}
+      {rows.map((r, i) => (
+        <div key={r.rank} className="grid items-center px-2 py-1.5" style={{ gridTemplateColumns: '54px 1fr auto 30px', gap: 6, borderTop: '1px solid #EDE8DF', background: i === 0 ? '#F8F5ED' : '#fff' }}>
+          <span className="flex items-baseline gap-1">
+            <span className="font-condensed text-[12px] font-bold" style={{ color: i === 0 ? '#B8963E' : '#7A7A7A' }}>{r.rank}</span>
+            <span className="text-[8px] font-bold" style={{ color: r.mv.startsWith('▲') ? '#2C4A3E' : '#C8392B' }}>{r.mv}</span>
+          </span>
+          <span className="font-condensed text-[12px] font-semibold text-ink truncate">
+            {r.name}{r.champ && <span className="ml-1 text-[10px]">🏅</span>}
+          </span>
+          <span className="text-right whitespace-nowrap">
+            <span className="font-condensed text-[12px] font-extrabold text-ink">{r.pts}</span>
+            <span className="font-condensed text-[9px] font-bold ml-0.5" style={{ color: r.profit.startsWith('+') ? '#2C4A3E' : '#C8392B' }}>({r.profit})</span>
+          </span>
+          <span className="font-condensed text-[12px] font-extrabold text-right" style={{ color: r.blok === '–' ? '#ccc' : '#B8963E' }}>{r.blok}</span>
+        </div>
+      ))}
     </div>
   )
 }
