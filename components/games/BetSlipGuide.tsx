@@ -148,7 +148,7 @@ function Stake() {
       <div className="w-16 h-7 rounded-sm border border-warm-border bg-white flex items-center justify-center font-condensed text-[14px] font-bold text-forest">
         100
       </div>
-      <span className="text-[10px] text-warm-gray font-semibold">pt</span>
+      <span className="text-[10px] text-warm-gray font-semibold">credits</span>
       <div className="w-7 h-7 rounded-sm border border-warm-border bg-white text-forest font-bold flex items-center justify-center">+</div>
     </div>
   )

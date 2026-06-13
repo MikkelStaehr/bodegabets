@@ -582,7 +582,7 @@ function KuponPanel({
           }
           style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
         >
-          {remaining} pt
+          {remaining} credits
         </span>
       </div>
 
@@ -631,7 +631,7 @@ function KuponPanel({
                 <div className="flex-1 text-center font-condensed text-[15px] sm:text-[14px] font-bold text-forest border border-warm-border rounded bg-cream h-9 sm:h-7 leading-9 sm:leading-7 tabular-nums">
                   {stake}
                 </div>
-                <span className="text-[10px] text-warm-taupe font-semibold">pt</span>
+                <span className="text-[10px] text-warm-taupe font-semibold">credits</span>
                 <button
                   type="button"
                   onClick={() => onAdjustStake(idx, STAKE_STEP)}
@@ -668,7 +668,7 @@ function KuponPanel({
             className="font-condensed text-[14px] font-bold text-gold-dark tabular-nums"
             style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
           >
-            {used} / {TOTAL_BUDGET} pt
+            {used} / {TOTAL_BUDGET} credits
           </span>
         </div>
       </div>
@@ -1336,7 +1336,7 @@ function MatchCard({
                 (isRivalry ? 'text-cream/50' : 'text-warm-taupe')
               }
             >
-              pt
+              credits
             </span>
             <button
               type="button"

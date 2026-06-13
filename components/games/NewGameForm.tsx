@@ -301,7 +301,7 @@ export default function NewGameForm({ tournaments, seasonMap }: Props) {
       {/* ── Info-boks ───────────────────────────────────────── */}
       <div className="mt-10 bg-white border border-border rounded-sm px-5 py-4 space-y-2">
         {[
-          'Du starter med 1.000 point',
+          'Du starter med 1.000 credits',
           'Du modtager en 6-tegns invitationskode',
           'Andre kan joine via koden fra deres dashboard',
         ].map((item) => (
