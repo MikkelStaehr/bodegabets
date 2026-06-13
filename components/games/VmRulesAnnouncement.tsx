@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 /**
- * Engangs-besked (2 sider) der præsenterer det nye leaderboard + de nye
- * funktioner (Losers Luck og nul-runde-mærket). Vises ÉN gang pr. browser,
+ * Engangs-besked (3 sider) der præsenterer slutrunde-modellen: blok/credit-
+ * model → leaderboard → Losers Luck & nul-runde. Vises ÉN gang pr. browser,
  * første gang spilleren går ind i spilrummet. Nøglen er versioneret.
  *
  * Renderes kun for spil der kører blok-modellen (gates i page.tsx).
  */
-const SEEN_KEY = 'bodega_vm_leaderboard_seen_v4'
+const SEEN_KEY = 'bodega_vm_leaderboard_seen_v5'
+const TOTAL_PAGES = 3
 
 export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }) {
   const [visible, setVisible] = useState(false)
@@ -33,6 +34,9 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
 
   if (!visible) return null
 
+  const title = page === 0 ? 'Sådan spiller du 🧱' : page === 1 ? 'Nyt leaderboard 📊' : 'Comeback & klovne 🍀🤡'
+  const isLast = page === TOTAL_PAGES - 1
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/55 px-5 py-8 overflow-y-auto">
       <div
@@ -42,42 +46,65 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
         {/* Header */}
         <div className="bg-forest rounded-t-sm px-5 py-4">
           <p className="font-condensed text-[11px] font-bold tracking-[0.14em] uppercase text-gold">
-            Nyt · Opdatering {page + 1}/2
+            Slutrunden · {page + 1}/{TOTAL_PAGES}
           </p>
-          <h2 className="font-display text-[24px] font-bold text-cream leading-tight mt-0.5">
-            {page === 0 ? 'Nyt leaderboard 📊' : 'Comeback & klovne 🍀🤡'}
-          </h2>
+          <h2 className="font-display text-[24px] font-bold text-cream leading-tight mt-0.5">{title}</h2>
         </div>
 
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
-          {page === 0 ? (
+          {page === 0 && (
             <>
               <p className="font-body text-[14px] text-ink leading-relaxed">
-                Vi har bygget leaderboardet om til en rigtig ligatabel. Her er hvad du skal vide:
+                Slutrunden kører i <strong>blokke</strong> — sådan fungerer dine credits:
+              </p>
+              <BlockIllustration />
+              <ul className="space-y-2.5">
+                <RuleItem icon="🧱" title="2 spillerunder = 1 blok">
+                  Turneringen deles op i blokke på to runder.
+                </RuleItem>
+                <RuleItem icon="🎯" title="1000 credits pr. blok — ikke pr. runde">
+                  Du fordeler dine 1000 credits hen over blokkens to runder. Gem evt. til runde to —
+                  alt det du ikke bruger, er stadig i spil.
+                </RuleItem>
+                <RuleItem icon="🚫" title="Profit kan ikke spilles videre">
+                  Alle starter hver blok med friske 1000, så ingen stikker af på en tidlig gevinst.
+                </RuleItem>
+                <RuleItem icon="🏅" title="Højest profit vinder blokken">
+                  Den med mest profit i blokken får 1 blok-point. Det er blok-point der afgør spillet.
+                </RuleItem>
+              </ul>
+            </>
+          )}
+
+          {page === 1 && (
+            <>
+              <p className="font-body text-[14px] text-ink leading-relaxed">
+                Leaderboardet er en rigtig ligatabel. Sådan læser du den:
               </p>
               <LeaderboardIllustration />
               <ul className="space-y-2.5">
                 <RuleItem icon="📑" title="To faner: Blok & Sæson">
-                  <strong>Blok</strong> viser den nuværende blok — er du ved at vinde den? (bets,
-                  winrate, satset, point). <strong>Sæson</strong> viser din samlede placering.
+                  <strong>Blok</strong> = den nuværende blok (bets, winrate, satset, point).
+                  <strong> Sæson</strong> = din samlede placering.
                 </RuleItem>
                 <RuleItem icon="▲" title="Pile = bevægelse">
                   ▲ og ▼ viser hvor mange pladser du er rykket siden forrige spillede runde.
                 </RuleItem>
-                <RuleItem icon="💰" title="Point (+/− profit)">
-                  Dine point med netto-profit i parentes — vundet minus satset.
+                <RuleItem icon="🎯" title="MoM = Man of the Match">
+                  Antal runder hvor du har scoret flest point. Et lille æresbevis ved siden af point.
                 </RuleItem>
-                <RuleItem icon="🏅" title="Blok-point afgør spillet">
-                  Antal vundne blokke afgør hvem der fører. 🏅 ved navnet = vinder af seneste blok.
-                  Tryk på en spiller for fuld historik.
+                <RuleItem icon="👆" title="Tryk på en spiller">
+                  Se hele deres historik runde for runde (kun afgjorte spil).
                 </RuleItem>
               </ul>
             </>
-          ) : (
+          )}
+
+          {page === 2 && (
             <>
               <p className="font-body text-[14px] text-ink leading-relaxed">
-                To nye krydderier i spillet — det ene hjælper, det andet driller:
+                To krydderier — det ene hjælper, det andet driller:
               </p>
               <ul className="space-y-3">
                 <RuleItem icon="🍀" title="Losers Luck — comeback-hjælp">
@@ -97,44 +124,33 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
 
         {/* Footer */}
         <div className="px-5 pb-5 pt-1 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => (isLast ? dismiss() : setPage((p) => p + 1))}
+            className="w-full h-[44px] rounded-sm bg-gold text-forest font-condensed text-[14px] font-bold tracking-[0.08em] uppercase hover:opacity-85 transition-opacity"
+          >
+            {isLast ? 'Forstået' : 'Videre →'}
+          </button>
           {page === 0 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setPage(1)}
-                className="w-full h-[44px] rounded-sm bg-gold text-forest font-condensed text-[14px] font-bold tracking-[0.08em] uppercase hover:opacity-85 transition-opacity"
-              >
-                Videre →
-              </button>
-              <Link
-                href={guideHref}
-                onClick={dismiss}
-                className="w-full h-[40px] flex items-center justify-center rounded-sm border border-forest text-forest font-condensed text-[13px] font-bold tracking-[0.08em] uppercase hover:opacity-70 transition-opacity"
-              >
-                Se alle reglerne →
-              </Link>
-            </>
+            <Link
+              href={guideHref}
+              onClick={dismiss}
+              className="w-full h-[40px] flex items-center justify-center rounded-sm border border-forest text-forest font-condensed text-[13px] font-bold tracking-[0.08em] uppercase hover:opacity-70 transition-opacity"
+            >
+              Se alle reglerne →
+            </Link>
           ) : (
-            <>
-              <button
-                type="button"
-                onClick={dismiss}
-                className="w-full h-[44px] rounded-sm bg-gold text-forest font-condensed text-[14px] font-bold tracking-[0.08em] uppercase hover:opacity-85 transition-opacity"
-              >
-                Forstået
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage(0)}
-                className="w-full h-[36px] text-warm-gray font-condensed text-[13px] font-bold tracking-[0.08em] uppercase hover:text-forest transition-colors"
-              >
-                ← Tilbage
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setPage((p) => p - 1)}
+              className="w-full h-[36px] text-warm-gray font-condensed text-[13px] font-bold tracking-[0.08em] uppercase hover:text-forest transition-colors"
+            >
+              ← Tilbage
+            </button>
           )}
           {/* Side-indikator */}
           <div className="flex items-center justify-center gap-1.5 pt-1">
-            {[0, 1].map((p) => (
+            {Array.from({ length: TOTAL_PAGES }).map((_, p) => (
               <span key={p} className="rounded-full" style={{ width: 6, height: 6, background: p === page ? '#1a3329' : '#D4CFC4' }} />
             ))}
           </div>
@@ -153,6 +169,42 @@ function RuleItem({ icon, title, children }: { icon: string; title: string; chil
         <p className="font-body text-[12.5px] text-warm-gray leading-snug mt-0.5">{children}</p>
       </div>
     </li>
+  )
+}
+
+/** 2 runder = 1 blok med ét fælles 1000-credit-budget. */
+function BlockIllustration() {
+  const blocks = [
+    { n: 1, rounds: [1, 2], current: true },
+    { n: 2, rounds: [3, 4], current: false },
+  ]
+  return (
+    <div className="bg-white border border-warm-border rounded-sm p-3">
+      <div className="flex items-stretch gap-2">
+        {blocks.map((b) => (
+          <div key={b.n} className="flex-1 flex flex-col items-center gap-1.5">
+            <span className={`font-condensed text-[9px] font-bold tracking-[0.1em] uppercase ${b.current ? 'text-gold-dark' : 'text-warm-gray'}`}>
+              Blok {b.n}{b.current ? ' · nu' : ''}
+            </span>
+            <div className={`w-full flex gap-1 rounded-sm border p-1 ${b.current ? 'border-gold bg-gold/10' : 'border-warm-border bg-cream'}`}>
+              {b.rounds.map((r) => (
+                <div key={r} className="flex-1 flex flex-col items-center justify-center rounded-sm bg-forest/[0.06] py-1.5">
+                  <span className="font-condensed text-[7px] font-bold tracking-[0.08em] uppercase text-warm-gray leading-none">Runde</span>
+                  <span className="font-condensed text-[15px] font-bold text-forest leading-none mt-0.5">{r}</span>
+                </div>
+              ))}
+            </div>
+            <span className="font-condensed text-[10px] font-bold tracking-[0.04em] text-forest">🎯 1000 credits</span>
+          </div>
+        ))}
+        <div className="flex items-center pl-0.5">
+          <span className="font-condensed text-[14px] font-bold text-warm-border">→</span>
+        </div>
+      </div>
+      <p className="font-body text-[10.5px] text-warm-gray text-center mt-2 leading-snug">
+        2 spillerunder = 1 blok · de 1000 credits deles i blokken
+      </p>
+    </div>
   )
 }
 

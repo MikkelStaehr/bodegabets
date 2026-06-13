@@ -173,14 +173,61 @@ export default async function VmGuidePage() {
           </Callout>
         </Section>
 
-        {/* Stilling */}
-        <Section emoji="📊" title="Stillingen">
-          <p className="mb-3">Leaderboardet rangeres efter — i denne rækkefølge:</p>
-          <ol className="space-y-1.5">
-            <Bullet num={1}><strong>Blok-sejre</strong> — antal vundne blokke.</Bullet>
-            <Bullet num={2}><strong>Profit i nuværende blok</strong>.</Bullet>
-            <Bullet num={3}><strong>Profit i nuværende runde</strong>.</Bullet>
-          </ol>
+        {/* Leaderboardet */}
+        <Section emoji="📊" title="Leaderboardet">
+          <p className="mb-3">
+            Leaderboardet er en ligatabel med <strong>to faner</strong>:
+          </p>
+          <ul className="space-y-1.5 mb-3">
+            <Bullet><strong>Blok</strong> — den nuværende bloks stilling. Her ser du vundne/tabte
+              bets, winrate, satset credit og point — altså om du er ved at vinde blokken.</Bullet>
+            <Bullet><strong>Sæson</strong> — din samlede placering i spillet, rangeret efter
+              <strong> blok-point</strong> (vundne blokke), så samlet point.</Bullet>
+          </ul>
+          <p className="mb-3">Kolonnerne:</p>
+          <ul className="space-y-1.5 mb-3">
+            <Bullet><strong>▲ / ▼ pile</strong> ved placeringen viser hvor mange pladser du er
+              rykket op eller ned siden forrige spillede runde.</Bullet>
+            <Bullet><strong>Point (+/− profit)</strong> — dine point med netto-profit (vundet minus
+              satset) i parentes.</Bullet>
+            <Bullet><strong>🏅 ved navnet</strong> = vinder af seneste blok.</Bullet>
+          </ul>
+          <Callout>
+            Tryk på en spiller for at se hele deres historik — runde for runde, kun afgjorte spil.
+          </Callout>
+        </Section>
+
+        {/* MoM */}
+        <Section emoji="🎯" title="Man of the Match (MoM)">
+          <p>
+            Hver spillerunde får den med <strong>flest point</strong> en MoM. MoM-kolonnen i
+            sæson-tabben tæller hvor mange gange du har været rundens topscorer — en lille
+            sidekonkurrence ved siden af blokkene. Står to lige på toppen, får begge en.
+          </p>
+        </Section>
+
+        {/* Losers Luck */}
+        <Section emoji="🍀" title="Losers Luck">
+          <p className="mb-3">
+            For at ingen stikker af, får de <strong>to nederste i sæson-stillingen</strong> en
+            håndsrækning: <strong>+20% på deres gevinster</strong> i blokken.
+          </p>
+          <ul className="space-y-1.5 mb-3">
+            <Bullet>Hvem der får det <strong>låses ved blokkens start</strong> ud fra stillingen —
+              man kan ikke tabe med vilje for at snyde sig til det.</Bullet>
+            <Bullet>Du ser <strong>🍀</strong> ved deres navn i leaderboardet, og er du selv med,
+              får du et banner på kuponen.</Bullet>
+          </ul>
+          <Callout>Gælder kun de vundne bets — taber du, hjælper det ikke.</Callout>
+        </Section>
+
+        {/* Nul-runde */}
+        <Section emoji="🤡" title="Nul-runde">
+          <p>
+            Scorer du <strong>0 point i en runde</strong> mens andre får point, får du et lille
+            klovne-mærke ved navnet (fx 🤡 Mr. Nullable). Det er for sjov — og det forsvinder
+            igen, så snart du scorer i næste runde.
+          </p>
         </Section>
 
         {/* Ingen overførsel */}
