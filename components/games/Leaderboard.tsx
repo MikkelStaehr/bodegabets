@@ -170,6 +170,11 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
                   🏅{entry.block_wins}
                 </span>
               )}
+              {compact && entry.mvp_count > 0 && (
+                <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 700, color: '#7a7060' }}>
+                  🧸{entry.mvp_count}
+                </span>
+              )}
               {shouldTaunt(entry.round_points, allRoundPoints) && (
                 <span style={{
                   fontStyle: 'italic',

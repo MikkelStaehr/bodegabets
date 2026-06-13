@@ -76,6 +76,8 @@ export type LeaderboardEntry = {
   total_points: number
   /** Netto-profit: samlet vundet − samlet satset (kun afgjorte bets). */
   net_profit: number
+  /** 🧸 Fidusbamser: antal runder hvor spilleren scorede flest point (Man of the Match). */
+  mvp_count: number
 }
 
 export type BlockStandingRow = {
@@ -625,7 +627,24 @@ async function buildFootballLeaderboard(
     netByUser.set(b.user_id as string, (netByUser.get(b.user_id as string) ?? 0) + delta)
   }
 
-  return { leaderboard: buildEntries(members, userData, roundWins, blockWins, totalByUser, netByUser) }
+  // 🧸 Fidusbamser: pr. AFGJORT runde får topscoreren (flest point) en bamse.
+  // Uafgjort på toppen → alle med max (> 0) får hver én.
+  const mvpByUser = new Map<string, number>()
+  const ptsByRound = new Map<number, Map<string, number>>()
+  for (const s of scores ?? []) {
+    const rid = s.round_id as number
+    if (!finishedRoundIds.has(rid)) continue
+    if (!ptsByRound.has(rid)) ptsByRound.set(rid, new Map())
+    const m = ptsByRound.get(rid)!
+    m.set(s.user_id, (m.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
+  }
+  for (const [, userPts] of ptsByRound) {
+    let max = 0
+    for (const v of userPts.values()) if (v > max) max = v
+    if (max > 0) for (const [uid, v] of userPts) if (v === max) mvpByUser.set(uid, (mvpByUser.get(uid) ?? 0) + 1)
+  }
+
+  return { leaderboard: buildEntries(members, userData, roundWins, blockWins, totalByUser, netByUser, mvpByUser) }
 }
 
 // Tæl historiske blok-vindere ved at aggregere alle finished blocks separat.
@@ -1182,6 +1201,7 @@ function buildEntries(
   blockWins: Map<string, number>,
   totalPointsByUser?: Map<string, number>,
   netProfitByUser?: Map<string, number>,
+  mvpByUser?: Map<string, number>,
 ): LeaderboardEntry[] {
   const entries: LeaderboardEntry[] = members.map((m) => {
     const profile = m.profiles as { username: string; avatar_url: string | null }
@@ -1207,6 +1227,7 @@ function buildEntries(
       block_points: Math.round(totalBlockPoints * 10) / 10,
       total_points: Math.round(totalPoints * 10) / 10,
       net_profit: Math.round((netProfitByUser?.get(m.user_id) ?? 0) * 10) / 10,
+      mvp_count: mvpByUser?.get(m.user_id) ?? 0,
     }
   })
   // Sortér: B. SEJR (historiske trofæer) → B. PT i nuværende blok → R. PT

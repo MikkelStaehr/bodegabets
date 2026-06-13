@@ -3,6 +3,7 @@
 import { useGameState, type GameState } from '@/hooks/useGameState'
 import Leaderboard from './Leaderboard'
 import BlockLeaderboard from './BlockLeaderboard'
+import FidusbamseStanding from './FidusbamseStanding'
 
 type Theme = {
   primary: string
@@ -45,8 +46,9 @@ export default function FootballLiveSection({
   const active = state ?? initialState
 
   if (variant === 'sidebar') {
-    return active.leaderboard.length > 0
-      ? (
+    if (active.leaderboard.length === 0) return null
+    return (
+      <>
         <Leaderboard
           entries={active.leaderboard}
           compact
@@ -54,8 +56,9 @@ export default function FootballLiveSection({
           subtitle="tryk for detaljer"
           drillDownGameId={gameId}
         />
-      )
-      : null
+        <FidusbamseStanding entries={active.leaderboard} />
+      </>
+    )
   }
 
   return (
