@@ -120,7 +120,7 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
           borderBottom: '1px solid #E8E0D3',
           gap: 4,
         }}>
-          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', '✓', '✗', 'Samlet', 'Profit', 'Blok nu']).map((h, i) => (
+          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', '✓', '✗', 'Samlet', 'Profit', 'Blokke']).map((h, i) => (
             <span key={i} style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: compact ? 9 : 10, fontWeight: 700,
@@ -165,9 +165,14 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
               minWidth: 0,
             }}>
               {entry.username}
-              {entry.block_wins > 0 && (
-                <span style={{ marginLeft: 6, fontSize: compact ? 11 : 13, fontWeight: 700, color: '#B8963E' }}>
+              {compact && entry.block_wins > 0 && (
+                <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#B8963E' }}>
                   🏅{entry.block_wins}
+                </span>
+              )}
+              {!compact && entry.won_latest_block && (
+                <span title="Vinder af seneste blok" style={{ marginLeft: 6, fontSize: 15 }}>
+                  🏅
                 </span>
               )}
               {entry.mvp_count > 0 && (
@@ -233,12 +238,12 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
                 }}>
                   {entry.net_profit !== 0 ? fmtProfit(entry.net_profit) : '-'}
                 </span>
-                {/* Blok-point — yderst til højre */}
+                {/* Blokke vundet — hvem fører turneringen — yderst til højre */}
                 <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700,
-                  color: entry.block_points > 0 ? '#B8963E' : '#ccc', textAlign: 'right',
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 800,
+                  color: entry.block_wins > 0 ? '#B8963E' : '#ccc', textAlign: 'right',
                 }}>
-                  {entry.block_points > 0 ? entry.block_points : '-'}
+                  {entry.block_wins > 0 ? entry.block_wins : '-'}
                 </span>
               </>
             )}
