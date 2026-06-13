@@ -72,26 +72,28 @@ function TabBtn({ label, sub, activeTab, disabled, onClick }: { label: string; s
 }
 
 function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block' | 'season'; onSelect: (r: LbTabRow) => void }) {
+  // Første kolonne (placering + spiller) er SAMMEN og STICKY, så den fryser
+  // når man scroller stat-kolonnerne vandret.
   const cols = variant === 'season'
-    ? '34px minmax(56px, 1fr) 78px 34px 52px'
-    : '32px minmax(56px, 1fr) 30px 30px 46px 56px 86px'
+    ? 'minmax(120px, 1fr) 80px 36px 54px'
+    : '136px 32px 32px 48px 58px 88px'
   const headers = variant === 'season'
     ? [
-        { l: '#', t: 'Placering — pilen viser bevægelse siden forrige spillede runde', a: 'left' as const },
-        { l: 'Spiller', t: 'Spiller — tryk for fuld historik', a: 'left' as const },
+        { l: 'Spiller', t: 'Placering & spiller — pilen viser bevægelse siden forrige runde · tryk for historik', a: 'left' as const, sticky: true },
         { l: 'Point', t: 'Samlet point over hele turneringen (+/− netto-profit)', a: 'right' as const },
         { l: 'MoM', t: 'Man of the Match — antal runder som topscorer', a: 'right' as const },
         { l: 'Blok pt', t: 'Blok-point — point for vundne blokke (afgør hvem der fører)', a: 'right' as const },
       ]
     : [
-        { l: '#', t: 'Placering — pilen viser bevægelse siden forrige runde i blokken', a: 'left' as const },
-        { l: 'Spiller', t: 'Spiller — tryk for fuld historik', a: 'left' as const },
+        { l: 'Spiller', t: 'Placering & spiller — pilen viser bevægelse i blokken · tryk for historik', a: 'left' as const, sticky: true },
         { l: '✓', t: 'Vundne bets i blokken', a: 'right' as const },
         { l: '✗', t: 'Tabte bets i blokken', a: 'right' as const },
         { l: 'Win%', t: 'Winrate — vundne bets ud af afgjorte bets i blokken', a: 'right' as const },
         { l: 'Satset', t: 'Satset credit i blokken', a: 'right' as const },
         { l: 'Point', t: 'Point i blokken (+/− netto-profit)', a: 'right' as const },
       ]
+  const lastIdx = headers.length - 1
+  const stickyShadow = variant === 'block' ? '4px 0 6px -4px rgba(0,0,0,0.22)' : undefined
 
   if (rows.length === 0) {
     return <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 2, padding: '24px 12px', textAlign: 'center', fontFamily: "'Barlow', sans-serif", fontSize: 13, color: C.muted }}>Ingen point endnu</div>
@@ -99,19 +101,22 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
 
   return (
     <div style={{ overflowX: variant === 'block' ? 'auto' : 'visible' }}>
-    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 2, minWidth: variant === 'block' ? 420 : undefined }}>
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 2, minWidth: variant === 'block' ? 444 : undefined }}>
       {/* Header */}
-      <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '7px 10px', borderBottom: `1px solid ${C.border}`, gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols, padding: '7px 0', borderBottom: `1px solid ${C.border}`, gap: 4 }}>
         {headers.map((h, i) => (
-          <Th key={i} label={h.l} tip={h.t} align={h.a} />
+          <Th key={i} label={h.l} tip={h.t} align={h.a}
+            sticky={h.sticky} stickyBg={C.bg} shadow={h.sticky ? stickyShadow : undefined}
+            padLeft={h.sticky ? 10 : undefined} padRight={i === lastIdx ? 10 : undefined} />
         ))}
       </div>
       {/* Rows */}
       {rows.map((r, idx) => {
         const settled = r.won_bets + r.lost_bets
         const winrate = settled > 0 ? Math.round((r.won_bets / settled) * 100) : null
+        const rowBg = idx === 0 ? C.highlight : C.bg
         const pointCell = (
-          <span style={{ textAlign: 'right', lineHeight: 1.05 }}>
+          <span style={{ textAlign: 'right', lineHeight: 1.05, paddingRight: 10, boxSizing: 'border-box' }}>
             <span style={{ fontFamily: FF, fontSize: 15, fontWeight: 800, color: r.points > 0 ? C.ink : '#ccc' }}>
               {r.points > 0 ? r.points : '-'}
             </span>
@@ -127,22 +132,25 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
           key={r.user_id}
           onClick={() => onSelect(r)}
           style={{
-            display: 'grid', gridTemplateColumns: cols, padding: '7px 10px', gap: 4, alignItems: 'center',
+            display: 'grid', gridTemplateColumns: cols, padding: '7px 0', gap: 4, alignItems: 'center',
             borderBottom: idx < rows.length - 1 ? `1px solid ${C.border}` : 'none',
             background: idx === 0 ? C.highlight : 'transparent', cursor: 'pointer',
           }}
         >
-          {/* Pos + bevægelse */}
-          <span style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-            <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 700, color: idx === 0 ? C.gold : idx === 1 ? '#7A7A7A' : idx === 2 ? '#A0785A' : C.muted }}>
+          {/* STICKY: placering + bevægelse + spiller */}
+          <span style={{
+            position: 'sticky', left: 0, zIndex: 1, boxSizing: 'border-box', paddingLeft: 10,
+            background: rowBg, boxShadow: stickyShadow,
+            display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0,
+          }}>
+            <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 700, flexShrink: 0, color: idx === 0 ? C.gold : idx === 1 ? '#7A7A7A' : idx === 2 ? '#A0785A' : C.muted }}>
               {r.rank}
             </span>
             <Move delta={r.rank_delta} />
-          </span>
-          {/* Spiller */}
-          <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-            {r.username}
-            {variant === 'season' && r.won_latest_block && <span title="Vinder af seneste blok" style={{ marginLeft: 4, fontSize: 12 }}>🏅</span>}
+            <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+              {r.username}
+              {variant === 'season' && r.won_latest_block && <span title="Vinder af seneste blok" style={{ marginLeft: 4, fontSize: 12 }}>🏅</span>}
+            </span>
           </span>
           {variant === 'block' ? (
             <>
@@ -166,7 +174,7 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
               <span style={{ textAlign: 'right', fontFamily: FF, fontSize: 14, fontWeight: 700, color: r.mvp_count > 0 ? '#7a7060' : '#ccc' }}>
                 {r.mvp_count > 0 ? r.mvp_count : '-'}
               </span>
-              <span style={{ textAlign: 'right', fontFamily: FF, fontSize: 14, fontWeight: 800, color: r.block_wins > 0 ? C.gold : '#ccc' }}>
+              <span style={{ textAlign: 'right', paddingRight: 10, boxSizing: 'border-box', fontFamily: FF, fontSize: 14, fontWeight: 800, color: r.block_wins > 0 ? C.gold : '#ccc' }}>
                 {r.block_wins > 0 ? r.block_wins : '-'}
               </span>
             </>
@@ -189,14 +197,23 @@ function Move({ delta }: { delta: number }) {
   )
 }
 
-function Th({ label, tip, align }: { label: string; tip: string; align: 'left' | 'right' }) {
+function Th({ label, tip, align, sticky, stickyBg, shadow, padLeft, padRight }: {
+  label: string; tip: string; align: 'left' | 'right'
+  sticky?: boolean; stickyBg?: string; shadow?: string; padLeft?: number; padRight?: number
+}) {
   const [show, setShow] = useState(false)
   return (
     <span
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
       onClick={(e) => { e.stopPropagation(); setShow((s) => !s) }}
-      style={{ position: 'relative', textAlign: align, cursor: 'help', fontFamily: FF, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted }}
+      style={{
+        position: sticky ? 'sticky' : 'relative', left: sticky ? 0 : undefined, zIndex: sticky ? 2 : undefined,
+        background: sticky ? stickyBg : undefined, boxShadow: sticky ? shadow : undefined,
+        boxSizing: 'border-box', paddingLeft: padLeft, paddingRight: padRight,
+        textAlign: align, cursor: 'help', fontFamily: FF, fontSize: 9, fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted,
+      }}
     >
       {label}
       {show && (
