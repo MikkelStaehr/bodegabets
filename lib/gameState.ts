@@ -1078,6 +1078,10 @@ export async function getPlayerHistory(gameId: number, userId: string): Promise<
   const byRound = new Map<number, PlayerHistory['rounds'][number]>()
   let tStaked = 0, tWon = 0
   for (const b of bets) {
+    // KUN afgjorte spil — man skal ikke kunne se andres kommende/uafgjorte bets.
+    const settled = b.result === 'win' || b.result === 'loss'
+    if (!settled) continue
+
     const rid = b.round_id as number
     const r = roundById.get(rid)
     if (!byRound.has(rid)) {
@@ -1086,20 +1090,16 @@ export async function getPlayerHistory(gameId: number, userId: string): Promise<
         round_name: (r?.name as string) ?? `Runde ${rid}`,
         block_number: r?.block_id != null ? blockNumById.get(r.block_id) ?? null : null,
         status: (r?.status as string) ?? 'unknown',
-        staked: 0, won: 0, net: 0, settled: false, bets: [],
+        staked: 0, won: 0, net: 0, settled: true, bets: [],
       })
     }
     const row = byRound.get(rid)!
-    const settled = b.result === 'win' || b.result === 'loss'
     const stake = Number(b.stake) || 0
     const won = Number(b.points_earned) || 0
-    if (settled) {
-      row.staked += stake
-      row.won += won
-      row.settled = true
-      tStaked += stake
-      tWon += won
-    }
+    row.staked += stake
+    row.won += won
+    tStaked += stake
+    tWon += won
     row.bets.push({
       label: matchLabel.get(b.match_id as number) ?? '—',
       bet_type: b.bet_type as string,

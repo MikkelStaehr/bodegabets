@@ -113,15 +113,15 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
         {/* Header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '32px 1fr 56px 64px 56px 64px',
-          padding: '8px 12px',
+          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '44px minmax(0, 1fr) 96px 96px',
+          padding: compact ? '8px 12px' : '11px 18px',
           borderBottom: '1px solid #E8E0D3',
           gap: 4,
         }}>
-          {(compact ? ['#', '', 'Samlet'] : ['#', '', 'R. sejr', 'R. point', 'B. sejr', 'B. point']).map((h, i) => (
+          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', 'Samlet', 'Profit']).map((h, i) => (
             <span key={i} style={{
               fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 9, fontWeight: 700,
+              fontSize: compact ? 9 : 10, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em',
               color: '#9E9486',
               textAlign: i >= 2 ? 'right' : 'left',
@@ -138,18 +138,18 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
             onClick={drillDownGameId ? () => setSelected({ userId: entry.user_id, username: entry.username }) : undefined}
             style={{
               display: 'grid',
-              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '32px 1fr 56px 64px 56px 64px',
-              padding: '10px 12px',
+              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '44px minmax(0, 1fr) 96px 96px',
+              padding: compact ? '10px 12px' : '14px 18px',
               borderBottom: idx < entries.length - 1 ? '1px solid #E8E0D3' : 'none',
               gap: 4,
               alignItems: 'center',
-              background: idx === 0 && entry.block_points > 0 ? '#F8F5ED' : 'transparent',
+              background: idx === 0 && entry.total_points > 0 ? '#F8F5ED' : 'transparent',
               cursor: drillDownGameId ? 'pointer' : 'default',
             }}
           >
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 14, fontWeight: 700,
+              fontSize: compact ? 14 : 20, fontWeight: 700,
               color: idx === 0 ? '#B8963E' : idx === 1 ? '#7A7A7A' : idx === 2 ? '#A0785A' : '#9E9486',
             }}>
               {idx + 1}
@@ -157,69 +157,31 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
 
             <span style={{
               fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 13, fontWeight: 600,
+              fontSize: compact ? 13 : 16, fontWeight: 600,
               color: '#1a1a1a',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               minWidth: 0,
             }}>
               {entry.username}
-              {compact && entry.block_wins > 0 && (
-                <span style={{
-                  marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#B8963E',
-                }}>
+              {entry.block_wins > 0 && (
+                <span style={{ marginLeft: 6, fontSize: compact ? 11 : 13, fontWeight: 700, color: '#B8963E' }}>
                   🏅{entry.block_wins}
                 </span>
               )}
-              {compact && entry.mvp_count > 0 && (
-                <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 700, color: '#7a7060' }}>
+              {entry.mvp_count > 0 && (
+                <span style={{ marginLeft: 5, fontSize: compact ? 11 : 13, fontWeight: 700, color: '#7a7060' }}>
                   🧸{entry.mvp_count}
                 </span>
               )}
               {shouldTaunt(entry.round_points, allRoundPoints) && (
                 <span style={{
-                  fontStyle: 'italic',
-                  fontWeight: 400,
-                  color: '#9E9486',
-                  marginLeft: 6,
-                  fontSize: 11,
+                  fontStyle: 'italic', fontWeight: 400, color: '#9E9486',
+                  marginLeft: 6, fontSize: compact ? 11 : 12,
                 }}>
                   {getTaunt(`${entry.user_id}:round`)}
                 </span>
               )}
             </span>
-
-            {!compact && (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontSize: 12, fontWeight: 600,
-                color: entry.round_wins > 0 ? '#B8963E' : '#ccc',
-                textAlign: 'right',
-              }}>
-                {entry.round_wins > 0 ? entry.round_wins : '-'}
-              </span>
-            )}
-
-            {!compact && (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontSize: 12, fontWeight: 600,
-                color: entry.round_points > 0 ? '#1a1a1a' : '#ccc',
-                textAlign: 'right',
-              }}>
-                {entry.round_points > 0 ? entry.round_points : '-'}
-              </span>
-            )}
-
-            {!compact && (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontSize: 12, fontWeight: 600,
-                color: entry.block_wins > 0 ? '#B8963E' : '#ccc',
-                textAlign: 'right',
-              }}>
-                {entry.block_wins > 0 ? entry.block_wins : '-'}
-              </span>
-            )}
 
             {compact ? (
               <div style={{ textAlign: 'right', lineHeight: 1.05 }}>
@@ -239,14 +201,21 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
                 )}
               </div>
             ) : (
-              <span style={{
-                fontFamily: "'Barlow Condensed', sans-serif",
-                fontSize: 13, fontWeight: 700,
-                color: entry.block_points > 0 ? '#1a1a1a' : '#ccc',
-                textAlign: 'right',
-              }}>
-                {entry.block_points > 0 ? entry.block_points : '-'}
-              </span>
+              <>
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 800,
+                  color: entry.total_points > 0 ? '#1a1a1a' : '#ccc', textAlign: 'right',
+                }}>
+                  {entry.total_points > 0 ? entry.total_points : '-'}
+                </span>
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700,
+                  color: entry.net_profit > 0 ? '#2C4A3E' : entry.net_profit < 0 ? '#C8392B' : '#ccc',
+                  textAlign: 'right',
+                }}>
+                  {entry.net_profit !== 0 ? fmtProfit(entry.net_profit) : '-'}
+                </span>
+              </>
             )}
           </div>
         ))}

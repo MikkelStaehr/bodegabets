@@ -45,24 +45,24 @@ export default function FootballLiveSection({
   const { state } = useGameState(gameId, { initialState })
   const active = state ?? initialState
 
+  // Sidebar: kun fidusbamse-sidekonkurrencen (det store leaderboard ligger i main).
   if (variant === 'sidebar') {
     if (active.leaderboard.length === 0) return null
-    return (
-      <>
-        <Leaderboard
-          entries={active.leaderboard}
-          compact
-          title="Samlet stilling"
-          subtitle="tryk for detaljer"
-          drillDownGameId={gameId}
-        />
-        <FidusbamseStanding entries={active.leaderboard} />
-      </>
-    )
+    return <FidusbamseStanding entries={active.leaderboard} />
   }
 
+  // Main: det STORE leaderboard er centrum — overblik over hele spillet — efterfulgt
+  // af den aktive bloks stilling.
   return (
     <>
+      {active.leaderboard.length > 0 && (
+        <Leaderboard
+          entries={active.leaderboard}
+          title="Stilling"
+          subtitle="tryk på en spiller for fuld historik"
+          drillDownGameId={gameId}
+        />
+      )}
       {active.activeBlockStandings && (
         <BlockLeaderboard
           standings={active.activeBlockStandings}
@@ -70,9 +70,6 @@ export default function FootballLiveSection({
           theme={theme}
           currentRoundName={currentRoundName}
         />
-      )}
-      {variant === 'main' && active.leaderboard.length > 0 && (
-        <Leaderboard entries={active.leaderboard} title="Samlet stilling" subtitle="blok-sejre afgør" />
       )}
     </>
   )
