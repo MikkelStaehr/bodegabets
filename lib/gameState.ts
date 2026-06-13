@@ -1169,6 +1169,8 @@ export type LbTabRow = {
   lost_bets: number
   /** Samlet satset (credits) i scope. */
   staked: number
+  /** Scorede 0 i seneste afgjorte runde (i scope), mens andre fik point → klovne-mærke. */
+  latest_round_zero: boolean
 }
 
 export type LeaderboardTabs = {
@@ -1281,6 +1283,20 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   const prevFinished = new Set(finishedRoundIds)
   if (latestFinished != null) prevFinished.delete(latestFinished)
 
+  // Klovne-mærke: scorede 0 i en given runde, mens mindst én anden fik point.
+  const zeroInRound = (rid: number | null): Set<string> => {
+    const s = new Set<string>()
+    if (rid == null) return s
+    const m = ptsByRound.get(rid)
+    if (!m) return s
+    let max = 0
+    for (const v of m.values()) if (v > max) max = v
+    if (max <= 0) return s
+    for (const u of userIds) if ((m.get(u) ?? 0) === 0) s.add(u)
+    return s
+  }
+  const seasonZero = zeroInRound(latestFinished)
+
   // ── SÆSON: rangér efter blokke vundet, så samlet point ──
   const seasonWinsNow = blockWinsFor(finishedRoundIds)
   const seasonWinsPrev = blockWinsFor(prevFinished)
@@ -1314,6 +1330,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     won_bets: sumOver(wonMap, u, finishedRoundIds),
     lost_bets: sumOver(lostMap, u, finishedRoundIds),
     staked: Math.round(sumOver(stakedMap, u, finishedRoundIds) * 10) / 10,
+    latest_round_zero: seasonZero.has(u),
   }))
 
   // ── BLOK: aktiv blok ──
@@ -1328,6 +1345,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
 
     const bNow = rankBy((u) => [sumOver(earnings, u, blockFinished), 0])
     const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevFinished), 0])
+    const blockZero = zeroInRound(latestInBlock)
     const rows: LbTabRow[] = bNow.sorted.map((u) => ({
       user_id: u,
       username: usernameById.get(u)!,
@@ -1341,6 +1359,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
       won_bets: sumOver(wonMap, u, blockFinished),
       lost_bets: sumOver(lostMap, u, blockFinished),
       staked: Math.round(sumOver(stakedMap, u, blockFinished) * 10) / 10,
+      latest_round_zero: blockZero.has(u),
     }))
     block = {
       block_name: (activeBlock.name as string) ?? `Blok ${activeBlock.block_number}`,
