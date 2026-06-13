@@ -73,7 +73,7 @@ function TabBtn({ label, sub, activeTab, disabled, onClick }: { label: string; s
 
 function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block' | 'season'; onSelect: (r: LbTabRow) => void }) {
   const cols = variant === 'season'
-    ? '34px minmax(60px, 1fr) 80px 34px 34px'
+    ? '34px minmax(56px, 1fr) 78px 34px 52px'
     : '32px minmax(56px, 1fr) 30px 30px 46px 56px 86px'
   const headers = variant === 'season'
     ? [
@@ -81,7 +81,7 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
         { l: 'Spiller', t: 'Spiller — tryk for fuld historik', a: 'left' as const },
         { l: 'Point', t: 'Samlet point over hele turneringen (+/− netto-profit)', a: 'right' as const },
         { l: 'MoM', t: 'Man of the Match — antal runder som topscorer', a: 'right' as const },
-        { l: '🏅', t: 'Blokke vundet — afgør hvem der fører', a: 'right' as const },
+        { l: 'Blok pt', t: 'Blok-point — point for vundne blokke (afgør hvem der fører)', a: 'right' as const },
       ]
     : [
         { l: '#', t: 'Placering — pilen viser bevægelse siden forrige runde i blokken', a: 'left' as const },
