@@ -51,6 +51,23 @@ function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Matchdag-nøgle: en kamp hører til sin DANSKE matchdag — ikke nødvendigvis sin
+// kickoff-kalenderdag. Kampe før kl. 12:00 (dansk) hører til dagen før, samme
+// 12:00-grænse som rundegrupperingen (syncLeagueMatches.matchDayLabel). Det
+// holder VM-natkampe (USA, ~02–05 dansk) på deres rundes dag, så de ikke
+// "smitter" den næste kalenderdags blok-/runde-label.
+function matchDayKey(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Copenhagen',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? '0')
+  let dt = new Date(Date.UTC(get('year'), get('month') - 1, get('day')))
+  if (get('hour') < 12) dt = new Date(dt.getTime() - 86400000)
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+}
+
 function getRoundNum(name: string): string {
   const m = name.match(/\d+/)
   return m ? `R${m[0]}` : name
@@ -68,7 +85,7 @@ export default function CalendarSlider({
   const matchesByDate = useMemo(() => {
     const map = new Map<string, CalendarMatch[]>()
     for (const m of matches) {
-      const key = toDateKey(new Date(m.kickoff_at))
+      const key = matchDayKey(m.kickoff_at)
       const arr = map.get(key) ?? []
       arr.push(m)
       map.set(key, arr)
