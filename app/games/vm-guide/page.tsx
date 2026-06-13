@@ -231,6 +231,16 @@ export default async function VmGuidePage() {
           </p>
         </Section>
 
+        {/* Skarp runde */}
+        <Section emoji="🎯" title="Skarp runde — helte-navn">
+          <p>
+            Rammer du <strong>4 kamp-resultater rigtigt i samme runde</strong> (full house), bliver
+            dit navn i leaderboardet <strong>skiftet ud med et helte-navn</strong> i kursiv og guld
+            (fx 🎯 Skarpskytte-Søren). Hold musen over navnet for at se hvem det er. Det er den
+            positive pendant til klovnen — og nulstilles igen næste runde.
+          </p>
+        </Section>
+
         {/* Ingen overførsel */}
         <Section emoji="🚫" title="Profit kan ikke spilles videre">
           <p>
