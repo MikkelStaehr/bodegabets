@@ -3,24 +3,29 @@
 import { useEffect, useState } from 'react'
 import type { LeaderboardEntry } from '@/lib/gameState'
 import { getTaunt, shouldTaunt } from '@/lib/zeroPointTaunt'
+import PlayerHistoryModal from './PlayerHistoryModal'
 
 type Props = {
   /** Hvis entries er givet, render dem direkte (ingen fetch). Ellers fetch én gang. */
   entries?: LeaderboardEntry[]
   /** Bruges kun hvis entries ikke er givet. */
   gameId?: number
-  /** Compact-mode: kun rank + navn + B.point (til smal sidebar). Skjuler
-   *  R.sejr/R.point/B.sejr-kolonnerne så navn-kolonnen har plads. */
+  /** Compact-mode: kun rank + navn + Samlet/profit (til smal sidebar). */
   compact?: boolean
   /** Overskrift (default "Leaderboard"). Fx "Samlet stilling". */
   title?: string
   /** Lille undertekst under titlen, fx hvad der afgør stillingen. */
   subtitle?: string
+  /** Hvis sat: rækker er klikbare og åbner spillerens drill-down-historik. */
+  drillDownGameId?: number
 }
 
-export default function Leaderboard({ entries: entriesProp, gameId, compact, title = 'Leaderboard', subtitle }: Props) {
+const fmtProfit = (n: number) => (n >= 0 ? `+${n}` : `${n}`)
+
+export default function Leaderboard({ entries: entriesProp, gameId, compact, title = 'Leaderboard', subtitle, drillDownGameId }: Props) {
   const [fetchedEntries, setFetchedEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(entriesProp === undefined)
+  const [selected, setSelected] = useState<{ userId: string; username: string } | null>(null)
 
   const entries = entriesProp ?? fetchedEntries
 
@@ -74,6 +79,7 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
   }
 
   return (
+    <>
     <div>
       <div style={{ marginBottom: 10, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
         <span style={{
@@ -107,12 +113,12 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
         {/* Header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 56px' : '32px 1fr 56px 64px 56px 64px',
+          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '32px 1fr 56px 64px 56px 64px',
           padding: '8px 12px',
           borderBottom: '1px solid #E8E0D3',
           gap: 4,
         }}>
-          {(compact ? ['#', '', 'Point'] : ['#', '', 'R. sejr', 'R. point', 'B. sejr', 'B. point']).map((h, i) => (
+          {(compact ? ['#', '', 'Samlet'] : ['#', '', 'R. sejr', 'R. point', 'B. sejr', 'B. point']).map((h, i) => (
             <span key={i} style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: 9, fontWeight: 700,
@@ -129,14 +135,16 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
         {entries.map((entry, idx) => (
           <div
             key={entry.user_id}
+            onClick={drillDownGameId ? () => setSelected({ userId: entry.user_id, username: entry.username }) : undefined}
             style={{
               display: 'grid',
-              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 56px' : '32px 1fr 56px 64px 56px 64px',
+              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '32px 1fr 56px 64px 56px 64px',
               padding: '10px 12px',
               borderBottom: idx < entries.length - 1 ? '1px solid #E8E0D3' : 'none',
               gap: 4,
               alignItems: 'center',
               background: idx === 0 && entry.block_points > 0 ? '#F8F5ED' : 'transparent',
+              cursor: drillDownGameId ? 'pointer' : 'default',
             }}
           >
             <span style={{
@@ -208,17 +216,45 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
               </span>
             )}
 
-            <span style={{
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: 13, fontWeight: 700,
-              color: entry.block_points > 0 ? '#1a1a1a' : '#ccc',
-              textAlign: 'right',
-            }}>
-              {entry.block_points > 0 ? entry.block_points : '-'}
-            </span>
+            {compact ? (
+              <div style={{ textAlign: 'right', lineHeight: 1.05 }}>
+                <div style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 800,
+                  color: entry.total_points > 0 ? '#1a1a1a' : '#ccc',
+                }}>
+                  {entry.total_points > 0 ? entry.total_points : '-'}
+                </div>
+                {entry.net_profit !== 0 && (
+                  <div style={{
+                    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, fontWeight: 700,
+                    color: entry.net_profit >= 0 ? '#2C4A3E' : '#C8392B',
+                  }}>
+                    {fmtProfit(entry.net_profit)}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span style={{
+                fontFamily: "'Barlow Condensed', sans-serif",
+                fontSize: 13, fontWeight: 700,
+                color: entry.block_points > 0 ? '#1a1a1a' : '#ccc',
+                textAlign: 'right',
+              }}>
+                {entry.block_points > 0 ? entry.block_points : '-'}
+              </span>
+            )}
           </div>
         ))}
       </div>
     </div>
+    {selected && drillDownGameId && (
+      <PlayerHistoryModal
+        gameId={drillDownGameId}
+        userId={selected.userId}
+        username={selected.username}
+        onClose={() => setSelected(null)}
+      />
+    )}
+    </>
   )
 }

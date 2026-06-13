@@ -51,7 +51,8 @@ export default function FootballLiveSection({
           entries={active.leaderboard}
           compact
           title="Samlet stilling"
-          subtitle="blok-sejre afgør"
+          subtitle="tryk for detaljer"
+          drillDownGameId={gameId}
         />
       )
       : null
