@@ -106,19 +106,21 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
         )}
       </div>
 
+      <div style={{ overflowX: compact ? 'visible' : 'auto' }}>
       <div style={{
         background: '#FDFAF5', border: '1px solid #E8E0D3',
         borderRadius: 2, overflow: 'hidden',
+        minWidth: compact ? undefined : 480,
       }}>
         {/* Header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '44px minmax(0, 1fr) 96px 96px',
-          padding: compact ? '8px 12px' : '11px 18px',
+          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '38px minmax(110px, 1fr) 44px 44px 78px 80px 64px',
+          padding: compact ? '8px 12px' : '11px 16px',
           borderBottom: '1px solid #E8E0D3',
           gap: 4,
         }}>
-          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', 'Samlet', 'Profit']).map((h, i) => (
+          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', '✓', '✗', 'Samlet', 'Profit', 'Blok']).map((h, i) => (
             <span key={i} style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: compact ? 9 : 10, fontWeight: 700,
@@ -138,8 +140,8 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
             onClick={drillDownGameId ? () => setSelected({ userId: entry.user_id, username: entry.username }) : undefined}
             style={{
               display: 'grid',
-              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '44px minmax(0, 1fr) 96px 96px',
-              padding: compact ? '10px 12px' : '14px 18px',
+              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '38px minmax(110px, 1fr) 44px 44px 78px 80px 64px',
+              padding: compact ? '10px 12px' : '13px 16px',
               borderBottom: idx < entries.length - 1 ? '1px solid #E8E0D3' : 'none',
               gap: 4,
               alignItems: 'center',
@@ -202,12 +204,28 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
               </div>
             ) : (
               <>
+                {/* ✓ vundne */}
                 <span style={{
-                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 800,
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700,
+                  color: entry.won_bets > 0 ? '#2C4A3E' : '#ccc', textAlign: 'right',
+                }}>
+                  {entry.won_bets > 0 ? entry.won_bets : '-'}
+                </span>
+                {/* ✗ tabte */}
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700,
+                  color: entry.lost_bets > 0 ? '#C8392B' : '#ccc', textAlign: 'right',
+                }}>
+                  {entry.lost_bets > 0 ? entry.lost_bets : '-'}
+                </span>
+                {/* Samlet */}
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 21, fontWeight: 800,
                   color: entry.total_points > 0 ? '#1a1a1a' : '#ccc', textAlign: 'right',
                 }}>
                   {entry.total_points > 0 ? entry.total_points : '-'}
                 </span>
+                {/* Profit (total) */}
                 <span style={{
                   fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700,
                   color: entry.net_profit > 0 ? '#2C4A3E' : entry.net_profit < 0 ? '#C8392B' : '#ccc',
@@ -215,10 +233,18 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
                 }}>
                   {entry.net_profit !== 0 ? fmtProfit(entry.net_profit) : '-'}
                 </span>
+                {/* Blok-point — yderst til højre */}
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700,
+                  color: entry.block_points > 0 ? '#B8963E' : '#ccc', textAlign: 'right',
+                }}>
+                  {entry.block_points > 0 ? entry.block_points : '-'}
+                </span>
               </>
             )}
           </div>
         ))}
+      </div>
       </div>
     </div>
     {selected && drillDownGameId && (
