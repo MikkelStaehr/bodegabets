@@ -78,6 +78,27 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
     )
   }
 
+  // Delt grid-template + kolonne-headers (m. tooltip) for header og rækker.
+  const gridCols = compact
+    ? '24px minmax(0, 1fr) 76px'
+    : '36px minmax(100px, 1fr) 40px 40px 72px 74px 50px 56px'
+  const headers: { label: string; title: string }[] = compact
+    ? [
+        { label: '#', title: 'Placering' },
+        { label: '', title: 'Spiller' },
+        { label: 'Samlet', title: 'Samlet point over hele turneringen' },
+      ]
+    : [
+        { label: '#', title: 'Placering' },
+        { label: 'Spiller', title: 'Spiller' },
+        { label: '✓', title: 'Vundne bets (afgjorte, alle runder)' },
+        { label: '✗', title: 'Tabte bets (afgjorte, alle runder)' },
+        { label: 'Samlet', title: 'Samlet point — akkumuleret profit over hele turneringen' },
+        { label: 'Profit', title: 'Netto-profit: samlet vundet − samlet satset' },
+        { label: 'MoM', title: 'Man of the Match — antal runder hvor du scorede flest point' },
+        { label: 'Blokke', title: 'Antal vundne blokke — afgør hvem der fører turneringen' },
+      ]
+
   return (
     <>
     <div>
@@ -110,25 +131,26 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
       <div style={{
         background: '#FDFAF5', border: '1px solid #E8E0D3',
         borderRadius: 2, overflow: 'hidden',
-        minWidth: compact ? undefined : 480,
+        minWidth: compact ? undefined : 520,
       }}>
         {/* Header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '38px minmax(110px, 1fr) 44px 44px 78px 80px 64px',
+          gridTemplateColumns: gridCols,
           padding: compact ? '8px 12px' : '11px 16px',
           borderBottom: '1px solid #E8E0D3',
           gap: 4,
         }}>
-          {(compact ? ['#', '', 'Samlet'] : ['#', 'Spiller', '✓', '✗', 'Samlet', 'Profit', 'Blokke']).map((h, i) => (
-            <span key={i} style={{
+          {headers.map((h, i) => (
+            <span key={i} title={h.title} style={{
               fontFamily: "'Barlow Condensed', sans-serif",
               fontSize: compact ? 9 : 10, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.08em',
               color: '#9E9486',
               textAlign: i >= 2 ? 'right' : 'left',
+              cursor: h.title ? 'help' : 'default',
             }}>
-              {h}
+              {h.label}
             </span>
           ))}
         </div>
@@ -140,7 +162,7 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
             onClick={drillDownGameId ? () => setSelected({ userId: entry.user_id, username: entry.username }) : undefined}
             style={{
               display: 'grid',
-              gridTemplateColumns: compact ? '24px minmax(0, 1fr) 76px' : '38px minmax(110px, 1fr) 44px 44px 78px 80px 64px',
+              gridTemplateColumns: gridCols,
               padding: compact ? '10px 12px' : '13px 16px',
               borderBottom: idx < entries.length - 1 ? '1px solid #E8E0D3' : 'none',
               gap: 4,
@@ -173,11 +195,6 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
               {!compact && entry.won_latest_block && (
                 <span title="Vinder af seneste blok" style={{ marginLeft: 6, fontSize: 15 }}>
                   🏅
-                </span>
-              )}
-              {entry.mvp_count > 0 && (
-                <span style={{ marginLeft: 5, fontSize: compact ? 11 : 13, fontWeight: 700, color: '#7a7060' }}>
-                  🧸{entry.mvp_count}
                 </span>
               )}
               {shouldTaunt(entry.round_points, allRoundPoints) && (
@@ -237,6 +254,13 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
                   textAlign: 'right',
                 }}>
                   {entry.net_profit !== 0 ? fmtProfit(entry.net_profit) : '-'}
+                </span>
+                {/* MoM — Man of the Match (flest point i en runde) */}
+                <span style={{
+                  fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700,
+                  color: entry.mvp_count > 0 ? '#7a7060' : '#ccc', textAlign: 'right',
+                }}>
+                  {entry.mvp_count > 0 ? entry.mvp_count : '-'}
                 </span>
                 {/* Blokke vundet — hvem fører turneringen — yderst til højre */}
                 <span style={{
