@@ -4,16 +4,17 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 /**
- * Engangs-besked der præsenterer det nye leaderboard. Vises ÉN gang pr. browser,
- * første gang spilleren går ind i spilrummet efter rul-ud. Nøglen er versioneret,
- * så vi kan gen-annoncere når noget ændres.
+ * Engangs-besked (2 sider) der præsenterer det nye leaderboard + de nye
+ * funktioner (Losers Luck og nul-runde-mærket). Vises ÉN gang pr. browser,
+ * første gang spilleren går ind i spilrummet. Nøglen er versioneret.
  *
  * Renderes kun for spil der kører blok-modellen (gates i page.tsx).
  */
-const SEEN_KEY = 'bodega_vm_leaderboard_seen_v3'
+const SEEN_KEY = 'bodega_vm_leaderboard_seen_v4'
 
 export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }) {
   const [visible, setVisible] = useState(false)
+  const [page, setPage] = useState(0)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -41,58 +42,102 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
         {/* Header */}
         <div className="bg-forest rounded-t-sm px-5 py-4">
           <p className="font-condensed text-[11px] font-bold tracking-[0.14em] uppercase text-gold">
-            Nyt · Opdatering
+            Nyt · Opdatering {page + 1}/2
           </p>
           <h2 className="font-display text-[24px] font-bold text-cream leading-tight mt-0.5">
-            Nyt leaderboard 📊
+            {page === 0 ? 'Nyt leaderboard 📊' : 'Comeback & klovne 🍀🤡'}
           </h2>
         </div>
 
         {/* Body */}
         <div className="px-5 py-4 space-y-3">
-          <p className="font-body text-[14px] text-ink leading-relaxed">
-            Vi har bygget leaderboardet om til en rigtig ligatabel. Her er hvad du skal vide:
-          </p>
-
-          <LeaderboardIllustration />
-
-          <ul className="space-y-2.5">
-            <RuleItem icon="📑" title="To faner: Blok & Sæson">
-              <strong>Blok</strong> viser den nuværende blok — er du ved at vinde den? (vundne/tabte
-              bets, winrate, satset, point). <strong>Sæson</strong> viser din samlede placering.
-            </RuleItem>
-            <RuleItem icon="▲" title="Pile = bevægelse">
-              ▲ og ▼ viser hvor mange pladser du er rykket op eller ned siden forrige spillede runde.
-            </RuleItem>
-            <RuleItem icon="💰" title="Point (+/− profit)">
-              Dine point med netto-profit i parentes — altså hvad du har vundet minus hvad du har satset.
-            </RuleItem>
-            <RuleItem icon="🏅" title="Blok-point afgør spillet">
-              Antal vundne blokke afgør hvem der fører. 🏅 ved navnet betyder vinder af seneste blok.
-            </RuleItem>
-            <RuleItem icon="👆" title="Tryk på en spiller">
-              Se hele deres historik runde for runde (kun afgjorte spil). MoM = Man of the Match,
-              flest point i en runde.
-            </RuleItem>
-          </ul>
+          {page === 0 ? (
+            <>
+              <p className="font-body text-[14px] text-ink leading-relaxed">
+                Vi har bygget leaderboardet om til en rigtig ligatabel. Her er hvad du skal vide:
+              </p>
+              <LeaderboardIllustration />
+              <ul className="space-y-2.5">
+                <RuleItem icon="📑" title="To faner: Blok & Sæson">
+                  <strong>Blok</strong> viser den nuværende blok — er du ved at vinde den? (bets,
+                  winrate, satset, point). <strong>Sæson</strong> viser din samlede placering.
+                </RuleItem>
+                <RuleItem icon="▲" title="Pile = bevægelse">
+                  ▲ og ▼ viser hvor mange pladser du er rykket siden forrige spillede runde.
+                </RuleItem>
+                <RuleItem icon="💰" title="Point (+/− profit)">
+                  Dine point med netto-profit i parentes — vundet minus satset.
+                </RuleItem>
+                <RuleItem icon="🏅" title="Blok-point afgør spillet">
+                  Antal vundne blokke afgør hvem der fører. 🏅 ved navnet = vinder af seneste blok.
+                  Tryk på en spiller for fuld historik.
+                </RuleItem>
+              </ul>
+            </>
+          ) : (
+            <>
+              <p className="font-body text-[14px] text-ink leading-relaxed">
+                To nye krydderier i spillet — det ene hjælper, det andet driller:
+              </p>
+              <ul className="space-y-3">
+                <RuleItem icon="🍀" title="Losers Luck — comeback-hjælp">
+                  De <strong>to nederste i sæson-stillingen</strong> får <strong>+20% på deres
+                  gevinster</strong> i blokken, så ingen stikker af. Du ser 🍀 ved deres navn, og er
+                  du selv med, får du et banner på kuponen. Hvem der får det, låses ved blok-start.
+                </RuleItem>
+                <RuleItem icon="🤡" title="Nul-runde = klovne-mærke">
+                  Scorer du <strong>0 point i en runde</strong> mens andre får point, får du et lille
+                  klovne-mærke ved navnet (fx 🤡 Mr. Nullable). Det forsvinder igen, så snart du
+                  scorer i næste runde. Hold tungen lige i munden! 😄
+                </RuleItem>
+              </ul>
+            </>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-5 pb-5 pt-1 flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={dismiss}
-            className="w-full h-[44px] rounded-sm bg-gold text-forest font-condensed text-[14px] font-bold tracking-[0.08em] uppercase hover:opacity-85 transition-opacity"
-          >
-            Forstået
-          </button>
-          <Link
-            href={guideHref}
-            onClick={dismiss}
-            className="w-full h-[40px] flex items-center justify-center rounded-sm border border-forest text-forest font-condensed text-[13px] font-bold tracking-[0.08em] uppercase hover:opacity-70 transition-opacity"
-          >
-            Se alle reglerne →
-          </Link>
+          {page === 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setPage(1)}
+                className="w-full h-[44px] rounded-sm bg-gold text-forest font-condensed text-[14px] font-bold tracking-[0.08em] uppercase hover:opacity-85 transition-opacity"
+              >
+                Videre →
+              </button>
+              <Link
+                href={guideHref}
+                onClick={dismiss}
+                className="w-full h-[40px] flex items-center justify-center rounded-sm border border-forest text-forest font-condensed text-[13px] font-bold tracking-[0.08em] uppercase hover:opacity-70 transition-opacity"
+              >
+                Se alle reglerne →
+              </Link>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={dismiss}
+                className="w-full h-[44px] rounded-sm bg-gold text-forest font-condensed text-[14px] font-bold tracking-[0.08em] uppercase hover:opacity-85 transition-opacity"
+              >
+                Forstået
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(0)}
+                className="w-full h-[36px] text-warm-gray font-condensed text-[13px] font-bold tracking-[0.08em] uppercase hover:text-forest transition-colors"
+              >
+                ← Tilbage
+              </button>
+            </>
+          )}
+          {/* Side-indikator */}
+          <div className="flex items-center justify-center gap-1.5 pt-1">
+            {[0, 1].map((p) => (
+              <span key={p} className="rounded-full" style={{ width: 6, height: 6, background: p === page ? '#1a3329' : '#D4CFC4' }} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -119,18 +164,15 @@ function LeaderboardIllustration() {
   ]
   return (
     <div className="bg-white border border-warm-border rounded-sm overflow-hidden">
-      {/* tabs */}
       <div className="flex gap-1 px-2 pt-2">
         <span className="font-condensed text-[9px] font-bold tracking-[0.08em] uppercase px-2 py-0.5 rounded-sm bg-forest text-cream">Blok</span>
         <span className="font-condensed text-[9px] font-bold tracking-[0.08em] uppercase px-2 py-0.5 rounded-sm border border-warm-border text-warm-gray">Sæson</span>
       </div>
-      {/* header */}
       <div className="grid items-center px-2 pt-2 pb-1" style={{ gridTemplateColumns: '54px 1fr auto 30px', gap: 6 }}>
         {['#', 'Spiller', 'Point', 'Blok'].map((h, i) => (
           <span key={h} className="font-condensed text-[8px] font-bold tracking-[0.08em] uppercase text-warm-gray" style={{ textAlign: i >= 2 ? 'right' : 'left' }}>{h}</span>
         ))}
       </div>
-      {/* rows */}
       {rows.map((r, i) => (
         <div key={r.rank} className="grid items-center px-2 py-1.5" style={{ gridTemplateColumns: '54px 1fr auto 30px', gap: 6, borderTop: '1px solid #EDE8DF', background: i === 0 ? '#F8F5ED' : '#fff' }}>
           <span className="flex items-baseline gap-1">
