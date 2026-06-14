@@ -31,10 +31,20 @@ export async function getLosersLuckUserIds(gameId: number, blockId: number | nul
   const usernameById = new Map(members.map((m) => [m.user_id as string, (m.profiles as unknown as { username: string }).username ?? '']))
 
   const { data: rounds } = await supabaseAdmin.from('rounds').select('id, block_id, status').in('season_id', seasonIds)
-  // Runder afgjort FØR denne blok (ekskl. blokkens egne runder).
-  const prior = (rounds ?? []).filter((r) => r.status === 'finished' && r.block_id !== blockId)
+  const { data: blocks } = await supabaseAdmin.from('blocks').select('id, block_number').in('season_id', seasonIds)
+  const blockNumById = new Map((blocks ?? []).map((b) => [b.id as number, b.block_number as number]))
+  const thisBlockNum = blockNumById.get(blockId)
+  if (thisBlockNum == null) return new Set()
+
+  // Runder afgjort i TIDLIGERE blokke (lavere block_number). IKKE bare alle
+  // finished runder udenfor blokken — det ville fejlagtigt tælle SENERE blokkes
+  // afsluttede runder med (fx blok 2's runde som "prior" til blok 1). Første blok
+  // har ingen tidligere blokke → ingen Losers Luck (man skal først se bunden).
+  const prior = (rounds ?? []).filter(
+    (r) => r.status === 'finished' && (blockNumById.get(r.block_id as number) ?? Infinity) < thisBlockNum
+  )
   const priorIds = prior.map((r) => r.id as number)
-  if (priorIds.length === 0) return new Set() // første blok → ingen Losers Luck
+  if (priorIds.length === 0) return new Set()
 
   const { data: scores } = await supabaseAdmin
     .from('round_scores').select('user_id, round_id, earnings_delta').eq('game_id', gameId).in('round_id', priorIds)
@@ -45,7 +55,6 @@ export async function getLosersLuckUserIds(gameId: number, blockId: number | nul
 
   // Blok-sejre over blokke der ER afgjort før denne blok.
   const priorSet = new Set(priorIds)
-  const { data: blocks } = await supabaseAdmin.from('blocks').select('id').in('season_id', seasonIds)
   const wins = new Map<string, number>()
   for (const b of blocks ?? []) {
     if (b.id === blockId) continue
