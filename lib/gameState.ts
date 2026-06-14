@@ -1292,6 +1292,15 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   const prevFinished = new Set(finishedRoundIds)
   if (latestFinished != null) prevFinished.delete(latestFinished)
 
+  // LIVE-stilling: point/profit afspejler runder med SCOREDE resultater
+  // (round_scores opdateres pr. kamp), så en igangværende rundes allerede-
+  // spillede kampe tæller med — ikke kun fuldt afsluttede runder. Bevægelses-
+  // baseline (▲▼) = stillingen før den seneste scorede runde.
+  const scoredRoundIds = new Set((scores ?? []).map((s) => s.round_id as number))
+  const latestScored = scoredRoundIds.size ? Math.max(...scoredRoundIds) : null
+  const prevScored = new Set(scoredRoundIds)
+  if (latestScored != null) prevScored.delete(latestScored)
+
   // Klovne-mærke: scorede 0 i en given runde, mens mindst én anden fik point.
   const zeroInRound = (rid: number | null): Set<string> => {
     const s = new Set<string>()
@@ -1323,8 +1332,8 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   const seasonWinsNow = blockWinsFor(finishedRoundIds)
   const seasonWinsPrev = blockWinsFor(prevFinished)
   const seasonPts = (u: string, set: Set<number>) => sumOver(earnings, u, set)
-  const seasonNow = rankBy((u) => [seasonWinsNow.get(u) ?? 0, seasonPts(u, finishedRoundIds)])
-  const seasonPrev = rankBy((u) => [seasonWinsPrev.get(u) ?? 0, seasonPts(u, prevFinished)])
+  const seasonNow = rankBy((u) => [seasonWinsNow.get(u) ?? 0, seasonPts(u, scoredRoundIds)])
+  const seasonPrev = rankBy((u) => [seasonWinsPrev.get(u) ?? 0, seasonPts(u, prevScored)])
 
   // seneste afgjorte blok → won_latest_block
   const wonLatestBlock = new Set<string>()
@@ -1343,15 +1352,15 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     user_id: u,
     username: usernameById.get(u)!,
     rank: seasonNow.rankMap.get(u)!,
-    rank_delta: latestFinished != null ? (seasonPrev.rankMap.get(u)! - seasonNow.rankMap.get(u)!) : 0,
-    points: Math.round(seasonPts(u, finishedRoundIds) * 10) / 10,
-    profit: Math.round(sumOver(betProfit, u, finishedRoundIds) * 10) / 10,
+    rank_delta: latestScored != null ? (seasonPrev.rankMap.get(u)! - seasonNow.rankMap.get(u)!) : 0,
+    points: Math.round(seasonPts(u, scoredRoundIds) * 10) / 10,
+    profit: Math.round(sumOver(betProfit, u, scoredRoundIds) * 10) / 10,
     mvp_count: mvpCount.get(u) ?? 0,
     block_wins: seasonWinsNow.get(u) ?? 0,
     won_latest_block: wonLatestBlock.has(u),
-    won_bets: sumOver(wonMap, u, finishedRoundIds),
-    lost_bets: sumOver(lostMap, u, finishedRoundIds),
-    staked: Math.round(sumOver(stakedMap, u, finishedRoundIds) * 10) / 10,
+    won_bets: sumOver(wonMap, u, scoredRoundIds),
+    lost_bets: sumOver(lostMap, u, scoredRoundIds),
+    staked: Math.round(sumOver(stakedMap, u, scoredRoundIds) * 10) / 10,
     latest_round_zero: seasonZero.has(u),
     latest_round_match_wins: matchWinsLatest.get(u) ?? 0,
     losers_luck: losersLuckSet.has(u),
@@ -1363,25 +1372,27 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   if (activeBlock) {
     const blockRoundIds = (rounds ?? []).filter((r) => r.block_id === activeBlock.id).map((r) => r.id as number)
     const blockFinished = new Set(blockRoundIds.filter((rid) => finishedRoundIds.has(rid)))
-    const latestInBlock = blockFinished.size ? Math.max(...blockFinished) : null
-    const blockPrevFinished = new Set(blockFinished)
-    if (latestInBlock != null) blockPrevFinished.delete(latestInBlock)
+    // LIVE: medregn igangværende rundes scorede kampe. Baseline = forrige scorede runde.
+    const blockScored = new Set(blockRoundIds.filter((rid) => scoredRoundIds.has(rid)))
+    const latestInBlock = blockScored.size ? Math.max(...blockScored) : null
+    const blockPrevScored = new Set(blockScored)
+    if (latestInBlock != null) blockPrevScored.delete(latestInBlock)
 
-    const bNow = rankBy((u) => [sumOver(earnings, u, blockFinished), 0])
-    const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevFinished), 0])
+    const bNow = rankBy((u) => [sumOver(earnings, u, blockScored), 0])
+    const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevScored), 0])
     const rows: LbTabRow[] = bNow.sorted.map((u) => ({
       user_id: u,
       username: usernameById.get(u)!,
       rank: bNow.rankMap.get(u)!,
       rank_delta: latestInBlock != null ? (bPrev.rankMap.get(u)! - bNow.rankMap.get(u)!) : 0,
-      points: Math.round(sumOver(earnings, u, blockFinished) * 10) / 10,
-      profit: Math.round(sumOver(betProfit, u, blockFinished) * 10) / 10,
+      points: Math.round(sumOver(earnings, u, blockScored) * 10) / 10,
+      profit: Math.round(sumOver(betProfit, u, blockScored) * 10) / 10,
       mvp_count: 0,
       block_wins: 0,
       won_latest_block: false,
-      won_bets: sumOver(wonMap, u, blockFinished),
-      lost_bets: sumOver(lostMap, u, blockFinished),
-      staked: Math.round(sumOver(stakedMap, u, blockFinished) * 10) / 10,
+      won_bets: sumOver(wonMap, u, blockScored),
+      lost_bets: sumOver(lostMap, u, blockScored),
+      staked: Math.round(sumOver(stakedMap, u, blockScored) * 10) / 10,
       // Klovne-navn = bombede seneste runde overordnet (samme i begge faner).
       latest_round_zero: seasonZero.has(u),
       latest_round_match_wins: matchWinsLatest.get(u) ?? 0,
