@@ -155,7 +155,7 @@ app.get('/update-rounds', async (_req, res) => {
 
     const { data: allRounds, error: roundsError } = await supabaseAdmin
       .from('rounds')
-      .select('id, name, status, betting_closes_at, season_id')
+      .select('id, name, status, betting_closes_at, season_id, block_id')
       .order('id', { ascending: true })
 
     if (roundsError) {
@@ -163,7 +163,7 @@ app.get('/update-rounds', async (_req, res) => {
       return
     }
 
-    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; season_id: number }
+    type RoundRow = { id: number; name: string; status: string; betting_closes_at: string | null; season_id: number; block_id: number | null }
     const typedAllRounds = (allRounds ?? []) as RoundRow[]
     const rounds = typedAllRounds.filter((r) => r.status !== 'finished')
 
@@ -217,6 +217,13 @@ app.get('/update-rounds', async (_req, res) => {
       roundsBySeason.get(r.season_id)!.push(r)
     }
 
+    // Blok-rækkefølge (block_id → block_number), så en ny blok ikke åbner før
+    // den forrige blok er spillet færdig (slutrunde-spil).
+    const { data: blocksData } = await supabaseAdmin.from('blocks').select('id, block_number')
+    const blockNumById = new Map<number, number>(
+      ((blocksData ?? []) as Array<{ id: number; block_number: number }>).map((b) => [b.id, b.block_number])
+    )
+
     // 2) Åbn næste upcoming runde per season
     //
     // SELVHELENDE sekventiel åbning: tidligere blokerede en runde den næste
@@ -246,6 +253,17 @@ app.get('/update-rounds', async (_req, res) => {
         // Forrige runde må gerne åbne denne: enten færdig, ELLER dens betting
         // er lukket (deadline passeret) — så en fastlåst forrige ikke blokerer.
         if (effectiveStatus(prev) !== 'finished' && !deadlinePassed(prev)) return false
+      }
+      // BLOK-BEVIDST: en ny blok må ikke åbne før den FORRIGE blok er spillet
+      // færdig. Uden dette åbnede næste bloks runde så snart denne bloks sidste
+      // rundes deadline var passeret — selvom blokken ikke var afgjort endnu.
+      const rBlockNum = r.block_id != null ? (blockNumById.get(r.block_id) ?? null) : null
+      if (rBlockNum != null) {
+        const earlierBlockUnfinished = seasonRounds.some((rd) => {
+          const n = rd.block_id != null ? blockNumById.get(rd.block_id) : null
+          return n != null && n < rBlockNum && effectiveStatus(rd) !== 'finished'
+        })
+        if (earlierBlockUnfinished) return false
       }
       return true
     })
