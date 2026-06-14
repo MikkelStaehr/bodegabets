@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { getLosersLuckUserIds } from '@/lib/losersLuck'
+import { blockBudgetFor } from '@/lib/blockBudget'
 import AfgivBets from '@/components/games/AfgivBets'
 import type { Match, Bet, Round } from '@/types'
 
@@ -286,7 +287,7 @@ export default async function RoundPage({ params }: Props) {
       totalMatchesInRound={matches.length}
       betDistribution={betDistribution}
       blockInfo={blockInfo}
-      blockBudget={1000}
+      blockBudget={blockBudgetFor(roundBlockId)}
       blockSpentElsewhere={blockSpentElsewhere}
       creditsRollOver={creditsPerBlock && blockInfo != null && !blockInfo.is_last_in_block}
       losersLuckActive={losersLuckActive}
