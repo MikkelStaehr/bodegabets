@@ -6,7 +6,7 @@ import type { Match, Bet } from '@/types'
 import { BET_TYPE_LABELS, PREDICTION_LABELS } from '@/lib/betTypes'
 import { isBetCorrect } from '@/lib/betUtils'
 import { useToast } from '@/components/ui/Toast'
-import { formatKickoff } from '@/lib/dateUtils'
+import { formatKickoff, matchdayKey, matchdayLabel } from '@/lib/dateUtils'
 import GameTicker from '@/components/games/GameTicker'
 import BetSlipGuide from '@/components/games/BetSlipGuide'
 
@@ -688,9 +688,7 @@ export default function AfgivBets({
   // Spænder kuponens kampe over flere danske kalenderdage? (natkampe → "i morgen").
   const spansMultipleDays = useMemo(() => {
     const days = new Set(
-      matches
-        .filter((m) => m.kickoff_at)
-        .map((m) => new Date(m.kickoff_at).toLocaleDateString('da-DK', { timeZone: 'Europe/Copenhagen' }))
+      matches.filter((m) => m.kickoff_at).map((m) => matchdayKey(m.kickoff_at))
     )
     return days.size > 1
   }, [matches])
@@ -1022,17 +1020,9 @@ export default function AfgivBets({
     const elements: React.ReactNode[] = []
     let lastDateKey = ''
     for (const md of matchData) {
-      const dateKey = md.match.kickoff_at
-        ? new Date(md.match.kickoff_at).toLocaleDateString('da-DK', {
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            timeZone: 'Europe/Copenhagen',
-          })
-        : ''
+      const dateKey = md.match.kickoff_at ? matchdayKey(md.match.kickoff_at) : ''
       if (dateKey && dateKey !== lastDateKey) {
-        const label = new Date(md.match.kickoff_at).toLocaleDateString('da-DK', {
-          weekday: 'long', day: 'numeric', month: 'long',
-          timeZone: 'Europe/Copenhagen',
-        })
+        const label = matchdayLabel(md.match.kickoff_at)
         elements.push(
           <div key={`sep-${dateKey}`} className="flex items-center gap-2 my-3">
             <div className="flex-1 h-px bg-[#e5e0d8]" />

@@ -75,33 +75,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Validér at alle match_ids tilhører denne runde
-  const payloadMatchIds = [...new Set(bets.map((b) => b.match_id))]
-  const { data: roundMatches } = await supabaseAdmin
-    .from('matches')
-    .select('id, bet_open, kickoff_at:kickoff')
-    .eq('round_id', roundId)
-
-  const roundMatchIds = (roundMatches ?? []).map((m) => m.id)
-  const allValid = payloadMatchIds.every((id) => roundMatchIds.includes(id))
-  if (!allValid) {
-    return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
-  }
-
-  // Per-kamp bet-luk validering
-  const matchMap = new Map((roundMatches ?? []).map((m) => [m.id, m as { id: number; bet_open: boolean; kickoff_at: string }]))
-  const lockedMatches = payloadMatchIds.filter((id) => {
-    const m = matchMap.get(id)
-    return m && !m.bet_open
-  })
-  if (lockedMatches.length > 0) {
-    return NextResponse.json({ error: 'En eller flere kampe er lukket for bets' }, { status: 400 })
-  }
-
-  // ── Budget-grundlag (1000 credits) ────────────────────────────────────────
-  // VM (credits_per_block): budgettet er pr. BLOK, delt over blokkens runder
-  // (ekskl. legacy-runde). Ellers pr. runde. Beregnes FØR write, så loftet kan
-  // håndhæves server-side (ikke kun i UI'et).
+  // ── Kupon-/budget-runder ──────────────────────────────────────────────────
+  // VM (credits_per_block): hele blokken (ekskl. legacy-runde) hører til samme
+  // kupon og deler budget. Ellers kun denne runde. Beregnes FØR validering, så
+  // bets kan spænde over blokkens dage og round_id sættes pr. kamp.
   const LEGACY_PRE_BLOCK_ROUND_IDS = [36175]
   const roundBlockId = (round as { block_id?: number | null }).block_id ?? null
   let creditsPerBlock = false
@@ -124,6 +101,29 @@ export async function POST(req: NextRequest, { params }: Props) {
       .map((r) => r.id as number)
       .filter((rid) => !LEGACY_PRE_BLOCK_ROUND_IDS.includes(rid))
     if (!budgetRoundIds.includes(roundId)) budgetRoundIds.push(roundId)
+  }
+
+  // Validér match_ids mod kuponens runder, og find round_id pr. kamp (bets kan
+  // spænde over blokkens dage). Per-kamp bet-luk håndhæves samtidig.
+  const payloadMatchIds = [...new Set(bets.map((b) => b.match_id))]
+  const { data: couponMatches } = await supabaseAdmin
+    .from('matches')
+    .select('id, round_id, bet_open')
+    .in('round_id', budgetRoundIds)
+
+  const matchMap = new Map(
+    (couponMatches ?? []).map((m) => [m.id as number, m as { id: number; round_id: number; bet_open: boolean }])
+  )
+  const allValid = payloadMatchIds.every((id) => matchMap.has(id))
+  if (!allValid) {
+    return NextResponse.json({ error: 'Ugyldige kamp-id\'er' }, { status: 400 })
+  }
+  const lockedMatches = payloadMatchIds.filter((id) => {
+    const m = matchMap.get(id)
+    return m && !m.bet_open
+  })
+  if (lockedMatches.length > 0) {
+    return NextResponse.json({ error: 'En eller flere kampe er lukket for bets' }, { status: 400 })
   }
 
   // Håndhæv budget-loftet: allerede-placerede indsatser i budgettet (på kampe
@@ -163,9 +163,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
-  // Indsæt nye bets (inkl. round_id)
+  // Indsæt nye bets — round_id sættes pr. kamp (kuponen kan spænde over flere
+  // af blokkens runder/dage).
   const rows = bets.map((b) => ({
-    round_id: roundId,
+    round_id: matchMap.get(b.match_id)!.round_id,
     game_id: bodyGameId,
     match_id: b.match_id,
     user_id: user.id,

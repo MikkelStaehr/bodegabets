@@ -17,6 +17,33 @@ export function formatKickoff(iso: string): string {
   })
 }
 
+/**
+ * "Kampdag"-nøgle med 12:00-grænse (Europe/Copenhagen): kampe der starter
+ * mellem 00:00 og 11:59 hører til den FOREGÅENDE kampdag (natkampe ved VM i
+ * USA). Returnerer YYYY-MM-DD for kampdagen. Brug til at gruppere kampe på
+ * dage, så natkampe ikke smutter over i næste dag.
+ */
+function cphParts(iso: string): { y: number; m: number; d: number; h: number } {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const get = (t: string) => Number(p.find((x) => x.type === t)?.value ?? '0')
+  return { y: get('year'), m: get('month'), d: get('day'), h: get('hour') }
+}
+
+export function matchdayKey(iso: string): string {
+  const { y, m, d, h } = cphParts(iso)
+  const base = Date.UTC(y, m - 1, d) - (h < 12 ? 86_400_000 : 0)
+  const dt = new Date(base)
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+}
+
+/** "lørdag 13. juni" for kampdagen (12:00-grænse). */
+export function matchdayLabel(iso: string): string {
+  const dt = new Date(matchdayKey(iso) + 'T12:00:00Z')
+  return dt.toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+}
+
 /** Kun tid: "21:00" */
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('da-DK', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
