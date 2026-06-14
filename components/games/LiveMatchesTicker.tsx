@@ -168,8 +168,10 @@ function MatchRow({ match }: { match: LiveMatch }) {
         </div>
       )}
 
-      {/* Ekstra bets — kun brugerens egne, på låste kampe */}
-      {match.bet_open === false && match.userExtraPicks && Object.keys(match.userExtraPicks).length > 0 && (
+      {/* Ekstra bets — brugerens egne, vises med det samme. Odds + fordeling
+          (extraBetDist) findes kun for låste kampe og rendrer betinget nedenfor,
+          så det "blinde" element bevares indtil deadline. */}
+      {match.userExtraPicks && Object.keys(match.userExtraPicks).length > 0 && (
         <div className="px-3 pb-2 flex flex-col gap-1 border-t border-white/10 pt-2">
           {([
             { key: 'goals_3plus', label: 'Mål 3+' },
