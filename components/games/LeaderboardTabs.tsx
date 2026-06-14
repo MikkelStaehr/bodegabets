@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import type { LeaderboardTabs, LbTabRow } from '@/lib/gameState'
+import { useState, useRef, useEffect } from 'react'
+import type { LeaderboardTabs, LbTabRow, LbBlock } from '@/lib/gameState'
 import PlayerHistoryModal from './PlayerHistoryModal'
 import { getTaunt } from '@/lib/zeroPointTaunt'
 import { getHero, STREAK_THRESHOLD } from '@/lib/streakHero'
@@ -19,25 +19,36 @@ const FF = "'Barlow Condensed', sans-serif"
 const profitStr = (n: number) => (n >= 0 ? `+${n}` : `${n}`)
 
 export default function LeaderboardTabs({ tabs, gameId }: Props) {
-  const hasBlock = !!tabs.block && tabs.block.rows.length > 0
+  const hasBlock = tabs.blocks.length > 0
   const [tab, setTab] = useState<'block' | 'season'>(hasBlock ? 'block' : 'season')
+  const [blockNo, setBlockNo] = useState<number | null>(tabs.activeBlockNumber)
   const [selected, setSelected] = useState<{ userId: string; username: string } | null>(null)
 
   const active = tab === 'block' && hasBlock ? 'block' : 'season'
-  const rows = active === 'block' ? tabs.block!.rows : tabs.season.rows
+  const selBlock = hasBlock ? (tabs.blocks.find((b) => b.block_number === blockNo) ?? tabs.blocks[tabs.blocks.length - 1]) : null
+  const rows = active === 'block' && selBlock ? selBlock.rows : tabs.season.rows
 
   return (
     <div>
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-        <TabBtn label="Blok" sub={tabs.block?.block_name} activeTab={active === 'block'} disabled={!hasBlock} onClick={() => setTab('block')} />
+        <TabBtn label="Blok" sub={selBlock?.block_name} activeTab={active === 'block'} disabled={!hasBlock} onClick={() => setTab('block')} />
         <TabBtn label="Sæson" sub="Hele spillet" activeTab={active === 'season'} onClick={() => setTab('season')} />
       </div>
 
-      {active === 'block' && tabs.block && tabs.block.rounds_remaining > 0 && (
-        <p style={{ fontFamily: FF, fontSize: 10, color: C.muted, margin: '0 0 6px' }}>
-          {tabs.block.rounds_remaining} runde{tabs.block.rounds_remaining !== 1 ? 'r' : ''} tilbage i blokken
-        </p>
+      {active === 'block' && selBlock && (
+        <>
+          {tabs.blocks.length > 1 && (
+            <BlockPills blocks={tabs.blocks} selected={selBlock.block_number} onSelect={setBlockNo} />
+          )}
+          <p style={{ fontFamily: FF, fontSize: 10, color: C.muted, margin: '0 0 6px' }}>
+            {selBlock.status === 'active'
+              ? selBlock.rounds_remaining > 0
+                ? `${selBlock.rounds_remaining} runde${selBlock.rounds_remaining !== 1 ? 'r' : ''} tilbage i blokken`
+                : 'Igangværende blok'
+              : '🏅 Afgjort blok'}
+          </p>
+        </>
       )}
 
       <Table rows={rows} variant={active} onSelect={(r) => setSelected({ userId: r.user_id, username: r.username })} />
@@ -45,6 +56,41 @@ export default function LeaderboardTabs({ tabs, gameId }: Props) {
       {selected && (
         <PlayerHistoryModal gameId={gameId} userId={selected.userId} username={selected.username} onClose={() => setSelected(null)} />
       )}
+    </div>
+  )
+}
+
+/** Vandret scroll-række af blok-chips. Nuværende blok fremhævet i guld; afgjorte
+ *  får 🏅. Den valgte chip rulles automatisk i syne. */
+function BlockPills({ blocks, selected, onSelect }: { blocks: LbBlock[]; selected: number; onSelect: (n: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current?.querySelector('[data-sel="true"]') as HTMLElement | null
+    el?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [selected])
+  return (
+    <div ref={ref} style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0 0 8px', WebkitOverflowScrolling: 'touch' }}>
+      {blocks.map((b) => {
+        const sel = b.block_number === selected
+        const suffix = b.status === 'active' ? ' · nu' : b.status === 'finished' ? ' 🏅' : ''
+        return (
+          <button
+            key={b.block_number}
+            type="button"
+            data-sel={sel}
+            onClick={() => onSelect(b.block_number)}
+            style={{
+              flexShrink: 0, padding: '5px 11px', borderRadius: 999,
+              border: `1px solid ${sel ? C.gold : C.border}`,
+              background: sel ? C.gold : '#fff', cursor: 'pointer', whiteSpace: 'nowrap',
+              fontFamily: FF, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+              color: sel ? '#fff' : C.ink,
+            }}
+          >
+            Blok {b.block_number}{suffix}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -164,6 +210,7 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
                 r.username
               )}
               {variant === 'season' && r.won_latest_block && <span title="Vinder af seneste blok" style={{ marginLeft: 4, fontSize: 12 }}>🏅</span>}
+              {variant === 'block' && r.block_winner && <span title="Vandt blokken" style={{ marginLeft: 4, fontSize: 12 }}>🏅</span>}
               {r.losers_luck && <span title="🍀 Losers Luck — +20% på gevinster i denne blok" style={{ marginLeft: 4, fontSize: 12, flexShrink: 0 }}>🍀</span>}
             </span>
           </span>

@@ -1176,15 +1176,29 @@ export type LbTabRow = {
   latest_round_match_wins: number
   /** 🍀 Losers Luck aktiv i nuværende blok (+20% på gevinster). */
   losers_luck: boolean
+  /** Vandt blokken (kun afgjorte blokke) — højest profit, inkl. delt sejr. */
+  block_winner?: boolean
+}
+
+export type LbBlock = {
+  block_number: number
+  block_name: string
+  /** 'active' = igangværende blok, 'finished' = afgjort. */
+  status: string
+  rounds_remaining: number
+  rows: LbTabRow[]
 }
 
 export type LeaderboardTabs = {
-  block: { block_name: string; rounds_remaining: number; rows: LbTabRow[] } | null
+  /** Alle blokke med scorede runder (afgjorte + igangværende), ældste først. */
+  blocks: LbBlock[]
+  /** Bloknummer der skal vises som standard (den igangværende). */
+  activeBlockNumber: number | null
   season: { rows: LbTabRow[] }
 }
 
 export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTabs> {
-  const empty: LeaderboardTabs = { block: null, season: { rows: [] } }
+  const empty: LeaderboardTabs = { blocks: [], activeBlockNumber: null, season: { rows: [] } }
   const { data: gameSeasons } = await supabaseAdmin.from('game_seasons').select('season_id').eq('game_id', gameId)
   const seasonIds = (gameSeasons ?? []).map((g) => g.season_id as number)
   if (seasonIds.length === 0) return empty
@@ -1366,11 +1380,13 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     losers_luck: losersLuckSet.has(u),
   }))
 
-  // ── BLOK: aktiv blok ──
-  let block: LeaderboardTabs['block'] = null
-  const activeBlock = allBlocks.find((b) => b.status === 'active') ?? null
-  if (activeBlock) {
-    const blockRoundIds = (rounds ?? []).filter((r) => r.block_id === activeBlock.id).map((r) => r.id as number)
+  // ── BLOKKE: alle blokke med scorede runder (afgjorte + igangværende) ──
+  // Hver blok kan bladres i leaderboardet; klovne/helte/Losers Luck vises kun
+  // på den AKTIVE blok (live-flavor), og afgjorte blokke markerer vinder(e).
+  const buildBlock = (blk: typeof allBlocks[number]): LbBlock => {
+    const isActive = blk.status === 'active'
+    const isFinished = blk.status === 'finished'
+    const blockRoundIds = (rounds ?? []).filter((r) => r.block_id === blk.id).map((r) => r.id as number)
     const blockFinished = new Set(blockRoundIds.filter((rid) => finishedRoundIds.has(rid)))
     // LIVE: medregn igangværende rundes scorede kampe. Baseline = forrige scorede runde.
     const blockScored = new Set(blockRoundIds.filter((rid) => scoredRoundIds.has(rid)))
@@ -1378,34 +1394,52 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     const blockPrevScored = new Set(blockScored)
     if (latestInBlock != null) blockPrevScored.delete(latestInBlock)
 
+    // Vinder(e) for afgjort blok = højest profit (inkl. delt sejr).
+    let maxPts = 0
+    if (isFinished) for (const u of userIds) { const p = sumOver(earnings, u, blockScored); if (p > maxPts) maxPts = p }
+
     const bNow = rankBy((u) => [sumOver(earnings, u, blockScored), 0])
     const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevScored), 0])
-    const rows: LbTabRow[] = bNow.sorted.map((u) => ({
-      user_id: u,
-      username: usernameById.get(u)!,
-      rank: bNow.rankMap.get(u)!,
-      rank_delta: latestInBlock != null ? (bPrev.rankMap.get(u)! - bNow.rankMap.get(u)!) : 0,
-      points: Math.round(sumOver(earnings, u, blockScored) * 10) / 10,
-      profit: Math.round(sumOver(betProfit, u, blockScored) * 10) / 10,
-      mvp_count: 0,
-      block_wins: 0,
-      won_latest_block: false,
-      won_bets: sumOver(wonMap, u, blockScored),
-      lost_bets: sumOver(lostMap, u, blockScored),
-      staked: Math.round(sumOver(stakedMap, u, blockScored) * 10) / 10,
-      // Klovne-navn = bombede seneste runde overordnet (samme i begge faner).
-      latest_round_zero: seasonZero.has(u),
-      latest_round_match_wins: matchWinsLatest.get(u) ?? 0,
-      losers_luck: losersLuckSet.has(u),
-    }))
-    block = {
-      block_name: (activeBlock.name as string) ?? `Blok ${activeBlock.block_number}`,
+    const rows: LbTabRow[] = bNow.sorted.map((u) => {
+      const pts = sumOver(earnings, u, blockScored)
+      return {
+        user_id: u,
+        username: usernameById.get(u)!,
+        rank: bNow.rankMap.get(u)!,
+        rank_delta: latestInBlock != null ? (bPrev.rankMap.get(u)! - bNow.rankMap.get(u)!) : 0,
+        points: Math.round(pts * 10) / 10,
+        profit: Math.round(sumOver(betProfit, u, blockScored) * 10) / 10,
+        mvp_count: 0,
+        block_wins: 0,
+        won_latest_block: false,
+        won_bets: sumOver(wonMap, u, blockScored),
+        lost_bets: sumOver(lostMap, u, blockScored),
+        staked: Math.round(sumOver(stakedMap, u, blockScored) * 10) / 10,
+        // Klovne/helte/Losers Luck = kun live på den aktive blok.
+        latest_round_zero: isActive ? seasonZero.has(u) : false,
+        latest_round_match_wins: isActive ? (matchWinsLatest.get(u) ?? 0) : 0,
+        losers_luck: isActive ? losersLuckSet.has(u) : false,
+        block_winner: isFinished && maxPts > 0 && pts === maxPts,
+      }
+    })
+    return {
+      block_number: blk.block_number as number,
+      block_name: (blk.name as string) ?? `Blok ${blk.block_number}`,
+      status: blk.status as string,
       rounds_remaining: blockRoundIds.length - blockFinished.size,
       rows,
     }
   }
 
-  return { block, season: { rows: seasonRows } }
+  const lbBlocks = allBlocks
+    .filter((b) => (rounds ?? []).some((r) => r.block_id === b.id && scoredRoundIds.has(r.id as number)))
+    .sort((a, z) => (a.block_number as number) - (z.block_number as number))
+    .map(buildBlock)
+  const activeBlockNumber =
+    (allBlocks.find((b) => b.status === 'active')?.block_number as number | undefined) ??
+    (lbBlocks.length ? lbBlocks[lbBlocks.length - 1].block_number : null)
+
+  return { blocks: lbBlocks, activeBlockNumber, season: { rows: seasonRows } }
 }
 
 // ─── getGameState — kombineret state for /api/games/[id]/state ──────────────
@@ -1428,7 +1462,7 @@ export async function getGameState(
     getGameMatches(gameId, userId),
     getGameLeaderboard(gameId),
     isFootballRegular ? getActiveBlockStandings(gameId) : Promise.resolve(null),
-    isFootballRegular ? getLeaderboardTabs(gameId) : Promise.resolve({ block: null, season: { rows: [] } } as LeaderboardTabs),
+    isFootballRegular ? getLeaderboardTabs(gameId) : Promise.resolve({ blocks: [], activeBlockNumber: null, season: { rows: [] } } as LeaderboardTabs),
   ])
 
   return {
