@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import type { BetType } from '@/types'
 import { rateLimit, getIp } from '@/lib/rateLimit'
+import { blockBudgetFor } from '@/lib/blockBudget'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -125,8 +126,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     if (!budgetRoundIds.includes(roundId)) budgetRoundIds.push(roundId)
   }
 
-  // Håndhæv 1000-loftet: allerede-placerede indsatser i budgettet (på kampe der
-  // IKKE erstattes i denne submission) + de nye indsatser må ikke overstige 1000.
+  // Håndhæv budget-loftet: allerede-placerede indsatser i budgettet (på kampe
+  // der IKKE erstattes i denne submission) + de nye indsatser må ikke overstige
+  // blokkens budget (typisk 1000, men kan have engangs-override — se blockBudget).
+  const budgetCap = creditsPerBlock ? blockBudgetFor(roundBlockId) : 1000
   const newPayloadStake = bets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
   const { data: existingBudgetBets } = await supabaseAdmin
     .from('bets')
@@ -137,11 +140,11 @@ export async function POST(req: NextRequest, { params }: Props) {
   const existingBudgetStake = (existingBudgetBets ?? [])
     .filter((b) => !payloadMatchIds.includes(b.match_id as number))
     .reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  if (existingBudgetStake + newPayloadStake > 1000) {
+  if (existingBudgetStake + newPayloadStake > budgetCap) {
     const scope = creditsPerBlock ? 'blokken' : 'runden'
     return NextResponse.json(
       {
-        error: `Du kan højst bruge 1000 credits i ${scope}. Du har ${Math.max(0, 1000 - existingBudgetStake)} tilbage.`,
+        error: `Du kan højst bruge ${budgetCap} credits i ${scope}. Du har ${Math.max(0, budgetCap - existingBudgetStake)} tilbage.`,
       },
       { status: 400 }
     )
@@ -190,7 +193,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   const totalStake = (allRoundBets ?? []).reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  const newBalance = 1000 - totalStake
+  const newBalance = budgetCap - totalStake
 
   const { error: balanceError, count } = await supabaseAdmin
     .from('round_members')
