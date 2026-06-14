@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import type { BetType } from '@/types'
 import { rateLimit, getIp } from '@/lib/rateLimit'
-import { blockBudgetFor } from '@/lib/blockBudget'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -100,9 +99,13 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   // ── Budget-grundlag (1000 credits) ────────────────────────────────────────
   // VM (credits_per_block): budgettet er pr. BLOK, delt over blokkens runder
-  // (ekskl. legacy-runde). Ellers pr. runde. Beregnes FØR write, så loftet kan
+  // (ekskl. legacy-runder). Ellers pr. runde. Beregnes FØR write, så loftet kan
   // håndhæves server-side (ikke kun i UI'et).
-  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175]
+  //
+  // 36175 + 36177: spillet under den gamle pr-runde-adfærd (runde 2's kupon
+  // åbnede først dagen efter), så de tæller ikke mod blok-budgettet — runde 2
+  // får dermed sit eget friske 1000.
+  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175, 36177]
   const roundBlockId = (round as { block_id?: number | null }).block_id ?? null
   let creditsPerBlock = false
   if (roundBlockId) {
@@ -126,10 +129,9 @@ export async function POST(req: NextRequest, { params }: Props) {
     if (!budgetRoundIds.includes(roundId)) budgetRoundIds.push(roundId)
   }
 
-  // Håndhæv budget-loftet: allerede-placerede indsatser i budgettet (på kampe
-  // der IKKE erstattes i denne submission) + de nye indsatser må ikke overstige
-  // blokkens budget (typisk 1000, men kan have engangs-override — se blockBudget).
-  const budgetCap = creditsPerBlock ? blockBudgetFor(roundBlockId) : 1000
+  // Håndhæv 1000-loftet: allerede-placerede indsatser i budgettet (på kampe der
+  // IKKE erstattes i denne submission) + de nye indsatser må ikke overstige 1000.
+  const budgetCap = 1000
   const newPayloadStake = bets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
   const { data: existingBudgetBets } = await supabaseAdmin
     .from('bets')

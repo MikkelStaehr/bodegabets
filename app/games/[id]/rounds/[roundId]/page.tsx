@@ -2,7 +2,6 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { getLosersLuckUserIds } from '@/lib/losersLuck'
-import { blockBudgetFor } from '@/lib/blockBudget'
 import AfgivBets from '@/components/games/AfgivBets'
 import type { Match, Bet, Round } from '@/types'
 
@@ -68,9 +67,10 @@ export default async function RoundPage({ params }: Props) {
     .single()
   const creditsPerBlock = (seasonRow as { credits_per_block?: boolean } | null)?.credits_per_block === true
 
-  // Runder spillet under den GAMLE pr-runde-model tæller ikke mod blok-budgettet
-  // (VM: åbningskampen blev maxet under den gamle model, før blok-systemet).
-  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175]
+  // Runder spillet under den GAMLE pr-runde-adfærd tæller ikke mod blok-budgettet.
+  // 36175: VM-åbningskampen (før blok-systemet). 36177: blok 11's dag 1 — runde 2's
+  // kupon åbnede først dagen efter, så dag 2 får sit eget friske 1000.
+  const LEGACY_PRE_BLOCK_ROUND_IDS = [36175, 36177]
 
   // Hent block info hvis runden er tilknyttet en block
   const roundBlockId = (round as typeof round & { block_id?: number | null }).block_id ?? null
@@ -287,7 +287,7 @@ export default async function RoundPage({ params }: Props) {
       totalMatchesInRound={matches.length}
       betDistribution={betDistribution}
       blockInfo={blockInfo}
-      blockBudget={blockBudgetFor(roundBlockId)}
+      blockBudget={1000}
       blockSpentElsewhere={blockSpentElsewhere}
       creditsRollOver={creditsPerBlock && blockInfo != null && !blockInfo.is_last_in_block}
       losersLuckActive={losersLuckActive}
