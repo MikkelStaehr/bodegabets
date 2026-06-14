@@ -72,10 +72,16 @@ export default async function RoundPage({ params }: Props) {
   // kupon åbnede først dagen efter, så dag 2 får sit eget friske 1000.
   const LEGACY_PRE_BLOCK_ROUND_IDS = [36175, 36177]
 
-  // Hent block info hvis runden er tilknyttet en block
+  // Hent block info hvis runden er tilknyttet en block.
+  //
+  // VM (credits_per_block): HELE blokkens kampe vises på ÉN kupon, delt på dage
+  // — så hele blokken kan udfyldes på forhånd. Budgettet er fælles for blokken,
+  // og da alle blokkens bets nu ligger på samme kupon (via existingBets), er der
+  // intet "spent elsewhere" at trække fra (= 0). Almindelige spil: kun denne runde.
   const roundBlockId = (round as typeof round & { block_id?: number | null }).block_id ?? null
   let blockInfo: { block_number: number; block_name: string; is_last_in_block: boolean } | null = null
-  let blockSpentElsewhere = 0
+  let couponRoundIds: number[] = [roundIdNum]
+  const blockSpentElsewhere = 0
   if (roundBlockId) {
     const [{ data: block }, { data: blockRounds }] = await Promise.all([
       supabaseAdmin.from('blocks').select('id, block_number, name').eq('id', roundBlockId).single(),
@@ -86,21 +92,11 @@ export default async function RoundPage({ params }: Props) {
       const isLast = allBlockRoundIds.length > 0 && allBlockRoundIds[allBlockRoundIds.length - 1] === roundIdNum
       blockInfo = { block_number: block.block_number, block_name: block.name, is_last_in_block: isLast }
 
-      // Hvad brugeren allerede har brugt i blokkens ANDRE runder (ekskl. denne
-      // runde og legacy-runder) — trækkes fra det fælles blok-budget.
+      // Slå hele blokkens kampe sammen på kuponen (ekskl. legacy-runder, der blev
+      // spillet under den gamle pr-runde-adfærd og har eget budget).
       if (creditsPerBlock) {
-        const otherRoundIds = allBlockRoundIds.filter(
-          (rid) => rid !== roundIdNum && !LEGACY_PRE_BLOCK_ROUND_IDS.includes(rid)
-        )
-        if (otherRoundIds.length > 0) {
-          const { data: otherBets } = await supabaseAdmin
-            .from('bets')
-            .select('stake')
-            .eq('game_id', gameId)
-            .eq('user_id', user.id)
-            .in('round_id', otherRoundIds)
-          blockSpentElsewhere = (otherBets ?? []).reduce((s, b) => s + (b.stake ?? 0), 0)
-        }
+        couponRoundIds = allBlockRoundIds.filter((rid) => !LEGACY_PRE_BLOCK_ROUND_IDS.includes(rid))
+        if (!couponRoundIds.includes(roundIdNum)) couponRoundIds.push(roundIdNum)
       }
     }
   }
@@ -108,9 +104,9 @@ export default async function RoundPage({ params }: Props) {
   // 🍀 Losers Luck: er den aktuelle spiller blandt de nederste (boost i blokken)?
   const losersLuckActive = (await getLosersLuckUserIds(gameId, roundBlockId)).has(user.id)
 
-  // Step 2: Hent matches via round_id med team joins
+  // Step 2: Hent matches for kuponens runder (blokken for VM, ellers denne runde)
   const matchSelect = `
-    id, kickoff_at:kickoff, status, result, bet_open, second_half_started_at,
+    id, round_id, kickoff_at:kickoff, status, result, bet_open, second_half_started_at,
     home_score, away_score,
     home_team:teams!home_team_id(id, name, logo_url),
     away_team:teams!away_team_id(id, name, logo_url)
@@ -118,6 +114,7 @@ export default async function RoundPage({ params }: Props) {
 
   type RawMatch = {
     id: number
+    round_id: number
     kickoff_at: string | null
     status: string
     result: string | null
@@ -144,14 +141,14 @@ export default async function RoundPage({ params }: Props) {
       away_team_logo: raw.away_team?.logo_url ?? null,
       bet_open: raw.bet_open,
       second_half_started_at: raw.second_half_started_at,
-      round_id: roundIdNum,
+      round_id: raw.round_id,
     }
   }
 
   const { data: rawMatches, error: matchesError } = await supabaseAdmin
     .from('matches')
     .select(matchSelect)
-    .eq('round_id', roundIdNum)
+    .in('round_id', couponRoundIds)
     .order('kickoff', { ascending: true })
 
   const matches = (rawMatches ?? []).map((m) => toMatchRow(m as unknown as RawMatch))
@@ -289,7 +286,7 @@ export default async function RoundPage({ params }: Props) {
       blockInfo={blockInfo}
       blockBudget={1000}
       blockSpentElsewhere={blockSpentElsewhere}
-      creditsRollOver={creditsPerBlock && blockInfo != null && !blockInfo.is_last_in_block}
+      creditsRollOver={false}
       losersLuckActive={losersLuckActive}
     />
   )
