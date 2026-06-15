@@ -48,7 +48,7 @@ export function getRoleStageBonus(role: string, profile: string | null): RoleSta
 
   switch (role) {
     case 'grimpeur': {
-      if (profile === 'mountain') return { multiplier: 1.8, pillLabel: `×1.8 ${pUp}`, cardLine: 'Bjerg-bonus + breakaway-jagt', strength: 'high' }
+      if (profile === 'mountain') return { multiplier: 1.8, pillLabel: `×1.8 ${pUp} v. SEJR`, cardLine: 'Vind etapen → ×1.8 + solo-bonus (ellers ×1.2)', strength: 'high' }
       if (profile === 'hilly' || profile === 'cobbled') return { multiplier: 1.2, pillLabel: `×1.2 ${pUp}`, cardLine: 'Let bakke-bonus, KOM-mulighed', strength: 'mid' }
       return { multiplier: 1.0, pillLabel: '', cardLine: 'Ingen profil-bonus i dag', strength: 'low' }
     }
