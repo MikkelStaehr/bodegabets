@@ -370,9 +370,11 @@ export async function calculateCyclingPoints(
 
         case 'grimpeur':
           usedCatMul = catMul
-          profileMul = getGrimpeurMultiplier(profile, newRules)
+          // ×1.8 (bjerg) KUN ved etapesejr — ellers ×1.2. Belønningen følger sejren.
+          profileMul = getGrimpeurMultiplier(profile, newRules, position === 1)
           roleMul = catMul * profileMul
-          if (wonHow && position != null && position <= 10) {
+          // Won-how (solo-bonus) kun til etapevinderen — ikke alle top-10 grimpeurs.
+          if (wonHow && position === 1) {
             roleBonus = getWonHowGrimpeurBonus(wonHow)
           }
           break

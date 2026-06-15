@@ -227,17 +227,18 @@ const ROLES: RoleData[] = [
     key: 'grimpeur',
     name: 'Grimpeur',
     tagline: 'Bjergrytter',
-    desc: 'Stor multiplier på bjerg-etaper. Får bonus hvis løbet vindes solo eller fra lille gruppe.',
+    desc: 'Stor multiplier på bjerg — men ×1.8 (og solo-bonus) kun når grimpeuren VINDER etapen. Ellers ×1.2. Belønningen følger sejren.',
     category: 'Kategori 3–5',
     formulaLabel: 'Basispoint × Kategori × Profil + Bonus',
     scoring: [
       { label: 'Profil', rows: [
-        ['Bjerg', '×1.8'],
+        ['Bjerg — vinder etapen', '×1.8'],
+        ['Bjerg — ellers', '×1.2'],
         ['Bakket', '×1.2'],
         ['Brosten', '×1.2'],
         ['Flad / ITT', '×1.0'],
       ]},
-      { label: 'Bonus (top-10)', rows: [
+      { label: 'Bonus (kun etapevinder)', rows: [
         ['Lille gruppe-spurt', '+20'],
         ['Spurt à deux', '+25'],
         ['Solo', '+50'],
@@ -247,7 +248,7 @@ const ROLES: RoleData[] = [
     examples: [
       { title: 'Kat 4 grimpeur vinder bjerg', calculation: `50 × ${CAT_MULTIPLIER[4]} × 1.8`, result: pt(50 * CAT_MULTIPLIER[4] * 1.8) },
       { title: 'Samme + 4 km solo', calculation: `50 × ${CAT_MULTIPLIER[4]} × 1.8 + 54`, result: pt(50 * CAT_MULTIPLIER[4] * 1.8 + 54), highlight: true },
-      { title: 'Kat 5 grimpeur, 3. plads bjerg', calculation: `30 × ${CAT_MULTIPLIER[5]} × 1.8`, result: pt(30 * CAT_MULTIPLIER[5] * 1.8) },
+      { title: 'Kat 5 grimpeur, 3. plads bjerg (ingen sejr)', calculation: `30 × ${CAT_MULTIPLIER[5]} × 1.2`, result: pt(30 * CAT_MULTIPLIER[5] * 1.2) },
     ],
     bonuses: [`+${TEAM_BONUS_DEFAULT} hvis vinderens hold`, 'Trøje-point (oftest bjergtrøje)'],
     strategy: 'Lav kategori i bjergene er en lotto-billet — sjælden succes, men store udbytter.',

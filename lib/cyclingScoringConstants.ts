@@ -139,8 +139,10 @@ export function computeTrainMultiplier(leadoutCount: number, sprinterTop3: boole
 // cobbled (brosten) behandles som 'hilly' (bakket) ×1.2 under nye regler.
 // Før NEW_SCORING_FROM gav cobbled ×1.0 (uændret bagud).
 
-export function getGrimpeurMultiplier(profile: string, newRules: boolean): number {
-  if (profile === 'mountain') return 1.8
+export function getGrimpeurMultiplier(profile: string, newRules: boolean, isStageWinner = false): number {
+  // Bjerg: fuld ×1.8 KUN når grimpeuren vinder etapen — ellers ×1.2. Den store
+  // belønning følger sejren, så en 2.-plads ikke crusher en vindende Leader.
+  if (profile === 'mountain') return isStageWinner ? 1.8 : 1.2
   if (profile === 'hilly') return 1.2
   if (profile === 'cobbled') return newRules ? 1.2 : 1.0
   return 1.0
