@@ -1393,6 +1393,10 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     const latestInBlock = blockScored.size ? Math.max(...blockScored) : null
     const blockPrevScored = new Set(blockScored)
     if (latestInBlock != null) blockPrevScored.delete(latestInBlock)
+    // Klovne/helte hører til den seneste afgjorte runde — vis dem kun hvis DEN
+    // runde ligger i DENNE blok (ellers ville en netop åbnet blok uden scorede
+    // runder arve forrige bloks klovne).
+    const showLiveFlavor = isActive && latestFinished != null && blockScored.has(latestFinished)
 
     // Vinder(e) for afgjort blok = højest profit (inkl. delt sejr).
     let maxPts = 0
@@ -1415,9 +1419,10 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
         won_bets: sumOver(wonMap, u, blockScored),
         lost_bets: sumOver(lostMap, u, blockScored),
         staked: Math.round(sumOver(stakedMap, u, blockScored) * 10) / 10,
-        // Klovne/helte/Losers Luck = kun live på den aktive blok.
-        latest_round_zero: isActive ? seasonZero.has(u) : false,
-        latest_round_match_wins: isActive ? (matchWinsLatest.get(u) ?? 0) : 0,
+        // Klovne/helte = kun når seneste afgjorte runde ligger i denne blok.
+        // Losers Luck = den aktive bloks beneficienter (vises også før scoring).
+        latest_round_zero: showLiveFlavor ? seasonZero.has(u) : false,
+        latest_round_match_wins: showLiveFlavor ? (matchWinsLatest.get(u) ?? 0) : 0,
         losers_luck: isActive ? losersLuckSet.has(u) : false,
         block_winner: isFinished && maxPts > 0 && pts === maxPts,
       }
@@ -1432,7 +1437,9 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   }
 
   const lbBlocks = allBlocks
-    .filter((b) => (rounds ?? []).some((r) => r.block_id === b.id && scoredRoundIds.has(r.id as number)))
+    // Vis blokke med scorede runder + den AKTIVE blok (også før dens første
+    // runde er scoret), så en netop åbnet blok straks dukker op i leaderboardet.
+    .filter((b) => b.status === 'active' || (rounds ?? []).some((r) => r.block_id === b.id && scoredRoundIds.has(r.id as number)))
     .sort((a, z) => (a.block_number as number) - (z.block_number as number))
     .map(buildBlock)
   const activeBlockNumber =
