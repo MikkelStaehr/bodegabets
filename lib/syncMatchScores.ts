@@ -166,11 +166,13 @@ export async function syncMatchScores(options?: {
             if (bet.prediction in count) count[bet.prediction]++
           }
 
+          // Ekstra-bets giver MINDRE odds end hoved-bettet (1/X/2 = 1,2–1,8) —
+          // de skal blot være et lille tillæg til sejren. Range 1,2–1,5.
           const calcOdds = (pred: string): number => {
             const n = count[pred] ?? 0
-            if (total === 0 || n === 0) return 2.0
+            if (total === 0 || n === 0) return 1.5
             const pct = n / total
-            return Math.round(Math.max(1.5, 2.0 - pct * 0.5) * 100) / 100
+            return Math.round(Math.max(1.2, 1.5 - pct * 0.3) * 100) / 100
           }
 
           for (const bet of groupBets) {

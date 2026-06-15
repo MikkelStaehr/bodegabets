@@ -8,7 +8,7 @@ import { getLosersLuckUserIds, LOSERS_LUCK_BOOST } from '@/lib/losersLuck'
  *
  * PRINCIP:
  *   Korrekt match_result → stake × consensus odds
- *   Korrekt ekstra bet → stake × consensus odds (fallback 2.0)
+ *   Korrekt ekstra bet → stake × consensus odds (mindre end hoved-bet; fallback 1.5)
  *   Forkert bet → 0 (stake tabt)
  *   earnings_delta = SUM(points_earned) per runde
  *   game_members.earnings = SUM(round_scores.earnings_delta) (absolut, aldrig relativt)
@@ -80,8 +80,8 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
           const odds = (bet as { odds?: number | null }).odds ?? 1.0
           pointsEarned = Math.round(stake * odds)
         } else {
-          // Ekstra bets: brug konsensus odds med fallback 2.0
-          const odds = (bet as { odds?: number | null }).odds ?? 2.0
+          // Ekstra bets: brug konsensus odds (mindre end hoved-bet) med fallback 1.5
+          const odds = (bet as { odds?: number | null }).odds ?? 1.5
           pointsEarned = Math.round(stake * odds)
         }
         // 🍀 Losers Luck: +20% på vundne bets for de nederste i sæsonen.
@@ -326,7 +326,7 @@ export async function calculateChampionshipRoundPoints(championshipRoundId: numb
           const odds = (bet as { odds?: number | null }).odds ?? 1.0
           pointsEarned = Math.round(stake * odds)
         } else {
-          const odds = (bet as { odds?: number | null }).odds ?? 2.0
+          const odds = (bet as { odds?: number | null }).odds ?? 1.5
           pointsEarned = Math.round(stake * odds)
         }
         const result = correct ? 'win' : 'loss'
