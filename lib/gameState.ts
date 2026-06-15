@@ -1393,10 +1393,11 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     const latestInBlock = blockScored.size ? Math.max(...blockScored) : null
     const blockPrevScored = new Set(blockScored)
     if (latestInBlock != null) blockPrevScored.delete(latestInBlock)
-    // Klovne/helte hører til den seneste afgjorte runde — vis dem kun hvis DEN
-    // runde ligger i DENNE blok (ellers ville en netop åbnet blok uden scorede
-    // runder arve forrige bloks klovne).
-    const showLiveFlavor = isActive && latestFinished != null && blockScored.has(latestFinished)
+    // Klovne/helte hører til den seneste afgjorte runde — vis dem på den blok
+    // der INDEHOLDER den runde (uanset om blokken er aktiv eller afsluttet). En
+    // netop åbnet blok uden scorede runder arver derfor IKKE forrige bloks
+    // klovne, og en lige afsluttet blok beholder sine (som sæson-fanen).
+    const showLiveFlavor = latestFinished != null && blockScored.has(latestFinished)
 
     // Vinder(e) for afgjort blok = højest profit (inkl. delt sejr).
     let maxPts = 0
@@ -1442,7 +1443,16 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     .filter((b) => b.status === 'active' || (rounds ?? []).some((r) => r.block_id === b.id && scoredRoundIds.has(r.id as number)))
     .sort((a, z) => (a.block_number as number) - (z.block_number as number))
     .map(buildBlock)
+  // Default-blok = blokken med den SENESTE afgjorte runde (seneste action +
+  // klovne/helte), så blok-fanen åbner samme sted som sæson-fanens flavor.
+  // Når den aktive blok får sin første scorede runde, flytter defaulten dertil.
+  // Fallback: aktiv blok, ellers seneste blok i listen.
+  const latestBlockId = latestFinished != null ? roundToBlock.get(latestFinished) : null
+  const latestBlockNumber = latestBlockId != null
+    ? (allBlocks.find((b) => b.id === latestBlockId)?.block_number as number | undefined) ?? null
+    : null
   const activeBlockNumber =
+    latestBlockNumber ??
     (allBlocks.find((b) => b.status === 'active')?.block_number as number | undefined) ??
     (lbBlocks.length ? lbBlocks[lbBlocks.length - 1].block_number : null)
 
