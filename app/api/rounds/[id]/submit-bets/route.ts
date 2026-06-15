@@ -74,6 +74,35 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
+  // Ekstra-bets skal følge hoved-bettets vinder (1=hjemme/2=ude) — aldrig
+  // modparten, og ikke på kryds (X). Forhindrer selvmodsigende kuponer som
+  // "Belgien sejr" + "Egypten vinder med 2+". Defensiv server-side validering.
+  const EXTRA_TYPES = ['goals_3plus', 'clean_sheet', 'win_margin']
+  const extraBets = bets.filter((b) => EXTRA_TYPES.includes(b.bet_type))
+  if (extraBets.length > 0) {
+    const mrByMatch = new Map<number, string>()
+    for (const b of bets) if (b.bet_type === 'match_result') mrByMatch.set(b.match_id, b.prediction)
+    // For ekstra-bets på kampe uden nyt match_result i payloaded: brug bruger-
+    // ens eksisterende hoved-bet på kampen.
+    const needExisting = [...new Set(extraBets.map((b) => b.match_id))].filter((mid) => !mrByMatch.has(mid))
+    if (needExisting.length > 0) {
+      const { data: existingMr } = await supabaseAdmin
+        .from('bets').select('match_id, prediction')
+        .eq('user_id', user.id).eq('game_id', bodyGameId).eq('bet_type', 'match_result')
+        .in('match_id', needExisting)
+      for (const b of existingMr ?? []) mrByMatch.set(b.match_id as number, b.prediction as string)
+    }
+    for (const b of extraBets) {
+      const mr = mrByMatch.get(b.match_id)
+      if (mr == null) {
+        return NextResponse.json({ error: 'Ekstra-valg kræver et hoved-bet (1 eller 2) på samme kamp' }, { status: 400 })
+      }
+      if (mr === 'X' || (b.prediction !== mr)) {
+        return NextResponse.json({ error: 'Ekstra-valg skal følge dit hoved-bets vinder' }, { status: 400 })
+      }
+    }
+  }
+
   // ── Kupon-/budget-runder ──────────────────────────────────────────────────
   // VM (credits_per_block): hele blokken (ekskl. legacy-runder) hører til samme
   // kupon og deler budget. Ellers kun denne runde. Beregnes FØR validering, så

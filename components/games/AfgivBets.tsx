@@ -139,11 +139,16 @@ function InlineExtraBets({
   matchId: number
   sel: BetEntry
   isRivalry: boolean
-  toggleExtra: (matchId: number, key: ExtraBetType, value: string) => void
+  toggleExtra: (matchId: number, key: ExtraBetType) => void
   adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
   setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
 }) {
   const [open, setOpen] = useState(sel.extraBets.length > 0)
+
+  // Ekstra-valg er et tillæg til DIN sejr — kun relevant når du har valgt en
+  // vinder (1/2). På kryds (X) er der ingen vinder at tilføje til.
+  if (sel.outcome !== '1' && sel.outcome !== '2') return null
+  const winnerTeam = sel.outcome === '1' ? sel.match.home_team : sel.match.away_team
 
   return (
     <div className={`border-t ${isRivalry ? 'border-gold/20' : 'border-black/[0.06]'}`}>
@@ -162,38 +167,20 @@ function InlineExtraBets({
       {open && (
         <div className="px-3 pb-2 flex flex-col gap-1.5">
           {EXTRA_BET_ROWS.map((row) => {
-            const pick = sel.extraBets.find((eb) => eb.type === row.key)?.prediction
+            const active = sel.extraBets.some((eb) => eb.type === row.key)
+            const cls = active
+              ? (isRivalry ? 'bg-gold border-gold text-[var(--color-dark-green)]' : 'bg-[var(--color-card-green)] border-[#2C4A3E] text-white')
+              : (isRivalry ? 'bg-[var(--color-card-green)] border-gold/20 text-[var(--color-cream)]/70 hover:border-gold/50' : 'bg-white border-black/10 text-[var(--color-warm-taupe)] hover:border-[#2C4A3E] hover:text-[var(--color-dark-green)]')
             return (
               <div key={row.key}>
-                <span className={`text-[9px] font-bold tracking-wider uppercase mb-1 block ${isRivalry ? 'text-gold/70' : 'text-[var(--color-warm-taupe)]'}`}>
-                  {row.label}
-                </span>
-                <div className="flex gap-1">
-                  {row.opts.map((opt) => {
-                    const active = pick === opt.value
-                    let cls: string
-                    if (active) {
-                      cls = isRivalry
-                        ? 'bg-gold border-gold text-[var(--color-dark-green)]'
-                        : 'bg-[var(--color-card-green)] border-[#2C4A3E] text-white'
-                    } else {
-                      cls = isRivalry
-                        ? 'bg-[var(--color-card-green)] border-gold/20 text-[var(--color-cream)]/60 hover:border-gold/50'
-                        : 'bg-white border-black/10 text-[var(--color-warm-taupe)] hover:border-[#2C4A3E] hover:text-[var(--color-dark-green)]'
-                    }
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => toggleExtra(matchId, row.key, opt.value)}
-                        className={`flex-1 py-1 border-[1.5px] rounded text-[10px] font-semibold transition-all ${cls}`}
-                      >
-                        {opt.label}
-                      </button>
-                    )
-                  })}
-                </div>
-                {pick && (
+                <button
+                  type="button"
+                  onClick={() => toggleExtra(matchId, row.key)}
+                  className={`w-full py-1.5 px-2 border-[1.5px] rounded text-[11px] font-semibold transition-all text-left ${cls}`}
+                >
+                  {active ? '✓ ' : '+ '}{winnerTeam} {row.label.toLowerCase()}
+                </button>
+                {active && (
                   <div className="flex items-center gap-1 mt-1.5">
                     <button
                       type="button"
@@ -336,7 +323,7 @@ function MatchCard({
   userExtraBetData: Record<string, ExtraBetData>
   matchResultBet: Bet | undefined
   selectOutcome: (matchId: number, outcome: '1' | 'X' | '2') => void
-  toggleExtra: (matchId: number, key: ExtraBetType, value: string) => void
+  toggleExtra: (matchId: number, key: ExtraBetType) => void
   adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
   setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
   adjustStake: (matchId: number, delta: number) => void
@@ -736,11 +723,12 @@ export default function AfgivBets({
         if (sel.isReplacement && existingBet) {
           // Revert to existing bet outcome
           setSelections((prev) =>
-            prev.map((s) =>
-              s.matchId === matchId
-                ? { ...s, outcome: existingBet.prediction as '1' | 'X' | '2' }
-                : s
-            )
+            prev.map((s) => {
+              if (s.matchId !== matchId) return s
+              const o = existingBet.prediction as '1' | 'X' | '2'
+              const extraBets = (o === '1' || o === '2') ? s.extraBets.map((eb) => ({ ...eb, prediction: o })) : []
+              return { ...s, outcome: o, extraBets }
+            })
           )
         } else {
           setSelections((prev) => prev.filter((s) => s.matchId !== matchId))
@@ -748,7 +736,14 @@ export default function AfgivBets({
         return
       }
       setSelections((prev) =>
-        prev.map((s) => (s.matchId === matchId ? { ...s, outcome } : s))
+        prev.map((s) => {
+          if (s.matchId !== matchId) return s
+          // Ekstra-bets følger den nye vinder; kryds (X) rydder dem.
+          const extraBets = (outcome === '1' || outcome === '2')
+            ? s.extraBets.map((eb) => ({ ...eb, prediction: outcome }))
+            : []
+          return { ...s, outcome, extraBets }
+        })
       )
     } else {
       setSelections((prev) => [
@@ -823,19 +818,17 @@ export default function AfgivBets({
     )
   }, [existingBets, selections, effectiveBudget])
 
-  const toggleExtra = (matchId: number, key: ExtraBetType, value: string) => {
+  const toggleExtra = (matchId: number, key: ExtraBetType) => {
     setSelections((prev) =>
       prev.map((s) => {
         if (s.matchId !== matchId) return s
+        // Ekstra-bets gælder hoved-bettets vinder (1=hjemme, 2=ude) — aldrig
+        // modparten. På kryds (X) kan der ikke tilføjes ekstra-bets.
+        if (s.outcome !== '1' && s.outcome !== '2') return s
         const existing = s.extraBets.find((eb) => eb.type === key)
-        let next: ExtraBet[]
-        if (existing?.prediction === value) {
-          next = s.extraBets.filter((eb) => eb.type !== key)
-        } else if (existing) {
-          next = s.extraBets.map((eb) => (eb.type === key ? { ...eb, prediction: value } : eb))
-        } else {
-          next = [...s.extraBets, { type: key, prediction: value, points: 50 }]
-        }
+        const next = existing
+          ? s.extraBets.filter((eb) => eb.type !== key)
+          : [...s.extraBets, { type: key, prediction: s.outcome, points: 50 }]
         return { ...s, extraBets: next }
       })
     )
