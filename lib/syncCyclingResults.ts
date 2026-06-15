@@ -515,6 +515,15 @@ export async function syncCyclingResults(): Promise<{
     return { ok: true, stagesProcessed: 0, resultsUpserted: 0, unmatched: 0, syncedStageIds: [], errors: [] }
   }
 
+  // Højeste stage_number pr. race — bruges til at genkende SIDSTE etape. Den
+  // afgør løbet/blokken, så den skal ikke hænge 24t på et brudt GC-klassement.
+  const { data: allRaceStages } = await supabaseAdmin
+    .from('cycling_stages').select('race_id, stage_number').in('race_id', raceIds)
+  const maxStageByRace = new Map<string, number>()
+  for (const s of (allRaceStages ?? []) as Array<{ race_id: string; stage_number: number }>) {
+    if (s.stage_number > (maxStageByRace.get(s.race_id) ?? 0)) maxStageByRace.set(s.race_id, s.stage_number)
+  }
+
   // 3) Build pcs_slug → rider_id index
   const { data: ridersData } = await supabaseAdmin
     .from('cycling_riders')
@@ -573,7 +582,12 @@ export async function syncCyclingResults(): Promise<{
     const classificationsComplete = gcCount >= 50
     const stageAgeMs = Date.now() - new Date(stage.start_date).getTime()
     const stageOlderThan24h = stageAgeMs > 24 * 60 * 60 * 1000
-    const shouldMarkUploaded = classificationsComplete || stageOlderThan24h
+    // SIDSTE etape afgør løbet — vent kun en kort grace (3t) på det fulde GC-
+    // klassement. Er PCS' GC-side brudt (som ved Dauphiné 2026), finaliserer vi
+    // på placeringerne i stedet for at hænge i 24t.
+    const isLastStage = stage.stage_number === maxStageByRace.get(stage.race_id)
+    const lastStageGracePassed = isLastStage && stageAgeMs > 3 * 60 * 60 * 1000
+    const shouldMarkUploaded = classificationsComplete || stageOlderThan24h || lastStageGracePassed
     if (!classificationsComplete) {
       console.warn(
         `[syncCyclingResults]   klassementer ufuldstændige (gc=${gcCount}) — ` +

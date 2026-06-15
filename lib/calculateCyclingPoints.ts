@@ -676,6 +676,39 @@ export async function updateCyclingBlockStatuses(gameId?: number): Promise<numbe
   return flipped
 }
 
+// ── Race lifecycle — sæt cycling_races.status = 'finished' ────────────────────
+//
+// Stage races (grand tours mv.) flippede aldrig til 'finished' — kun endags-løb
+// gjorde. Appen bruger race.status === 'finished' flere steder, så et færdigt
+// løb så "igangværende" ud. Her sættes status til 'finished' (+ results_uploaded_at)
+// så snart ALLE løbets etaper har results_uploaded_at. Idempotent.
+export async function finalizeCyclingRaces(raceId?: string): Promise<number> {
+  const q = supabaseAdmin
+    .from('cycling_races')
+    .select('id, status')
+    .eq('race_type', 'stage_race')
+    .neq('status', 'finished')
+    .neq('status', 'cancelled')
+  if (raceId) q.eq('id', raceId)
+  const { data: races } = await q
+  if (!races?.length) return 0
+
+  let finalized = 0
+  for (const race of races) {
+    const { data: stages } = await supabaseAdmin
+      .from('cycling_stages').select('results_uploaded_at').eq('race_id', race.id)
+    if (!stages?.length) continue
+    if (stages.every((s) => (s as { results_uploaded_at: string | null }).results_uploaded_at != null)) {
+      await supabaseAdmin
+        .from('cycling_races')
+        .update({ status: 'finished', results_uploaded_at: new Date().toISOString() })
+        .eq('id', race.id)
+      finalized++
+    }
+  }
+  return finalized
+}
+
 // ── Run for a specific stage across all games ────────────────────────────────
 
 export async function runCyclingPointsForStage(
@@ -700,6 +733,8 @@ export async function runCyclingPointsForStage(
     await calculateCyclingPoints(stage.race_id, stageId, stage.stage_number, gameId)
     await updateCyclingBlockStatuses(gameId as number)
   }
+  // Når alle løbets etaper har resultater, markér selve racet 'finished'.
+  await finalizeCyclingRaces(stage.race_id)
 }
 
 // ── Legacy wrapper — run all stages for a race across all games ──────────────

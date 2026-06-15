@@ -35,7 +35,7 @@ import { syncMatchScores } from '@/lib/syncMatchScores'
 import { runLeagueSync } from '@/lib/syncLeagueMatches'
 import { calculateRoundPoints, calculateChampionshipRoundPoints, syncProfilesPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
-import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage } from '@/lib/calculateCyclingPoints'
+import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage, finalizeCyclingRaces } from '@/lib/calculateCyclingPoints'
 import { syncCyclingResults } from '@/lib/syncCyclingResults'
 import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
 import { syncCyclingStageTimes } from '@/lib/syncCyclingStageTimes'
@@ -1224,6 +1224,11 @@ app.get('/sync-cycling-results', async (_req, res) => {
     if (result.syncedStageIds.length > 0) {
       console.log(`[sync-cycling-results] Beregnet point for ${result.syncedStageIds.length} nye stages`)
     }
+
+    // Markér stage races som 'finished' når alle deres etaper har resultater
+    // (også løb der hænger fast — fx grand tours der aldrig blev flippet).
+    const racesFinalized = await finalizeCyclingRaces()
+    if (racesFinalized > 0) console.log(`[sync-cycling-results] Finaliserede ${racesFinalized} løb`)
 
     res.json({
       ok: result.ok && pointsErrors.length === 0,
