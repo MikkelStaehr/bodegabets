@@ -97,6 +97,8 @@ type Props = {
   /** 🍀 Spilleren er blandt de nederste → +20% på gevinster i denne blok. */
   losersLuckActive?: boolean
   submitApiPath?: string
+  /** 🎯 Blok Bets-panel, rendres nederst i kuponens venstre kolonne. */
+  blockBets?: React.ReactNode
 }
 
 function initSelections(_matches: MatchWithOptions[], _existing: Bet[]): BetEntry[] {
@@ -651,6 +653,7 @@ export default function AfgivBets({
   creditsRollOver = false,
   losersLuckActive = false,
   submitApiPath,
+  blockBets,
 }: Props) {
   const router = useRouter()
   const { toast } = useToast()
@@ -1135,6 +1138,7 @@ export default function AfgivBets({
       <div className="md:hidden pb-[80px]">
         <div className="max-w-[680px] mx-auto px-4 py-4">
           {renderMatchList(true)}
+          {blockBets}
         </div>
 
         {/* Mobile sticky footer */}
@@ -1221,6 +1225,7 @@ export default function AfgivBets({
               </div>
             </div>
             {renderMatchList(false)}
+            {blockBets}
           </div>
 
           {/* Right — sticky sidebar */}
