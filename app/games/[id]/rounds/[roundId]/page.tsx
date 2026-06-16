@@ -288,7 +288,6 @@ export default async function RoundPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-[var(--color-cream)]">
-      {blockBetsProps && <BlockBetsPanel gameId={gameId} {...blockBetsProps} />}
       <AfgivBets
       gameId={gameId}
       roundId={roundIdNum}
@@ -310,6 +309,7 @@ export default async function RoundPage({ params }: Props) {
       blockSpentElsewhere={blockSpentElsewhere}
       creditsRollOver={false}
       losersLuckActive={losersLuckActive}
+      blockBets={blockBetsProps && <BlockBetsPanel gameId={gameId} {...blockBetsProps} />}
     />
     </div>
   )

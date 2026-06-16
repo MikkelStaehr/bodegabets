@@ -65,7 +65,7 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
   }
 
   return (
-    <div className="mx-auto max-w-[680px] px-4 pt-3">
+    <div className="mt-3">
       <div className="bg-white border border-black/10 rounded-sm overflow-hidden">
         <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-left">
           <span className="text-[14px]">🎯</span>
