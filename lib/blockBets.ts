@@ -65,7 +65,7 @@ export type BlockBetMarket = {
   describe: (matchCount: number) => string
 }
 
-// .5-linje (ingen "push") sat ud fra en rate pr. kamp.
+// .5-linje (ingen "push") sat ud fra en rate pr. kamp (data-drevet fra VM).
 const halfLine = (matchCount: number, perMatch: number) => Math.floor(matchCount * perMatch) + 0.5
 const OU = (line: number): BlockBetSide[] => [
   { value: 'over', label: `Over ${line}`, odds: 1.85 },
@@ -74,53 +74,54 @@ const OU = (line: number): BlockBetSide[] => [
 const ouResolve = (line: (n: number) => number, actual: (s: BlockBetStats) => number) =>
   (s: BlockBetStats): string | null => (s.matchCount === 0 ? null : (actual(s) > line(s.matchCount) ? 'over' : 'under'))
 
+// "Dominans"-markeder: mindst 60% af blokkens kampe samme resultat-type.
+const domThreshold = (n: number) => Math.ceil(n * 0.6)
+const yesNo = (yesOdds: number, noOdds: number): BlockBetSide[] => [
+  { value: 'yes', label: 'Ja', odds: yesOdds },
+  { value: 'no', label: 'Nej', odds: noOdds },
+]
+const domMarket = (
+  key: string, label: string, noun: string, actual: (s: BlockBetStats) => number, yesOdds: number, noOdds: number,
+): BlockBetMarket => ({
+  key, label,
+  sides: () => yesNo(yesOdds, noOdds),
+  actual,
+  resolve: (s) => (s.matchCount === 0 ? null : (actual(s) >= domThreshold(s.matchCount) ? 'yes' : 'no')),
+  describe: (n) => `Mindst 60% (${domThreshold(n)} af ${n}) ${noun} i blokken?`,
+})
+
+// Målfest-tærskel (min. 2 kampe m. 5+ mål for en 8-kamps blok; skalerer).
+const bigGameLine = (n: number) => Math.max(1, Math.round(n * 0.2))
+
 export const BLOCK_BET_MARKETS: BlockBetMarket[] = [
   {
     key: 'goals_ou',
     label: 'Mål i blokken',
-    line: (n) => halfLine(n, 2.6),
-    sides: (n) => OU(halfLine(n, 2.6)),
+    line: (n) => halfLine(n, 2.85),
+    sides: (n) => OU(halfLine(n, 2.85)),
     actual: (s) => s.totalGoals,
-    resolve: ouResolve((n) => halfLine(n, 2.6), (s) => s.totalGoals),
-    describe: (n) => `Samlet antal mål i blokkens ${n} kampe — over/under ${halfLine(n, 2.6)}.`,
+    resolve: ouResolve((n) => halfLine(n, 2.85), (s) => s.totalGoals),
+    describe: (n) => `Samlet antal mål i blokkens ${n} kampe — over/under ${halfLine(n, 2.85)}.`,
   },
-  {
-    key: 'draws_ou',
-    label: 'Uafgjorte',
-    line: (n) => halfLine(n, 0.28),
-    sides: (n) => OU(halfLine(n, 0.28)),
-    actual: (s) => s.draws,
-    resolve: ouResolve((n) => halfLine(n, 0.28), (s) => s.draws),
-    describe: (n) => `Antal uafgjorte kampe i blokken — over/under ${halfLine(n, 0.28)}.`,
-  },
-  {
-    key: 'home_wins_ou',
-    label: 'Hjemmesejre',
-    line: (n) => halfLine(n, 0.45),
-    sides: (n) => OU(halfLine(n, 0.45)),
-    actual: (s) => s.homeWins,
-    resolve: ouResolve((n) => halfLine(n, 0.45), (s) => s.homeWins),
-    describe: (n) => `Antal hjemmesejre i blokken — over/under ${halfLine(n, 0.45)}.`,
-  },
+  domMarket('home_dom', 'Hjemme-dominans', 'hjemmesejre', (s) => s.homeWins, 4.0, 1.25),
+  domMarket('draw_dom', 'Uafgjort-dominans', 'uafgjorte', (s) => s.draws, 4.5, 1.22),
+  domMarket('away_dom', 'Ude-dominans', 'udesejre', (s) => s.awayWins, 6.0, 1.15),
   {
     key: 'clean_sheets_ou',
     label: 'Clean sheets',
-    line: (n) => halfLine(n, 0.6),
-    sides: (n) => OU(halfLine(n, 0.6)),
+    line: (n) => halfLine(n, 0.42),
+    sides: (n) => OU(halfLine(n, 0.42)),
     actual: (s) => s.cleanSheets,
-    resolve: ouResolve((n) => halfLine(n, 0.6), (s) => s.cleanSheets),
-    describe: (n) => `Antal clean sheets (hold der holdt buret rent) — over/under ${halfLine(n, 0.6)}.`,
+    resolve: ouResolve((n) => halfLine(n, 0.42), (s) => s.cleanSheets),
+    describe: (n) => `Clean sheets (hold der holdt buret rent) — over/under ${halfLine(n, 0.42)}.`,
   },
   {
     key: 'big_game',
-    label: 'Måfest',
-    sides: () => [
-      { value: 'yes', label: 'Ja', odds: 1.5 },
-      { value: 'no', label: 'Nej', odds: 2.4 },
-    ],
+    label: 'Målfest',
+    sides: () => yesNo(2.3, 1.6),
     actual: (s) => s.bigGames,
-    resolve: (s) => (s.matchCount === 0 ? null : (s.bigGames >= 1 ? 'yes' : 'no')),
-    describe: () => 'Mindst én kamp i blokken med 5+ mål?',
+    resolve: (s) => (s.matchCount === 0 ? null : (s.bigGames >= bigGameLine(s.matchCount) ? 'yes' : 'no')),
+    describe: (n) => `Mindst ${bigGameLine(n)} kampe i blokken med 5+ mål?`,
   },
 ]
 
