@@ -159,7 +159,7 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   // Håndhæv 1000-loftet: allerede-placerede indsatser i budgettet (på kampe der
   // IKKE erstattes i denne submission) + de nye indsatser må ikke overstige 1000.
-  const budgetCap = 1000
+  const budgetCap = 1250
   const newPayloadStake = bets.reduce((sum, b) => sum + (b.stake ?? 0), 0)
   const { data: existingBudgetBets } = await supabaseAdmin
     .from('bets')
@@ -167,10 +167,15 @@ export async function POST(req: NextRequest, { params }: Props) {
     .eq('user_id', user.id)
     .eq('game_id', bodyGameId)
     .in('round_id', budgetRoundIds)
-  const existingBudgetStake = (existingBudgetBets ?? [])
+  let existingBudgetStake = (existingBudgetBets ?? [])
     .filter((b) => !payloadMatchIds.includes(b.match_id as number))
     .reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  // Blok Bets har deres eget låste 250-budget og tæller IKKE mod de 1000 her.
+  // Blok Bets deler det fælles blok-budget (1250) — tæl deres indsats med.
+  if (creditsPerBlock && roundBlockId) {
+    const { data: blockBetRows } = await supabaseAdmin
+      .from('block_bets').select('stake').eq('user_id', user.id).eq('game_id', bodyGameId).eq('block_id', roundBlockId)
+    existingBudgetStake += (blockBetRows ?? []).reduce((sum, b) => sum + (b.stake ?? 0), 0)
+  }
   if (existingBudgetStake + newPayloadStake > budgetCap) {
     const scope = creditsPerBlock ? 'blokken' : 'runden'
     return NextResponse.json(

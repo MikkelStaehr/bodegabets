@@ -58,7 +58,7 @@ export default async function RoundPage({ params }: Props) {
   if (!round) notFound()
   if (!membership) redirect(`/games/${gameId}`)
 
-  // Slutrunde-credit-model: 1000 credits PR. BLOK (delt over blokkens 2 runder)
+  // Slutrunde-credit-model: 1250 credits PR. BLOK (delt over blokkens 2 runder + Blok Bets)
   // i stedet for pr. runde. Kun aktivt for sæsoner med credits_per_block (VM).
   const roundSeasonId = (round as typeof round & { season_id: number }).season_id
   const { data: seasonRow } = await supabaseAdmin
@@ -82,7 +82,10 @@ export default async function RoundPage({ params }: Props) {
   const roundBlockId = (round as typeof round & { block_id?: number | null }).block_id ?? null
   let blockInfo: { block_number: number; block_name: string; is_last_in_block: boolean } | null = null
   let couponRoundIds: number[] = [roundIdNum]
-  const blockSpentElsewhere = 0
+  // Blok bets deler blokkens samlede budget (1250) med kamp-bets. Da blok bets
+  // placeres separat (eget panel), behandles deres indsats som "allerede brugt"
+  // når kamp-kuponens rådige credits beregnes. Sættes nedenfor.
+  let blockSpentElsewhere = 0
   if (roundBlockId) {
     const [{ data: block }, { data: blockRounds }] = await Promise.all([
       supabaseAdmin.from('blocks').select('id, block_number, name').eq('id', roundBlockId).single(),
@@ -179,14 +182,16 @@ export default async function RoundPage({ params }: Props) {
   const typedBets = (betsData ?? []) as Bet[]
 
   // Blok Bets — brugerens placerede + om de stadig kan placeres (blokken er
-  // ikke gået i gang). Eget låst 250-budget, uafhængigt af de 1000 til kamp-bets.
+  // ikke gået i gang). Deler blokkens 1250-budget med kamp-bets.
   let blockBetsProps:
-    | { blockId: number; blockName: string; matchCount: number; initialBets: { market_key: string; selection: string; stake: number }[]; placeable: boolean }
+    | { blockId: number; blockName: string; matchCount: number; initialBets: { market_key: string; selection: string; stake: number }[]; placeable: boolean; spentOnMatches: number }
     | null = null
   if (creditsPerBlock && roundBlockId && blockInfo) {
     const { data: bbets } = await supabaseAdmin
       .from('block_bets').select('market_key, selection, stake')
       .eq('game_id', gameId).eq('user_id', user.id).eq('block_id', roundBlockId)
+    // Blok-bet-indsats tæller mod det fælles budget → træk fra kamp-kuponen.
+    blockSpentElsewhere = (bbets ?? []).reduce((s, b) => s + ((b.stake as number) ?? 0), 0)
     const earliest = [...matches].sort((a, b) => String(a.kickoff_at).localeCompare(String(b.kickoff_at)))[0]
     blockBetsProps = {
       blockId: roundBlockId,
@@ -194,6 +199,7 @@ export default async function RoundPage({ params }: Props) {
       matchCount: matches.length,
       initialBets: (bbets ?? []).map((b) => ({ market_key: b.market_key as string, selection: b.selection as string, stake: b.stake as number })),
       placeable: (earliest?.bet_open ?? false) === true,
+      spentOnMatches: typedBets.reduce((s, b) => s + (b.stake ?? 0), 0),
     }
   }
 
@@ -305,7 +311,7 @@ export default async function RoundPage({ params }: Props) {
       totalMatchesInRound={matches.length}
       betDistribution={betDistribution}
       blockInfo={blockInfo}
-      blockBudget={1000}
+      blockBudget={1250}
       blockSpentElsewhere={blockSpentElsewhere}
       creditsRollOver={false}
       losersLuckActive={losersLuckActive}

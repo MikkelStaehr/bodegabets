@@ -1262,7 +1262,7 @@ export default function AfgivBets({
                 {/* Blok-kontekst: forklar at budgettet deles over blokkens 2 runder */}
                 {blockSpentElsewhere > 0 && (
                   <p className="mt-1 text-[9px] text-[var(--color-warm-taupe)] leading-tight">
-                    Blok-budget {blockBudget} · brugt i blokkens anden runde: {blockSpentElsewhere}
+                    Blok-budget {blockBudget} · brugt på Blok Bets: {blockSpentElsewhere}
                   </p>
                 )}
                 {/* Maxe ud / læg-i-spil-knap når der er credits tilbage */}
