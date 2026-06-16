@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { scoreBlockBets } from '@/lib/scoreBlockBets'
 
 /**
  * Opdaterer status på blocks baseret på runders status.
@@ -49,6 +50,13 @@ export async function updateBlockStatuses(seasonId: number): Promise<void> {
 
       if (error) {
         console.error(`[updateBlockStatuses] Fejl ved opdatering af block ${block.id} → ${newStatus}:`, error.message)
+      } else if (newStatus === 'finished') {
+        // Blokken er færdigspillet → afgør evt. Blok Bets på de samlede stats.
+        try {
+          await scoreBlockBets(block.id as number)
+        } catch (e) {
+          console.error(`[updateBlockStatuses] scoreBlockBets fejl for block ${block.id}:`, e)
+        }
       }
     }
   }
