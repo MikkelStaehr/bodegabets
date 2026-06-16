@@ -1261,6 +1261,49 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     return t
   }
 
+  // 🎯 Blok Bets — AFGJORTE blok-bets tæller med i blok-/sæson-stillingen.
+  // Settlement sker når HELE blokken er færdig (scoreBlockBets), så vi knytter
+  // point til blokkens SIDSTE runde: blok-bet-point opfører sig som en klump der
+  // lander på den runde → pile/baseline/sæson forbliver konsistente med kamp-bets.
+  const { data: blockBets } = await supabaseAdmin
+    .from('block_bets').select('block_id, user_id, stake, result, points_earned').eq('game_id', gameId)
+  // bb*[blockId][user]
+  const bbPts = new Map<number, Map<string, number>>()
+  const bbProfit = new Map<number, Map<string, number>>()
+  const bbWon = new Map<number, Map<string, number>>()
+  const bbLost = new Map<number, Map<string, number>>()
+  const bbStaked = new Map<number, Map<string, number>>()
+  const bbBump = (mp: Map<number, Map<string, number>>, bid: number, uid: string, v: number) => {
+    if (!mp.has(bid)) mp.set(bid, new Map())
+    const m = mp.get(bid)!
+    m.set(uid, (m.get(uid) ?? 0) + v)
+  }
+  for (const r of blockBets ?? []) {
+    if (r.result !== 'win' && r.result !== 'loss') continue
+    const bid = r.block_id as number, uid = r.user_id as string
+    const stake = Number(r.stake) || 0, pts = Number(r.points_earned) || 0
+    bbBump(bbPts, bid, uid, pts)
+    bbBump(bbProfit, bid, uid, pts - stake)
+    bbBump(bbStaked, bid, uid, stake)
+    bbBump(r.result === 'win' ? bbWon : bbLost, bid, uid, 1)
+  }
+  const bbGet = (mp: Map<number, Map<string, number>>, bid: number, uid: string) => mp.get(bid)?.get(uid) ?? 0
+  // Blokkens sidste runde (settlement-runden for dens blok-bets).
+  const blockLastRound = new Map<number, number>()
+  for (const b of allBlocks) {
+    const rids = (rounds ?? []).filter((r) => r.block_id === b.id).map((r) => r.id as number)
+    if (rids.length) blockLastRound.set(b.id, Math.max(...rids))
+  }
+  // Sum et blok-bet-map over de blokke hvis SIDSTE runde ligger i runde-sættet.
+  const bbSumInSet = (mp: Map<number, Map<string, number>>, uid: string, set: Set<number>) => {
+    let t = 0
+    for (const b of allBlocks) {
+      const last = blockLastRound.get(b.id)
+      if (last != null && set.has(last)) t += bbGet(mp, b.id, uid)
+    }
+    return t
+  }
+
   // mvp_count (alle afgjorte runder)
   const mvpCount = new Map<string, number>()
   const ptsByRound = new Map<number, Map<string, number>>()
@@ -1283,7 +1326,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
       const blockRounds = (rounds ?? []).filter((r) => r.block_id === b.id).map((r) => r.id as number)
       if (blockRounds.length === 0 || !blockRounds.every((rid) => counted.has(rid))) continue
       const tot = new Map<string, number>()
-      for (const uid of userIds) tot.set(uid, sumOver(earnings, uid, new Set(blockRounds)))
+      for (const uid of userIds) tot.set(uid, sumOver(earnings, uid, new Set(blockRounds)) + bbGet(bbPts, b.id, uid))
       let max = 0
       for (const v of tot.values()) if (v > max) max = v
       if (max > 0) for (const [u, v] of tot) if (v === max) wins.set(u, (wins.get(u) ?? 0) + 1)
@@ -1345,7 +1388,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   // ── SÆSON: rangér efter blokke vundet, så samlet point ──
   const seasonWinsNow = blockWinsFor(finishedRoundIds)
   const seasonWinsPrev = blockWinsFor(prevFinished)
-  const seasonPts = (u: string, set: Set<number>) => sumOver(earnings, u, set)
+  const seasonPts = (u: string, set: Set<number>) => sumOver(earnings, u, set) + bbSumInSet(bbPts, u, set)
   const seasonNow = rankBy((u) => [seasonWinsNow.get(u) ?? 0, seasonPts(u, scoredRoundIds)])
   const seasonPrev = rankBy((u) => [seasonWinsPrev.get(u) ?? 0, seasonPts(u, prevScored)])
 
@@ -1356,7 +1399,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
   if (latestBlock) {
     const brIds = new Set((rounds ?? []).filter((r) => r.block_id === latestBlock.id).map((r) => r.id as number))
     const tot = new Map<string, number>()
-    for (const uid of userIds) tot.set(uid, sumOver(earnings, uid, brIds))
+    for (const uid of userIds) tot.set(uid, sumOver(earnings, uid, brIds) + bbGet(bbPts, latestBlock.id, uid))
     let max = 0
     for (const v of tot.values()) if (v > max) max = v
     if (max > 0) for (const [u, v] of tot) if (v === max) wonLatestBlock.add(u)
@@ -1368,13 +1411,13 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     rank: seasonNow.rankMap.get(u)!,
     rank_delta: latestScored != null ? (seasonPrev.rankMap.get(u)! - seasonNow.rankMap.get(u)!) : 0,
     points: Math.round(seasonPts(u, scoredRoundIds) * 10) / 10,
-    profit: Math.round(sumOver(betProfit, u, scoredRoundIds) * 10) / 10,
+    profit: Math.round((sumOver(betProfit, u, scoredRoundIds) + bbSumInSet(bbProfit, u, scoredRoundIds)) * 10) / 10,
     mvp_count: mvpCount.get(u) ?? 0,
     block_wins: seasonWinsNow.get(u) ?? 0,
     won_latest_block: wonLatestBlock.has(u),
-    won_bets: sumOver(wonMap, u, scoredRoundIds),
-    lost_bets: sumOver(lostMap, u, scoredRoundIds),
-    staked: Math.round(sumOver(stakedMap, u, scoredRoundIds) * 10) / 10,
+    won_bets: sumOver(wonMap, u, scoredRoundIds) + bbSumInSet(bbWon, u, scoredRoundIds),
+    lost_bets: sumOver(lostMap, u, scoredRoundIds) + bbSumInSet(bbLost, u, scoredRoundIds),
+    staked: Math.round((sumOver(stakedMap, u, scoredRoundIds) + bbSumInSet(bbStaked, u, scoredRoundIds)) * 10) / 10,
     latest_round_zero: seasonZero.has(u),
     latest_round_match_wins: matchWinsLatest.get(u) ?? 0,
     losers_luck: losersLuckSet.has(u),
@@ -1393,6 +1436,11 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     const latestInBlock = blockScored.size ? Math.max(...blockScored) : null
     const blockPrevScored = new Set(blockScored)
     if (latestInBlock != null) blockPrevScored.delete(latestInBlock)
+    // Blok-bets afgøres på blokkens sidste runde → medregn kun når den runde er
+    // i sættet (så baseline/pile afspejler blok-bet-svinget når blokken lukker).
+    const lastRid = blockLastRound.get(blk.id)
+    const bbIn = (mp: Map<number, Map<string, number>>, u: string, set: Set<number>) =>
+      lastRid != null && set.has(lastRid) ? bbGet(mp, blk.id, u) : 0
     // Klovne/helte hører til den seneste afgjorte runde — vis dem på den blok
     // der INDEHOLDER den runde (uanset om blokken er aktiv eller afsluttet). En
     // netop åbnet blok uden scorede runder arver derfor IKKE forrige bloks
@@ -1401,25 +1449,25 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
 
     // Vinder(e) for afgjort blok = højest profit (inkl. delt sejr).
     let maxPts = 0
-    if (isFinished) for (const u of userIds) { const p = sumOver(earnings, u, blockScored); if (p > maxPts) maxPts = p }
+    if (isFinished) for (const u of userIds) { const p = sumOver(earnings, u, blockScored) + bbIn(bbPts, u, blockScored); if (p > maxPts) maxPts = p }
 
-    const bNow = rankBy((u) => [sumOver(earnings, u, blockScored), 0])
-    const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevScored), 0])
+    const bNow = rankBy((u) => [sumOver(earnings, u, blockScored) + bbIn(bbPts, u, blockScored), 0])
+    const bPrev = rankBy((u) => [sumOver(earnings, u, blockPrevScored) + bbIn(bbPts, u, blockPrevScored), 0])
     const rows: LbTabRow[] = bNow.sorted.map((u) => {
-      const pts = sumOver(earnings, u, blockScored)
+      const pts = sumOver(earnings, u, blockScored) + bbIn(bbPts, u, blockScored)
       return {
         user_id: u,
         username: usernameById.get(u)!,
         rank: bNow.rankMap.get(u)!,
         rank_delta: latestInBlock != null ? (bPrev.rankMap.get(u)! - bNow.rankMap.get(u)!) : 0,
         points: Math.round(pts * 10) / 10,
-        profit: Math.round(sumOver(betProfit, u, blockScored) * 10) / 10,
+        profit: Math.round((sumOver(betProfit, u, blockScored) + bbIn(bbProfit, u, blockScored)) * 10) / 10,
         mvp_count: 0,
         block_wins: 0,
         won_latest_block: false,
-        won_bets: sumOver(wonMap, u, blockScored),
-        lost_bets: sumOver(lostMap, u, blockScored),
-        staked: Math.round(sumOver(stakedMap, u, blockScored) * 10) / 10,
+        won_bets: sumOver(wonMap, u, blockScored) + bbIn(bbWon, u, blockScored),
+        lost_bets: sumOver(lostMap, u, blockScored) + bbIn(bbLost, u, blockScored),
+        staked: Math.round((sumOver(stakedMap, u, blockScored) + bbIn(bbStaked, u, blockScored)) * 10) / 10,
         // Klovne/helte = kun når seneste afgjorte runde ligger i denne blok.
         // Losers Luck = den aktive bloks beneficienter (vises også før scoring).
         latest_round_zero: showLiveFlavor ? seasonZero.has(u) : false,

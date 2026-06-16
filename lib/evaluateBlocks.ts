@@ -115,18 +115,22 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
 
     // Summér earnings_delta per bruger per spil
     const totals = new Map<string, { user_id: string; game_id: number; total: number }>()
-    for (const score of scores) {
-      const key = `${score.user_id}:${score.game_id}`
+    const addTotal = (user_id: string, game_id: number, delta: number) => {
+      const key = `${user_id}:${game_id}`
       const existing = totals.get(key)
-      if (existing) {
-        existing.total += score.earnings_delta ?? 0
-      } else {
-        totals.set(key, {
-          user_id: score.user_id,
-          game_id: score.game_id,
-          total: score.earnings_delta ?? 0,
-        })
-      }
+      if (existing) existing.total += delta
+      else totals.set(key, { user_id, game_id, total: delta })
+    }
+    for (const score of scores) addTotal(score.user_id, score.game_id, score.earnings_delta ?? 0)
+
+    // 🎯 Blok Bets tæller med i blok-vinderen (samme som live-leaderboardet).
+    const { data: blockBets } = await supabaseAdmin
+      .from('block_bets')
+      .select('user_id, game_id, points_earned, result')
+      .eq('block_id', block.id)
+    for (const bb of blockBets ?? []) {
+      if (bb.result !== 'win' && bb.result !== 'loss') continue
+      addTotal(bb.user_id as string, bb.game_id as number, Number(bb.points_earned) || 0)
     }
 
     // Gruppér per spil og find vinder(e)
