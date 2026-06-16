@@ -179,9 +179,9 @@ export default async function RoundPage({ params }: Props) {
   const typedBets = (betsData ?? []) as Bet[]
 
   // Blok Bets — brugerens placerede + om de stadig kan placeres (blokken er
-  // ikke gået i gang). Deler blokkens 1000-budget med kamp-bets.
+  // ikke gået i gang). Eget låst 250-budget, uafhængigt af de 1000 til kamp-bets.
   let blockBetsProps:
-    | { blockId: number; blockName: string; matchCount: number; initialBets: { market_key: string; selection: string; stake: number }[]; placeable: boolean; spentOnMatches: number }
+    | { blockId: number; blockName: string; matchCount: number; initialBets: { market_key: string; selection: string; stake: number }[]; placeable: boolean }
     | null = null
   if (creditsPerBlock && roundBlockId && blockInfo) {
     const { data: bbets } = await supabaseAdmin
@@ -194,7 +194,6 @@ export default async function RoundPage({ params }: Props) {
       matchCount: matches.length,
       initialBets: (bbets ?? []).map((b) => ({ market_key: b.market_key as string, selection: b.selection as string, stake: b.stake as number })),
       placeable: (earliest?.bet_open ?? false) === true,
-      spentOnMatches: typedBets.reduce((s, b) => s + (b.stake ?? 0), 0),
     }
   }
 
