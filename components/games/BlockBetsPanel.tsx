@@ -15,13 +15,12 @@ type Props = {
   initialBets: BlockBetPick[]
   /** Kan der stadig placeres (blokken er ikke gået i gang)? */
   placeable: boolean
-  /** Credits brugt på kamp-bets i blokken (til "tilbage"-visning). */
-  spentOnMatches: number
 }
 
-const BUDGET = 1000
+// Blok Bets har deres eget låste budget — adskilt fra de 1000 til kamp-bets.
+const BUDGET = 250
 
-export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount, initialBets, placeable, spentOnMatches }: Props) {
+export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount, initialBets, placeable }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(initialBets.length > 0 || placeable)
   const [picks, setPicks] = useState<Record<string, { selection: string; stake: number }>>(() => {
@@ -33,7 +32,7 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const blockTotal = useMemo(() => Object.values(picks).reduce((s, p) => s + (p.stake || 0), 0), [picks])
-  const remaining = BUDGET - spentOnMatches - blockTotal
+  const remaining = BUDGET - blockTotal
 
   function toggle(marketKey: string, selection: string) {
     if (!placeable) return
@@ -72,7 +71,7 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
           <span className="text-[14px]">🎯</span>
           <span className="flex-1">
             <span className="block font-condensed text-[14px] font-bold text-[var(--color-dark-green)] tracking-wide uppercase">Blok Bets</span>
-            <span className="block text-[10px] text-[var(--color-warm-taupe)]">{blockName} · hele blokken samlet{placeable ? '' : ' · låst'}</span>
+            <span className="block text-[10px] text-[var(--color-warm-taupe)]">{blockName} · {BUDGET} ekstra credits låst til blok bets{placeable ? '' : ' · låst'}</span>
           </span>
           <span className={`text-[10px] text-[var(--color-warm-taupe)] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
         </button>
@@ -123,7 +122,7 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
             {placeable ? (
               <div className="flex items-center justify-between gap-3 mt-0.5">
                 <span className="text-[11px] text-[var(--color-warm-taupe)]">
-                  Blok Bets: <strong className="text-[var(--color-dark-green)]">{blockTotal}</strong> · tilbage i blokken: <strong className={remaining < 0 ? 'text-[var(--color-red-dark)]' : 'text-[var(--color-dark-green)]'}>{remaining}</strong>
+                  Brugt: <strong className="text-[var(--color-dark-green)]">{blockTotal}</strong> · tilbage af {BUDGET}: <strong className={remaining < 0 ? 'text-[var(--color-red-dark)]' : 'text-[var(--color-dark-green)]'}>{remaining}</strong>
                 </span>
                 <button type="button" onClick={save} disabled={saving || remaining < 0}
                   className="h-[36px] px-4 rounded-sm bg-gold text-[var(--color-dark-green)] font-condensed text-[13px] font-bold tracking-wider disabled:opacity-50 hover:bg-[#d4aa55] transition-colors">

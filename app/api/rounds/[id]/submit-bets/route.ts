@@ -167,15 +167,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     .eq('user_id', user.id)
     .eq('game_id', bodyGameId)
     .in('round_id', budgetRoundIds)
-  let existingBudgetStake = (existingBudgetBets ?? [])
+  const existingBudgetStake = (existingBudgetBets ?? [])
     .filter((b) => !payloadMatchIds.includes(b.match_id as number))
     .reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  // Blok Bets deler samme blok-budget — tæl deres indsats med.
-  if (creditsPerBlock && roundBlockId) {
-    const { data: blockBetRows } = await supabaseAdmin
-      .from('block_bets').select('stake').eq('user_id', user.id).eq('game_id', bodyGameId).eq('block_id', roundBlockId)
-    existingBudgetStake += (blockBetRows ?? []).reduce((sum, b) => sum + (b.stake ?? 0), 0)
-  }
+  // Blok Bets har deres eget låste 250-budget og tæller IKKE mod de 1000 her.
   if (existingBudgetStake + newPayloadStake > budgetCap) {
     const scope = creditsPerBlock ? 'blokken' : 'runden'
     return NextResponse.json(
