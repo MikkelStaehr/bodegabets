@@ -3,10 +3,10 @@ import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { rateLimit, getIp } from '@/lib/rateLimit'
 import { getBlockBetMarket } from '@/lib/blockBets'
 
-// Blok Bets har deres EGET låste budget (250) pr. blok — uafhængigt af de 1000
-// credits til kamp-bets. Legacy-runder bruges kun til at finde blokkens kampe.
+// Blok Bets deler blokkens samlede budget (1250) med kamp-bets — spilleren
+// fordeler frit. Legacy-runder tæller ikke med (samme som submit-bets).
 const LEGACY_PRE_BLOCK_ROUND_IDS = [36175, 36177]
-const BLOCK_BET_BUDGET = 250
+const BLOCK_BUDGET = 1250
 
 type Props = { params: Promise<{ id: string }> }
 type BlockBetInput = { market_key: string; selection: string; stake: number }
@@ -72,11 +72,13 @@ export async function POST(req: NextRequest, { params }: Props) {
     rows.push({ block_id: blockId, game_id: gameId, user_id: user.id, market_key: b.market_key, selection: b.selection, stake: b.stake, odds: side.odds, result: 'pending' })
   }
 
-  // Budget: Blok Bets har deres eget låste 250-budget — uafhængigt af kamp-bets.
-  // Da vi erstatter hele sættet, er newBlockStake brugerens nye samlede forbrug.
-  if (newBlockStake > BLOCK_BET_BUDGET) {
+  // Budget: kamp-bet-indsats i blokken + nye Blok Bets ≤ 1250 (fælles pulje).
+  const { data: matchBets } = await supabaseAdmin
+    .from('bets').select('stake').eq('user_id', user.id).eq('game_id', gameId).in('round_id', budgetRoundIds)
+  const matchStake = (matchBets ?? []).reduce((s, b) => s + (b.stake ?? 0), 0)
+  if (matchStake + newBlockStake > BLOCK_BUDGET) {
     return NextResponse.json(
-      { error: `Du kan højst bruge ${BLOCK_BET_BUDGET} credits på Blok Bets.` },
+      { error: `Du kan højst bruge ${BLOCK_BUDGET} credits i blokken. Du har ${Math.max(0, BLOCK_BUDGET - matchStake)} tilbage.` },
       { status: 400 }
     )
   }

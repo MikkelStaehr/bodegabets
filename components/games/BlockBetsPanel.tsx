@@ -15,12 +15,14 @@ type Props = {
   initialBets: BlockBetPick[]
   /** Kan der stadig placeres (blokken er ikke gået i gang)? */
   placeable: boolean
+  /** Credits brugt på kamp-bets i blokken (deler det fælles budget). */
+  spentOnMatches: number
 }
 
-// Blok Bets har deres eget låste budget — adskilt fra de 1000 til kamp-bets.
-const BUDGET = 250
+// Blok Bets deler blokkens samlede budget med kamp-bets — spilleren fordeler frit.
+const BUDGET = 1250
 
-export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount, initialBets, placeable }: Props) {
+export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount, initialBets, placeable, spentOnMatches }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(initialBets.length > 0 || placeable)
   const [picks, setPicks] = useState<Record<string, { selection: string; stake: number }>>(() => {
@@ -32,7 +34,7 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const blockTotal = useMemo(() => Object.values(picks).reduce((s, p) => s + (p.stake || 0), 0), [picks])
-  const remaining = BUDGET - blockTotal
+  const remaining = BUDGET - spentOnMatches - blockTotal
 
   function toggle(marketKey: string, selection: string) {
     if (!placeable) return
@@ -71,7 +73,7 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
           <span className="text-[14px]">🎯</span>
           <span className="flex-1">
             <span className="block font-condensed text-[14px] font-bold text-[var(--color-dark-green)] tracking-wide uppercase">Blok Bets</span>
-            <span className="block text-[10px] text-[var(--color-warm-taupe)]">{blockName} · {BUDGET} ekstra credits låst til blok bets{placeable ? '' : ' · låst'}</span>
+            <span className="block text-[10px] text-[var(--color-warm-taupe)]">{blockName} · deler blokkens {BUDGET} credits{placeable ? '' : ' · låst'}</span>
           </span>
           <span className={`text-[10px] text-[var(--color-warm-taupe)] transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
         </button>

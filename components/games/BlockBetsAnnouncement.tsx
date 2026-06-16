@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
  * markederne → reglerne. Vises ÉN gang pr. browser, efter VM-regel-beskeden.
  * Nøglen er versioneret. Renderes kun for blok-modellen (gates i page.tsx).
  */
-const SEEN_KEY = 'bodega_vm_block_bets_seen_v2'
+const SEEN_KEY = 'bodega_vm_block_bets_seen_v3'
 // Vis først Blok Bets-nyheden når regel-beskeden er set (så de ikke stabler).
 const RULES_SEEN_KEY = 'bodega_vm_leaderboard_seen_v6'
 const TOTAL_PAGES = 2
@@ -58,8 +58,8 @@ export default function BlockBetsAnnouncement() {
             <>
               <p className="font-body text-[14px] text-ink leading-relaxed">
                 Helt nye bets der dækker <strong>hele blokken på én gang</strong> — ikke bare en
-                enkelt kamp. Og det bedste: du får <strong>250 ekstra credits pr. blok</strong>,
-                der er <strong>låst til Blok Bets</strong>:
+                enkelt kamp. Og du får <strong>250 ekstra credits oveni</strong>, så du har
+                <strong> 1250 i alt pr. blok</strong>:
               </p>
               <MarketsIllustration />
               <ul className="space-y-2.5">
@@ -87,9 +87,9 @@ export default function BlockBetsAnnouncement() {
                 Fire ting at huske, så du spiller dem rigtigt:
               </p>
               <ul className="space-y-3">
-                <RuleItem icon="🎁" title="250 ekstra credits — gratis">
-                  Du får <strong>250 ekstra credits pr. blok der KUN kan bruges på Blok Bets</strong>
-                  — helt adskilt fra dine 1000 til kamp-bets. Brug dem, eller mist dem.
+                <RuleItem icon="🎁" title="250 ekstra credits — 1250 i alt">
+                  Dit blok-budget er hævet fra 1000 til <strong>1250 credits</strong>. De ekstra
+                  250 kan du <strong>frit bruge på kampe og/eller Blok Bets</strong> — du fordeler selv.
                 </RuleItem>
                 <RuleItem icon="🔒" title="Lægges før blokken går i gang">
                   Du sætter dem ved blok-start. De <strong>låses</strong>, så snart blokkens første
@@ -105,7 +105,7 @@ export default function BlockBetsAnnouncement() {
                 </RuleItem>
               </ul>
               <p className="font-body text-[12.5px] text-warm-gray leading-snug text-center pt-1">
-                Klar fra <strong className="text-forest">blok 4</strong> — du finder dem øverst på kuponen 🎯
+                Klar fra <strong className="text-forest">blok 4</strong> — du finder dem nederst på kuponen 🎯
               </p>
             </>
           )}

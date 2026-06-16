@@ -30,7 +30,7 @@ export default async function VmGuidePage() {
               Grundprincip
             </p>
             <p className="font-display text-[15px] text-cream font-bold tracking-tight">
-              2 spillerunder = 1 blok · 1000 credits pr. blok · højest profit vinder
+              2 spillerunder = 1 blok · 1250 credits pr. blok · højest profit vinder
             </p>
           </div>
         </div>
@@ -49,11 +49,11 @@ export default async function VmGuidePage() {
         </Section>
 
         {/* Credits */}
-        <Section emoji="🎯" title="1000 credits — pr. blok, ikke pr. runde">
+        <Section emoji="🎯" title="1250 credits — pr. blok, ikke pr. runde">
           <p className="mb-3">
-            Du får <strong>1000 credits pr. blok</strong>, som du fordeler hen over blokkens to
-            runder. Det er <strong>ikke</strong> 1000 pr. runde — det er 1000 til hele blokken.
-            Bruger du 700 i første runde, har du 300 tilbage til anden runde.
+            Du får <strong>1250 credits pr. blok</strong>, som du fordeler hen over blokkens to
+            runder — og evt. på Blok Bets. Det er <strong>ikke</strong> 1250 pr. runde — det er
+            1250 til hele blokken. Bruger du 700 i første runde, har du 550 tilbage.
           </p>
           <ul className="space-y-1.5 mb-3">
             <Bullet>Du behøver ikke bruge alt i første runde — du kan gemme til den næste.</Bullet>
@@ -245,7 +245,7 @@ export default async function VmGuidePage() {
         <Section emoji="🚫" title="Profit kan ikke spilles videre">
           <p>
             Din profit er en <strong>score</strong> — ikke credits du kan gen-indsætte. Alle
-            starter hver ny blok med friske 1000 credits. Sådan kan ingen løbe fra feltet på en
+            starter hver ny blok med friske 1250 credits. Sådan kan ingen løbe fra feltet på en
             tidlig storgevinst, og det forbliver fair hele vejen.
           </p>
         </Section>

@@ -63,12 +63,12 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
                 <RuleItem icon="🧱" title="2 spillerunder = 1 blok">
                   Turneringen deles op i blokke på to runder.
                 </RuleItem>
-                <RuleItem icon="🎯" title="1000 credits pr. blok — ikke pr. runde">
-                  Du fordeler dine 1000 credits hen over blokkens to runder. Gem evt. til runde to —
-                  alt det du ikke bruger, er stadig i spil.
+                <RuleItem icon="🎯" title="1250 credits pr. blok — ikke pr. runde">
+                  Du fordeler dine 1250 credits hen over blokkens to runder (og evt. Blok Bets).
+                  Gem evt. til runde to — alt det du ikke bruger, er stadig i spil.
                 </RuleItem>
                 <RuleItem icon="🚫" title="Profit kan ikke spilles videre">
-                  Alle starter hver blok med friske 1000, så ingen stikker af på en tidlig gevinst.
+                  Alle starter hver blok med friske 1250, så ingen stikker af på en tidlig gevinst.
                 </RuleItem>
                 <RuleItem icon="🏅" title="Højest profit vinder blokken">
                   Den med mest profit i blokken får 1 blok-point. Det er blok-point der afgør spillet.
@@ -178,7 +178,7 @@ function RuleItem({ icon, title, children }: { icon: string; title: string; chil
   )
 }
 
-/** 2 runder = 1 blok med ét fælles 1000-credit-budget. */
+/** 2 runder = 1 blok med ét fælles 1250-credit-budget. */
 function BlockIllustration() {
   const blocks = [
     { n: 1, rounds: [1, 2], current: true },
@@ -200,7 +200,7 @@ function BlockIllustration() {
                 </div>
               ))}
             </div>
-            <span className="font-condensed text-[10px] font-bold tracking-[0.04em] text-forest">🎯 1000 credits</span>
+            <span className="font-condensed text-[10px] font-bold tracking-[0.04em] text-forest">🎯 1250 credits</span>
           </div>
         ))}
         <div className="flex items-center pl-0.5">
@@ -208,7 +208,7 @@ function BlockIllustration() {
         </div>
       </div>
       <p className="font-body text-[10.5px] text-warm-gray text-center mt-2 leading-snug">
-        2 spillerunder = 1 blok · de 1000 credits deles i blokken
+        2 spillerunder = 1 blok · de 1250 credits deles i blokken
       </p>
     </div>
   )
