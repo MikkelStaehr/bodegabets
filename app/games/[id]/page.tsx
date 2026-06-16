@@ -10,6 +10,7 @@ import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
 import { CalendarSelectionProvider } from '@/components/games/CalendarSelectionContext'
 import VmRulesAnnouncement from '@/components/games/VmRulesAnnouncement'
+import BlockBetsAnnouncement from '@/components/games/BlockBetsAnnouncement'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
 import CalendarSlider from '@/components/games/CalendarSlider'
 import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
@@ -1364,6 +1365,7 @@ export default async function GamePage({ params }: Props) {
     <GameStateProvider gameId={gameId} initialState={initialGameState}>
     <div className="min-h-screen" style={{ background: '#F2EDE4', fontFamily: "'Barlow', sans-serif" }}>
       {usesBlockCredits && <VmRulesAnnouncement guideHref="/games/vm-guide" />}
+      {usesBlockCredits && <BlockBetsAnnouncement />}
       <NavbarSportTheme sport={typedGame.sport} />
       <GameTicker items={tickerItems} />
 
