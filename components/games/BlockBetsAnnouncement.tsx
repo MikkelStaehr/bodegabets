@@ -166,7 +166,7 @@ function MarketsIllustration() {
   const chips = [
     { icon: '🥅', label: 'Mål i blokken', side: 'Over 22.5', odds: '1.85' },
     { icon: '🏠', label: 'Hjemme-dominans', side: 'Ja', odds: '4.0' },
-    { icon: '🧤', label: 'Clean sheets', side: 'Under 3.5', odds: '1.85' },
+    { icon: '🧤', label: 'Clean sheets', side: 'Over 3.5', odds: '1.85' },
     { icon: '🎉', label: 'Målfest', side: 'Ja', odds: '2.3' },
   ]
   return (
