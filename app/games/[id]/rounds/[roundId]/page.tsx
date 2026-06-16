@@ -184,11 +184,11 @@ export default async function RoundPage({ params }: Props) {
   // Blok Bets — brugerens placerede + om de stadig kan placeres (blokken er
   // ikke gået i gang). Deler blokkens 1250-budget med kamp-bets.
   let blockBetsProps:
-    | { blockId: number; blockName: string; matchCount: number; initialBets: { market_key: string; selection: string; stake: number }[]; placeable: boolean; spentOnMatches: number }
+    | { blockId: number; blockName: string; matchCount: number; initialBets: { market_key: string; selection: string; stake: number; odds?: number }[]; placeable: boolean; spentOnMatches: number }
     | null = null
   if (creditsPerBlock && roundBlockId && blockInfo) {
     const { data: bbets } = await supabaseAdmin
-      .from('block_bets').select('market_key, selection, stake')
+      .from('block_bets').select('market_key, selection, stake, odds')
       .eq('game_id', gameId).eq('user_id', user.id).eq('block_id', roundBlockId)
     // Blok-bet-indsats tæller mod det fælles budget → træk fra kamp-kuponen.
     blockSpentElsewhere = (bbets ?? []).reduce((s, b) => s + ((b.stake as number) ?? 0), 0)
@@ -197,7 +197,7 @@ export default async function RoundPage({ params }: Props) {
       blockId: roundBlockId,
       blockName: blockInfo.block_name ?? `Blok ${blockInfo.block_number}`,
       matchCount: matches.length,
-      initialBets: (bbets ?? []).map((b) => ({ market_key: b.market_key as string, selection: b.selection as string, stake: b.stake as number })),
+      initialBets: (bbets ?? []).map((b) => ({ market_key: b.market_key as string, selection: b.selection as string, stake: b.stake as number, odds: b.odds as number | undefined })),
       placeable: (earliest?.bet_open ?? false) === true,
       spentOnMatches: typedBets.reduce((s, b) => s + (b.stake ?? 0), 0),
     }

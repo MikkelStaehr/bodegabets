@@ -6,7 +6,7 @@ import { computeBlockBetStats, getBlockBetMarket, type BlockMatchRow } from '@/l
  * kampe finished). Markeder afgøres på de samlede stats, så vi scorer først
  * når hele blokken er spillet — ikke undervejs. Idempotent (sætter absolut).
  *
- * Gevinst = indsats × odds (faste odds gemt på bettet ved placering).
+ * Gevinst = indsats × odds (konsensus-odds sat ved lås; base-odds som fallback).
  */
 export async function scoreBlockBets(blockId: number): Promise<number> {
   const { data: rounds } = await supabaseAdmin.from('rounds').select('id').eq('block_id', blockId)

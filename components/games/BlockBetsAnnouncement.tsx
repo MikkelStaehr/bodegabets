@@ -161,13 +161,13 @@ function RuleItem({ icon, title, children }: { icon: string; title: string; chil
   )
 }
 
-/** Lille mock af Blok Bets-panelet — markeds-chips med eksempel-odds. */
+/** Lille mock af Blok Bets-panelet — markeds-chips (odds = konsensus ved lås). */
 function MarketsIllustration() {
   const chips = [
-    { icon: '🥅', label: 'Mål i blokken', side: 'Over 22.5', odds: '1.85' },
-    { icon: '🏠', label: 'Hjemme-dominans', side: 'Ja', odds: '4.0' },
-    { icon: '🧤', label: 'Clean sheets', side: 'Over 3.5', odds: '1.85' },
-    { icon: '🎉', label: 'Målfest', side: 'Ja', odds: '2.3' },
+    { icon: '🥅', label: 'Mål i blokken', side: 'Over 22.5' },
+    { icon: '🏠', label: 'Hjemme-dominans', side: 'Ja' },
+    { icon: '🧤', label: 'Clean sheets', side: 'Over 3.5' },
+    { icon: '🎉', label: 'Målfest', side: 'Ja' },
   ]
   return (
     <div className="bg-white border border-warm-border rounded-sm p-3">
@@ -184,7 +184,6 @@ function MarketsIllustration() {
               <p className="font-condensed text-[9.5px] font-bold text-forest leading-tight truncate">{c.label}</p>
               <p className="font-condensed text-[8.5px] text-warm-gray leading-tight">{c.side}</p>
             </div>
-            <span className="font-condensed text-[10px] font-extrabold text-forest shrink-0">@{c.odds}</span>
           </div>
         ))}
       </div>

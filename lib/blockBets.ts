@@ -46,7 +46,24 @@ export function computeBlockBetStats(matches: BlockMatchRow[]): BlockBetStats {
   return s
 }
 
-export type BlockBetSide = { value: string; label: string; odds: number }
+export type BlockBetSide = { value: string; label: string }
+
+// Konsensus-odds — SAMME limits som kamp-bets (match_result: 1.2–1.8). Odds er
+// ikke faste, men beregnes ved lås ud fra hvor mange der backede markedet:
+// populært valg → lavere odds (ned mod 1.2), upopulært → op mod 1.8.
+export const BLOCK_BET_MIN_ODDS = 1.2
+export const BLOCK_BET_BASE_ODDS = 1.8
+
+/**
+ * Konsensus-odds for et Blok Bet-marked. `backers` = antal der lagde dette
+ * marked, `participants` = antal spillere der lagde mindst ét Blok Bet i
+ * blokken (pr. spil). Spejler kamp-formlen: max(1.2, 1.8 − pct·0.6).
+ */
+export function blockBetConsensusOdds(backers: number, participants: number): number {
+  if (participants === 0 || backers === 0) return BLOCK_BET_BASE_ODDS
+  const pct = backers / participants
+  return Math.round(Math.max(BLOCK_BET_MIN_ODDS, BLOCK_BET_BASE_ODDS - pct * 0.6) * 100) / 100
+}
 
 export type BlockBetMarket = {
   key: string
@@ -70,23 +87,23 @@ const halfLine = (matchCount: number, perMatch: number) => Math.floor(matchCount
 // Markederne er ENSIDEDE: kun den positive forudsigelse (Over/Ja) kan spilles —
 // "Under N mål" / "Nej til dominans" giver ikke mening som selvstændigt bet.
 // resolve returnerer stadig over/under (hhv. yes/no), så et 'over'-bet taber
-// korrekt når det lander under linjen.
+// korrekt når det lander under linjen. Odds er konsensus-baserede (sættes ved lås).
 const OU = (line: number): BlockBetSide[] => [
-  { value: 'over', label: `Over ${line}`, odds: 1.85 },
+  { value: 'over', label: `Over ${line}` },
 ]
 const ouResolve = (line: (n: number) => number, actual: (s: BlockBetStats) => number) =>
   (s: BlockBetStats): string | null => (s.matchCount === 0 ? null : (actual(s) > line(s.matchCount) ? 'over' : 'under'))
 
 // "Dominans"-markeder: mindst 60% af blokkens kampe samme resultat-type.
 const domThreshold = (n: number) => Math.ceil(n * 0.6)
-const yesOnly = (yesOdds: number): BlockBetSide[] => [
-  { value: 'yes', label: 'Ja', odds: yesOdds },
+const yesOnly = (): BlockBetSide[] => [
+  { value: 'yes', label: 'Ja' },
 ]
 const domMarket = (
-  key: string, label: string, noun: string, actual: (s: BlockBetStats) => number, yesOdds: number,
+  key: string, label: string, noun: string, actual: (s: BlockBetStats) => number,
 ): BlockBetMarket => ({
   key, label,
-  sides: () => yesOnly(yesOdds),
+  sides: () => yesOnly(),
   actual,
   resolve: (s) => (s.matchCount === 0 ? null : (actual(s) >= domThreshold(s.matchCount) ? 'yes' : 'no')),
   describe: (n) => `Mindst 60% (${domThreshold(n)} af ${n}) ${noun} i blokken?`,
@@ -103,11 +120,11 @@ export const BLOCK_BET_MARKETS: BlockBetMarket[] = [
     sides: (n) => OU(halfLine(n, 2.85)),
     actual: (s) => s.totalGoals,
     resolve: ouResolve((n) => halfLine(n, 2.85), (s) => s.totalGoals),
-    describe: (n) => `Går blokkens ${n} kampe over ${halfLine(n, 2.85)} mål i alt?`,
+    describe: (n) => `Går blokkens ${n} kampe over ${halfLine(n, 2.85)} mål i alt? (≈${(halfLine(n, 2.85) / n).toFixed(1)} mål/kamp)`,
   },
-  domMarket('home_dom', 'Hjemme-dominans', 'hjemmesejre', (s) => s.homeWins, 4.0),
-  domMarket('draw_dom', 'Uafgjort-dominans', 'uafgjorte', (s) => s.draws, 4.5),
-  domMarket('away_dom', 'Ude-dominans', 'udesejre', (s) => s.awayWins, 6.0),
+  domMarket('home_dom', 'Hjemme-dominans', 'hjemmesejre', (s) => s.homeWins),
+  domMarket('draw_dom', 'Uafgjort-dominans', 'uafgjorte', (s) => s.draws),
+  domMarket('away_dom', 'Ude-dominans', 'udesejre', (s) => s.awayWins),
   {
     key: 'clean_sheets_ou',
     label: 'Clean sheets',
@@ -120,7 +137,7 @@ export const BLOCK_BET_MARKETS: BlockBetMarket[] = [
   {
     key: 'big_game',
     label: 'Målfest',
-    sides: () => yesOnly(2.3),
+    sides: () => yesOnly(),
     actual: (s) => s.bigGames,
     resolve: (s) => (s.matchCount === 0 ? null : (s.bigGames >= bigGameLine(s.matchCount) ? 'yes' : 'no')),
     describe: (n) => `Mindst ${bigGameLine(n)} kampe i blokken med 5+ mål?`,
@@ -129,11 +146,4 @@ export const BLOCK_BET_MARKETS: BlockBetMarket[] = [
 
 export function getBlockBetMarket(key: string): BlockBetMarket | undefined {
   return BLOCK_BET_MARKETS.find((m) => m.key === key)
-}
-
-/** Odds for en bestemt side i et marked (til validering server-side). */
-export function blockBetOdds(key: string, selection: string, matchCount: number): number | null {
-  const m = getBlockBetMarket(key)
-  if (!m) return null
-  return m.sides(matchCount).find((s) => s.value === selection)?.odds ?? null
 }
