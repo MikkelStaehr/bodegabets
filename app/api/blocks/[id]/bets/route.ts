@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { rateLimit, getIp } from '@/lib/rateLimit'
-import { getBlockBetMarket } from '@/lib/blockBets'
+import { getBlockBetMarket, BLOCK_BET_BASE_ODDS } from '@/lib/blockBets'
 
 // Blok Bets deler blokkens samlede budget (1250) med kamp-bets — spilleren
 // fordeler frit. Legacy-runder tæller ikke med (samme som submit-bets).
@@ -69,7 +69,9 @@ export async function POST(req: NextRequest, { params }: Props) {
     if (b.stake === 0) continue
     if (b.stake < 10) return NextResponse.json({ error: 'Minimum indsats er 10 credits' }, { status: 400 })
     newBlockStake += b.stake
-    rows.push({ block_id: blockId, game_id: gameId, user_id: user.id, market_key: b.market_key, selection: b.selection, stake: b.stake, odds: side.odds, result: 'pending' })
+    // Odds er konsensus-baserede og sættes ved lås (lockBlockBetConsensus).
+    // Gem base-odds indtil da — bruges også som fallback hvis lås-job aldrig kører.
+    rows.push({ block_id: blockId, game_id: gameId, user_id: user.id, market_key: b.market_key, selection: b.selection, stake: b.stake, odds: BLOCK_BET_BASE_ODDS, result: 'pending' })
   }
 
   // Budget: kamp-bet-indsats i blokken + nye Blok Bets ≤ 1250 (fælles pulje).

@@ -35,6 +35,12 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
 
   const blockTotal = useMemo(() => Object.values(picks).reduce((s, p) => s + (p.stake || 0), 0), [picks])
   const remaining = BUDGET - spentOnMatches - blockTotal
+  // Konsensus-odds (sat ved lås) til read-only-visning, pr. marked.
+  const initialOdds = useMemo(() => {
+    const m: Record<string, number | undefined> = {}
+    for (const b of initialBets) m[b.market_key] = b.odds
+    return m
+  }, [initialBets])
 
   function toggle(marketKey: string, selection: string) {
     if (!placeable) return
@@ -99,7 +105,7 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
                               : 'bg-white border-black/10 text-[var(--color-warm-taupe)] hover:border-[#2C4A3E] disabled:opacity-50'
                           }`}
                         >
-                          {side.label} <span className="opacity-70">@{side.odds}</span>
+                          {side.label}
                         </button>
                       )
                     })}
@@ -115,11 +121,17 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
                     </div>
                   )}
                   {pick && !placeable && (
-                    <p className="text-[11px] text-[var(--color-dark-green)] mt-1.5 font-semibold">{pick.stake} credits @ {sides.find((s) => s.value === pick.selection)?.odds}</p>
+                    <p className="text-[11px] text-[var(--color-dark-green)] mt-1.5 font-semibold">{pick.stake} credits{initialOdds[market.key] ? ` @ ${initialOdds[market.key]}` : ''}</p>
                   )}
                 </div>
               )
             })}
+
+            {placeable && (
+              <p className="text-[10px] text-[var(--color-warm-taupe)] leading-snug -mt-0.5">
+                💡 Odds afgøres af <strong>konsensus</strong> når blokken låser — jo flere der spiller samme valg, jo lavere odds (1.2–1.8), ligesom på kampene.
+              </p>
+            )}
 
             {placeable ? (
               <div className="flex items-center justify-between gap-3 mt-0.5">

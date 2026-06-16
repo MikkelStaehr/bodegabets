@@ -7,6 +7,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { calculateRoundPoints, calculateChampionshipRoundPoints } from '@/lib/calculatePoints'
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
+import { lockBlockBetConsensus } from '@/lib/lockBlockBets'
 import { lazyProxy } from '@/lib/lazyProxy'
 
 // Lazy (se lib/lazyProxy): klienten oprettes først ved brug, ikke ved
@@ -183,6 +184,22 @@ export async function syncMatchScores(options?: {
           }
         }
 
+      }
+
+      // 🎯 Blok Bets: når kampe låser, sæt konsensus-odds for de(n) berørte
+      // blok(ke) (idempotent — kører kun reelt når blokkens første kamp er låst).
+      const lockedRoundIds = [...new Set(toLock.map((m) => m.round_id).filter(Boolean))]
+      if (lockedRoundIds.length > 0) {
+        const { data: lockedRounds } = await supabaseAdmin
+          .from('rounds').select('block_id').in('id', lockedRoundIds)
+        const blockIds = [...new Set((lockedRounds ?? []).map((r) => r.block_id).filter((b): b is number => b != null))]
+        for (const blockId of blockIds) {
+          try {
+            await lockBlockBetConsensus(blockId)
+          } catch (e) {
+            console.error(`[syncMatchScores] lockBlockBetConsensus fejl for block ${blockId}:`, e)
+          }
+        }
       }
     }
 
