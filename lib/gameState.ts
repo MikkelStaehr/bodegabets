@@ -1441,11 +1441,11 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     const lastRid = blockLastRound.get(blk.id)
     const bbIn = (mp: Map<number, Map<string, number>>, u: string, set: Set<number>) =>
       lastRid != null && set.has(lastRid) ? bbGet(mp, blk.id, u) : 0
-    // Klovne/helte hører til den seneste afgjorte runde — vis dem på den blok
-    // der INDEHOLDER den runde (uanset om blokken er aktiv eller afsluttet). En
-    // netop åbnet blok uden scorede runder arver derfor IKKE forrige bloks
-    // klovne, og en lige afsluttet blok beholder sine (som sæson-fanen).
-    const showLiveFlavor = latestFinished != null && blockScored.has(latestFinished)
+    // Øgenavne (helt/klovn) for den seneste afgjorte runde vises på den AKTIVE
+    // (næste) blok — de bæres FREMAD som et badge ind i den blok man nu spiller,
+    // ikke retroaktivt på den foregående blok hvor de blev tjent. (Losers Luck
+    // vises samme sted.) Den afsluttede blok beholder dem derfor ikke.
+    const showLiveFlavor = latestFinished != null && isActive
 
     // Vinder(e) for afgjort blok = højest profit (inkl. delt sejr).
     let maxPts = 0
@@ -1491,17 +1491,16 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     .filter((b) => b.status === 'active' || (rounds ?? []).some((r) => r.block_id === b.id && scoredRoundIds.has(r.id as number)))
     .sort((a, z) => (a.block_number as number) - (z.block_number as number))
     .map(buildBlock)
-  // Default-blok = blokken med den SENESTE afgjorte runde (seneste action +
-  // klovne/helte), så blok-fanen åbner samme sted som sæson-fanens flavor.
-  // Når den aktive blok får sin første scorede runde, flytter defaulten dertil.
-  // Fallback: aktiv blok, ellers seneste blok i listen.
+  // Default-blok = den AKTIVE (næste) blok, så blok-fanen åbner hvor øgenavnene
+  // og Losers Luck nu vises (de bæres fremad). Fallback: blokken med den seneste
+  // afgjorte runde, ellers seneste blok i listen.
   const latestBlockId = latestFinished != null ? roundToBlock.get(latestFinished) : null
   const latestBlockNumber = latestBlockId != null
     ? (allBlocks.find((b) => b.id === latestBlockId)?.block_number as number | undefined) ?? null
     : null
   const activeBlockNumber =
-    latestBlockNumber ??
     (allBlocks.find((b) => b.status === 'active')?.block_number as number | undefined) ??
+    latestBlockNumber ??
     (lbBlocks.length ? lbBlocks[lbBlocks.length - 1].block_number : null)
 
   return { blocks: lbBlocks, activeBlockNumber, season: { rows: seasonRows } }

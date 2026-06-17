@@ -53,26 +53,32 @@ export async function getLosersLuckUserIds(gameId: number, blockId: number | nul
   for (const u of userIds) pts.set(u, 0)
   for (const s of scores ?? []) pts.set(s.user_id, (pts.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
 
-  // Blok-sejre over blokke der ER afgjort før denne blok.
-  const priorSet = new Set(priorIds)
-  const wins = new Map<string, number>()
-  for (const b of blocks ?? []) {
-    if (b.id === blockId) continue
-    const brs = (rounds ?? []).filter((r) => r.block_id === b.id).map((r) => r.id as number)
-    if (brs.length === 0 || !brs.every((rid) => priorSet.has(rid))) continue
-    const tot = new Map<string, number>()
-    for (const u of userIds) tot.set(u, 0)
-    for (const s of scores ?? []) if (brs.includes(s.round_id as number)) tot.set(s.user_id, (tot.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
-    let max = 0
-    for (const v of tot.values()) if (v > max) max = v
-    if (max > 0) for (const [u, v] of tot) if (v === max) wins.set(u, (wins.get(u) ?? 0) + 1)
+  // Deltog spilleren i den FORRIGE blok? En spiller der er holdt op med at
+  // spille skal IKKE have comeback-hjælp — og må heller ikke optage en plads
+  // (ellers rykker en midter-spiller fejlagtigt ind i stedet, se nedenfor).
+  const priorBlockNums = (blocks ?? []).map((b) => b.block_number as number).filter((n) => n < thisBlockNum)
+  const prevBlockNum = priorBlockNums.length ? Math.max(...priorBlockNums) : null
+  const prevBlockId = prevBlockNum != null
+    ? ((blocks ?? []).find((b) => (b.block_number as number) === prevBlockNum)?.id as number | undefined) ?? null
+    : null
+  const prevRoundIds = prevBlockId != null
+    ? (rounds ?? []).filter((r) => r.block_id === prevBlockId).map((r) => r.id as number)
+    : []
+  let participated = new Set<string>(userIds)
+  if (prevRoundIds.length > 0) {
+    const { data: prevBets } = await supabaseAdmin
+      .from('bets').select('user_id').eq('game_id', gameId).in('round_id', prevRoundIds)
+    participated = new Set((prevBets ?? []).map((b) => b.user_id as string))
   }
 
-  // Rangér som sæson-tabellen (blok-sejre, så point), tag de nederste N.
-  const sorted = [...userIds].sort((a, z) =>
-    (wins.get(z) ?? 0) - (wins.get(a) ?? 0) ||
-    (pts.get(z) ?? 0) - (pts.get(a) ?? 0) ||
+  // Rangér efter PRÆSTATION (point) — ikke blok-sejre. En højtscorende spiller
+  // uden blok-sejr er ikke en "taber". Tag de nederste N, og fjern dem der ikke
+  // deltog i forrige blok UDEN at fylde pladsen op — så en midter-spiller ikke
+  // arver en inaktiv spillers plads.
+  const byPointsAsc = [...userIds].sort((a, z) =>
+    (pts.get(a) ?? 0) - (pts.get(z) ?? 0) ||
     usernameById.get(a)!.localeCompare(usernameById.get(z)!)
   )
-  return new Set(sorted.slice(-LOSERS_LUCK_COUNT))
+  const bottom = byPointsAsc.slice(0, LOSERS_LUCK_COUNT)
+  return new Set(bottom.filter((u) => participated.has(u)))
 }
