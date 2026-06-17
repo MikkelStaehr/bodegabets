@@ -9,7 +9,9 @@ import { supabaseAdmin } from '@/lib/supabase'
  * Kun aktivt for slutrunde-spil (seasons.credits_per_block).
  */
 export const LOSERS_LUCK_BOOST = 1.2 // +20% på vundne bets
-export const LOSERS_LUCK_COUNT = 2 // nederste 2 i sæsonen
+// Antal modtagere skalerer med feltet: 1 ved ≤4 aktive deltagere, ellers 2.
+// (Med få spillere er 2 for stor en andel af feltet.)
+const losersLuckCount = (activeParticipants: number) => (activeParticipants <= 4 ? 1 : 2)
 
 export async function getLosersLuckUserIds(gameId: number, blockId: number | null): Promise<Set<string>> {
   if (blockId == null) return new Set()
@@ -75,10 +77,10 @@ export async function getLosersLuckUserIds(gameId: number, blockId: number | nul
   const participated = new Set((prevBets ?? []).map((b) => b.user_id as string))
   const participants = userIds.filter((u) => participated.has(u))
 
-  // Nederste N på forrige bloks point → Losers Luck.
+  // Nederste N på forrige bloks point → Losers Luck. N skalerer med feltet.
   const sortedAsc = [...participants].sort((a, z) =>
     (prevPts.get(a) ?? 0) - (prevPts.get(z) ?? 0) ||
     usernameById.get(a)!.localeCompare(usernameById.get(z)!)
   )
-  return new Set(sortedAsc.slice(0, LOSERS_LUCK_COUNT))
+  return new Set(sortedAsc.slice(0, losersLuckCount(participants.length)))
 }
