@@ -133,6 +133,12 @@ export default function BlockBetsPanel({ gameId, blockId, blockName, matchCount,
               </p>
             )}
 
+            {placeable && spentOnMatches >= BUDGET && (
+              <p className="text-[11px] text-[var(--color-red-dark)] font-semibold leading-snug">
+                ⚠️ Du har brugt alle {BUDGET} credits på kamp-bets. Blok Bets deler samme pulje — skru ned for en kamp-indsats for at frigøre credits til Blok Bets.
+              </p>
+            )}
+
             {placeable ? (
               <div className="flex items-center justify-between gap-3 mt-0.5">
                 <span className="text-[11px] text-[var(--color-warm-taupe)]">
