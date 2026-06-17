@@ -1334,9 +1334,33 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     return wins
   }
 
-  // Rangering → Map<user, rank> (1-baseret) givet sortértal
+  // 🔌 Aktive spillere = dem der har lagt bets i den seneste AFSLUTTEDE blok
+  // eller den AKTIVE blok. Inaktive (holdt op med at spille) skal ALTID ligge i
+  // bunden af leaderboardet — uanset gamle point — så de ikke sidder over dem
+  // der stadig er med.
+  const refBlockIds = new Set<number>()
+  const lastFinishedBlock = allBlocks
+    .filter((b) => b.status === 'finished')
+    .sort((a, z) => (z.block_number as number) - (a.block_number as number))[0]
+  if (lastFinishedBlock) refBlockIds.add(lastFinishedBlock.id as number)
+  for (const b of allBlocks) if (b.status === 'active') refBlockIds.add(b.id as number)
+  let activeSet = new Set<string>(userIds)
+  if (refBlockIds.size > 0) {
+    const refRoundIds = new Set(
+      (rounds ?? []).filter((r) => refBlockIds.has(r.block_id as number)).map((r) => r.id as number)
+    )
+    const betters = new Set(
+      (bets ?? []).filter((b) => refRoundIds.has(b.round_id as number)).map((b) => b.user_id as string)
+    )
+    if (betters.size > 0) activeSet = betters
+  }
+
+  // Rangering → Map<user, rank> (1-baseret) givet sortértal. Inaktive spillere
+  // sorteres altid sidst (efter alle aktive), uanset deres sortértal.
   const rankBy = (score: (u: string) => [number, number]) => {
     const sorted = [...userIds].sort((a, z) => {
+      const aActive = activeSet.has(a), zActive = activeSet.has(z)
+      if (aActive !== zActive) return aActive ? -1 : 1
       const [a1, a2] = score(a), [z1, z2] = score(z)
       return z1 - a1 || z2 - a2 || usernameById.get(a)!.localeCompare(usernameById.get(z)!)
     })
