@@ -49,36 +49,36 @@ export async function getLosersLuckUserIds(gameId: number, blockId: number | nul
   const { data: scores } = await supabaseAdmin
     .from('round_scores').select('user_id, round_id, earnings_delta').eq('game_id', gameId).in('round_id', priorIds)
 
-  const pts = new Map<string, number>()
-  for (const u of userIds) pts.set(u, 0)
-  for (const s of scores ?? []) pts.set(s.user_id, (pts.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
-
-  // Deltog spilleren i den FORRIGE blok? En spiller der er holdt op med at
-  // spille skal IKKE have comeback-hjælp — og må heller ikke optage en plads
-  // (ellers rykker en midter-spiller fejlagtigt ind i stedet, se nedenfor).
+  // Losers Luck bedømmes på PLACERINGEN i den FORRIGE blok — ikke samlede
+  // sæson-point — så fx blok-vinderen aldrig får comeback-hjælp. Kun spillere
+  // der DELTOG i forrige blok rangeres; de nederste N på blok-point får boostet.
   const priorBlockNums = (blocks ?? []).map((b) => b.block_number as number).filter((n) => n < thisBlockNum)
   const prevBlockNum = priorBlockNums.length ? Math.max(...priorBlockNums) : null
-  const prevBlockId = prevBlockNum != null
-    ? ((blocks ?? []).find((b) => (b.block_number as number) === prevBlockNum)?.id as number | undefined) ?? null
-    : null
+  if (prevBlockNum == null) return new Set()
+  const prevBlockId = ((blocks ?? []).find((b) => (b.block_number as number) === prevBlockNum)?.id as number | undefined) ?? null
   const prevRoundIds = prevBlockId != null
     ? (rounds ?? []).filter((r) => r.block_id === prevBlockId).map((r) => r.id as number)
     : []
-  let participated = new Set<string>(userIds)
-  if (prevRoundIds.length > 0) {
-    const { data: prevBets } = await supabaseAdmin
-      .from('bets').select('user_id').eq('game_id', gameId).in('round_id', prevRoundIds)
-    participated = new Set((prevBets ?? []).map((b) => b.user_id as string))
+  if (prevRoundIds.length === 0) return new Set()
+  const prevSet = new Set(prevRoundIds)
+
+  // Point pr. spiller i FORRIGE blok (kun dens runder).
+  const prevPts = new Map<string, number>()
+  for (const s of scores ?? []) {
+    if (!prevSet.has(s.round_id as number)) continue
+    prevPts.set(s.user_id, (prevPts.get(s.user_id) ?? 0) + (Number(s.earnings_delta) || 0))
   }
 
-  // Rangér efter PRÆSTATION (point) — ikke blok-sejre. En højtscorende spiller
-  // uden blok-sejr er ikke en "taber". Tag de nederste N, og fjern dem der ikke
-  // deltog i forrige blok UDEN at fylde pladsen op — så en midter-spiller ikke
-  // arver en inaktiv spillers plads.
-  const byPointsAsc = [...userIds].sort((a, z) =>
-    (pts.get(a) ?? 0) - (pts.get(z) ?? 0) ||
+  // Kun spillere der deltog i forrige blok (lagde bets der) kan rangeres/få boost.
+  const { data: prevBets } = await supabaseAdmin
+    .from('bets').select('user_id').eq('game_id', gameId).in('round_id', prevRoundIds)
+  const participated = new Set((prevBets ?? []).map((b) => b.user_id as string))
+  const participants = userIds.filter((u) => participated.has(u))
+
+  // Nederste N på forrige bloks point → Losers Luck.
+  const sortedAsc = [...participants].sort((a, z) =>
+    (prevPts.get(a) ?? 0) - (prevPts.get(z) ?? 0) ||
     usernameById.get(a)!.localeCompare(usernameById.get(z)!)
   )
-  const bottom = byPointsAsc.slice(0, LOSERS_LUCK_COUNT)
-  return new Set(bottom.filter((u) => participated.has(u)))
+  return new Set(sortedAsc.slice(0, LOSERS_LUCK_COUNT))
 }
