@@ -135,7 +135,7 @@ function Table({ rows, variant, flavorRoundId, onSelect }: { rows: LbTabRow[]; v
   // når man scroller stat-kolonnerne vandret.
   const cols = variant === 'season'
     ? 'minmax(120px, 1fr) 80px 36px 54px'
-    : '136px 32px 32px 48px 58px 88px'
+    : '160px 32px 32px 48px 58px 88px'
   const headers = variant === 'season'
     ? [
         { l: 'Spiller', t: 'Placering & spiller — pilen viser bevægelse siden forrige runde · tryk for historik', a: 'left' as const, sticky: true },
@@ -211,7 +211,12 @@ function Table({ rows, variant, flavorRoundId, onSelect }: { rows: LbTabRow[]; v
               {r.rank}
             </span>
             <Move delta={r.rank_delta} />
-            <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+            <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.1, minWidth: 0,
+              // Øgenavne kan være lange — lad dem ombryde i stedet for at blive
+              // klippet. Almindelige brugernavne beholder ellipsis (er korte).
+              whiteSpace: (taunt || hero) ? 'normal' : 'nowrap',
+              overflow: (taunt || hero) ? 'visible' : 'hidden',
+              textOverflow: 'ellipsis', overflowWrap: 'anywhere' }}>
               {taunt ? (
                 <span title={`${r.username} fik klovne-navnet fordi han scorede 0 point i seneste runde, mens andre fik point 😅 — det forsvinder igen så snart han scorer.`} style={{ fontStyle: 'italic', color: '#7a7060', cursor: 'help' }}>
                   {taunt}
