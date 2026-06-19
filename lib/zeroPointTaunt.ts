@@ -51,6 +51,19 @@ export function getTaunt(seed: string): string {
 }
 
 /**
+ * Som getTaunt, men springer navne i `taken` over (og tilføjer det valgte) —
+ * så to spillere i SAMME visning aldrig får samme klovne-navn.
+ */
+export function getTauntUnique(seed: string, taken: Set<string>): string {
+  const start = djb2(seed) % ZERO_POINT_TAUNTS.length
+  for (let i = 0; i < ZERO_POINT_TAUNTS.length; i++) {
+    const name = ZERO_POINT_TAUNTS[(start + i) % ZERO_POINT_TAUNTS.length]
+    if (!taken.has(name)) { taken.add(name); return name }
+  }
+  return ZERO_POINT_TAUNTS[start]
+}
+
+/**
  * True hvis denne spillers score er 0 OG mindst én anden i samme kontekst
  * har scoret >0. Hvis alle har 0 (runden/etapen ikke scoret endnu) returneres
  * false — vi vil ikke taunte folk før der overhovedet er kommet point.

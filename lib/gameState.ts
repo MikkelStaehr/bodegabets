@@ -1194,11 +1194,13 @@ export type LeaderboardTabs = {
   blocks: LbBlock[]
   /** Bloknummer der skal vises som standard (den igangværende). */
   activeBlockNumber: number | null
+  /** Seneste afgjorte runde — bruges som seed til øgenavne (varierer pr. runde). */
+  flavorRoundId: number | null
   season: { rows: LbTabRow[] }
 }
 
 export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTabs> {
-  const empty: LeaderboardTabs = { blocks: [], activeBlockNumber: null, season: { rows: [] } }
+  const empty: LeaderboardTabs = { blocks: [], activeBlockNumber: null, flavorRoundId: null, season: { rows: [] } }
   const { data: gameSeasons } = await supabaseAdmin.from('game_seasons').select('season_id').eq('game_id', gameId)
   const seasonIds = (gameSeasons ?? []).map((g) => g.season_id as number)
   if (seasonIds.length === 0) return empty
@@ -1530,7 +1532,7 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     latestBlockNumber ??
     (lbBlocks.length ? lbBlocks[lbBlocks.length - 1].block_number : null)
 
-  return { blocks: lbBlocks, activeBlockNumber, season: { rows: seasonRows } }
+  return { blocks: lbBlocks, activeBlockNumber, flavorRoundId: latestFinished, season: { rows: seasonRows } }
 }
 
 // ─── getGameState — kombineret state for /api/games/[id]/state ──────────────
@@ -1553,7 +1555,7 @@ export async function getGameState(
     getGameMatches(gameId, userId),
     getGameLeaderboard(gameId),
     isFootballRegular ? getActiveBlockStandings(gameId) : Promise.resolve(null),
-    isFootballRegular ? getLeaderboardTabs(gameId) : Promise.resolve({ blocks: [], activeBlockNumber: null, season: { rows: [] } } as LeaderboardTabs),
+    isFootballRegular ? getLeaderboardTabs(gameId) : Promise.resolve({ blocks: [], activeBlockNumber: null, flavorRoundId: null, season: { rows: [] } } as LeaderboardTabs),
   ])
 
   return {
