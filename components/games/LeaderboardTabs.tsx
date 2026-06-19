@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import type { LeaderboardTabs, LbTabRow, LbBlock } from '@/lib/gameState'
 import PlayerHistoryModal from './PlayerHistoryModal'
-import { getTaunt } from '@/lib/zeroPointTaunt'
-import { getHero, STREAK_THRESHOLD } from '@/lib/streakHero'
+import { getTauntUnique } from '@/lib/zeroPointTaunt'
+import { getHeroUnique, STREAK_THRESHOLD } from '@/lib/streakHero'
 
 type Props = {
   tabs: LeaderboardTabs
@@ -51,7 +51,7 @@ export default function LeaderboardTabs({ tabs, gameId }: Props) {
         </>
       )}
 
-      <Table rows={rows} variant={active} onSelect={(r) => setSelected({ userId: r.user_id, username: r.username })} />
+      <Table rows={rows} variant={active} flavorRoundId={tabs.flavorRoundId} onSelect={(r) => setSelected({ userId: r.user_id, username: r.username })} />
 
       {selected && (
         <PlayerHistoryModal gameId={gameId} userId={selected.userId} username={selected.username} onClose={() => setSelected(null)} />
@@ -119,7 +119,10 @@ function TabBtn({ label, sub, activeTab, disabled, onClick }: { label: string; s
   )
 }
 
-function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block' | 'season'; onSelect: (r: LbTabRow) => void }) {
+function Table({ rows, variant, flavorRoundId, onSelect }: { rows: LbTabRow[]; variant: 'block' | 'season'; flavorRoundId: number | null; onSelect: (r: LbTabRow) => void }) {
+  // Taken-sæt pr. visning, så to spillere aldrig får samme øgenavn i samme tabel.
+  const tauntTaken = new Set<string>()
+  const heroTaken = new Set<string>()
   // Første kolonne (placering + spiller) er SAMMEN og STICKY, så den fryser
   // når man scroller stat-kolonnerne vandret.
   const cols = variant === 'season'
@@ -162,8 +165,11 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
       {rows.map((r, idx) => {
         const settled = r.won_bets + r.lost_bets
         const winrate = settled > 0 ? Math.round((r.won_bets / settled) * 100) : null
-        const taunt = r.latest_round_zero ? getTaunt(`${r.user_id}:round`) : null
-        const hero = !taunt && r.latest_round_match_wins >= STREAK_THRESHOLD ? getHero(`${r.user_id}:round`) : null
+        // Seed med rundens id, så øgenavnet varierer fra runde til runde (men er
+        // stabilt inden for samme runde — ingen flicker).
+        const flavorSeed = `${r.user_id}:${flavorRoundId ?? 'r'}`
+        const taunt = r.latest_round_zero ? getTauntUnique(flavorSeed, tauntTaken) : null
+        const hero = !taunt && r.latest_round_match_wins >= STREAK_THRESHOLD ? getHeroUnique(flavorSeed, heroTaken) : null
         const rowBg = idx === 0 ? C.highlight : C.bg
         const pointCell = (
           <span style={{ textAlign: 'right', lineHeight: 1.05, paddingRight: 10, boxSizing: 'border-box' }}>
@@ -199,11 +205,11 @@ function Table({ rows, variant, onSelect }: { rows: LbTabRow[]; variant: 'block'
             <Move delta={r.rank_delta} />
             <span style={{ fontFamily: FF, fontSize: 13, fontWeight: 600, color: C.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
               {taunt ? (
-                <span title={`${r.username} — scorede 0 point i seneste runde 😅`} style={{ fontStyle: 'italic', color: '#7a7060', cursor: 'help' }}>
+                <span title={`${r.username} fik klovne-navnet fordi han scorede 0 point i seneste runde, mens andre fik point 😅 — det forsvinder igen så snart han scorer.`} style={{ fontStyle: 'italic', color: '#7a7060', cursor: 'help' }}>
                   {taunt}
                 </span>
               ) : hero ? (
-                <span title={`${r.username} — ramte ${r.latest_round_match_wins} kampe rigtigt i seneste runde 🎯`} style={{ fontStyle: 'italic', fontWeight: 700, color: C.gold, cursor: 'help' }}>
+                <span title={`${r.username} fik helte-navnet fordi han ramte ${r.latest_round_match_wins} kamp-resultater rigtigt i seneste runde 🎯 — nulstilles næste runde.`} style={{ fontStyle: 'italic', fontWeight: 700, color: C.gold, cursor: 'help' }}>
                   {hero}
                 </span>
               ) : (

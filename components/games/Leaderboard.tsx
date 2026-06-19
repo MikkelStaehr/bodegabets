@@ -198,10 +198,13 @@ export default function Leaderboard({ entries: entriesProp, gameId, compact, tit
                 </span>
               )}
               {shouldTaunt(entry.round_points, allRoundPoints) && (
-                <span style={{
-                  fontStyle: 'italic', fontWeight: 400, color: '#9E9486',
-                  marginLeft: 6, fontSize: compact ? 11 : 12,
-                }}>
+                <span
+                  title={`${entry.username} fik klovne-navnet fordi han scorede 0 point i seneste runde, mens andre fik point 😅 — forsvinder når han scorer igen.`}
+                  style={{
+                    fontStyle: 'italic', fontWeight: 400, color: '#9E9486',
+                    marginLeft: 6, fontSize: compact ? 11 : 12, cursor: 'help',
+                  }}
+                >
                   {getTaunt(`${entry.user_id}:round`)}
                 </span>
               )}
