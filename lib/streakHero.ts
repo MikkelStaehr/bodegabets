@@ -58,8 +58,8 @@ export function getHero(seed: string): string {
  * Som getHero, men springer navne i `taken` over (og tilføjer det valgte) — så
  * to spillere i SAMME visning aldrig får samme helte-navn.
  */
-export function getHeroUnique(seed: string, taken: Set<string>): string {
-  const start = djb2(seed) % STREAK_HEROES.length
+export function getHeroUnique(seed: string, taken: Set<string>, offset = 0): string {
+  const start = (djb2(seed) + offset) % STREAK_HEROES.length
   for (let i = 0; i < STREAK_HEROES.length; i++) {
     const name = STREAK_HEROES[(start + i) % STREAK_HEROES.length]
     if (!taken.has(name)) { taken.add(name); return name }

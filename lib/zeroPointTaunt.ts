@@ -54,8 +54,8 @@ export function getTaunt(seed: string): string {
  * Som getTaunt, men springer navne i `taken` over (og tilføjer det valgte) —
  * så to spillere i SAMME visning aldrig får samme klovne-navn.
  */
-export function getTauntUnique(seed: string, taken: Set<string>): string {
-  const start = djb2(seed) % ZERO_POINT_TAUNTS.length
+export function getTauntUnique(seed: string, taken: Set<string>, offset = 0): string {
+  const start = (djb2(seed) + offset) % ZERO_POINT_TAUNTS.length
   for (let i = 0; i < ZERO_POINT_TAUNTS.length; i++) {
     const name = ZERO_POINT_TAUNTS[(start + i) % ZERO_POINT_TAUNTS.length]
     if (!taken.has(name)) { taken.add(name); return name }

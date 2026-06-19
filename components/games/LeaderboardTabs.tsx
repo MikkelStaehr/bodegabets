@@ -120,6 +120,14 @@ function TabBtn({ label, sub, activeTab, disabled, onClick }: { label: string; s
 }
 
 function Table({ rows, variant, flavorRoundId, onSelect }: { rows: LbTabRow[]; variant: 'block' | 'season'; flavorRoundId: number | null; onSelect: (r: LbTabRow) => void }) {
+  // Roterende øgenavne: navnet cykler gennem listen over tid, så ingen hænger
+  // fast på ét navn. Starter på 0 (matcher server-render → ingen hydration-
+  // mismatch) og tæller op hvert 5. sekund på klienten.
+  const [rotTick, setRotTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setRotTick((t) => t + 1), 5000)
+    return () => clearInterval(id)
+  }, [])
   // Taken-sæt pr. visning, så to spillere aldrig får samme øgenavn i samme tabel.
   const tauntTaken = new Set<string>()
   const heroTaken = new Set<string>()
@@ -168,8 +176,8 @@ function Table({ rows, variant, flavorRoundId, onSelect }: { rows: LbTabRow[]; v
         // Seed med rundens id, så øgenavnet varierer fra runde til runde (men er
         // stabilt inden for samme runde — ingen flicker).
         const flavorSeed = `${r.user_id}:${flavorRoundId ?? 'r'}`
-        const taunt = r.latest_round_zero ? getTauntUnique(flavorSeed, tauntTaken) : null
-        const hero = !taunt && r.latest_round_match_wins >= STREAK_THRESHOLD ? getHeroUnique(flavorSeed, heroTaken) : null
+        const taunt = r.latest_round_zero ? getTauntUnique(flavorSeed, tauntTaken, rotTick) : null
+        const hero = !taunt && r.latest_round_match_wins >= STREAK_THRESHOLD ? getHeroUnique(flavorSeed, heroTaken, rotTick) : null
         const rowBg = idx === 0 ? C.highlight : C.bg
         const pointCell = (
           <span style={{ textAlign: 'right', lineHeight: 1.05, paddingRight: 10, boxSizing: 'border-box' }}>
