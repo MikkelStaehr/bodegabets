@@ -1391,7 +1391,10 @@ export async function getLeaderboardTabs(gameId: number): Promise<LeaderboardTab
     let max = 0
     for (const v of m.values()) if (v > max) max = v
     if (max <= 0) return s
-    for (const u of userIds) if ((m.get(u) ?? 0) === 0) s.add(u)
+    // Kun spillere der faktisk DELTOG i runden (lagde bets) kan blive "Null æg".
+    // En der sad over scorede ikke 0 — han var der ikke, og skal ikke hænges ud.
+    const played = new Set((bets ?? []).filter((b) => (b.round_id as number) === rid).map((b) => b.user_id as string))
+    for (const u of userIds) if (played.has(u) && (m.get(u) ?? 0) === 0) s.add(u)
     return s
   }
   const seasonZero = zeroInRound(latestFinished)
