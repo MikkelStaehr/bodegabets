@@ -30,6 +30,19 @@ export async function POST(req: NextRequest, { params }: Props) {
 
   const body = await req.json()
   const { game_id: gameId, bets } = body as { game_id?: number; bets: BlockBetInput[] }
+
+  // 🐞 MIDLERTIDIG diagnostik: log hvad ruten modtager (fjernes igen).
+  const dbg = async (stage: string, extra: Record<string, unknown> = {}) => {
+    try {
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'block_bets_debug', status: 'info',
+        message: `[blocks/${blockId}/bets] ${stage}`,
+        metadata: { stage, blockId, gameId, user: user.id.slice(0, 8), betsRaw: bets, ...extra },
+      })
+    } catch { /* ignorér */ }
+  }
+  await dbg('received', { betsCount: Array.isArray(bets) ? bets.length : 'IKKE-ARRAY' })
+
   if (!gameId) return NextResponse.json({ error: 'game_id er påkrævet' }, { status: 400 })
   if (!Array.isArray(bets)) return NextResponse.json({ error: 'Manglende bets-array' }, { status: 400 })
 
@@ -89,8 +102,9 @@ export async function POST(req: NextRequest, { params }: Props) {
   await supabaseAdmin.from('block_bets').delete().eq('block_id', blockId).eq('game_id', gameId).eq('user_id', user.id)
   if (rows.length > 0) {
     const { error: insErr } = await supabaseAdmin.from('block_bets').insert(rows)
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
+    if (insErr) { await dbg('insert_error', { rowsCount: rows.length, error: insErr.message }); return NextResponse.json({ error: insErr.message }, { status: 500 }) }
   }
+  await dbg('done', { placed: rows.length, matchStake, newBlockStake })
 
   return NextResponse.json({ ok: true, placed: rows.length })
 }
