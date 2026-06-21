@@ -64,8 +64,8 @@ export default function VmRulesAnnouncement({ guideHref }: { guideHref: string }
                   Turneringen deles op i blokke på to runder.
                 </RuleItem>
                 <RuleItem icon="🎯" title="1250 credits pr. blok — ikke pr. runde">
-                  Du fordeler dine 1250 credits hen over blokkens to runder (og evt. Blok Bets).
-                  Gem evt. til runde to — alt det du ikke bruger, er stadig i spil.
+                  Du fordeler dine 1250 credits hen over blokkens to runder. Gem evt. til runde to —
+                  alt det du ikke bruger, er stadig i spil.
                 </RuleItem>
                 <RuleItem icon="🚫" title="Profit kan ikke spilles videre">
                   Alle starter hver blok med friske 1250, så ingen stikker af på en tidlig gevinst.

@@ -52,8 +52,8 @@ export default async function VmGuidePage() {
         <Section emoji="🎯" title="1250 credits — pr. blok, ikke pr. runde">
           <p className="mb-3">
             Du får <strong>1250 credits pr. blok</strong>, som du fordeler hen over blokkens to
-            runder — og evt. på Blok Bets. Det er <strong>ikke</strong> 1250 pr. runde — det er
-            1250 til hele blokken. Bruger du 700 i første runde, har du 550 tilbage.
+            runder. Det er <strong>ikke</strong> 1250 pr. runde — det er 1250 til hele blokken.
+            Bruger du 700 i første runde, har du 550 tilbage.
           </p>
           <ul className="space-y-1.5 mb-3">
             <Bullet>Du behøver ikke bruge alt i første runde — du kan gemme til den næste.</Bullet>
