@@ -62,9 +62,27 @@ Knockout-resultat udledes af `status_short` + slutresultat:
   - `'et'`: vinder = højeste slutresultat (kendt). Score automatisk.
   - `'pen'`: vinder = `matches.ko_advanced` (admin-indtastet). Indtil det er sat
     forbliver bettet **pending** (scores ikke).
-- **Odds**: konsensus (1.2–1.8) sat ved lås, samme model/formel som kamp-bets
-  (`lib/syncMatchScores` consensus-blokken). ko_advance og ko_method får hver
-  deres konsensus ud fra fordelingen af valg.
+- **Odds**: samme model som de eksisterende **ekstra-bets** (ikke hoved-bettet):
+  konsensus i intervallet **1.2–1.5** via `max(1.2, 1.5 − pct·0.3)`, sat ved lås.
+  ko_advance og ko_method får hver deres konsensus ud fra fordelingen af valg.
+
+## 🔥 On fire-kamp (dobbelt odds)
+
+Per **knockout-blok** udvælges **én tilfældig kamp** som "on fire" — alle bets på
+den kamp giver **dobbelt odds** (odds × 2 → dobbelt gevinst).
+
+- **Omfang**: alle bet-typer på kampen (match_result + ekstra-bets +
+  ko_advance/ko_method). Kun i knockout-fasen.
+- **Udvælgelse**: tilfældig blandt blokkens knockout-kampe, **låst ved blok-start**
+  (cron'en der åbner blokken vælger én kamp og sætter et flag). Deterministisk/gemt
+  så den ikke kan game'es eller skifte undervejs.
+- **Synlighed**: vises med et 🔥-badge på kampen **fra blok-start**, så spillerne
+  kan se den og satse derefter (det er hele pointen).
+- **Datamodel**: `matches.is_on_fire boolean default false` (sættes når blokken
+  åbner; nulstilles aldrig for spillede blokke).
+- **Scoring**: for bets på on-fire-kampen ganges gevinsten med 2
+  (`points_earned = stake × odds × 2` ved gevinst). Selve konsensus-oddsene er
+  uændrede — multiplikatoren lægges oveni ved scoring.
 
 ## Admin-felt: straffesparks-vinder
 
@@ -88,9 +106,10 @@ Knockout-resultat udledes af `status_short` + slutresultat:
 
 ## Byggerækkefølge
 
-1. Schema: `is_knockout`, `ko_method`, `ko_advanced`, de to bet-typer.
+1. Schema: `is_knockout`, `ko_method`, `ko_advanced`, `is_on_fire`, de to bet-typer.
 2. Sync: sæt `is_knockout` (round-navn) + `ko_method`/`ko_advanced` (status_short) i `syncMatchScores`.
-3. UI: X-foldout i `AfgivBets` + server-validering i `submit-bets`.
-4. Scoring + konsensus-odds for de to nye bet-typer.
-5. Admin-felt for straffesparks-vinder.
-6. Verifikation på første rigtige knockout-kamp.
+3. On fire: vælg + sæt `is_on_fire` på én tilfældig knockout-kamp når blokken åbner (block-aware åbnings-logik i `railway/index.ts`).
+4. UI: X-foldout + 🔥-badge i `AfgivBets` + server-validering i `submit-bets`.
+5. Scoring: de to nye bet-typer (ekstra-bet-odds 1.2–1.5) + ×2-multiplikator for on-fire-kampen.
+6. Admin-felt for straffesparks-vinder.
+7. Verifikation på første rigtige knockout-kamp.
