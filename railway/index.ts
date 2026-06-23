@@ -1148,28 +1148,31 @@ app.get('/sync-cycling-stage-times', async (_req, res) => {
 // League 26/27 (typisk juni-juli) bliver en ny season-row automatisk oprettet
 // så den dukker op i game-creation UI uden manuel intervention.
 
-app.get('/discover-bold-seasons', async (_req, res) => {
-  try {
-    const result = await discoverBoldSeasons()
+// Discovery sweeper Bold's phase-frontier og kan tage flere minutter. Vi svarer
+// derfor med det samme (202) og kører scanningen i baggrunden — Railway-appen er
+// en persistent Node-proces, så promise'et kører færdigt. Resultatet logges til
+// admin_logs når det er færdigt.
+app.get('/discover-bold-seasons', (_req, res) => {
+  res.status(202).json({ ok: true, started: true })
 
-    const insertedCount = result.candidates.filter((c) => c.inserted).length
-    await supabaseAdmin.from('admin_logs').insert({
-      type: 'bold_seasons_discover',
-      status: result.ok ? 'success' : 'error',
-      message: `discover-bold-seasons: ${insertedCount} ny(e) sæsoner oprettet (${result.scanned} phase-id'er scannet)`,
-      metadata: result as unknown as Record<string, unknown>,
+  discoverBoldSeasons()
+    .then(async (result) => {
+      const insertedCount = result.candidates.filter((c) => c.inserted).length
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'bold_seasons_discover',
+        status: result.ok ? 'success' : 'error',
+        message: `discover-bold-seasons: ${insertedCount} ny(e) sæsoner oprettet (${result.scanned} phase-id'er scannet)`,
+        metadata: result as unknown as Record<string, unknown>,
+      })
     })
-
-    res.json({ ok: result.ok, ...result })
-  } catch (err) {
-    console.error('[discover-bold-seasons]', err)
-    await supabaseAdmin.from('admin_logs').insert({
-      type: 'bold_seasons_discover',
-      status: 'error',
-      message: `discover-bold-seasons failed: ${String(err)}`,
+    .catch(async (err) => {
+      console.error('[discover-bold-seasons]', err)
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'bold_seasons_discover',
+        status: 'error',
+        message: `discover-bold-seasons failed: ${String(err)}`,
+      })
     })
-    res.status(500).json({ error: String(err) })
-  }
 })
 
 // ─── GET /refresh-cycling-riders ───────────────────────────────────────────
