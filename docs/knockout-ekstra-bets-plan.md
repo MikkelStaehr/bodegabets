@@ -97,6 +97,27 @@ den kamp giver **dobbelt odds** (odds × 2 → dobbelt gevinst).
   for forlænget/straffe og justér mapping. Evt. en `/schedule`-kørsel der logger
   `status_short` for den første knockout-kamp.
 
+## Afslutnings-popup: "Knald eller fald" (når gruppespillet er slut)
+
+Engangs-popup i **samme stil** som `VmRulesAnnouncement` (forest-header med
+guld-eyebrow, cream-body, `RuleItem`-rækker, side-indikator) der forklarer alle
+knockout-nyhederne — vist når **sidste gruppespils-runde er spillet**.
+
+- **Komponent**: `components/games/KnockoutAnnouncement.tsx`, mountet i
+  `app/games/[id]/page.tsx` ved siden af `VmRulesAnnouncement` (kun blok-spil).
+- **Trigger**: vises ÉN gang pr. browser (localStorage-nøgle, fx
+  `bodega_vm_knockout_seen_v1`), men **kun når knockout-fasen er begyndt** — gates
+  på at gruppespillet er færdigt (alle gruppe-runder finished / aktiv blok er en
+  knockout-blok). Så den popper ikke op under gruppespillet, og ikke før feature'en
+  er relevant.
+- **Indhold (3 sider)**:
+  1. **"Knald eller fald"** 🏆 — knockout starter; herfra kan kampe ikke ende
+     uafgjort.
+  2. **Kryds = forlænget** 🔄 — vælger du X, tager du stilling til *hvem der går
+     videre* + *forlænget eller straffe* (giver ekstra-odds).
+  3. **🔥 On fire-kampen** — én tilfældig kamp pr. blok giver **dobbelt odds**;
+     hold øje med 🔥-badget.
+
 ## Edge cases
 
 - Knockout afgjort i ordinær tid (`FT`): et X-bet + ET-ekstra-bets taber.
@@ -112,4 +133,5 @@ den kamp giver **dobbelt odds** (odds × 2 → dobbelt gevinst).
 4. UI: X-foldout + 🔥-badge i `AfgivBets` + server-validering i `submit-bets`.
 5. Scoring: de to nye bet-typer (ekstra-bet-odds 1.2–1.5) + ×2-multiplikator for on-fire-kampen.
 6. Admin-felt for straffesparks-vinder.
-7. Verifikation på første rigtige knockout-kamp.
+7. Afslutnings-popup `KnockoutAnnouncement` (gated på knockout-fase-start).
+8. Verifikation på første rigtige knockout-kamp.
