@@ -175,6 +175,7 @@ export function AdminChampionshipTab() {
           name: champRound?.name ?? `Runde`,
           betting_closes_at: champRound?.betting_closes_at ?? null,
           match_ids: selectedMatches.map((m) => m.id),
+          season,
         }),
       })
       const createData = await createRes.json()

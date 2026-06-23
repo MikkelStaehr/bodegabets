@@ -63,23 +63,26 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response
 
   const body = await req.json()
-  const { name, betting_closes_at, match_ids } = body as {
+  const { name, betting_closes_at, match_ids, season } = body as {
     name: string
     betting_closes_at: string
     match_ids: number[]
+    season?: string
   }
 
   if (!name?.trim()) return NextResponse.json({ error: 'Navn er påkrævet' }, { status: 400 })
   if (!match_ids?.length) return NextResponse.json({ error: 'Vælg mindst én kamp' }, { status: 400 })
   if (match_ids.length > 9) return NextResponse.json({ error: 'Maks 9 kampe per runde' }, { status: 400 })
 
-  // Opret runde
+  // Opret runde. `season` SKAL med — ellers falder den tilbage til DB-default
+  // og forsvinder fra den sæson admin arbejder i (gemme = slet + genopret).
   const { data: round, error: roundError } = await supabaseAdmin
     .from('championship_rounds')
     .insert({
       name: name.trim(),
       status: 'upcoming',
       betting_closes_at: betting_closes_at || null,
+      ...(season ? { season } : {}),
     })
     .select('id')
     .single()
