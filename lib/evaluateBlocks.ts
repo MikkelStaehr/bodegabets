@@ -87,14 +87,6 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
   if (!finishedBlocks?.length) return
 
   for (const block of finishedBlocks) {
-    // Tjek om der allerede er block_winners for denne block
-    const { count: existingWinners } = await supabaseAdmin
-      .from('block_winners')
-      .select('id', { count: 'exact', head: true })
-      .eq('block_id', block.id)
-
-    if (existingWinners && existingWinners > 0) continue
-
     // Hent alle runde-id'er for denne block
     const { data: rounds, error: roundsError } = await supabaseAdmin
       .from('rounds')
@@ -133,6 +125,21 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
       addTotal(bb.user_id as string, bb.game_id as number, Number(bb.points_earned) || 0)
     }
 
+    // Allerede lagrede vindere for blokken (pr. spil) — så vi kun opdaterer ved
+    // ÆNDRING (selv-helende: hvis fx sene bets ændrer vinderen efter blokken
+    // først blev gjort op).
+    const { data: storedWinners } = await supabaseAdmin
+      .from('block_winners')
+      .select('game_id, user_id, points_in_block')
+      .eq('block_id', block.id)
+    const storedByGame = new Map<number, { users: Set<string>; maxPts: number }>()
+    for (const w of storedWinners ?? []) {
+      const g = storedByGame.get(w.game_id as number) ?? { users: new Set<string>(), maxPts: 0 }
+      g.users.add(w.user_id as string)
+      g.maxPts = Math.max(g.maxPts, Number(w.points_in_block) || 0)
+      storedByGame.set(w.game_id as number, g)
+    }
+
     // Gruppér per spil og find vinder(e)
     const byGame = new Map<number, Array<{ user_id: string; total: number }>>()
     for (const entry of totals.values()) {
@@ -144,9 +151,18 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
     for (const [gameId, entries] of byGame.entries()) {
       const maxTotal = Math.max(...entries.map((e) => e.total))
       const winners = entries.filter((e) => e.total === maxTotal)
+      const newSet = new Set(winners.map((w) => w.user_id))
+
+      // Spring over hvis lagret vinder(sæt) + point er uændret.
+      const stored = storedByGame.get(gameId)
+      const sameSet = stored != null && stored.users.size === newSet.size && [...newSet].every((u) => stored.users.has(u))
+      const samePts = stored != null && Math.round(stored.maxPts) === Math.round(maxTotal)
+      if (sameSet && samePts) continue
+
+      // Ellers: erstat blokkens lagrede vinder(e) for spillet med de aktuelle.
+      await supabaseAdmin.from('block_winners').delete().eq('block_id', block.id).eq('game_id', gameId)
 
       for (const winner of winners) {
-        // Indsæt block_winner (ON CONFLICT DO NOTHING)
         const { error: winnerError } = await supabaseAdmin
           .from('block_winners')
           .insert({
@@ -157,7 +173,6 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
           })
 
         if (winnerError) {
-          // Ignorer konflikter (allerede indsat)
           if (!winnerError.message.includes('duplicate') && !winnerError.code?.includes('23505')) {
             console.error(
               `[evaluateFinishedBlocks] Fejl ved insert af block_winner (block=${block.id}, game=${gameId}, user=${winner.user_id.slice(0, 8)}):`,
@@ -167,7 +182,8 @@ export async function evaluateFinishedBlocks(seasonId: number): Promise<void> {
           continue
         }
 
-        // Tildel frame_gold achievement (game_id=null, globalt)
+        // Tildel frame_gold achievement (game_id=null, globalt). Fjernes ALDRIG
+        // (en spiller der har vundet mindst én blok beholder badget).
         const { count: existing } = await supabaseAdmin
           .from('user_achievements')
           .select('id', { count: 'exact', head: true })
