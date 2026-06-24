@@ -15,11 +15,15 @@ type Log = {
 type Props = {
 }
 
-const FILTERS = ['Alle', 'Cron', 'Bold API', 'Point', 'Brugere'] as const
+const FILTERS = ['Alle', 'Cron', 'Bold API', 'Discovery', 'Startlister', 'Ryttere', 'Cykel-point', 'Point', 'Brugere'] as const
 const TYPE_MAP: Record<string, string> = {
   Alle: '',
   Cron: 'cron_sync',
   'Bold API': 'bold_api',
+  Discovery: 'bold_seasons_discover',
+  Startlister: 'cycling_startlists_sync',
+  Ryttere: 'cycling_riders_refresh',
+  'Cykel-point': 'cycling_points',
   Point: 'point_calc',
   Brugere: 'user_action',
 }
