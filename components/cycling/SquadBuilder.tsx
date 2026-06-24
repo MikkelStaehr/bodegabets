@@ -110,6 +110,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<number | null>(null)
   const [confirmedOnly, setConfirmedOnly] = useState(false)
+  const [teamFilter, setTeamFilter] = useState('') // '' = alle hold
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -181,10 +182,18 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
   }, [squad])
 
   // Filtered available riders
+  // Hold-liste til dropdown: unikke hold i puljen (alfabetisk, med antal).
+  const teamOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of availableRiders) counts.set(r.team_name, (counts.get(r.team_name) ?? 0) + 1)
+    return [...counts.entries()].sort((a, z) => a[0].localeCompare(z[0]))
+  }, [availableRiders])
+
   const filtered = useMemo(() => {
     let list = availableRiders.filter((r) => !squadIds.has(r.id))
     if (confirmedOnly) list = list.filter((r) => confirmedSet.has(r.id))
     if (catFilter !== null) list = list.filter((r) => r.category === catFilter)
+    if (teamFilter) list = list.filter((r) => r.team_name === teamFilter)
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -195,7 +204,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
       )
     }
     return list
-  }, [availableRiders, squadIds, catFilter, search, confirmedOnly, confirmedSet])
+  }, [availableRiders, squadIds, catFilter, teamFilter, search, confirmedOnly, confirmedSet])
 
   function canAdd(rider: Rider): { ok: boolean; reason?: string; short?: string; kind?: 'total' | 'category' | 'team' } {
     if (squad.length >= MAX_TOTAL) {
@@ -564,7 +573,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
             </span>
           </div>
 
-          {/* Search + filter */}
+          {/* Search + hold-filter */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <input
               type="text"
@@ -583,6 +592,28 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                 color: '#1a1a1a',
               }}
             />
+            <select
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              title="Filtrér på hold"
+              style={{
+                maxWidth: 200,
+                padding: '8px 10px',
+                border: `1px solid ${teamFilter ? '#1E3A5F' : '#D4CFC4'}`,
+                borderRadius: 2,
+                fontFamily: "'Barlow', sans-serif",
+                fontSize: 13,
+                outline: 'none',
+                background: '#fff',
+                color: teamFilter ? '#1E3A5F' : '#6b6b6b',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">Alle hold</option>
+              {teamOptions.map(([team, count]) => (
+                <option key={team} value={team}>{team} ({count})</option>
+              ))}
+            </select>
           </div>
 
           {/* Category filter pills + confirmed toggle */}
