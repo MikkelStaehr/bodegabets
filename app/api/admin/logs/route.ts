@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-const VALID_TYPES = ['cron_sync', 'bold_api', 'point_calc', 'user_action']
+const VALID_TYPES = [
+  'cron_sync', 'bold_api', 'point_calc', 'user_action',
+  // Cykel- og discovery-jobs — så admin kan se at de faktisk kører.
+  'bold_seasons_discover', 'cycling_startlists_sync', 'cycling_riders_refresh', 'cycling_points',
+]
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
