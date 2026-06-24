@@ -105,21 +105,8 @@ export default async function SquadPage({ params, searchParams }: Props) {
     }
   }
 
-  // Hent DNF/DNS-ryttere fra de aktive løb — markeres som 'UD' i squad-view
-  // så brugeren ser hvem der er kørt hjem og kan transferre dem ud.
-  const abandonedRiderIds: Set<string> = new Set()
-  if (raceIds.length > 0) {
-    const { data: dnfData } = await supabaseAdmin
-      .from('cycling_results')
-      .select('rider_id')
-      .in('race_id', raceIds)
-      .eq('dnf', true)
-    for (const row of dnfData ?? []) {
-      abandonedRiderIds.add(row.rider_id)
-    }
-  }
-
-  // Fetch block name and block race IDs if blockId is provided
+  // Bloknavn + bloks løb — hentes FØR rytter-scoping, så puljen og 'UD'-markering
+  // kan begrænses til netop denne bloks løb.
   let blockName: string | null = null
   let blockRaceIds: string[] = []
   if (blockId) {
@@ -138,6 +125,31 @@ export default async function SquadPage({ params, searchParams }: Props) {
 
     blockRaceIds = (blockRaces ?? []).map((r) => r.race_id)
   }
+
+  // 'UD'-markering: KUN ryttere der er DNF i DENNE bloks løb — ikke tidligere løb.
+  // (Falder tilbage til alle spillets løb hvis siden åbnes uden blok.)
+  const abandonedScopeRaceIds = blockRaceIds.length > 0 ? blockRaceIds : raceIds
+  const abandonedRiderIds: Set<string> = new Set()
+  if (abandonedScopeRaceIds.length > 0) {
+    const { data: dnfData } = await supabaseAdmin
+      .from('cycling_results')
+      .select('rider_id')
+      .in('race_id', abandonedScopeRaceIds)
+      .eq('dnf', true)
+    for (const row of dnfData ?? []) {
+      abandonedRiderIds.add(row.rider_id)
+    }
+  }
+
+  // Begræns rytter-puljen til dem der faktisk er på startlisten for denne bloks
+  // løb — så man ikke skal lede blandt ALLE ryttere. Falder tilbage til alle
+  // ryttere hvis startlisten endnu ikke er offentliggjort (UI'et advarer da).
+  const blockStartlistRiderIds = new Set(
+    raceStartlists.filter((rs) => blockRaceIds.includes(rs.raceId)).flatMap((rs) => rs.riderIds)
+  )
+  const availableRiders: Rider[] = blockStartlistRiderIds.size > 0
+    ? allRiders.filter((r) => blockStartlistRiderIds.has(r.id))
+    : allRiders
 
   // Compute dynamic squad limits baseret på blokkens startlister
   const squadLimits = await computeBlockSquadLimits(blockRaceIds)
@@ -219,7 +231,7 @@ export default async function SquadPage({ params, searchParams }: Props) {
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px 80px' }}>
         <SquadBuilder
           gameId={gameId}
-          availableRiders={allRiders}
+          availableRiders={availableRiders}
           raceStartlists={raceStartlists}
           initialSquad={initialSquad}
           blockId={blockId ?? null}
