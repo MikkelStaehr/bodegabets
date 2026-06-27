@@ -12,12 +12,28 @@ import BetSlipGuide from '@/components/games/BetSlipGuide'
 
 type MatchWithOptions = Match
 
-type ExtraBetType = 'goals_3plus' | 'clean_sheet' | 'win_margin'
+// Klassiske ekstra-bets (knyttet til en valgt vinder, 1/2) + knockout-bets
+// (ko_advance/ko_method, kun på X-valg). Begge bæres i samme extraBets-array.
+type ExtraBetType = 'goals_3plus' | 'clean_sheet' | 'win_margin' | 'ko_advance' | 'ko_method'
+
+const isKoType = (t: ExtraBetType) => t === 'ko_advance' || t === 'ko_method'
 
 type ExtraBet = {
   type: ExtraBetType
   prediction: string
   points: number
+}
+
+/**
+ * Genberegn extraBets når en kamps udfald skifter:
+ *   - 1/2: klassiske ekstra-bets følger den nye vinder; knockout-bets ryddes.
+ *   - X:   på knockout-kampe bevares knockout-bets; ellers ryddes alt.
+ */
+function remapExtrasForOutcome(extras: ExtraBet[], outcome: '1' | 'X' | '2', isKnockout: boolean): ExtraBet[] {
+  if (outcome === '1' || outcome === '2') {
+    return extras.filter((eb) => !isKoType(eb.type)).map((eb) => ({ ...eb, prediction: outcome }))
+  }
+  return isKnockout ? extras.filter((eb) => isKoType(eb.type)) : []
 }
 
 type BetEntry = {
@@ -231,6 +247,112 @@ function InlineExtraBets({
   )
 }
 
+/* ─── Inline Knockout Bets (X-valg på knockout-kampe) ─── */
+function InlineKnockoutBets({
+  matchId,
+  sel,
+  setKoPick,
+  adjustExtraStake,
+  setExtraStake,
+}: {
+  matchId: number
+  sel: BetEntry
+  setKoPick: (matchId: number, type: 'ko_advance' | 'ko_method', prediction: string) => void
+  adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
+  setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
+}) {
+  const [open, setOpen] = useState(sel.extraBets.some((eb) => isKoType(eb.type)))
+  // Knockout-kampe kan ikke ende uafgjort: vælger du X (uafgjort efter ordinær
+  // tid → forlænget), tager du stilling til hvem der går videre + hvordan.
+  if (sel.outcome !== 'X' || !sel.match.is_knockout) return null
+
+  const groups: { key: 'ko_advance' | 'ko_method'; title: string; opts: { label: string; value: string }[] }[] = [
+    { key: 'ko_advance', title: 'Hvem går videre?', opts: [
+      { label: sel.match.home_team, value: '1' },
+      { label: sel.match.away_team, value: '2' },
+    ] },
+    { key: 'ko_method', title: 'Hvordan afgøres det?', opts: [
+      { label: 'Forlænget', value: 'et' },
+      { label: 'Straffe', value: 'pen' },
+    ] },
+  ]
+
+  return (
+    <div className="border-t border-gold/30">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left"
+      >
+        <span className="text-[9px] font-bold tracking-widest uppercase flex-1 text-gold/80">
+          ⚔️ Forlænget — hvem går videre?
+        </span>
+        <span className={`text-[9px] text-gold/60 transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-2 flex flex-col gap-2.5">
+          {groups.map((g) => {
+            const active = sel.extraBets.find((eb) => eb.type === g.key)
+            return (
+              <div key={g.key}>
+                <p className="text-[9px] font-bold tracking-wide uppercase text-[var(--color-warm-taupe)] mb-1">{g.title}</p>
+                <div className="flex gap-1">
+                  {g.opts.map((o) => {
+                    const selected = active?.prediction === o.value
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setKoPick(matchId, g.key, o.value)}
+                        className={`flex-1 py-1.5 px-2 border-[1.5px] rounded text-[11px] font-semibold transition-all truncate ${
+                          selected
+                            ? 'bg-[var(--color-card-green)] border-[#2C4A3E] text-white'
+                            : 'bg-white border-black/10 text-[var(--color-warm-taupe)] hover:border-[#2C4A3E] hover:text-[var(--color-dark-green)]'
+                        }`}
+                      >
+                        {selected ? '✓ ' : ''}{o.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {active && (
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => adjustExtraStake(matchId, g.key, -50)}
+                      className="w-6 h-6 border border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)] rounded font-bold text-sm flex items-center justify-center"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={10}
+                      value={active.points}
+                      onChange={(e) => setExtraStake(matchId, g.key, parseInt(e.target.value) || 10)}
+                      className="w-14 text-center font-condensed text-[13px] font-bold border border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)] rounded h-6"
+                    />
+                    <span className="text-[10px] font-semibold text-[var(--color-warm-taupe)]">credits</span>
+                    <button
+                      type="button"
+                      onClick={() => adjustExtraStake(matchId, g.key, 50)}
+                      className="w-6 h-6 border border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)] rounded font-bold text-sm flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          <p className="text-[9px] text-[var(--color-warm-taupe)] leading-snug">
+            Ekstra-odds (1,2–1,5). Afgøres kun hvis kampen står lige efter ordinær tid.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 type ExtraBetData = { prediction: string; stake: number; points_earned: number | null; result: string | null; odds: number | null }
 
 /* ─── Read-only Extra Bets for Finished/Locked Matches ─── */
@@ -302,6 +424,7 @@ function MatchCard({
   matchResultBet,
   selectOutcome,
   toggleExtra,
+  setKoPick,
   adjustExtraStake,
   setExtraStake,
   adjustStake,
@@ -326,6 +449,7 @@ function MatchCard({
   matchResultBet: Bet | undefined
   selectOutcome: (matchId: number, outcome: '1' | 'X' | '2') => void
   toggleExtra: (matchId: number, key: ExtraBetType) => void
+  setKoPick: (matchId: number, type: 'ko_advance' | 'ko_method', prediction: string) => void
   adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
   setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
   adjustStake: (matchId: number, delta: number) => void
@@ -358,6 +482,16 @@ function MatchCard({
           <span className="text-[12px]">🔥</span>
           <span className="font-condensed text-[11px] font-bold text-gold uppercase tracking-widest">
             {rivalry.rivalry_name} · {rivalry.multiplier}×
+          </span>
+        </div>
+      )}
+
+      {/* 🔥 On fire — dobbelt odds på ALLE bets i denne kamp (én pr. knockout-blok) */}
+      {match.is_on_fire && !isRivalry && (
+        <div className="flex items-center gap-2 px-3 pt-2.5 pb-0.5">
+          <span className="text-[12px]">🔥</span>
+          <span className="font-condensed text-[11px] font-bold text-gold uppercase tracking-widest">
+            On fire · dobbelt odds
           </span>
         </div>
       )}
@@ -464,6 +598,17 @@ function MatchCard({
           sel={sel}
           isRivalry={isRivalry}
           toggleExtra={toggleExtra}
+          adjustExtraStake={adjustExtraStake}
+          setExtraStake={setExtraStake}
+        />
+      )}
+
+      {/* Knockout-valg — kun på knockout-kampe når X (uafgjort) er valgt */}
+      {isOpen && sel && (
+        <InlineKnockoutBets
+          matchId={match.id}
+          sel={sel}
+          setKoPick={setKoPick}
           adjustExtraStake={adjustExtraStake}
           setExtraStake={setExtraStake}
         />
@@ -729,7 +874,7 @@ export default function AfgivBets({
             prev.map((s) => {
               if (s.matchId !== matchId) return s
               const o = existingBet.prediction as '1' | 'X' | '2'
-              const extraBets = (o === '1' || o === '2') ? s.extraBets.map((eb) => ({ ...eb, prediction: o })) : []
+              const extraBets = remapExtrasForOutcome(s.extraBets, o, s.match.is_knockout ?? false)
               return { ...s, outcome: o, extraBets }
             })
           )
@@ -741,10 +886,8 @@ export default function AfgivBets({
       setSelections((prev) =>
         prev.map((s) => {
           if (s.matchId !== matchId) return s
-          // Ekstra-bets følger den nye vinder; kryds (X) rydder dem.
-          const extraBets = (outcome === '1' || outcome === '2')
-            ? s.extraBets.map((eb) => ({ ...eb, prediction: outcome }))
-            : []
+          // Ekstra-bets følger den nye vinder; X bevarer knockout-bets (ellers ryddet).
+          const extraBets = remapExtrasForOutcome(s.extraBets, outcome, s.match.is_knockout ?? false)
           return { ...s, outcome, extraBets }
         })
       )
@@ -832,6 +975,27 @@ export default function AfgivBets({
         const next = existing
           ? s.extraBets.filter((eb) => eb.type !== key)
           : [...s.extraBets, { type: key, prediction: s.outcome, points: 50 }]
+        return { ...s, extraBets: next }
+      })
+    )
+  }
+
+  // Knockout-valg: ét ko_advance + ét ko_method pr. kamp, kun på X. Tryk samme
+  // valg igen = fjern. Andet valg = skift. (Bæres i extraBets som de øvrige.)
+  const setKoPick = (matchId: number, type: 'ko_advance' | 'ko_method', prediction: string) => {
+    setSelections((prev) =>
+      prev.map((s) => {
+        if (s.matchId !== matchId) return s
+        if (s.outcome !== 'X') return s
+        const existing = s.extraBets.find((eb) => eb.type === type)
+        let next: ExtraBet[]
+        if (existing && existing.prediction === prediction) {
+          next = s.extraBets.filter((eb) => eb.type !== type)
+        } else if (existing) {
+          next = s.extraBets.map((eb) => (eb.type === type ? { ...eb, prediction } : eb))
+        } else {
+          next = [...s.extraBets, { type, prediction, points: 50 }]
+        }
         return { ...s, extraBets: next }
       })
     )
@@ -1048,6 +1212,7 @@ export default function AfgivBets({
           matchResultBet={md.matchResultBet}
           selectOutcome={selectOutcome}
           toggleExtra={toggleExtra}
+          setKoPick={setKoPick}
           adjustExtraStake={adjustExtraStake}
           setExtraStake={setExtraStake}
           adjustStake={adjustStake}

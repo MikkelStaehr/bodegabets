@@ -71,9 +71,15 @@ export type Match = {
   second_half_started_at?: string | null
   sofascore_event_id?: string | null
   league_match_id?: number | null
+  // Knockout-fasen (VM-slutspil)
+  is_knockout?: boolean
+  is_on_fire?: boolean
+  ko_method?: string | null
+  ko_advanced?: string | null
+  ko_resolved?: boolean
 }
 
-export type BetType = 'match_result' | 'goals_3plus' | 'clean_sheet' | 'win_margin'
+export type BetType = 'match_result' | 'goals_3plus' | 'clean_sheet' | 'win_margin' | 'ko_advance' | 'ko_method'
 
 export type Bet = {
   id: number
