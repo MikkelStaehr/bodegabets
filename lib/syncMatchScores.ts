@@ -140,10 +140,9 @@ export async function syncMatchScores(options?: {
 
       }
 
-      // Beregn konsensus odds for ekstra bets (goals_3plus, clean_sheet,
-      // win_margin) + knockout-bets (ko_advance: 1/2, ko_method: et/pen).
+      // Beregn konsensus odds for ekstra bets (goals_3plus, clean_sheet, win_margin).
       // Samme 1,2–1,5-range — et lille tillæg, ikke hoved-bettets odds.
-      const extraBetTypes = ['goals_3plus', 'clean_sheet', 'win_margin', 'ko_advance', 'ko_method']
+      const extraBetTypes = ['goals_3plus', 'clean_sheet', 'win_margin']
       for (const betType of extraBetTypes) {
         const { data: extraBets } = await supabaseAdmin
           .from('bets')

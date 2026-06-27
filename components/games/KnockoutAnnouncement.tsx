@@ -8,8 +8,8 @@ import { useState, useEffect } from 'react'
  * browser (versioneret nøgle) — og kun når knockout-fasen er i gang (gates i
  * page.tsx på at en knockout-runde er åbnet).
  */
-const SEEN_KEY = 'bodega_vm_knockout_seen_v1'
-const TOTAL_PAGES = 3
+const SEEN_KEY = 'bodega_vm_knockout_seen_v2'
+const TOTAL_PAGES = 2
 
 export default function KnockoutAnnouncement() {
   const [visible, setVisible] = useState(false)
@@ -32,7 +32,7 @@ export default function KnockoutAnnouncement() {
 
   if (!visible) return null
 
-  const title = page === 0 ? 'Knald eller fald 🏆' : page === 1 ? 'Kryds = forlænget 🔄' : 'On fire-kampen 🔥'
+  const title = page === 0 ? 'Knald eller fald 🏆' : 'On fire-kampen 🔥'
   const isLast = page === TOTAL_PAGES - 1
 
   return (
@@ -54,14 +54,13 @@ export default function KnockoutAnnouncement() {
           {page === 0 && (
             <>
               <p className="font-body text-[14px] text-ink leading-relaxed">
-                Gruppespillet er slut — nu er det <strong>knald eller fald</strong>. Fra her kan
-                kampe <strong>ikke ende uafgjort</strong>: står de lige efter 90 minutter, fortsætter
-                de i forlænget spilletid og evt. straffespark.
+                Gruppespillet er slut — nu er det <strong>knald eller fald</strong>. Knockout-kampe
+                kan ikke ende uafgjort, så du vælger ganske enkelt <strong>hvem der går videre</strong>.
               </p>
               <ul className="space-y-2.5">
-                <RuleItem icon="🏆" title="Vinderen går videre, taberen ryger ud">
-                  Hver kamp har en vinder. Dit <strong>1/X/2</strong> gælder resultatet efter
-                  ordinær tid — ligesom altid.
+                <RuleItem icon="🏆" title="Hvem går videre?">
+                  Ingen uafgjort (X) — kun <strong>hjemme eller ude</strong>. Det tæller, uanset om
+                  kampen blev afgjort i ordinær tid, forlænget eller på straffe.
                 </RuleItem>
               </ul>
             </>
@@ -70,33 +69,13 @@ export default function KnockoutAnnouncement() {
           {page === 1 && (
             <>
               <p className="font-body text-[14px] text-ink leading-relaxed">
-                <strong>X betyder nu noget nyt:</strong> uafgjort efter ordinær tid → forlænget.
-                Vælger du X, folder to ekstra-valg sig ud:
-              </p>
-              <ul className="space-y-2.5">
-                <RuleItem icon="⚔️" title="Hvem går videre?">
-                  Hjemme eller ude — hvem ender med at gå videre, uanset om det bliver afgjort i
-                  forlænget eller på straffe.
-                </RuleItem>
-                <RuleItem icon="⏱️" title="Hvordan afgøres det?">
-                  Forlænget spilletid eller straffespark. Begge giver <strong>ekstra-odds (1,2–1,5)</strong>
-                  oveni — et lille tillæg når du rammer rigtigt.
-                </RuleItem>
-              </ul>
-            </>
-          )}
-
-          {page === 2 && (
-            <>
-              <p className="font-body text-[14px] text-ink leading-relaxed">
                 Én tilfældig kamp i hver blok er <strong>🔥 on fire</strong>:
               </p>
               <ul className="space-y-2.5">
-                <RuleItem icon="🔥" title="Dobbelt odds på alt">
-                  Alle dine bets på on-fire-kampen giver <strong>dobbelt gevinst</strong> — kampresultat,
-                  ekstra-bets og forlænget-valg.
+                <RuleItem icon="🔥" title="Dobbelt odds">
+                  Alle dine bets på on-fire-kampen giver <strong>dobbelt gevinst</strong>.
                 </RuleItem>
-                <RuleItem icon="👀" title="Den er synlig fra start">
+                <RuleItem icon="👀" title="Synlig fra start">
                   Kampen markeres med et <strong>🔥-badge</strong> på kuponen fra blokkens start, så du
                   kan satse derefter. Vælges tilfældigt og låses — den skifter ikke undervejs.
                 </RuleItem>
