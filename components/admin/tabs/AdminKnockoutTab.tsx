@@ -27,6 +27,17 @@ const METHOD_LABEL: Record<Method, string> = {
   pen: 'Straffe',
 }
 
+/**
+ * Smart standard pr. kamp: afgjort i ordinær tid, og "hvem videre" = holdet med
+ * højeste score. Det passer for ordinær (vinderen), forlænget (vindermålet) OG
+ * straffe (Bold lægger straffescoren i resultatet, så straffevinderen har den
+ * højeste score). Admin behøver derfor kun ændre METODEN på ikke-ordinære kampe.
+ */
+function defaultDraft(m: KoMatch): Draft {
+  const advanced: '1' | '2' = (m.home_score ?? 0) >= (m.away_score ?? 0) ? '1' : '2'
+  return { method: 'reg', advanced }
+}
+
 function fmtKickoff(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('da-DK', {
@@ -53,11 +64,11 @@ export function AdminKnockoutTab() {
 
   useEffect(() => { load() }, [load])
 
-  const setDraft = (id: number, patch: Partial<Draft>) =>
-    setDrafts((prev) => ({ ...prev, [id]: { method: 'et', advanced: '1', ...prev[id], ...patch } }))
+  const setDraft = (m: KoMatch, patch: Partial<Draft>) =>
+    setDrafts((prev) => ({ ...prev, [m.id]: { ...defaultDraft(m), ...prev[m.id], ...patch } }))
 
   async function resolve(m: KoMatch) {
-    const d = drafts[m.id] ?? { method: 'et' as Method, advanced: '1' as const }
+    const d = drafts[m.id] ?? defaultDraft(m)
     setSavingId(m.id)
     setMsg(null)
     const res = await fetch('/api/admin/knockout', {
@@ -109,7 +120,7 @@ export function AdminKnockoutTab() {
             ) : (
               <div className="space-y-2">
                 {unresolved.map((m) => {
-                  const d = drafts[m.id] ?? { method: 'et' as Method, advanced: '1' as const }
+                  const d = drafts[m.id] ?? defaultDraft(m)
                   return (
                     <div key={m.id} className="border border-warm-border bg-cream p-3" style={{ borderRadius: '2px' }}>
                       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -130,7 +141,7 @@ export function AdminKnockoutTab() {
                             <button
                               key={mt}
                               type="button"
-                              onClick={() => setDraft(m.id, { method: mt })}
+                              onClick={() => setDraft(m, { method: mt })}
                               className={`font-condensed text-[11px] font-bold px-2.5 py-1 border transition-colors ${
                                 d.method === mt ? 'bg-forest text-cream border-forest' : 'bg-cream text-warm-gray border-warm-border hover:border-forest'
                               }`}
@@ -146,7 +157,7 @@ export function AdminKnockoutTab() {
                             <button
                               key={v}
                               type="button"
-                              onClick={() => setDraft(m.id, { advanced: v })}
+                              onClick={() => setDraft(m, { advanced: v })}
                               className={`font-condensed text-[11px] font-bold px-2.5 py-1 border transition-colors max-w-[140px] truncate ${
                                 d.advanced === v ? 'bg-forest text-cream border-forest' : 'bg-cream text-warm-gray border-warm-border hover:border-forest'
                               }`}
