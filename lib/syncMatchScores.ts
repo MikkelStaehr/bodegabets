@@ -422,10 +422,10 @@ export async function syncMatchScores(options?: {
       continue
     }
 
-    // Pre-fetch current status to detect finished-transition
+    // Pre-fetch current status to detect finished-transition (+ is_knockout til probe)
     const { data: currentMatch } = await supabaseAdmin
       .from('matches')
-      .select('status')
+      .select('status, is_knockout')
       .eq('id', match.id)
       .single()
 
@@ -463,6 +463,34 @@ export async function syncMatchScores(options?: {
       if (status === 'finished' && currentMatch?.status !== 'finished') {
         if (match.round_id) finishedRoundIds.add(match.round_id)
         finishedMatchIds.add(match.id)
+      }
+
+      // 🔬 MIDLERTIDIG knockout-probe (fjernes efter blok 10-analyse):
+      // log status + minut + score for knockout-kampe ved hvert poll, så vi kan
+      // se om Bold sender en ekstra 'halftime'/pause omkring minut 90 før
+      // forlænget — dvs. om vi kan auto-detektere forlænget/straffe senere.
+      if (currentMatch?.is_knockout) {
+        const minute = typeof boldData.time === 'number' ? boldData.time : null
+        try {
+          await supabaseAdmin.from('admin_logs').insert({
+            type: 'knockout_probe',
+            status: 'info',
+            message: `m${match.id} ${currentMatch.status}→${status} @ ${minute ?? '?'}' (${h}-${a})`,
+            metadata: {
+              match_id: match.id,
+              from_status: currentMatch.status,
+              to_status: status,
+              minute,
+              paused: status === 'halftime',
+              home_score: h,
+              away_score: a,
+              bold_time: boldData.time ?? null,
+              at: new Date().toISOString(),
+            },
+          })
+        } catch {
+          // probe må aldrig vælte sync'en
+        }
       }
     }
   }
