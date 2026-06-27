@@ -6,6 +6,7 @@ const VALID_TYPES = [
   'cron_sync', 'bold_api', 'point_calc', 'user_action',
   // Cykel- og discovery-jobs — så admin kan se at de faktisk kører.
   'bold_seasons_discover', 'cycling_startlists_sync', 'cycling_riders_refresh', 'cycling_points',
+  'knockout_probe',
 ]
 
 export async function GET(req: NextRequest) {
