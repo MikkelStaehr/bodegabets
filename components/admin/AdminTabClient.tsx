@@ -11,7 +11,6 @@ import { AdminLogsTab } from './tabs/AdminLogsTab'
 import { AdminAuditTab } from './tabs/AdminAuditTab'
 import { LiveTestTab } from './tabs/LiveTestTab'
 import { AdminChampionshipTab } from './tabs/AdminChampionshipTab'
-import { AdminKnockoutTab } from './tabs/AdminKnockoutTab'
 import { AdminCyclingDashboardTab } from './tabs/cycling/AdminCyclingDashboardTab'
 import { AdminCyclingRidersTab } from './tabs/cycling/AdminCyclingRidersTab'
 import { AdminCyclingRacesTab } from './tabs/cycling/AdminCyclingRacesTab'
@@ -37,7 +36,6 @@ const FOOTBALL_TABS = [
   { id: 'seasons', label: 'Sæsoner', icon: '📅' },
   { id: 'games', label: 'Spilrum', icon: '🏆' },
   { id: 'championship', label: 'Mesterskabet', icon: '🏅' },
-  { id: 'knockout', label: 'Knockout', icon: '⚔️' },
   { id: 'live-test', label: 'LIVE TEST', icon: '🔴' },
 ] as const
 
@@ -138,7 +136,6 @@ export default function AdminTabClient({ tournaments, lastSync }: Props) {
           {validTab === 'seasons' && <AdminSeasonsTab />}
           {validTab === 'games' && <AdminGamesTab sport="football" />}
           {validTab === 'championship' && <AdminChampionshipTab />}
-          {validTab === 'knockout' && <AdminKnockoutTab />}
           {validTab === 'live-test' && <LiveTestTab />}
         </>
       )}
