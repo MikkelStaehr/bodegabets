@@ -46,8 +46,14 @@ CREATE INDEX IF NOT EXISTS matches_is_knockout_idx ON matches (is_knockout) WHER
 -- slutspilskampe findes allerede (med pladsholder-hold som "2A v 2B"), så denne
 -- ene UPDATE dækker hele knockout-fasen. Rundenavne ser ud som "1/16-finale ·
 -- 28. jun", "Kvartfinale · 9. jul" osv. (gruppespil starter med "Gruppespil").
+--
+-- VIGTIGT: scopet til VM-sæsonen (season_id = 25). De nye knockout-felter driver
+-- en VM-SPECIFIK scoring (admin-afgjort, pending til ko_resolved). Andre turneringer
+-- (CL/EL m.fl.) bruger ALTID "1/16-finale" som rundenavn og scores på slutresultatet
+-- som hidtil — de må IKKE flagges, ellers ville deres bets ende pending.
 UPDATE matches m
 SET is_knockout = true
 FROM rounds r
 WHERE m.round_id = r.id
+  AND m.season_id = 25
   AND r.name ~* '^(1/16-finale|Ottendedelsfinale|Kvartfinale|Semifinale|Bronzekamp|Finale)';
