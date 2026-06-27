@@ -140,8 +140,10 @@ export async function syncMatchScores(options?: {
 
       }
 
-      // Beregn konsensus odds for ekstra bets (goals_3plus, clean_sheet, win_margin)
-      const extraBetTypes = ['goals_3plus', 'clean_sheet', 'win_margin']
+      // Beregn konsensus odds for ekstra bets (goals_3plus, clean_sheet,
+      // win_margin) + knockout-bets (ko_advance: 1/2, ko_method: et/pen).
+      // Samme 1,2–1,5-range — et lille tillæg, ikke hoved-bettets odds.
+      const extraBetTypes = ['goals_3plus', 'clean_sheet', 'win_margin', 'ko_advance', 'ko_method']
       for (const betType of extraBetTypes) {
         const { data: extraBets } = await supabaseAdmin
           .from('bets')
@@ -162,9 +164,10 @@ export async function syncMatchScores(options?: {
 
         for (const groupBets of groups.values()) {
           const total = groupBets.length
-          const count: Record<string, number> = { '1': 0, '2': 0 }
+          // Generisk optælling — virker for både 1/2 og et/pen.
+          const count: Record<string, number> = {}
           for (const bet of groupBets) {
-            if (bet.prediction in count) count[bet.prediction]++
+            count[bet.prediction] = (count[bet.prediction] ?? 0) + 1
           }
 
           // Ekstra-bets giver MINDRE odds end hoved-bettet (1/X/2 = 1,2–1,8) —

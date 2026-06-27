@@ -10,6 +10,7 @@ import GameTicker from '@/components/games/GameTicker'
 import ActiveRoundLiveTicker from '@/components/games/ActiveRoundLiveTicker'
 import { CalendarSelectionProvider } from '@/components/games/CalendarSelectionContext'
 import VmRulesAnnouncement from '@/components/games/VmRulesAnnouncement'
+import KnockoutAnnouncement from '@/components/games/KnockoutAnnouncement'
 import InviteCodeShare from '@/components/games/InviteCodeShare'
 import CalendarSlider from '@/components/games/CalendarSlider'
 import type { CalendarMatch, CalendarRound } from '@/components/games/CalendarSlider'
@@ -170,6 +171,13 @@ export default async function GamePage({ params }: Props) {
   if (!myMembership) redirect('/dashboard')
 
   const typedRoundsEarly = (rounds ?? []) as Round[]
+
+  // Knockout-fasen er begyndt når en slutspils-runde er åbnet (ikke længere upcoming).
+  // Gater KnockoutAnnouncement-popuppen, så den ikke popper op under gruppespillet.
+  const KNOCKOUT_NAME_RE = /^(1\/16-finale|Ottendedelsfinale|Kvartfinale|Semifinale|Bronzekamp|Finale)/i
+  const knockoutStarted = typedRoundsEarly.some(
+    (r) => KNOCKOUT_NAME_RE.test(r.name ?? '') && r.status !== 'upcoming'
+  )
 
   // Hent liga-info via seasons → tournaments
   const uniqueSeasonIds = [...new Set(typedRoundsEarly.map((r) => r.season_id).filter(Boolean))]
@@ -1364,6 +1372,7 @@ export default async function GamePage({ params }: Props) {
     <GameStateProvider gameId={gameId} initialState={initialGameState}>
     <div className="min-h-screen" style={{ background: '#F2EDE4', fontFamily: "'Barlow', sans-serif" }}>
       {usesBlockCredits && <VmRulesAnnouncement guideHref="/games/vm-guide" />}
+      {usesBlockCredits && knockoutStarted && <KnockoutAnnouncement />}
       <NavbarSportTheme sport={typedGame.sport} />
       <GameTicker items={tickerItems} />
 

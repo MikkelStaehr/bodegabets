@@ -146,6 +146,55 @@ app.get('/batch-sync', async (_req, res) => {
   }
 })
 
+/**
+ * 🔥 On fire: vælg én tilfældig knockout-kamp pr. knockout-blok som "on fire"
+ * (dobbelt odds på alle bets i kampen) når blokken er i spil. Idempotent —
+ * vælger kun hvis blokken ikke allerede har en on-fire-kamp, og ændrer den
+ * aldrig bagefter. Returnerer antal nyligt valgte.
+ */
+async function assignKnockoutOnFire(): Promise<number> {
+  const { data: koMatches } = await supabaseAdmin
+    .from('matches')
+    .select('id, round_id, is_on_fire')
+    .eq('is_knockout', true)
+  if (!koMatches?.length) return 0
+
+  const roundIds = [...new Set(koMatches.map((m) => m.round_id).filter((x): x is number => x != null))]
+  const { data: rounds } = await supabaseAdmin
+    .from('rounds')
+    .select('id, block_id, status')
+    .in('id', roundIds)
+  const roundById = new Map(
+    (rounds ?? []).map((r) => [r.id as number, r as { id: number; block_id: number | null; status: string }])
+  )
+
+  type Blk = { matchIds: number[]; hasOnFire: boolean; inPlay: boolean }
+  const blocks = new Map<number, Blk>()
+  for (const m of koMatches) {
+    const r = m.round_id != null ? roundById.get(m.round_id as number) : null
+    const bid = r?.block_id ?? null
+    if (bid == null) continue
+    const blk = blocks.get(bid) ?? { matchIds: [], hasOnFire: false, inPlay: false }
+    blk.matchIds.push(m.id as number)
+    if ((m as { is_on_fire?: boolean }).is_on_fire) blk.hasOnFire = true
+    // Blokken er "i spil" når mindst én af dens runder ikke længere er upcoming.
+    if (r && r.status !== 'upcoming') blk.inPlay = true
+    blocks.set(bid, blk)
+  }
+
+  let assigned = 0
+  for (const [, blk] of blocks) {
+    if (blk.hasOnFire || !blk.inPlay || blk.matchIds.length === 0) continue
+    const pick = blk.matchIds[Math.floor(Math.random() * blk.matchIds.length)]
+    const { error } = await supabaseAdmin
+      .from('matches')
+      .update({ is_on_fire: true, is_on_fire_set_at: new Date().toISOString() })
+      .eq('id', pick)
+    if (!error) assigned++
+  }
+  return assigned
+}
+
 // ─── GET /update-rounds ─────────────────────────────────────────────────────
 
 app.get('/update-rounds', async (_req, res) => {
@@ -272,6 +321,10 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ status: 'open' }).in('id', openIds)
     }
 
+    // 🔥 On fire: vælg én tilfældig knockout-kamp for hver knockout-blok der nu
+    // er i spil (og som ikke allerede har en on-fire-kamp). Idempotent.
+    const onFireAssigned = await assignKnockoutOnFire()
+
     // 3) Sæt betting_closes_at
     const toSetDeadline = rounds.filter((r) => {
       if (r.betting_closes_at) return false
@@ -309,7 +362,7 @@ app.get('/update-rounds', async (_req, res) => {
       }
     }
 
-    console.log(`[update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}, champ finished: ${champFinished}`)
+    console.log(`[update-rounds] ${nowIso} — finished: ${finishedIds.length}, opened: ${openIds.length}, deadlines set: ${toSetDeadline.length}, champ finished: ${champFinished}, on-fire: ${onFireAssigned}`)
 
     await supabaseAdmin.from('admin_logs').insert({
       type: 'cron_sync',

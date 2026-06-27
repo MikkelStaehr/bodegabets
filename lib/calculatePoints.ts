@@ -1,7 +1,77 @@
 import { supabaseAdmin } from '@/lib/supabase'
 import { isBetCorrect } from './betUtils'
+import { BET_TYPES } from './betTypes'
 import { evaluateAchievements } from '@/lib/evaluateAchievements'
 import { getLosersLuckUserIds, LOSERS_LUCK_BOOST } from '@/lib/losersLuck'
+
+type ScorableMatch = {
+  home_score: number
+  away_score: number
+  home_score_ht?: number | null
+  away_score_ht?: number | null
+  is_knockout?: boolean | null
+  ko_resolved?: boolean | null
+  ko_method?: string | null
+  ko_advanced?: string | null
+  is_on_fire?: boolean | null
+}
+
+/**
+ * Afgør ét bet på en finished kamp.
+ *   - skip=true → lad bettet være PENDING (knockout-kamp endnu ikke admin-afgjort).
+ *   - correct  → om bettet vandt.
+ *
+ * Knockout: match_result + ko_advance/ko_method afgøres ud fra de admin-satte
+ * felter (ko_method/ko_advanced), IKKE det rå slutresultat — slutresultatet
+ * inkluderer forlænget spilletid og afspejler ikke 90-min-udfaldet.
+ */
+export function evaluateBet(
+  betType: string,
+  prediction: string,
+  m: ScorableMatch
+): { skip: boolean; correct: boolean } {
+  if (m.is_knockout) {
+    if (!m.ko_resolved) return { skip: true, correct: false }
+    const decidedInReg = m.ko_method == null // null = afgjort i ordinær tid
+    const regWinner = m.home_score > m.away_score ? '1' : '2'
+    const regResult = decidedInReg ? regWinner : 'X' // X = stod lige efter 90
+    const advancer = decidedInReg ? regWinner : (m.ko_advanced ?? null)
+
+    switch (betType) {
+      case BET_TYPES.MATCH_RESULT:
+        return { skip: false, correct: prediction === regResult }
+      case BET_TYPES.KO_ADVANCE:
+        return { skip: false, correct: !decidedInReg && advancer != null && prediction === advancer }
+      case BET_TYPES.KO_METHOD:
+        return { skip: false, correct: !decidedInReg && prediction === m.ko_method }
+      default:
+        // Eksisterende ekstra-bets (goals_3plus m.fl.) — på slutresultat som hidtil.
+        return { skip: false, correct: isBetCorrect(betType, prediction, m.home_score, m.away_score) }
+    }
+  }
+  return {
+    skip: false,
+    correct: isBetCorrect(betType, prediction, m.home_score, m.away_score, m.home_score_ht, m.away_score_ht),
+  }
+}
+
+/**
+ * stake × odds (match_result fallback 1.0, ekstra-bets 1.5), ×2 hvis 🔥 on-fire-kamp.
+ * Losers Luck-boost lægges oveni af kalderen.
+ */
+export function computeBasePoints(
+  correct: boolean,
+  betType: string,
+  stake: number,
+  odds: number | null | undefined,
+  onFire: boolean
+): number {
+  if (!correct) return 0
+  const base = betType === BET_TYPES.MATCH_RESULT ? (odds ?? 1.0) : (odds ?? 1.5)
+  let pts = Math.round(stake * base)
+  if (onFire) pts = pts * 2
+  return pts
+}
 
 /**
  * V1 — Simpel, idempotent pointberegning.
@@ -20,7 +90,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
   // 1. Hent finished matches via round_id
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_score, away_score, home_score_ht, away_score_ht, status')
+    .select('id, home_score, away_score, home_score_ht, away_score_ht, status, is_knockout, ko_resolved, ko_method, ko_advanced, is_on_fire')
     .eq('round_id', roundId)
     .eq('status', 'finished')
 
@@ -63,27 +133,18 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       if (!bets?.length) continue
 
       for (const bet of bets) {
-        const correct = isBetCorrect(
-          bet.bet_type,
-          bet.prediction,
-          match.home_score,
-          match.away_score,
-          match.home_score_ht,
-          match.away_score_ht
-        )
+        const { skip, correct } = evaluateBet(bet.bet_type, bet.prediction, match as ScorableMatch)
+        // Knockout-kamp endnu ikke admin-afgjort → lad bettet være pending.
+        if (skip) continue
 
         const stake = bet.stake ?? 0
-        let pointsEarned: number
-        if (!correct) {
-          pointsEarned = 0
-        } else if (bet.bet_type === 'match_result') {
-          const odds = (bet as { odds?: number | null }).odds ?? 1.0
-          pointsEarned = Math.round(stake * odds)
-        } else {
-          // Ekstra bets: brug konsensus odds (mindre end hoved-bet) med fallback 1.5
-          const odds = (bet as { odds?: number | null }).odds ?? 1.5
-          pointsEarned = Math.round(stake * odds)
-        }
+        let pointsEarned = computeBasePoints(
+          correct,
+          bet.bet_type,
+          stake,
+          (bet as { odds?: number | null }).odds,
+          !!match.is_on_fire
+        )
         // 🍀 Losers Luck: +20% på vundne bets for de nederste i sæsonen.
         if (correct && losersLuck.has(bet.user_id as string)) {
           pointsEarned = Math.round(pointsEarned * LOSERS_LUCK_BOOST)

@@ -107,6 +107,7 @@ export default async function RoundPage({ params }: Props) {
   const matchSelect = `
     id, round_id, kickoff_at:kickoff, status, result, bet_open, second_half_started_at,
     home_score, away_score,
+    is_knockout, is_on_fire, ko_method, ko_advanced, ko_resolved,
     home_team:teams!home_team_id(id, name, logo_url),
     away_team:teams!away_team_id(id, name, logo_url)
   `
@@ -121,6 +122,11 @@ export default async function RoundPage({ params }: Props) {
     second_half_started_at: string | null
     home_score: number | null
     away_score: number | null
+    is_knockout: boolean | null
+    is_on_fire: boolean | null
+    ko_method: string | null
+    ko_advanced: string | null
+    ko_resolved: boolean | null
     home_team: { id: number; name: string; logo_url: string | null } | null
     away_team: { id: number; name: string; logo_url: string | null } | null
   }
@@ -141,6 +147,11 @@ export default async function RoundPage({ params }: Props) {
       bet_open: raw.bet_open,
       second_half_started_at: raw.second_half_started_at,
       round_id: raw.round_id,
+      is_knockout: raw.is_knockout ?? false,
+      is_on_fire: raw.is_on_fire ?? false,
+      ko_method: raw.ko_method,
+      ko_advanced: raw.ko_advanced,
+      ko_resolved: raw.ko_resolved ?? false,
     }
   }
 

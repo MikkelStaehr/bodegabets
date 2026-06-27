@@ -103,6 +103,46 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
+  // ── Knockout-bets (ko_advance / ko_method) ────────────────────────────────
+  // Kun gyldige på knockout-kampe når brugerens match_result på samme kamp er 'X'
+  // (uafgjort efter ordinær tid → forlænget/straffe). Defensiv server-validering.
+  const KO_TYPES = ['ko_advance', 'ko_method']
+  const koBets = bets.filter((b) => KO_TYPES.includes(b.bet_type))
+  if (koBets.length > 0) {
+    const koMatchIds = [...new Set(koBets.map((b) => b.match_id))]
+    const { data: koMatchRows } = await supabaseAdmin
+      .from('matches').select('id, is_knockout').in('id', koMatchIds)
+    const koMatchMap = new Map(
+      (koMatchRows ?? []).map((m) => [m.id as number, !!(m as { is_knockout?: boolean }).is_knockout])
+    )
+
+    const mrByMatch = new Map<number, string>()
+    for (const b of bets) if (b.bet_type === 'match_result') mrByMatch.set(b.match_id, b.prediction)
+    const needMr = koMatchIds.filter((mid) => !mrByMatch.has(mid))
+    if (needMr.length > 0) {
+      const { data: existingMr } = await supabaseAdmin
+        .from('bets').select('match_id, prediction')
+        .eq('user_id', user.id).eq('game_id', bodyGameId).eq('bet_type', 'match_result')
+        .in('match_id', needMr)
+      for (const b of existingMr ?? []) mrByMatch.set(b.match_id as number, b.prediction as string)
+    }
+
+    for (const b of koBets) {
+      if (!koMatchMap.get(b.match_id)) {
+        return NextResponse.json({ error: 'Forlænget-valg er kun muligt på knockout-kampe' }, { status: 400 })
+      }
+      if (mrByMatch.get(b.match_id) !== 'X') {
+        return NextResponse.json({ error: 'Forlænget-valg kræver at du vælger uafgjort (X) på kampen' }, { status: 400 })
+      }
+      if (b.bet_type === 'ko_advance' && !['1', '2'].includes(b.prediction)) {
+        return NextResponse.json({ error: 'Ugyldigt "går videre"-valg' }, { status: 400 })
+      }
+      if (b.bet_type === 'ko_method' && !['et', 'pen'].includes(b.prediction)) {
+        return NextResponse.json({ error: 'Ugyldigt afgørelses-valg' }, { status: 400 })
+      }
+    }
+  }
+
   // ── Kupon-/budget-runder ──────────────────────────────────────────────────
   // VM (credits_per_block): hele blokken (ekskl. legacy-runder) hører til samme
   // kupon og deler budget. Ellers kun denne runde. Beregnes FØR validering, så
