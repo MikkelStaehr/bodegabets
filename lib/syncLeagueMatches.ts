@@ -696,17 +696,12 @@ export async function syncSeasonViaBold(seasonId: number): Promise<{
   const isMultiPhase = phaseIds.includes(',')
   const result = await syncBoldFixtures(seasonId, phaseIds, { splitRoundsByDate: isMultiPhase })
 
-  // VM-specifik post-sync: omstrukturér til ~10-kamps gruppespils-runder +
-  // samlede knockout-faser. Bold-sync giver os én runde pr. kampdag (35),
-  // som vi grupperer ned til 14 til betting-overblik. Idempotent.
-  if (seasonId === 25) {
-    try {
-      const { restructureVmRounds } = await import('@/lib/restructureVmRounds')
-      await restructureVmRounds(seasonId)
-    } catch (err) {
-      result.errors.push(`VM-restructure failed: ${String(err)}`)
-    }
-  }
+  // BEMÆRK: tidligere kørte vi her en VM-specifik `restructureVmRounds(25)` der
+  // SLETTEDE alle sæsonens runder og genskabte dem som "én runde pr. fase" uden
+  // block_id. Det er fjernet: live-strukturen er dato-splittede runder (én pr.
+  // kampdag) fra syncBoldFixtures ovenfor, som upsert'er non-destruktivt og
+  // bevarer eksisterende runders block_id + scores. En VM-resync (fx for at
+  // opløse knockout-bracket-pladsholdere) må aldrig destruere historik/blokke.
 
   return result
 }
