@@ -1514,9 +1514,13 @@ app.listen(PORT, () => {
   // Dagligt kl. 10:00 UTC — send reminders
   cron.schedule('0 10 * * *', () => callEndpoint('/send-reminders'))
 
-  // Hvert 30. minut — safety net for point-beregning (primær trigger er i syncMatchScores
-  // når en kamp flipper til finished). Fanger edge-cases som manglende match-events.
-  cron.schedule('*/30 11-23 * * *', () => callEndpoint('/calculate-points'))
+  // Hvert 30. minut, DØGNET RUNDT — safety net for point-beregning (primær trigger er i
+  // syncMatchScores når en kamp flipper til finished). Fanger edge-cases som manglende
+  // match-events OG sene resultat-rettelser (en rettelse re-trigger ikke scoring i sync).
+  // 24/7 fordi VM 2026 spilles i USA: natkampe afsluttes ~06:00 UTC og skal re-scores straks
+  // — det gamle 11-23-vindue lod natresultater sidde un-rescoret indtil kl. 11. syncMatchScores
+  // er allerede 24/7 af samme grund.
+  cron.schedule('*/30 * * * *', () => callEndpoint('/calculate-points'))
 
   // Hvert 15. minut — lås cycling lineups (kun 09:00–20:00 UTC / 10:00–21:00 DK)
   cron.schedule('*/15 9-20 * * *', () => callEndpoint('/cycling-lock-lineups'))
