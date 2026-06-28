@@ -1107,7 +1107,22 @@ export default async function GamePage({ params }: Props) {
           .in('match_id', allMatchIds)
       : { data: [] as { id: number; match_id: number }[] }
 
-  const openRounds = sortedRounds.filter((r) => isRoundBettable(r, Date.now()))
+  let openRounds = sortedRounds.filter((r) => isRoundBettable(r, Date.now()))
+  // VM blok-kupon: kuponen dækker HELE blokken (alle blokkens runder/dage), så
+  // vis kun ÉN kupon pr. blok — den tidligste åbne runde. Er flere af blokkens
+  // runder åbne samtidig (kan ske ved slutspillets ude-af-rækkefølge-runder),
+  // ville vi ellers få dublet-kuponer for samme blok. sortedRounds er allerede
+  // sorteret efter deadline, så den første pr. blok er den tidligste.
+  if (usesBlockCredits) {
+    const seenBlocks = new Set<number>()
+    openRounds = openRounds.filter((r) => {
+      const bid = (r as { block_id?: number | null }).block_id ?? null
+      if (bid == null) return true
+      if (seenBlocks.has(bid)) return false
+      seenBlocks.add(bid)
+      return true
+    })
+  }
 
   const userBetsByRound: Record<number, number> = {}
   const seenMatchIds = new Set<number>()
