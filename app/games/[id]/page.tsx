@@ -204,8 +204,14 @@ export default async function GamePage({ params }: Props) {
   const isRoundBettable = (r: { status: string; betting_closes_at: string | null }, nowMs: number) =>
     r.status === 'open' && (r.betting_closes_at == null || new Date(r.betting_closes_at).getTime() > nowMs)
   const nowMsEarly = Date.now()
+  // Vælg den mest FORESTÅENDE åbne runde (tidligste deadline) — ikke bare den
+  // første i array-rækkefølge. Runde-id/created_at er ikke altid kronologisk:
+  // slutspillets åbningsdage (fx 1/16 · 28. jun) blev oprettet efter de senere
+  // dage og har derfor højere id, så en .find() ville vælge den forkerte dag.
   const activeRoundEarly =
-    typedRoundsEarly.find((r) => isRoundBettable(r, nowMsEarly)) ?? null
+    typedRoundsEarly
+      .filter((r) => isRoundBettable(r, nowMsEarly))
+      .sort((a, b) => (a.betting_closes_at ?? '').localeCompare(b.betting_closes_at ?? ''))[0] ?? null
   const latestFinishedRound = (latestFinishedRoundByStatus as { id: number; name: string; season_id: number } | null) ?? null
 
   const [{ data: recentMatches }, { data: activeRoundMatches }] = await Promise.all([
