@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react'
  * browser (versioneret nøgle) — og kun når knockout-fasen er i gang (gates i
  * page.tsx på at en knockout-runde er åbnet).
  */
-const SEEN_KEY = 'bodega_vm_knockout_seen_v2'
+const SEEN_KEY = 'bodega_vm_knockout_seen_v3'
 const TOTAL_PAGES = 2
 
 export default function KnockoutAnnouncement() {
@@ -61,6 +61,11 @@ export default function KnockoutAnnouncement() {
                 <RuleItem icon="🏆" title="Hvem går videre?">
                   Ingen uafgjort (X) — kun <strong>hjemme eller ude</strong>. Det tæller, uanset om
                   kampen blev afgjort i ordinær tid, forlænget eller på straffe.
+                </RuleItem>
+                <RuleItem icon="⏸️" title="Ekstra-bets holder pause">
+                  Vi har <strong>midlertidigt sat ekstra-bets på pause</strong> i slutspillet, mens
+                  vi analyserer den første runde. <strong>Stay tuned</strong> når blok 10 er ovre —
+                  så melder vi tilbage! 👀
                 </RuleItem>
               </ul>
             </>

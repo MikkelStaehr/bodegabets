@@ -343,19 +343,22 @@ function MatchCard({
   distribution?: { '1': number; 'X': number; '2': number; total: number; odds?: { '1': number | null; 'X': number | null; '2': number | null } }
 }) {
   const isRivalry = !!rivalry
+  // 🔥 On-fire-kampe: sort kort (som Bodega Championship). Rivalry har forrang.
+  const isOnFire = !!match.is_on_fire && !isRivalry
+  const isDark = isRivalry || isOnFire
   const hasExistingBet = isOpen && !!matchResultBet
   const displayOutcome = isFinished ? userPrediction : (sel?.outcome ?? userPrediction)
 
-  const cardBg = isRivalry ? 'bg-[var(--color-dark-green)]' : 'bg-white'
+  const cardBg = isOnFire ? 'bg-[var(--color-ink)]' : isRivalry ? 'bg-[var(--color-dark-green)]' : 'bg-white'
   const hasSelection = !!sel || (!isFinished && !!userPrediction)
-  const cardBorder = isRivalry
+  const cardBorder = isDark
     ? 'border-gold'
     : hasSelection
       ? 'border-[#2C4A3E] shadow-[0_0_0_1px_#2C4A3E]'
       : 'border-black/10'
-  const textPrimary = isRivalry ? 'text-[var(--color-cream)]' : 'text-[var(--color-dark-green)]'
-  const textSecondary = isRivalry ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'
-  const scoreSep = isRivalry ? 'text-[var(--color-cream)]/60' : 'text-[var(--color-warm-taupe)]'
+  const textPrimary = isDark ? 'text-[var(--color-cream)]' : 'text-[var(--color-dark-green)]'
+  const textSecondary = isDark ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'
+  const scoreSep = isDark ? 'text-[var(--color-cream)]/60' : 'text-[var(--color-warm-taupe)]'
 
   return (
     <div className={`${cardBg} border rounded-sm mb-2 overflow-hidden transition-all ${cardBorder}`}>
