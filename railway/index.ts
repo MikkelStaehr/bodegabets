@@ -259,11 +259,20 @@ app.get('/update-rounds', async (_req, res) => {
       await supabaseAdmin.from('rounds').update({ status: 'finished' }).in('id', finishedIds)
     }
 
-    // Gruppér per season (ikke league)
+    // Gruppér per season (ikke league) — sorteret KRONOLOGISK (første kickoff),
+    // ikke efter id. Runde-id er ikke altid kronologisk: slutspillets åbningsdage
+    // (fx 1/16 · 28. jun) blev oprettet efter de senere dage og har derfor højere
+    // id, så en id-sortering ville lade den senere dag åbne først og blokere den
+    // tidligere. For normale sæsoner (id == kronologi) ændrer dette intet.
+    const roundSortKey = (r: RoundRow) =>
+      statMap[r.id]?.minKickoff ?? r.betting_closes_at ?? String(r.id).padStart(12, '0')
     const roundsBySeason = new Map<number, RoundRow[]>()
     for (const r of typedAllRounds) {
       if (!roundsBySeason.has(r.season_id)) roundsBySeason.set(r.season_id, [])
       roundsBySeason.get(r.season_id)!.push(r)
+    }
+    for (const arr of roundsBySeason.values()) {
+      arr.sort((a, b) => roundSortKey(a).localeCompare(roundSortKey(b)))
     }
 
     // Blok-rækkefølge (block_id → block_number), så en ny blok ikke åbner før
