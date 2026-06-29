@@ -97,7 +97,11 @@ export default function PlayerHistoryModal({ gameId, userId, username, onClose }
                               <span className="text-warm-gray">{BET_TYPE_LABELS[b.bet_type] ?? b.bet_type}:</span>{' '}
                               <strong>{b.prediction}</strong> · {b.label}
                             </span>
-                            <span className="text-warm-gray shrink-0">{b.stake}{b.odds != null ? ` × ${b.odds.toFixed(2)}` : ''}</span>
+                            <span className="text-warm-gray shrink-0">
+                              {b.stake}{b.odds != null ? ` × ${b.odds.toFixed(2)}` : ''}
+                              {b.is_on_fire && b.result === 'win' && <span className="text-gold font-bold"> 🔥×2</span>}
+                              {b.losers_luck && <span className="text-forest font-bold"> 🍀×1.2</span>}
+                            </span>
                             <span className={`shrink-0 w-10 text-right font-bold ${
                               b.result === 'win' ? 'text-forest' : b.result === 'loss' ? 'text-vintage-red' : 'text-warm-gray'
                             }`}>

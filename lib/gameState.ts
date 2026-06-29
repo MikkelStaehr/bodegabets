@@ -1071,6 +1071,10 @@ export type PlayerHistory = {
       odds: number | null
       result: string | null
       points_earned: number | null
+      /** 🔥 On-fire-kamp → dobbelt gevinst. */
+      is_on_fire: boolean
+      /** 🍀 Losers Luck ramte denne gevinst (+20%). Udledt af point vs. base. */
+      losers_luck: boolean
     }[]
   }[]
 }
@@ -1092,7 +1096,7 @@ export async function getPlayerHistory(gameId: number, userId: string): Promise<
 
   const [{ data: rounds }, { data: matches }] = await Promise.all([
     supabaseAdmin.from('rounds').select('id, name, block_id, status').in('id', roundIds),
-    supabaseAdmin.from('matches').select('id, home_team_id, away_team_id').in('id', matchIds),
+    supabaseAdmin.from('matches').select('id, home_team_id, away_team_id, is_on_fire').in('id', matchIds),
   ])
   const blockIds = [...new Set((rounds ?? []).map((r) => r.block_id).filter((b): b is number => b != null))]
   const teamIds = [...new Set((matches ?? []).flatMap((m) => [m.home_team_id, m.away_team_id]).filter((t): t is number => t != null))]
@@ -1104,6 +1108,9 @@ export async function getPlayerHistory(gameId: number, userId: string): Promise<
   const teamName = new Map((teams ?? []).map((t) => [t.id, t.name]))
   const matchLabel = new Map(
     (matches ?? []).map((m) => [m.id, `${teamName.get(m.home_team_id as number) ?? '?'} – ${teamName.get(m.away_team_id as number) ?? '?'}`]),
+  )
+  const onFireByMatch = new Map(
+    (matches ?? []).map((m) => [m.id, !!(m as { is_on_fire?: boolean }).is_on_fire]),
   )
   const roundById = new Map((rounds ?? []).map((r) => [r.id, r]))
 
@@ -1132,6 +1139,13 @@ export async function getPlayerHistory(gameId: number, userId: string): Promise<
     row.won += won
     tStaked += stake
     tWon += won
+    // 🔥 on-fire (dobbelt) + 🍀 losers luck (+20%) udledt af de gemte tal, så
+    // gevinsten kan forklares: base = stake × odds, ×2 hvis on-fire; ramte point
+    // højere end det, var det Losers Luck-boostet (×1.2).
+    const isOnFire = onFireByMatch.get(b.match_id as number) ?? false
+    const oddsVal = (b.odds as number | null) ?? (b.bet_type === 'match_result' ? 1.0 : 1.5)
+    const baseWithFire = Math.round(stake * oddsVal) * (isOnFire ? 2 : 1)
+    const losersLuck = b.result === 'win' && won > baseWithFire
     row.bets.push({
       label: matchLabel.get(b.match_id as number) ?? '—',
       bet_type: b.bet_type as string,
@@ -1140,6 +1154,8 @@ export async function getPlayerHistory(gameId: number, userId: string): Promise<
       odds: (b.odds as number | null) ?? null,
       result: (b.result as string | null) ?? null,
       points_earned: (b.points_earned as number | null) ?? null,
+      is_on_fire: isOnFire,
+      losers_luck: losersLuck,
     })
   }
   for (const row of byRound.values()) row.net = row.won - row.staked
