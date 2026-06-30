@@ -411,7 +411,13 @@ function MatchCard({
         </div>
         <div className="text-center pb-1">
           <span className={`text-[10px] ${textSecondary}`}>
-            {isFinished ? 'Færdig' : isLocked ? '🔒 Lukket' : formatKickoff(match.kickoff_at)}
+            {isFinished
+              ? (match.is_knockout && match.ko_method === 'pen'
+                  ? 'Afgjort på straffe'
+                  : match.is_knockout && match.ko_method === 'et'
+                    ? 'Efter forlænget'
+                    : 'Færdig')
+              : isLocked ? '🔒 Lukket' : formatKickoff(match.kickoff_at)}
           </span>
         </div>
       </div>
