@@ -40,6 +40,7 @@ import { syncCyclingResults } from '@/lib/syncCyclingResults'
 import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
 import { syncCyclingStageTimes } from '@/lib/syncCyclingStageTimes'
 import { refreshCyclingRiders } from '@/lib/refreshCyclingRiders'
+import { categorizeRiders } from '@/lib/categorizeCyclingRiders'
 import { discoverBoldSeasons } from '@/lib/discoverBoldSeasons'
 
 const app = express()
@@ -1267,6 +1268,91 @@ app.get('/refresh-cycling-riders', async (_req, res) => {
   }
 })
 
+// ─── GET /categorize-cycling-riders ─────────────────────────────────────────
+// Kategoriserer det KOMMENDE løbs startliste-ryttere (uci_ranking → category)
+// 48 timer før første etape. Regler (Stæhr): ALDRIG under et løb, og kun ÉN
+// gang pr. løb (frosset indtil 48t før næste løb). Kun løbets egne ryttere —
+// så kvinde-/ikke-deltagende ryttere røres aldrig.
+app.get('/categorize-cycling-riders', async (_req, res) => {
+  try {
+    const now = new Date()
+    const today = now.toISOString().slice(0, 10)
+
+    // 1) Aldrig under et løb — er der et løb i gang lige nu?
+    const { data: running } = await supabaseAdmin
+      .from('cycling_races')
+      .select('id, name')
+      .lte('start_date', today)
+      .gte('end_date', today)
+      .limit(1)
+    if (running && running.length > 0) {
+      res.json({ ok: true, skipped: 'race_running', race: running[0].name })
+      return
+    }
+
+    // 2) Næste kommende løb
+    const { data: nextRaces } = await supabaseAdmin
+      .from('cycling_races')
+      .select('id, name, start_date')
+      .gt('start_date', today)
+      .order('start_date', { ascending: true })
+      .limit(1)
+    const race = nextRaces?.[0]
+    if (!race) {
+      res.json({ ok: true, skipped: 'no_upcoming_race' })
+      return
+    }
+
+    // 3) Kun når første etape er ≤ 48 timer væk
+    const hoursUntil = (new Date(race.start_date + 'T00:00:00Z').getTime() - now.getTime()) / 36e5
+    if (hoursUntil > 48) {
+      res.json({ ok: true, skipped: 'too_early', race: race.name, hours_until: Math.round(hoursUntil) })
+      return
+    }
+
+    // 4) Kun én gang pr. løb — er dette løb allerede kategoriseret?
+    const { data: prevLogs } = await supabaseAdmin
+      .from('admin_logs')
+      .select('metadata')
+      .eq('type', 'cycling_categorize')
+      .eq('status', 'success')
+      .order('created_at', { ascending: false })
+      .limit(30)
+    const alreadyDone = (prevLogs ?? []).some(
+      (l) => (l.metadata as { race_id?: string } | null)?.race_id === race.id
+    )
+    if (alreadyDone) {
+      res.json({ ok: true, skipped: 'already_done', race: race.name })
+      return
+    }
+
+    // 5) Kategorisér løbets startliste-ryttere (frisk ranking + bucket → category)
+    const { data: sl } = await supabaseAdmin
+      .from('cycling_startlists')
+      .select('rider_id')
+      .eq('race_id', race.id)
+    const riderIds = [...new Set((sl ?? []).map((s) => s.rider_id as string).filter(Boolean))]
+    const result = await categorizeRiders(riderIds)
+
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_categorize',
+      status: 'success',
+      message: `categorize: ${race.name} — ${result.updated}/${result.total} ryttere (${result.ranked} med ranking)`,
+      metadata: { race_id: race.id, race_name: race.name, ...result },
+    })
+
+    res.json({ ok: true, race: race.name, ...result })
+  } catch (err) {
+    console.error('[categorize-cycling-riders]', err)
+    await supabaseAdmin.from('admin_logs').insert({
+      type: 'cycling_categorize',
+      status: 'error',
+      message: `categorize failed: ${String(err)}`,
+    })
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /sync-cycling-results ──────────────────────────────────────────────
 // Henter etape-resultater fra PCS for aktive stage races og upserter dem til
 // cycling_results. Trigger derefter automatisk runCyclingPointsForStage for
@@ -1618,6 +1704,12 @@ app.listen(PORT, () => {
   // hold-skift, foto-opdateringer, manglende team_logo osv. Kører om natten
   // hvor der ikke er anden trafik.
   cron.schedule('0 3 * * *', () => callEndpoint('/refresh-cycling-riders'))
+
+  // Dagligt kl. 04:30 UTC — kategorisér det kommende løbs ryttere (uci_ranking →
+  // category) når første etape er ≤48t væk. Endpointet håndterer selv reglerne:
+  // aldrig under et løb, og kun én gang pr. løb. (Frosset under løbet, så ingen
+  // kategori-skift midt i konkurrencen.)
+  cron.schedule('30 4 * * *', () => callEndpoint('/categorize-cycling-riders'))
 
   // Dagligt kl. 05:30 UTC — scrape PCS for hver upcoming stage's nøjagtige
   // starttidspunkt. Lineup-deadline beregnes som start - 30 min, så det er
