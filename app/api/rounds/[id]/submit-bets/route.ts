@@ -103,6 +103,27 @@ export async function POST(req: NextRequest, { params }: Props) {
     }
   }
 
+  // ── 'extra_time' (går kampen i forlænget?) ────────────────────────────────
+  // Kun på knockout-kampe; prediction skal være 'yes'/'no'. Uafhængigt af
+  // hoved-bettet (afgøres af ko_method, ikke resultatet).
+  const etBets = bets.filter((b) => b.bet_type === 'extra_time')
+  if (etBets.length > 0) {
+    const etMatchIds = [...new Set(etBets.map((b) => b.match_id))]
+    const { data: etMatchRows } = await supabaseAdmin
+      .from('matches').select('id, is_knockout').in('id', etMatchIds)
+    const koMap = new Map(
+      (etMatchRows ?? []).map((m) => [m.id as number, !!(m as { is_knockout?: boolean }).is_knockout])
+    )
+    for (const b of etBets) {
+      if (!koMap.get(b.match_id)) {
+        return NextResponse.json({ error: '"Går i forlænget?" er kun muligt på knockout-kampe' }, { status: 400 })
+      }
+      if (!['yes', 'no'].includes(b.prediction)) {
+        return NextResponse.json({ error: 'Ugyldigt forlænget-valg' }, { status: 400 })
+      }
+    }
+  }
+
   // ── Kupon-/budget-runder ──────────────────────────────────────────────────
   // VM (credits_per_block): hele blokken (ekskl. legacy-runder) hører til samme
   // kupon og deler budget. Ellers kun denne runde. Beregnes FØR validering, så

@@ -43,7 +43,7 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
   // 1. Hent finished matches via round_id
   const { data: matches } = await supabaseAdmin
     .from('matches')
-    .select('id, home_score, away_score, home_score_ht, away_score_ht, status, is_on_fire')
+    .select('id, home_score, away_score, home_score_ht, away_score_ht, status, is_on_fire, ko_method')
     .eq('round_id', roundId)
     .eq('status', 'finished')
 
@@ -86,14 +86,18 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       if (!bets?.length) continue
 
       for (const bet of bets) {
-        const correct = isBetCorrect(
-          bet.bet_type,
-          bet.prediction,
-          match.home_score,
-          match.away_score,
-          match.home_score_ht,
-          match.away_score_ht
-        )
+        // 'extra_time' (går kampen i forlænget?) afgøres af ko_method, ikke scoren:
+        // 'et'/'pen' = ja, null = nej (ordinær). Resten via isBetCorrect på scoren.
+        const correct = bet.bet_type === 'extra_time'
+          ? (bet.prediction === 'yes') === ((match as { ko_method?: string | null }).ko_method != null)
+          : isBetCorrect(
+              bet.bet_type,
+              bet.prediction,
+              match.home_score,
+              match.away_score,
+              match.home_score_ht,
+              match.away_score_ht
+            )
 
         const stake = bet.stake ?? 0
         let pointsEarned = computeBasePoints(

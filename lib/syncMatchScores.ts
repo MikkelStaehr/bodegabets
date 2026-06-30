@@ -188,6 +188,41 @@ export async function syncMatchScores(options?: {
 
       }
 
+      // Konsensus odds for 'extra_time' (går kampen i forlænget? ja/nej). "Ja"
+      // er sjældnere (~25-30% af knockout-kampe), så bredere range end ekstra-
+      // bets: 1,3–2,8. Få der spiller en side → høj odds; mange → lav.
+      {
+        const { data: etBets } = await supabaseAdmin
+          .from('bets')
+          .select('id, match_id, game_id, prediction')
+          .in('match_id', lockedMatchIds)
+          .eq('bet_type', 'extra_time')
+
+        if (etBets?.length) {
+          const groups = new Map<string, typeof etBets>()
+          for (const bet of etBets) {
+            const key = `${bet.match_id}:${bet.game_id}`
+            const group = groups.get(key) ?? []
+            group.push(bet)
+            groups.set(key, group)
+          }
+          for (const groupBets of groups.values()) {
+            const total = groupBets.length
+            const count: Record<string, number> = {}
+            for (const bet of groupBets) count[bet.prediction] = (count[bet.prediction] ?? 0) + 1
+            const calcOdds = (pred: string): number => {
+              const n = count[pred] ?? 0
+              if (total === 0 || n === 0) return 2.8
+              const pct = n / total
+              return Math.round(Math.max(1.3, 2.8 - pct * 1.5) * 100) / 100
+            }
+            for (const bet of groupBets) {
+              await supabaseAdmin.from('bets').update({ odds: calcOdds(bet.prediction) }).eq('id', bet.id)
+            }
+          }
+        }
+      }
+
       // 🎯 Blok Bets: når kampe låser, sæt konsensus-odds for de(n) berørte
       // blok(ke) (idempotent — kører kun reelt når blokkens første kamp er låst).
       const lockedRoundIds = [...new Set(toLock.map((m) => m.round_id).filter(Boolean))]

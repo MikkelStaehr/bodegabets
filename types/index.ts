@@ -81,7 +81,7 @@ export type Match = {
   et_away_score?: number | null
 }
 
-export type BetType = 'match_result' | 'goals_3plus' | 'clean_sheet' | 'win_margin'
+export type BetType = 'match_result' | 'goals_3plus' | 'clean_sheet' | 'win_margin' | 'extra_time'
 
 export type Bet = {
   id: number
