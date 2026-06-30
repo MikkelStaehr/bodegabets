@@ -422,10 +422,10 @@ export async function syncMatchScores(options?: {
       continue
     }
 
-    // Pre-fetch current status to detect finished-transition (+ is_knockout til probe)
+    // Pre-fetch current status to detect finished-transition (+ is_knockout/ko_method)
     const { data: currentMatch } = await supabaseAdmin
       .from('matches')
-      .select('status, is_knockout')
+      .select('status, is_knockout, ko_method')
       .eq('id', match.id)
       .single()
 
@@ -446,8 +446,27 @@ export async function syncMatchScores(options?: {
     }
 
     // Gem 2. halvleg starttidspunkt
-    if (currentMatch?.status === 'halftime' && status === 'live') {
+    const resumeFromPause = currentMatch?.status === 'halftime' && status === 'live'
+    if (resumeFromPause) {
       updates.second_half_started_at = new Date().toISOString()
+    }
+
+    // 🏆 Knockout-stadie: udled ordinær/forlænget/straffe af minut-signalet
+    // (Bold giver os ikke FT/AET/Pen). Bekræftet i blok 10: regulær tid når max
+    // 90'; forlænget genoptager ~92' og når 100'+; straffe genoptager ~121'.
+    //   - genoptagelse (pause→live) ved minut ≥ 115, eller minut ≥ 123 → straffe
+    //   - minut ≥ 100, eller genoptagelse ved minut ≥ 85 → forlænget
+    // Regulær tid rammer aldrig 100, så stoppage-tid giver ikke falske positiver.
+    // Opgraderer KUN (aldrig nedgradér) → ko_method holder kampens højeste stadie.
+    if (currentMatch?.is_knockout) {
+      const cm = typeof boldData.time === 'number' ? boldData.time : null
+      const rank = (s: string | null | undefined) => (s === 'pen' ? 2 : s === 'et' ? 1 : 0)
+      let stage: 'et' | 'pen' | null = null
+      if ((resumeFromPause && cm != null && cm >= 115) || (cm != null && cm >= 123)) stage = 'pen'
+      else if ((cm != null && cm >= 100) || (resumeFromPause && cm != null && cm >= 85)) stage = 'et'
+      if (stage && rank(stage) > rank((currentMatch as { ko_method?: string | null }).ko_method)) {
+        updates.ko_method = stage
+      }
     }
 
     const { error } = await supabaseAdmin
