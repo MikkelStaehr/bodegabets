@@ -8,8 +8,8 @@ import { useState, useEffect } from 'react'
  * browser (versioneret nøgle) — og kun når knockout-fasen er i gang (gates i
  * page.tsx på at en knockout-runde er åbnet).
  */
-const SEEN_KEY = 'bodega_vm_knockout_seen_v3'
-const TOTAL_PAGES = 2
+const SEEN_KEY = 'bodega_vm_knockout_seen_v4'
+const TOTAL_PAGES = 3
 
 export default function KnockoutAnnouncement() {
   const [visible, setVisible] = useState(false)
@@ -32,7 +32,7 @@ export default function KnockoutAnnouncement() {
 
   if (!visible) return null
 
-  const title = page === 0 ? 'Knald eller fald 🏆' : 'On fire-kampen 🔥'
+  const title = page === 0 ? 'Knald eller fald 🏆' : page === 1 ? 'Hvordan afgøres den? ⏱️' : 'On fire-kampen 🔥'
   const isLast = page === TOTAL_PAGES - 1
 
   return (
@@ -62,16 +62,30 @@ export default function KnockoutAnnouncement() {
                   Ingen uafgjort (X) — kun <strong>hjemme eller ude</strong>. Det tæller, uanset om
                   kampen blev afgjort i ordinær tid, forlænget eller på straffe.
                 </RuleItem>
-                <RuleItem icon="⏸️" title="Ekstra-bets holder pause">
-                  Vi har <strong>midlertidigt sat ekstra-bets på pause</strong> i slutspillet, mens
-                  vi analyserer den første runde. <strong>Stay tuned</strong> når blok 10 er ovre —
-                  så melder vi tilbage! 👀
-                </RuleItem>
               </ul>
             </>
           )}
 
           {page === 1 && (
+            <>
+              <p className="font-body text-[14px] text-ink leading-relaxed">
+                Oven på hvem-der-vinder kan du nu også gætte <strong>hvordan kampen afgøres</strong> —
+                et selvstændigt ekstra-bet:
+              </p>
+              <ul className="space-y-2.5">
+                <RuleItem icon="⏱️" title="Ordinær / Forlænget / Straffe">
+                  Bliver kampen afgjort <strong>inden for 90 min</strong>, i <strong>forlænget</strong>
+                  {' '}eller på <strong>straffe</strong>? Vælg én — det afgøres automatisk når kampen er spillet.
+                </RuleItem>
+                <RuleItem icon="💰" title="Jo sjældnere, jo mere">
+                  "Ordinær" er hyppigst (lav odds), "straffe" er sjælden (høj odds). Uafhængigt af
+                  hvem du tror vinder — så du kan ramme begge.
+                </RuleItem>
+              </ul>
+            </>
+          )}
+
+          {page === 2 && (
             <>
               <p className="font-body text-[14px] text-ink leading-relaxed">
                 Én tilfældig kamp i hver blok er <strong>🔥 on fire</strong>:
