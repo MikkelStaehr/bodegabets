@@ -382,6 +382,26 @@ function ExtraBetRows({
   )
 }
 
+/* ─── Read-only "Hvordan afgøres den?" (extra_time) på låste/færdige kampe ─── */
+function ExtraTimeReadonly({ data, dark }: { data: ExtraBetData | null; dark: boolean }) {
+  if (!data) return null
+  const label = PREDICTION_LABELS[data.prediction] ?? data.prediction
+  const resultCls = data.result === 'win' ? 'text-forest' : data.result === 'loss' ? 'text-vintage-red' : (dark ? 'text-[var(--color-cream)]/60' : 'text-warm-gray')
+  const muted = dark ? 'text-[var(--color-cream)]/60' : 'text-[var(--color-warm-taupe)]'
+  const strong = dark ? 'text-[var(--color-cream)]' : 'text-ink'
+  return (
+    <div className={`px-3 pb-2 pt-1.5 border-t ${dark ? 'border-gold/20' : 'border-black/[0.06]'} flex items-center gap-2 text-[11px]`}>
+      <span className={`flex-1 min-w-0 truncate ${muted}`}>
+        Afgøres: <strong className={strong}>{label}</strong>
+      </span>
+      <span className={muted}>{data.stake}{data.odds != null ? ` × ${data.odds.toFixed(2)}` : ''}</span>
+      <span className={`font-bold shrink-0 ${resultCls}`}>
+        {data.result === 'win' ? `+${data.points_earned ?? 0}` : data.result === 'loss' ? `−${data.stake}` : '—'}
+      </span>
+    </div>
+  )
+}
+
 /* ─── Match Card (shared between mobile + desktop left column) ─── */
 function MatchCard({
   match,
@@ -396,6 +416,7 @@ function MatchCard({
   userPrediction,
   userExtraPicks,
   userExtraBetData,
+  userExtraTime,
   matchResultBet,
   selectOutcome,
   toggleExtra,
@@ -421,6 +442,7 @@ function MatchCard({
   userPrediction: '1' | 'X' | '2' | null
   userExtraPicks: Record<string, string>
   userExtraBetData: Record<string, ExtraBetData>
+  userExtraTime: ExtraBetData | null
   matchResultBet: Bet | undefined
   selectOutcome: (matchId: number, outcome: '1' | 'X' | '2') => void
   toggleExtra: (matchId: number, key: ExtraBetType) => void
@@ -607,6 +629,12 @@ function MatchCard({
           adjustExtraStake={adjustExtraStake}
           setExtraStake={setExtraStake}
         />
+      )}
+
+      {/* Placeret "Hvordan afgøres den?"-bet — read-only når foldouten ikke er aktiv
+          (revisit på åben kupon, eller låst/færdig kamp). */}
+      {!(isOpen && sel && match.is_knockout) && (
+        <ExtraTimeReadonly data={userExtraTime} dark={isDark} />
       )}
 
       {/* Existing extra bets on open match with no new selection — read-only */}
@@ -1142,10 +1170,20 @@ export default function AfgivBets({
       )
       const userExtraPicks: Record<string, string> = {}
       const userExtraBetData: Record<string, ExtraBetData> = {}
+      let userExtraTime: ExtraBetData | null = null
       for (const b of existingBets) {
-        if (b.match_id === match.id && EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType)) {
+        if (b.match_id !== match.id) continue
+        if (EXTRA_BET_TYPES.includes(b.bet_type as ExtraBetType)) {
           userExtraPicks[b.bet_type] = b.prediction
           userExtraBetData[b.bet_type] = {
+            prediction: b.prediction,
+            stake: b.stake,
+            points_earned: b.points_earned,
+            result: b.result,
+            odds: (b as unknown as { odds?: number | null }).odds ?? null,
+          }
+        } else if (b.bet_type === 'extra_time') {
+          userExtraTime = {
             prediction: b.prediction,
             stake: b.stake,
             points_earned: b.points_earned,
@@ -1164,6 +1202,7 @@ export default function AfgivBets({
         userPrediction: (matchResultBet?.prediction as '1' | 'X' | '2') ?? null,
         userExtraPicks,
         userExtraBetData,
+        userExtraTime,
         matchResultBet,
       }
     })
@@ -1203,6 +1242,7 @@ export default function AfgivBets({
           userPrediction={md.userPrediction}
           userExtraPicks={md.userExtraPicks}
           userExtraBetData={md.userExtraBetData}
+          userExtraTime={md.userExtraTime}
           matchResultBet={md.matchResultBet}
           selectOutcome={selectOutcome}
           toggleExtra={toggleExtra}
