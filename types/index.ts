@@ -76,6 +76,9 @@ export type Match = {
   is_on_fire?: boolean
   /** Auto-udledt stadie: null = ordinær tid, 'et' = forlænget, 'pen' = straffe. */
   ko_method?: string | null
+  /** Resultat efter forlænget (før straffene) — til at vise "1-1 · STR 3-4". */
+  et_home_score?: number | null
+  et_away_score?: number | null
 }
 
 export type BetType = 'match_result' | 'goals_3plus' | 'clean_sheet' | 'win_margin'

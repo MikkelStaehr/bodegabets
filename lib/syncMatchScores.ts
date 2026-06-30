@@ -467,6 +467,14 @@ export async function syncMatchScores(options?: {
       if (stage && rank(stage) > rank((currentMatch as { ko_method?: string | null }).ko_method)) {
         updates.ko_method = stage
       }
+
+      // Gem forlænget-resultatet (scoren FØR straffene): opdatér mens minut ≤ 120,
+      // frys når straffene begynder (minut > 120). Bold folder ellers straffe-
+      // scoren ind i home/away_score, så dette giver os det rigtige "1-1".
+      if (cm != null && cm <= 120) {
+        updates.et_home_score = h
+        updates.et_away_score = a
+      }
     }
 
     const { error } = await supabaseAdmin

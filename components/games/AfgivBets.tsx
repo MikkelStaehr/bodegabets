@@ -360,6 +360,16 @@ function MatchCard({
   const textSecondary = isDark ? 'text-[var(--color-cream)]/50' : 'text-[var(--color-warm-taupe)]'
   const scoreSep = isDark ? 'text-[var(--color-cream)]/60' : 'text-[var(--color-warm-taupe)]'
 
+  // Straffe-kamp: Bold folder straffescoren ind i resultatet (1-1 på banen → 4-5).
+  // Vis det rigtige forlænget-resultat + straffescoren separat (STR x-y).
+  const isPenMatch = isFinished && !!match.is_knockout && match.ko_method === 'pen'
+    && match.et_home_score != null && match.et_away_score != null
+  const dispHome = isPenMatch ? match.et_home_score! : match.home_score
+  const dispAway = isPenMatch ? match.et_away_score! : match.away_score
+  const penStr = isPenMatch
+    ? `${(match.home_score ?? 0) - match.et_home_score!}-${(match.away_score ?? 0) - match.et_away_score!}`
+    : null
+
   return (
     <div className={`${cardBg} border rounded-sm mb-2 overflow-hidden transition-all ${cardBorder}`}>
       {/* Rivalry badge */}
@@ -393,9 +403,9 @@ function MatchCard({
               <img src={match.home_team_logo} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} className="shrink-0" />
             )}
           </div>
-          {isFinished && match.home_score != null && match.away_score != null ? (
+          {isFinished && dispHome != null && dispAway != null ? (
             <span className={`font-condensed font-bold text-[13px] ${scoreSep} shrink-0`}>
-              {match.home_score} – {match.away_score}
+              {dispHome} – {dispAway}
             </span>
           ) : (
             <span className={`text-[9px] ${textSecondary} font-semibold shrink-0`}>vs</span>
@@ -413,7 +423,7 @@ function MatchCard({
           <span className={`text-[10px] ${textSecondary}`}>
             {isFinished
               ? (match.is_knockout && match.ko_method === 'pen'
-                  ? 'Afgjort på straffe'
+                  ? `Afgjort på straffe${penStr ? ` · STR ${penStr}` : ''}`
                   : match.is_knockout && match.ko_method === 'et'
                     ? 'Efter forlænget'
                     : 'Færdig')
