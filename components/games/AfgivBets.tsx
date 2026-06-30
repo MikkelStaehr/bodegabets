@@ -12,7 +12,7 @@ import BetSlipGuide from '@/components/games/BetSlipGuide'
 
 type MatchWithOptions = Match
 
-type ExtraBetType = 'goals_3plus' | 'clean_sheet' | 'win_margin'
+type ExtraBetType = 'goals_3plus' | 'clean_sheet' | 'win_margin' | 'extra_time'
 
 type ExtraBet = {
   type: ExtraBetType
@@ -20,11 +20,15 @@ type ExtraBet = {
   points: number
 }
 
-/** Ekstra-bets følger den valgte vinder (1/2); X rydder dem. */
+/**
+ * Klassiske ekstra-bets følger den valgte vinder (1/2); X rydder dem.
+ * 'extra_time' (går i forlænget? ja/nej) er UAFHÆNGIGT af vinderen → bevares.
+ */
 function remapExtrasForOutcome(extras: ExtraBet[], outcome: '1' | 'X' | '2'): ExtraBet[] {
-  return outcome === '1' || outcome === '2'
-    ? extras.map((eb) => ({ ...eb, prediction: outcome }))
-    : []
+  if (outcome === '1' || outcome === '2') {
+    return extras.map((eb) => (eb.type === 'extra_time' ? eb : { ...eb, prediction: outcome }))
+  }
+  return extras.filter((eb) => eb.type === 'extra_time')
 }
 
 type BetEntry = {
@@ -238,6 +242,92 @@ function InlineExtraBets({
   )
 }
 
+/* ─── Inline "Går kampen i forlænget?" (ja/nej) — kun knockout-kampe ─── */
+function InlineExtraTime({
+  matchId,
+  sel,
+  setExtraTimePick,
+  adjustExtraStake,
+  setExtraStake,
+}: {
+  matchId: number
+  sel: BetEntry
+  setExtraTimePick: (matchId: number, prediction: string) => void
+  adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
+  setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
+}) {
+  const active = sel.extraBets.find((eb) => eb.type === 'extra_time')
+  const [open, setOpen] = useState(!!active)
+  if (!sel.match.is_knockout) return null
+
+  return (
+    <div className="border-t border-gold/30">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left"
+      >
+        <span className="text-[9px] font-bold tracking-widest uppercase flex-1 text-gold/80">
+          ⏱️ Går kampen i forlænget?
+        </span>
+        <span className={`text-[9px] text-gold/60 transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-2 flex flex-col gap-1.5">
+          <div className="flex gap-1">
+            {([['yes', 'Ja'], ['no', 'Nej']] as const).map(([v, label]) => {
+              const selected = active?.prediction === v
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setExtraTimePick(matchId, v)}
+                  className={`flex-1 py-1.5 px-2 border-[1.5px] rounded text-[11px] font-semibold transition-all ${
+                    selected
+                      ? 'bg-[var(--color-card-green)] border-[#2C4A3E] text-white'
+                      : 'bg-white border-black/10 text-[var(--color-warm-taupe)] hover:border-[#2C4A3E] hover:text-[var(--color-dark-green)]'
+                  }`}
+                >
+                  {selected ? '✓ ' : ''}{label}
+                </button>
+              )
+            })}
+          </div>
+          {active && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <button
+                type="button"
+                onClick={() => adjustExtraStake(matchId, 'extra_time', -50)}
+                className="w-6 h-6 border border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)] rounded font-bold text-sm flex items-center justify-center"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min={10}
+                value={active.points}
+                onChange={(e) => setExtraStake(matchId, 'extra_time', parseInt(e.target.value) || 10)}
+                className="w-14 text-center font-condensed text-[13px] font-bold border border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)] rounded h-6"
+              />
+              <span className="text-[10px] font-semibold text-[var(--color-warm-taupe)]">credits</span>
+              <button
+                type="button"
+                onClick={() => adjustExtraStake(matchId, 'extra_time', 50)}
+                className="w-6 h-6 border border-black/10 bg-[var(--color-cream)] text-[var(--color-dark-green)] rounded font-bold text-sm flex items-center justify-center"
+              >
+                +
+              </button>
+            </div>
+          )}
+          <p className="text-[9px] text-[var(--color-warm-taupe)] leading-snug">
+            Afgøres automatisk: forlænget eller straffe = ja.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 type ExtraBetData = { prediction: string; stake: number; points_earned: number | null; result: string | null; odds: number | null }
 
 /* ─── Read-only Extra Bets for Finished/Locked Matches ─── */
@@ -309,6 +399,7 @@ function MatchCard({
   matchResultBet,
   selectOutcome,
   toggleExtra,
+  setExtraTimePick,
   adjustExtraStake,
   setExtraStake,
   adjustStake,
@@ -333,6 +424,7 @@ function MatchCard({
   matchResultBet: Bet | undefined
   selectOutcome: (matchId: number, outcome: '1' | 'X' | '2') => void
   toggleExtra: (matchId: number, key: ExtraBetType) => void
+  setExtraTimePick: (matchId: number, prediction: string) => void
   adjustExtraStake: (matchId: number, type: ExtraBetType, delta: number) => void
   setExtraStake: (matchId: number, type: ExtraBetType, val: number) => void
   adjustStake: (matchId: number, delta: number) => void
@@ -501,6 +593,17 @@ function MatchCard({
           sel={sel}
           isRivalry={isRivalry}
           toggleExtra={toggleExtra}
+          adjustExtraStake={adjustExtraStake}
+          setExtraStake={setExtraStake}
+        />
+      )}
+
+      {/* "Går kampen i forlænget?" — kun knockout-kampe med et valg */}
+      {isOpen && sel && match.is_knockout && (
+        <InlineExtraTime
+          matchId={match.id}
+          sel={sel}
+          setExtraTimePick={setExtraTimePick}
           adjustExtraStake={adjustExtraStake}
           setExtraStake={setExtraStake}
         />
@@ -872,6 +975,26 @@ export default function AfgivBets({
     )
   }
 
+  // "Går i forlænget?" (ja/nej) på knockout-kampe — uafhængigt af vinder-valget.
+  // Tryk samme valg igen = fjern. Bæres i extraBets som type 'extra_time'.
+  const setExtraTimePick = (matchId: number, prediction: string) => {
+    setSelections((prev) =>
+      prev.map((s) => {
+        if (s.matchId !== matchId) return s
+        const existing = s.extraBets.find((eb) => eb.type === 'extra_time')
+        let next: ExtraBet[]
+        if (existing && existing.prediction === prediction) {
+          next = s.extraBets.filter((eb) => eb.type !== 'extra_time')
+        } else if (existing) {
+          next = s.extraBets.map((eb) => (eb.type === 'extra_time' ? { ...eb, prediction } : eb))
+        } else {
+          next = [...s.extraBets, { type: 'extra_time', prediction, points: 50 }]
+        }
+        return { ...s, extraBets: next }
+      })
+    )
+  }
+
   const adjustExtraStake = (matchId: number, type: ExtraBetType, delta: number) => {
     setSelections((prev) =>
       prev.map((s) => {
@@ -1083,6 +1206,7 @@ export default function AfgivBets({
           matchResultBet={md.matchResultBet}
           selectOutcome={selectOutcome}
           toggleExtra={toggleExtra}
+          setExtraTimePick={setExtraTimePick}
           adjustExtraStake={adjustExtraStake}
           setExtraStake={setExtraStake}
           adjustStake={adjustStake}
