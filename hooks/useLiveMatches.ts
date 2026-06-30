@@ -21,6 +21,8 @@ export type LiveMatch = {
   distribution?: { '1': number; 'X': number; '2': number; total: number; odds: { '1': number | null; 'X': number | null; '2': number | null } } | null
   extraBetDist?: Record<string, { count_1: number; count_2: number; odds_1: number | null; odds_2: number | null }> | null
   userExtraPicks?: Record<string, string> | null
+  /** Knockout-stadie: null=ordinær, 'et'=forlænget, 'pen'=straffe (afgør extra_time). */
+  ko_method?: string | null
   isRivalry?: boolean
   rivalryName?: string | null
 }

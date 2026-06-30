@@ -41,6 +41,8 @@ export type MatchEntry = {
   distribution: MatchDistribution | null
   extraBetDist: Record<string, ExtraBetDist> | null
   userExtraPicks: Record<string, string> | null
+  /** Knockout-stadie (null=ordinær, 'et'=forlænget, 'pen'=straffe) til at afgøre extra_time. */
+  ko_method: string | null
   isRivalry: boolean
   rivalryName: string | null
 }
@@ -188,7 +190,7 @@ async function getRegularMatches(
   const { data: roundMatches } = await supabaseAdmin
     .from('matches')
     .select(`id, round_id, round_name, kickoff_at:kickoff, status, result, second_half_started_at, bet_open,
-      home_score, away_score, home_score_ht, away_score_ht, home_team_id, away_team_id,
+      home_score, away_score, home_score_ht, away_score_ht, home_team_id, away_team_id, ko_method,
       home_team_ref:teams!home_team_id(name, logo_url),
       away_team_ref:teams!away_team_id(name, logo_url)`)
     .in('round_id', activeRoundIds)
@@ -294,7 +296,7 @@ async function getRegularMatches(
         .select('match_id, bet_type, prediction')
         .eq('user_id', userId)
         .eq('game_id', gameId)
-        .in('bet_type', ['goals_3plus', 'clean_sheet', 'win_margin'])
+        .in('bet_type', ['goals_3plus', 'clean_sheet', 'win_margin', 'extra_time'])
         .in('match_id', matchIds)
     : { data: [] }
 
@@ -332,6 +334,7 @@ async function getRegularMatches(
       distribution: betDistribution[m.id as number] ?? null,
       extraBetDist: extraBetDistribution[m.id as number] ?? null,
       userExtraPicks: extraBetMap.get(m.id as number) ?? null,
+      ko_method: (mm.ko_method as string | null) ?? null,
       isRivalry: rivalryName != null,
       rivalryName,
     }
@@ -420,6 +423,7 @@ async function getChampionshipMatches(
         distribution: null,
         extraBetDist: null,
         userExtraPicks: null,
+        ko_method: null,
         isRivalry: true,
         rivalryName: null,
       })
