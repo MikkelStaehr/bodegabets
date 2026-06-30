@@ -2,6 +2,7 @@
 
 import { LiveMatch, LiveSummary } from '@/hooks/useLiveMatches'
 import { isBetCorrect } from '@/lib/betUtils'
+import { PREDICTION_LABELS } from '@/lib/betTypes'
 
 function StatusBadge({ status, kickoff }: { status: LiveMatch['status']; kickoff?: string }) {
   if (status === 'live') return (
@@ -212,6 +213,30 @@ function MatchRow({ match }: { match: LiveMatch }) {
               </div>
             )
           })}
+
+          {/* "Hvordan afgøres den?" (extra_time) — knockout-only. Afgøres af
+              ko_method (ikke scoren): pick = (ko_method ?? 'reg') → ✓. */}
+          {match.userExtraPicks?.extra_time && (() => {
+            const pick = match.userExtraPicks.extra_time
+            const finished = match.status === 'finished'
+            const correct = finished ? pick === (match.ko_method ?? 'reg') : null
+            const color = correct == null
+              ? 'text-[var(--color-cream)]/30'
+              : correct ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
+            return (
+              <div className="flex items-center gap-2 py-1">
+                <span className="text-[9px] font-bold tracking-wider uppercase text-[var(--color-gold-muted)] w-[72px] shrink-0">
+                  Afgøres
+                </span>
+                <span className="text-[10px] font-medium text-[var(--color-cream)] truncate flex-1">
+                  {PREDICTION_LABELS[pick] ?? pick}
+                </span>
+                <span className={`text-[13px] font-bold shrink-0 w-5 text-center ${color}`}>
+                  {finished ? (correct ? '✓' : '✗') : '—'}
+                </span>
+              </div>
+            )
+          })()}
         </div>
       )}
     </div>
