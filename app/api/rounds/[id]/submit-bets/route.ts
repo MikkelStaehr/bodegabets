@@ -116,10 +116,10 @@ export async function POST(req: NextRequest, { params }: Props) {
     )
     for (const b of etBets) {
       if (!koMap.get(b.match_id)) {
-        return NextResponse.json({ error: '"Går i forlænget?" er kun muligt på knockout-kampe' }, { status: 400 })
+        return NextResponse.json({ error: 'Afgørelses-valg er kun muligt på knockout-kampe' }, { status: 400 })
       }
-      if (!['yes', 'no'].includes(b.prediction)) {
-        return NextResponse.json({ error: 'Ugyldigt forlænget-valg' }, { status: 400 })
+      if (!['reg', 'et', 'pen'].includes(b.prediction)) {
+        return NextResponse.json({ error: 'Ugyldigt afgørelses-valg' }, { status: 400 })
       }
     }
   }

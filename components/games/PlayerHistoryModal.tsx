@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { PlayerHistory } from '@/lib/gameState'
-import { BET_TYPE_LABELS } from '@/lib/betTypes'
+import { BET_TYPE_LABELS, PREDICTION_LABELS } from '@/lib/betTypes'
 
 type Props = {
   gameId: number
@@ -95,7 +95,7 @@ export default function PlayerHistoryModal({ gameId, userId, username, onClose }
                           <div key={i} className="flex items-center gap-2 text-[11px]">
                             <span className="flex-1 min-w-0 truncate text-ink">
                               <span className="text-warm-gray">{BET_TYPE_LABELS[b.bet_type] ?? b.bet_type}:</span>{' '}
-                              <strong>{b.bet_type === 'extra_time' ? (b.prediction === 'yes' ? 'Ja' : 'Nej') : b.prediction}</strong> · {b.label}
+                              <strong>{b.bet_type === 'extra_time' ? (PREDICTION_LABELS[b.prediction] ?? b.prediction) : b.prediction}</strong> · {b.label}
                             </span>
                             <span className="text-warm-gray shrink-0">
                               {b.stake}{b.odds != null ? ` × ${b.odds.toFixed(2)}` : ''}

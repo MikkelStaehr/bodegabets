@@ -86,10 +86,10 @@ export async function calculateRoundPoints(roundId: number): Promise<void> {
       if (!bets?.length) continue
 
       for (const bet of bets) {
-        // 'extra_time' (går kampen i forlænget?) afgøres af ko_method, ikke scoren:
-        // 'et'/'pen' = ja, null = nej (ordinær). Resten via isBetCorrect på scoren.
+        // 'extra_time' (hvordan afgøres kampen?) afgøres af ko_method, ikke scoren:
+        // prediction 'reg'/'et'/'pen' vinder hvis = ko_method (null = 'reg').
         const correct = bet.bet_type === 'extra_time'
-          ? (bet.prediction === 'yes') === ((match as { ko_method?: string | null }).ko_method != null)
+          ? bet.prediction === ((match as { ko_method?: string | null }).ko_method ?? 'reg')
           : isBetCorrect(
               bet.bet_type,
               bet.prediction,

@@ -7,8 +7,8 @@ export const BET_TYPES = {
   GOALS_3PLUS: 'goals_3plus',
   CLEAN_SHEET: 'clean_sheet',
   WIN_MARGIN: 'win_margin',
-  // Knockout-only: går kampen i forlænget/straffe? (auto-scoret af ko_method)
-  EXTRA_TIME: 'extra_time', // prediction 'yes'/'no'
+  // Knockout-only: hvordan afgøres kampen? (auto-scoret af ko_method)
+  EXTRA_TIME: 'extra_time', // prediction 'reg' (ordinær) / 'et' (forlænget) / 'pen' (straffe)
 } as const
 
 export type BetType = (typeof BET_TYPES)[keyof typeof BET_TYPES]
@@ -18,13 +18,15 @@ export const BET_TYPE_LABELS: Record<BetType, string> = {
   goals_3plus: 'Scorer 3+ mål',
   clean_sheet: 'Clean sheet',
   win_margin: 'Vinder med 2+',
-  extra_time: 'Går i forlænget?',
+  extra_time: 'Hvordan afgøres den?',
 }
 
 export const PREDICTION_LABELS: Record<string, string> = {
   '1': 'Hjemmehold',
   'X': 'Uafgjort',
   '2': 'Udehold',
-  yes: 'Ja',
-  no: 'Nej',
+  // extra_time
+  reg: 'Ordinær tid',
+  et: 'Forlænget',
+  pen: 'På straffe',
 }

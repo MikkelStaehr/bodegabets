@@ -268,14 +268,14 @@ function InlineExtraTime({
         className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left"
       >
         <span className="text-[9px] font-bold tracking-widest uppercase flex-1 text-gold/80">
-          ⏱️ Går kampen i forlænget?
+          ⏱️ Hvordan afgøres kampen?
         </span>
         <span className={`text-[9px] text-gold/60 transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
       {open && (
         <div className="px-3 pb-2 flex flex-col gap-1.5">
           <div className="flex gap-1">
-            {([['yes', 'Ja'], ['no', 'Nej']] as const).map(([v, label]) => {
+            {([['reg', 'Ordinær'], ['et', 'Forlænget'], ['pen', 'Straffe']] as const).map(([v, label]) => {
               const selected = active?.prediction === v
               return (
                 <button
@@ -320,7 +320,7 @@ function InlineExtraTime({
             </div>
           )}
           <p className="text-[9px] text-[var(--color-warm-taupe)] leading-snug">
-            Afgøres automatisk: forlænget eller straffe = ja.
+            Afgøres automatisk når kampen er spillet (ordinær / forlænget / straffe).
           </p>
         </div>
       )}
