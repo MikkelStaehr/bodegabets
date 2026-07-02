@@ -1334,11 +1334,17 @@ app.get('/categorize-cycling-riders', async (_req, res) => {
     const riderIds = [...new Set((sl ?? []).map((s) => s.rider_id as string).filter(Boolean))]
     const result = await categorizeRiders(riderIds)
 
+    // freshRanked=0 → PCS-skrabet gav intet (fx Cloudflare-403). Kategorierne er
+    // stadig sat korrekt fra eksisterende ranking (aldrig nulstillet), men vi
+    // logger warning så det er synligt at rankings ikke blev friske.
+    const scrapeFailed = result.freshRanked === 0 && result.total > 0
     await supabaseAdmin.from('admin_logs').insert({
       type: 'cycling_categorize',
-      status: 'success',
-      message: `categorize: ${race.name} — ${result.updated}/${result.total} ryttere (${result.ranked} med ranking)`,
-      metadata: { race_id: race.id, race_name: race.name, ...result },
+      status: scrapeFailed ? 'warning' : 'success',
+      message: scrapeFailed
+        ? `categorize: ${race.name} — skrab gav 0 friske rankings (CF-blok?); ${result.updated}/${result.total} re-bucketet fra eksisterende`
+        : `categorize: ${race.name} — ${result.updated}/${result.total} ryttere (${result.freshRanked} friske rankings)`,
+      metadata: { race_id: race.id, race_name: race.name, scrape_failed: scrapeFailed, ...result },
     })
 
     res.json({ ok: true, race: race.name, ...result })

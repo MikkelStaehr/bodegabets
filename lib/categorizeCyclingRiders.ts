@@ -45,10 +45,28 @@ async function scrapeRankingsIndex(targetSlugs: Set<string>): Promise<Map<string
   const riderRe = /^rider\/([\w-]+)$/
   let offset = 0
 
+  // Hent én side med retries — PCS kan give en transient 403/tom side (fx fra
+  // datacenter-IP). Uden retry ville ét fejlet fetch tømme hele indekset.
+  const fetchPage = async (o: number): Promise<string | null> => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const res = await fetch(`${RANKINGS_BASE}&offset=${o}`, { headers: HEADERS, cache: 'no-store' })
+        if (res.ok) {
+          const html = await res.text()
+          if (html.includes('rider/')) return html // rigtig ranking-side, ikke challenge/tom
+        }
+      } catch {
+        // netværksfejl → prøv igen
+      }
+      await sleep(2000 * (attempt + 1))
+    }
+    return null
+  }
+
   while (offset <= MAX_OFFSET) {
-    const res = await fetch(`${RANKINGS_BASE}&offset=${offset}`, { headers: HEADERS, cache: 'no-store' })
-    if (!res.ok) break
-    const $ = cheerio.load(await res.text())
+    const html = await fetchPage(offset)
+    if (html == null) break
+    const $ = cheerio.load(html)
 
     let pageCount = 0
     $('tr').each((_, tr) => {
@@ -74,38 +92,42 @@ async function scrapeRankingsIndex(targetSlugs: Set<string>): Promise<Map<string
 }
 
 /**
- * Hent friske rankings for de givne ryttere og sæt uci_ranking + category.
- * Ryttere der ikke findes i ranking-indekset sættes til kategori 5 (uden for
- * top-listen). uci_ranking overskrives kun når en frisk værdi findes.
+ * Sæt category ud fra den BEDSTE tilgængelige ranking: frisk fra PCS hvis skrabet
+ * lykkes, ELLERS rytterens eksisterende uci_ranking. Så et fejlet/CF-blokeret
+ * skrab re-bucketer bare fra eksisterende data — det nulstiller ALDRIG til
+ * kategori 5. uci_ranking overskrives kun når en frisk værdi findes.
+ * `freshRanked` = antal med en NY ranking fra dette skrab (0 = skrab gav intet).
  */
-export async function categorizeRiders(riderIds: string[]): Promise<{ total: number; ranked: number; updated: number }> {
-  if (!riderIds.length) return { total: 0, ranked: 0, updated: 0 }
+export async function categorizeRiders(riderIds: string[]): Promise<{ total: number; freshRanked: number; updated: number }> {
+  if (!riderIds.length) return { total: 0, freshRanked: 0, updated: 0 }
 
   const { data: riders } = await supabaseAdmin
     .from('cycling_riders')
-    .select('id, pcs_slug')
+    .select('id, pcs_slug, uci_ranking')
     .in('id', riderIds)
 
-  const withSlug = (riders ?? []).filter((r) => !!r.pcs_slug) as { id: string; pcs_slug: string }[]
+  const withSlug = (riders ?? []).filter((r) => !!r.pcs_slug) as { id: string; pcs_slug: string; uci_ranking: number | null }[]
   const targetSlugs = new Set(withSlug.map((r) => r.pcs_slug))
-  if (targetSlugs.size === 0) return { total: 0, ranked: 0, updated: 0 }
+  if (targetSlugs.size === 0) return { total: 0, freshRanked: 0, updated: 0 }
 
   const index = await scrapeRankingsIndex(targetSlugs)
 
-  let ranked = 0
+  let freshRanked = 0
   let updated = 0
   const nowIso = new Date().toISOString()
   for (const r of withSlug) {
-    const rank = index.get(r.pcs_slug) ?? null
+    const fresh = index.get(r.pcs_slug) ?? null
+    // Frisk ranking hvis skrabet fandt den, ellers den eksisterende i DB'en.
+    const rank = fresh ?? r.uci_ranking ?? null
     const category = rankingToCategory(rank)
     const patch: Record<string, unknown> = { category, updated_at: nowIso }
-    if (rank != null) {
-      patch.uci_ranking = rank
-      ranked++
+    if (fresh != null) {
+      patch.uci_ranking = fresh
+      freshRanked++
     }
     const { error } = await supabaseAdmin.from('cycling_riders').update(patch).eq('id', r.id)
     if (!error) updated++
   }
 
-  return { total: withSlug.length, ranked, updated }
+  return { total: withSlug.length, freshRanked, updated }
 }
