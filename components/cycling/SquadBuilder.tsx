@@ -88,6 +88,7 @@ function shortRaceName(name: string): string {
 
 import CatBadge from './CatBadge'
 import TeamLogo from './TeamLogo'
+import LineupTester from './LineupTester'
 
 function Spinner() {
   return (
@@ -837,6 +838,9 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
           </div>
         </div>
       </div>
+
+      {/* ── Test opstilling (beredskabs-tjek: kan truppen stille lineup?) ─ */}
+      <LineupTester squad={squad} />
 
       {/* ── Error / Success ───────────────────────────────────────── */}
       {error && (
