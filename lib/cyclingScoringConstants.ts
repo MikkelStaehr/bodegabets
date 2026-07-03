@@ -123,6 +123,20 @@ export const GC_MULTIPLIER_DISPLAY: { label: string; value: string }[] = [
 // andre fradrag. En rytter der udgår eller placerer sig dårligt får
 // bare 0 placerings-point, men ikke negative point.
 
+// ── Udbruds-bonus (km_in_break) ────────────────────────────────────────────
+
+// Ryttere der stikker af belønnes med km × 0.1 (ingen loft) — men KUN de tre
+// roller der ellers ofte scorer 0: Domestique, Équipier, Joker. Gør det værd
+// at sætte en angriber i de slots. km_in_break parses fra PCS' svg_shield-ikon.
+export const BREAK_POINTS_PER_KM = 0.1
+export const BREAK_BONUS_ROLES: ReadonlySet<string> = new Set(['domestique', 'equipier', 'joker'])
+
+/** Udbruds-bonus for en rolle: km × 0.1 for de tre lav-scorende roller, ellers 0. */
+export function computeBreakPoints(role: string, kmInBreak: number): number {
+  if (!BREAK_BONUS_ROLES.has(role) || kmInBreak <= 0) return 0
+  return kmInBreak * BREAK_POINTS_PER_KM
+}
+
 // ── Spurt-tog ──────────────────────────────────────────────────────────────
 
 export const TRAIN_BONUS_PER_LEADOUT = 0.2  // +20% pr. leadout-equipier

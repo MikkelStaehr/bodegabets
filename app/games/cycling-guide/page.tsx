@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
 import {
+  BREAK_POINTS_PER_KM,
   CAT_MULTIPLIER,
   DOMESTIQUE_BONUS,
   EQUIPIER_TEAM_BONUS,
@@ -290,33 +291,41 @@ const ROLES: RoleData[] = [
     key: 'domestique',
     name: 'Domestique',
     tagline: 'Holdarbejder',
-    desc: 'Får en fast bonus hvis han ender top-40 OG Leader er top-10. Ingen multiplier.',
+    desc: `Får en fast bonus hvis han ender top-40 OG Leader er top-10. Ingen multiplier. Og en udbruds-bonus på ${BREAK_POINTS_PER_KM} pt pr. km han er i udbrud.`,
     category: 'Kun kategori 4',
-    formulaLabel: `Basispoint + ${DOMESTIQUE_BONUS} (hvis top-40 og Leader top-10)`,
+    formulaLabel: `Basispoint + ${DOMESTIQUE_BONUS} (hvis top-40 og Leader top-10) + udbruds-km × ${BREAK_POINTS_PER_KM}`,
     scoring: [
       { label: 'Bonus', rows: [
         [`Top-40 og Leader top-10`, `+${DOMESTIQUE_BONUS}`],
         ['Ellers', 'Kun basispoint'],
       ]},
+      { label: 'Udbrud', rows: [
+        ['Pr. km foran feltet', `+${BREAK_POINTS_PER_KM} pt`],
+        ['Fx 135 km i udbrud', '+13,5'],
+      ]},
     ],
     examples: [
       { title: 'Domestique 25. plads, Leader 3.', calculation: `0 + ${DOMESTIQUE_BONUS}`, result: `${DOMESTIQUE_BONUS} pt` },
-      { title: 'Domestique 10. plads, Leader vinder', calculation: `10 + ${DOMESTIQUE_BONUS}`, result: `${10 + DOMESTIQUE_BONUS} pt`, highlight: true },
-      { title: 'Domestique 50. plads', calculation: '0', result: '0 pt' },
+      { title: 'Domestique 135 km i udbrud, 40. plads', calculation: `0 + 135 × ${BREAK_POINTS_PER_KM}`, result: '13,5 pt', highlight: true },
+      { title: 'Domestique 50. plads, intet udbrud', calculation: '0', result: '0 pt' },
     ],
-    strategy: 'Sikre småpoint hvis din Leader-strategi virker.',
+    strategy: 'Sikre småpoint hvis din Leader-strategi virker — eller sæt en angriber der jager udbruddet: hver km foran feltet giver point, også når han fanges.',
   },
   {
     key: 'equipier',
     name: 'Équipier',
     tagline: 'Holdkammerat — kan blive leadout',
-    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Ingen multiplikator. På SAMME hold som din Sprinter forstærker han sprinterens score.`,
+    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold, plus en udbruds-bonus på ${BREAK_POINTS_PER_KM} pt pr. km i udbrud. Ingen multiplikator. På SAMME hold som din Sprinter forstærker han sprinterens score.`,
     category: 'Alle kategorier',
-    formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold)`,
+    formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold) + udbruds-km × ${BREAK_POINTS_PER_KM}`,
     scoring: [
       { label: 'Placering', rows: [
         ['Top-20 i mål', 'Fulde basispoint (50/30/20/10/5)'],
         ['Uden for top-20', '0 basispoint'],
+      ]},
+      { label: 'Udbrud', rows: [
+        ['Pr. km foran feltet', `+${BREAK_POINTS_PER_KM} pt`],
+        ['Fx 135 km i udbrud', '+13,5'],
       ]},
       { label: 'Bonus', rows: [
         ['Samme hold som vinder', `+${EQUIPIER_TEAM_BONUS}`],
@@ -328,22 +337,26 @@ const ROLES: RoleData[] = [
     ],
     examples: [
       { title: 'Équipier nr. 3 på etapen', calculation: '30 basispoint', result: '30 pt', highlight: true },
-      { title: 'Équipier nr. 30 (uden for top-20), vinderens hold', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
-      { title: 'Équipier på Sprinters hold (Sprinter får ×1.2)', calculation: 'eget point uændret', result: 'Sprinter får boost' },
+      { title: 'Équipier 135 km i udbrud, fanget', calculation: `135 × ${BREAK_POINTS_PER_KM}`, result: '13,5 pt', highlight: true },
+      { title: 'Équipier nr. 30, vinderens hold', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
     ],
-    strategy: 'En équipier der lander i top-20 giver fuld placeringsscore — sæt gerne en opportunist der kan snige sig med i et udbrud. Ellers bruges rollen som leadout for din Sprinter eller til holdbonus-jagt.',
+    strategy: 'Stærk til opportunister: en équipier i top-20 giver fuld placeringsscore, og hver km i udbrud giver point selv når han fanges. Ellers leadout for din Sprinter eller holdbonus-jagt.',
   },
   {
     key: 'joker',
     name: 'Joker',
     tagline: 'Wildcard',
-    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Ingen multiplikator.`,
+    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold, plus en udbruds-bonus på ${BREAK_POINTS_PER_KM} pt pr. km i udbrud. Ingen multiplikator.`,
     category: 'Alle kategorier',
-    formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold)`,
+    formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold) + udbruds-km × ${BREAK_POINTS_PER_KM}`,
     scoring: [
       { label: 'Placering', rows: [
         ['Top-20 i mål', 'Fulde basispoint (50/30/20/10/5)'],
         ['Uden for top-20', '0 basispoint'],
+      ]},
+      { label: 'Udbrud', rows: [
+        ['Pr. km foran feltet', `+${BREAK_POINTS_PER_KM} pt`],
+        ['Fx 135 km i udbrud', '+13,5'],
       ]},
       { label: 'Bonus', rows: [
         ['Samme hold som vinder', `+${EQUIPIER_TEAM_BONUS}`],
@@ -352,9 +365,10 @@ const ROLES: RoleData[] = [
     ],
     examples: [
       { title: 'Joker nr. 1 på etapen', calculation: '50 basispoint', result: '50 pt', highlight: true },
+      { title: 'Joker 135 km i udbrud, fanget', calculation: `135 × ${BREAK_POINTS_PER_KM}`, result: '13,5 pt', highlight: true },
       { title: 'Joker uden for top-20, vinderens hold', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
     ],
-    strategy: 'Et frit valg uden bindinger til kategori eller profil — godt sted til en risikabel rytter du tror på og som kan snige sig i top-20.',
+    strategy: 'Et frit valg uden bindinger til kategori eller profil — perfekt til en risikabel angriber: hver km i udbrud giver point, også når han fanges, og han kan snige sig i top-20.',
   },
 ]
 

@@ -25,6 +25,8 @@ type Score = {
   train_multiplier?: number | null
   jersey_points: number
   team_bonus: number
+  /** Udbruds-bonus (km × 0.1) for Domestique/Équipier/Joker. */
+  break_points?: number | null
   total_points: number
 }
 
@@ -374,6 +376,7 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   if (score.gc_multiplier && score.gc_multiplier !== 1) lines.push({ label: 'GC-multiplikator', value: fmtMul(score.gc_multiplier) })
   if (score.jersey_points > 0) lines.push({ label: 'Jersey-point', value: `+${score.jersey_points}` })
   if (score.team_bonus > 0) lines.push({ label: 'Hold-bonus', value: `+${score.team_bonus}` })
+  if (score.break_points != null && score.break_points > 0) lines.push({ label: 'Udbruds-bonus', value: `+${Math.round(score.break_points * 10) / 10}`, highlight: true })
   lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}`, isTotal: true })
 
   const roleAnchor = score.role.replace(/_\d+$/, '')

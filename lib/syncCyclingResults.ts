@@ -34,6 +34,8 @@ type ParsedRow = {
   time_gap_seconds: number | null
   dnf: boolean
   abandon_type: string | null
+  /** Km rytteren var i udbrud foran feltet (PCS svg_shield-ikon). 0 = ikke i udbrud. */
+  km_in_break: number
 }
 
 // ─── HTTP ───────────────────────────────────────────────────────────────────
@@ -137,6 +139,12 @@ export function parseResultsTable(html: string): ParsedRow[] {
       timeGapSeconds = parseGapToSeconds(raw, position)
     }
 
+    // Udbruds-km: PCS' røde svg_shield-ikon har title "N kilometre in a group
+    // in front of the peloton". Ligger i samme række som rytteren.
+    const breakTitle = $tr.find('div.svg_shield[title*="in front of the peloton"]').first().attr('title') ?? ''
+    const kmMatch = breakTitle.match(/(\d+)\s*kilometre/i)
+    const kmInBreak = kmMatch ? parseInt(kmMatch[1], 10) : 0
+
     results.push({
       pcs_slug: slug,
       name,
@@ -144,6 +152,7 @@ export function parseResultsTable(html: string): ParsedRow[] {
       time_gap_seconds: timeGapSeconds,
       dnf,
       abandon_type: abandonType,
+      km_in_break: kmInBreak,
     })
   })
 
@@ -620,6 +629,7 @@ export async function syncCyclingResults(): Promise<{
       youth_gap_seconds: number | null
       sprint_points: number
       mountain_points: number
+      km_in_break: number
     }> = []
     for (const r of parsed) {
       const riderId = riderIndex.get(r.pcs_slug)
@@ -658,6 +668,7 @@ export async function syncCyclingResults(): Promise<{
           : null,
         sprint_points: classifications.sprintPoints[r.pcs_slug] ?? 0,
         mountain_points: classifications.mountainPoints[r.pcs_slug] ?? 0,
+        km_in_break: r.km_in_break,
       })
     }
     if (stageUnmatched > 0) {

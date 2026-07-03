@@ -19,6 +19,7 @@ import {
   getGrimpeurMultiplier,
   getSprinterMultiplier,
   getWonHowGrimpeurBonus,
+  computeBreakPoints,
 } from '@/lib/cyclingScoringConstants'
 
 // Konstanterne er nu i lib/cyclingScoringConstants.ts — én kilde til sandhed
@@ -73,6 +74,7 @@ type RiderResult = {
   youth_position_after: number | null
   sprint_points: number
   mountain_points: number
+  km_in_break: number
 }
 
 type LineupRider = {
@@ -103,6 +105,7 @@ type ScoreRow = {
   jersey_points: number
   team_bonus: number
   intermediate_points: number
+  break_points: number
   calculated_at: string
   // total_points er generated i DB — må ikke insertes
 }
@@ -135,7 +138,7 @@ export async function calculateCyclingPoints(
   // 2. Fetch results for this stage
   const { data: resultsRaw } = await supabaseAdmin
     .from('cycling_results')
-    .select('rider_id, position, dnf, abandon_type, gc_position_after, points_position_after, mountain_position_after, youth_position_after, sprint_points, mountain_points')
+    .select('rider_id, position, dnf, abandon_type, gc_position_after, points_position_after, mountain_position_after, youth_position_after, sprint_points, mountain_points, km_in_break')
     .eq('race_id', raceId)
     .eq('stage_number', stageNumber)
 
@@ -437,6 +440,10 @@ export async function calculateCyclingPoints(
       // så feedback er forudsigelig ("PCS siger 15 = jeg får 15").
       const intermediatePoints = (result?.sprint_points ?? 0) + (result?.mountain_points ?? 0)
 
+      // Udbruds-bonus: km × 0.1, kun Domestique/Équipier/Joker. Belønner angreb
+      // selv uden top-20. Ikke på TTT (ingen udbrud i en holdtempo-etape).
+      const breakPoints = isTTT ? 0 : computeBreakPoints(rider.role, result?.km_in_break ?? 0)
+
       allScores.push({
         lineup_id: lineup.id,
         rider_id: rider.rider_id,
@@ -455,6 +462,7 @@ export async function calculateCyclingPoints(
         jersey_points: jerseyPts,
         team_bonus: teamBonus,
         intermediate_points: intermediatePoints,
+        break_points: breakPoints,
         calculated_at: now,
       })
     }
