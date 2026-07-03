@@ -42,7 +42,7 @@ const ROLES = [
     bg: '#27500A',
     cat: 'Kun Kat 4',
     score: 'Ingen multiplier',
-    bonus: '+8 hvis top 40 + Leader top 10',
+    bonus: '+8 top-40 & Leader top-10 · +0,1/km udbrud',
   },
   {
     role: 'Équipier (×2)',
@@ -50,7 +50,7 @@ const ROLES = [
     bg: '#444441',
     cat: 'Alle',
     score: 'Ingen multiplier',
-    bonus: '+7 hvis vinderhold',
+    bonus: '+7 vinderhold · +0,1/km udbrud',
   },
   {
     role: 'Joker',
@@ -58,7 +58,7 @@ const ROLES = [
     bg: '#3C3489',
     cat: 'Alle',
     score: 'Ingen multiplier',
-    bonus: '+7 vinderhold',
+    bonus: '+7 vinderhold · +0,1/km udbrud',
   },
 ]
 
