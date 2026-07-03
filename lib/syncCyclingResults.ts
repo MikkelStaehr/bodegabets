@@ -14,6 +14,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase'
+import { pcsFetch } from '@/lib/pcsFetch'
 import * as cheerio from 'cheerio'
 
 const PCS_BASE = 'https://www.procyclingstats.com'
@@ -40,7 +41,7 @@ type ParsedRow = {
 async function pcsGet(url: string): Promise<string | null> {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(url, { headers: HEADERS })
+      const res = await pcsFetch(url, { headers: HEADERS })
       if (res.status === 404) return null
       if (!res.ok) {
         if (attempt < MAX_RETRIES - 1) {

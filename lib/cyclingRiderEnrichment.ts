@@ -12,6 +12,7 @@
  */
 
 import * as cheerio from 'cheerio'
+import { pcsFetch } from '@/lib/pcsFetch'
 
 const PCS_BASE = 'https://www.procyclingstats.com'
 
@@ -32,7 +33,7 @@ export type RiderEnrichment = {
 export async function enrichRiderFromPcs(pcsSlug: string): Promise<RiderEnrichment | null> {
   const url = `${PCS_BASE}/rider/${pcsSlug}`
   try {
-    const res = await fetch(url, { headers: HEADERS })
+    const res = await pcsFetch(url, { headers: HEADERS })
     if (!res.ok) {
       console.warn(`[enrichRider] ${pcsSlug}: HTTP ${res.status}`)
       return null

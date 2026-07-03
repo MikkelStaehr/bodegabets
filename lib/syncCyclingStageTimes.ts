@@ -12,6 +12,7 @@
 
 import * as cheerio from 'cheerio'
 import { supabaseAdmin } from '@/lib/supabase'
+import { pcsFetch } from '@/lib/pcsFetch'
 
 const PCS_BASE = 'https://www.procyclingstats.com'
 const REQUEST_DELAY_MS = 1000
@@ -86,7 +87,7 @@ async function fetchStagePageData(
   const stagePath = stageNumber === 0 ? 'prologue' : `stage-${stageNumber}`
   const url = `${PCS_BASE}/race/${raceSlug}/${year}/${stagePath}`
   try {
-    const res = await fetch(url, { headers: HEADERS })
+    const res = await pcsFetch(url, { headers: HEADERS })
     if (!res.ok) return { startTime: null, climbs: [], profileImageUrl: null, isTTT: false }
     const html = await res.text()
     const $ = cheerio.load(html)

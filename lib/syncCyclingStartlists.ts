@@ -11,6 +11,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase'
+import { pcsFetch } from '@/lib/pcsFetch'
 import * as cheerio from 'cheerio'
 import { enrichRiderFromPcs } from '@/lib/cyclingRiderEnrichment'
 
@@ -25,7 +26,7 @@ const HEADERS: Record<string, string> = {
 
 async function pcsGet(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, { headers: HEADERS })
+    const res = await pcsFetch(url, { headers: HEADERS })
     if (!res.ok) {
       console.warn(`[syncCyclingStartlists] HTTP ${res.status} for ${url}`)
       return null

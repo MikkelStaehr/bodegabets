@@ -13,6 +13,7 @@
 
 import * as cheerio from 'cheerio'
 import { supabaseAdmin } from '@/lib/supabase'
+import { pcsFetch } from '@/lib/pcsFetch'
 
 const PCS_BASE = 'https://www.procyclingstats.com'
 const RANKINGS_BASE = `${PCS_BASE}/rankings.php?p=me&s=individual&filter=Filter`
@@ -50,7 +51,7 @@ async function scrapeRankingsIndex(targetSlugs: Set<string>): Promise<Map<string
   const fetchPage = async (o: number): Promise<string | null> => {
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        const res = await fetch(`${RANKINGS_BASE}&offset=${o}`, { headers: HEADERS, cache: 'no-store' })
+        const res = await pcsFetch(`${RANKINGS_BASE}&offset=${o}`, { headers: HEADERS, cache: 'no-store' })
         if (res.ok) {
           const html = await res.text()
           if (html.includes('rider/')) return html // rigtig ranking-side, ikke challenge/tom
