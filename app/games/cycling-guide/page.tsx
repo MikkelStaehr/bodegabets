@@ -310,10 +310,14 @@ const ROLES: RoleData[] = [
     key: 'equipier',
     name: 'Équipier',
     tagline: 'Holdkammerat — kan blive leadout',
-    desc: `Får +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Hvis han er på SAMME hold som din Sprinter, forstærker han sprinterens score.`,
+    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Ingen multiplikator. På SAMME hold som din Sprinter forstærker han sprinterens score.`,
     category: 'Alle kategorier',
     formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold)`,
     scoring: [
+      { label: 'Placering', rows: [
+        ['Top-20 i mål', 'Fulde basispoint (50/30/20/10/5)'],
+        ['Uden for top-20', '0 basispoint'],
+      ]},
       { label: 'Bonus', rows: [
         ['Samme hold som vinder', `+${EQUIPIER_TEAM_BONUS}`],
         ['Ellers', 'Kun basispoint'],
@@ -323,29 +327,34 @@ const ROLES: RoleData[] = [
       ]},
     ],
     examples: [
-      { title: 'Équipier på vinderens hold, 30. plads', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
-      { title: 'Équipier på Sprinters hold (Sprinter får ×1.2)', calculation: 'eget point uændret', result: 'Sprinter får boost', highlight: true },
+      { title: 'Équipier nr. 3 på etapen', calculation: '30 basispoint', result: '30 pt', highlight: true },
+      { title: 'Équipier nr. 30 (uden for top-20), vinderens hold', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
+      { title: 'Équipier på Sprinters hold (Sprinter får ×1.2)', calculation: 'eget point uændret', result: 'Sprinter får boost' },
     ],
-    strategy: 'Den taktiske rolle: bruges som leadout for din Sprinter eller som ekstra holdbonus-jagt.',
+    strategy: 'En équipier der lander i top-20 giver fuld placeringsscore — sæt gerne en opportunist der kan snige sig med i et udbrud. Ellers bruges rollen som leadout for din Sprinter eller til holdbonus-jagt.',
   },
   {
     key: 'joker',
     name: 'Joker',
     tagline: 'Wildcard',
-    desc: `Får +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Ingen multiplier.`,
+    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold. Ingen multiplikator.`,
     category: 'Alle kategorier',
     formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold)`,
     scoring: [
+      { label: 'Placering', rows: [
+        ['Top-20 i mål', 'Fulde basispoint (50/30/20/10/5)'],
+        ['Uden for top-20', '0 basispoint'],
+      ]},
       { label: 'Bonus', rows: [
         ['Samme hold som vinder', `+${EQUIPIER_TEAM_BONUS}`],
         ['Ellers', 'Kun basispoint'],
       ]},
     ],
     examples: [
-      { title: 'Joker på vinderens hold, 50. plads', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
+      { title: 'Joker nr. 1 på etapen', calculation: '50 basispoint', result: '50 pt', highlight: true },
       { title: 'Joker uden for top-20, vinderens hold', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
     ],
-    strategy: 'Et frit valg uden bindinger til kategori eller profil — godt sted til en risikabel rytter du tror på.',
+    strategy: 'Et frit valg uden bindinger til kategori eller profil — godt sted til en risikabel rytter du tror på og som kan snige sig i top-20.',
   },
 ]
 
