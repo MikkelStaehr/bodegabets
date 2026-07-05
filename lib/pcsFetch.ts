@@ -4,14 +4,18 @@
  * PCS er bag Cloudflare (403 "Just a moment") fra både vores hjemme-IP og
  * Railways datacenter-IP siden ~29/6 2026 — det rammer startliste-, resultat-,
  * rangliste- og rytter-scraping. For at komme udenom ruter vi kaldene gennem
- * ScraperAPI (løser CF-challenge server-side) NÅR miljøvariablen SCRAPER_API_KEY
- * er sat. Uden nøgle falder vi tilbage til direkte fetch — så lokal/ublokeret
- * brug bevares og helperen er en no-op i test.
+ * én af to CF-løsere, i prioriteret rækkefølge:
  *
- * Skulle CF stramme yderligere kan man eskalere UDEN en kode-ændring via
- * SCRAPER_API_EXTRA (fx "&premium=true" eller "&render=true") i Railway-env.
+ *   1. FLARESOLVERR_URL — selvhostet FlareSolverr (headless browser der løser
+ *      CF-challenge). GRATIS, ubegrænset volumen. Foretrukket når sat.
+ *   2. SCRAPER_API_KEY  — ScraperAPI (betalt pr. credit). Fallback.
+ *   3. Ingen af delene   — direkte fetch (lokal/ublokeret brug, no-op i test).
+ *
+ * Skifter man mellem løserne er det KUN env-variabler der ændres — ingen
+ * kode-ændring, ingen ændring af crons/scraping-frekvens.
  */
 
+const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL
 const SCRAPER_KEY = process.env.SCRAPER_API_KEY
 const SCRAPER_EXTRA = process.env.SCRAPER_API_EXTRA ?? ''
 
@@ -22,17 +26,48 @@ const DEFAULT_HEADERS: Record<string, string> = {
   'Accept-Language': 'en-US,en;q=0.9',
 }
 
-/** True hvis PCS-kald ruter gennem scrape-proxyen (nøgle sat). */
+/** True hvis PCS-kald ruter gennem en CF-løser (FlareSolverr eller ScraperAPI). */
 export function pcsProxied(): boolean {
-  return !!SCRAPER_KEY
+  return !!FLARESOLVERR_URL || !!SCRAPER_KEY
 }
 
 /**
- * Hent en PCS-URL. Ruter gennem ScraperAPI hvis SCRAPER_API_KEY er sat,
- * ellers direkte. `init` (fx caller-headers) bruges kun ved direkte fetch —
- * proxyen sætter selv realistiske headers/UA, så vi sender ikke vores egne.
+ * Hent en PCS-URL via selvhostet FlareSolverr. FlareSolverr kører en rigtig
+ * headless browser der løser CF's JavaScript-challenge og returnerer den
+ * færdige HTML som JSON. Vi pakker den ind i et Response-objekt så callere
+ * bruger den præcis som en almindelig fetch (res.ok / res.status / res.text()).
+ */
+async function flaresolverrFetch(url: string): Promise<Response> {
+  const endpoint = `${FLARESOLVERR_URL!.replace(/\/$/, '')}/v1`
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cmd: 'request.get', url, maxTimeout: 60000 }),
+  })
+  if (!res.ok) {
+    // FlareSolverr selv fejlede (5xx/timeout) — giv en 502 videre så caller-
+    // retries slår til i stedet for at tro at PCS gav tom HTML.
+    return new Response('', { status: 502 })
+  }
+  const data = (await res.json()) as {
+    status?: string
+    solution?: { status?: number; response?: string }
+  }
+  const sol = data?.solution
+  const html = sol?.response ?? ''
+  const status = sol?.status ?? (data?.status === 'ok' ? 200 : 502)
+  return new Response(html, { status })
+}
+
+/**
+ * Hent en PCS-URL. Ruter gennem FlareSolverr (hvis sat), ellers ScraperAPI
+ * (hvis sat), ellers direkte. `init` (fx caller-headers) bruges kun ved direkte
+ * fetch — CF-løserne sætter selv realistiske headers/UA.
  */
 export async function pcsFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  if (FLARESOLVERR_URL) {
+    return flaresolverrFetch(url)
+  }
   if (SCRAPER_KEY) {
     const proxied =
       `https://api.scraperapi.com/?api_key=${encodeURIComponent(SCRAPER_KEY)}` +
