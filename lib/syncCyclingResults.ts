@@ -590,6 +590,16 @@ export async function syncCyclingResults(): Promise<{
     // en evig PCS-fejl ikke blokerer point-beregning permanent.
     const gcCount = Object.keys(classifications.gc).length
     const classificationsComplete = gcCount >= 50
+    // Resultat-tabellen kan være DELVIS selvom GC-klassementet allerede er
+    // publiceret: en bjergetape drypper i mål over 20-40 min. Kræv derfor at vi
+    // har ~hele feltet (mod startlisten) før vi finaliserer — ellers låses
+    // delvise placeringer (Tour 2026 etape 2 blev låst på 116/184 ryttere → både
+    // udbruds-km og GC-snapshot ufuldstændige).
+    const { count: startlistCount } = await supabaseAdmin
+      .from('cycling_startlists')
+      .select('*', { count: 'exact', head: true })
+      .eq('race_id', stage.race_id)
+    const resultsComplete = !startlistCount || parsed.length >= Math.floor(startlistCount * 0.9)
     const stageAgeMs = Date.now() - new Date(stage.start_date).getTime()
     const stageOlderThan24h = stageAgeMs > 24 * 60 * 60 * 1000
     // SIDSTE etape afgør løbet — vent kun en kort grace (3t) på det fulde GC-
@@ -597,10 +607,10 @@ export async function syncCyclingResults(): Promise<{
     // på placeringerne i stedet for at hænge i 24t.
     const isLastStage = stage.stage_number === maxStageByRace.get(stage.race_id)
     const lastStageGracePassed = isLastStage && stageAgeMs > 3 * 60 * 60 * 1000
-    const shouldMarkUploaded = classificationsComplete || stageOlderThan24h || lastStageGracePassed
-    if (!classificationsComplete) {
+    const shouldMarkUploaded = (classificationsComplete && resultsComplete) || stageOlderThan24h || lastStageGracePassed
+    if (!classificationsComplete || !resultsComplete) {
       console.warn(
-        `[syncCyclingResults]   klassementer ufuldstændige (gc=${gcCount}) — ` +
+        `[syncCyclingResults]   ufuldstændig (gc=${gcCount}, resultater=${parsed.length}/${startlistCount ?? '?'}) — ` +
         (stageOlderThan24h
           ? 'stage >24t gammel, markerer alligevel som færdig'
           : 'markerer IKKE som færdig, retry næste cron')
