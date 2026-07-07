@@ -365,7 +365,15 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   const lines: Line[] = [
     { label: 'Basispoint', value: `${score.base_points}` },
   ]
-  if (score.role_bonus > 0) lines.push({ label: 'Rolle-bonus', value: `+${score.role_bonus}` })
+  if (score.role_bonus > 0) {
+    // role_bonus dækker forskellige mekanikker afhængigt af rollen — vis hvilken:
+    const rbLabel =
+      score.role === 'grimpeur' || score.role === 'sprinter' ? 'Won-how-bonus'
+      : score.role === 'domestique' ? 'Domestique-bonus'
+      : score.role === 'equipier' || score.role === 'joker' ? 'Holdsejr'
+      : 'Rolle-bonus'
+    lines.push({ label: rbLabel, value: `+${score.role_bonus}` })
+  }
 
   if (hasBreakdown) {
     if (catMul != null && catMul !== 1) lines.push({ label: 'Kategori', value: fmtMul(catMul) })
@@ -377,7 +385,7 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
 
   if (score.gc_multiplier && score.gc_multiplier !== 1) lines.push({ label: 'GC-multiplikator', value: fmtMul(score.gc_multiplier) })
   if (score.jersey_points > 0) lines.push({ label: 'Jersey-point', value: `+${score.jersey_points}` })
-  if (score.team_bonus > 0) lines.push({ label: 'Hold-bonus', value: `+${score.team_bonus}` })
+  if (score.team_bonus > 0) lines.push({ label: 'Holdsejr', value: `+${score.team_bonus}` })
   if (score.intermediate_points != null && score.intermediate_points > 0) lines.push({ label: 'Spurt/bjerg-point', value: `+${score.intermediate_points}` })
   if (score.break_points != null && score.break_points > 0) lines.push({ label: 'Udbruds-bonus', value: `+${Math.round(score.break_points * 10) / 10}`, highlight: true })
   lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}`, isTotal: true })
