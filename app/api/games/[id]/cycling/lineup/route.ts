@@ -175,8 +175,13 @@ export async function GET(req: NextRequest, { params }: Props) {
       role_bonus: Number(s.role_bonus),
       role_multiplier: Number(s.role_multiplier),
       gc_multiplier: Number(s.gc_multiplier ?? 1),
+      cat_multiplier: Number(s.cat_multiplier ?? 1),
+      profile_multiplier: Number(s.profile_multiplier ?? 1),
+      train_multiplier: Number(s.train_multiplier ?? 1),
       jersey_points: Number(s.jersey_points),
       team_bonus: Number(s.team_bonus),
+      intermediate_points: Number(s.intermediate_points ?? 0),
+      break_points: Number(s.break_points ?? 0),
       total_points: Number(s.total_points),
     }))
 
