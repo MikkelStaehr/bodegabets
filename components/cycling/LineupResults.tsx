@@ -6,6 +6,7 @@ import { Check, AlertTriangle, X as XIcon } from 'lucide-react'
 import { type JerseyKey } from '@/lib/cyclingJerseys'
 import JerseyIcon from './JerseyIcon'
 import { getRoleStageBonus } from '@/lib/cyclingRoleStageBonus'
+import { BREAK_POINTS_PER_KM } from '@/lib/cyclingScoringConstants'
 import { analyzeLineupSynergy, worstStatus, type RiderSynergyCheck, type SynergyStatus } from '@/lib/cyclingLineupSynergy'
 import { useNarrowViewport } from '@/hooks/useNarrowViewport'
 
@@ -387,7 +388,10 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
   if (score.jersey_points > 0) lines.push({ label: 'Jersey-point', value: `+${score.jersey_points}` })
   if (score.team_bonus > 0) lines.push({ label: 'Holdsejr', value: `+${score.team_bonus}` })
   if (score.intermediate_points != null && score.intermediate_points > 0) lines.push({ label: 'Spurt/bjerg-point', value: `+${score.intermediate_points}` })
-  if (score.break_points != null && score.break_points > 0) lines.push({ label: 'Udbruds-bonus', value: `+${Math.round(score.break_points * 10) / 10}`, highlight: true })
+  if (score.break_points != null && score.break_points > 0) {
+    const breakKm = Math.round(score.break_points / BREAK_POINTS_PER_KM)
+    lines.push({ label: `Udbruds-bonus (${breakKm} km)`, value: `+${Math.round(score.break_points * 10) / 10}`, highlight: true })
+  }
   lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}`, isTotal: true })
 
   const roleAnchor = score.role.replace(/_\d+$/, '')
