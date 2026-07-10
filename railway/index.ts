@@ -1364,9 +1364,11 @@ app.get('/categorize-cycling-riders', async (_req, res) => {
 // cycling_results. Trigger derefter automatisk runCyclingPointsForStage for
 // hver nyligt synket etape.
 
-app.get('/sync-cycling-results', async (_req, res) => {
+app.get('/sync-cycling-results', async (req, res) => {
   try {
-    const result = await syncCyclingResults()
+    // ?backfillDays=N udvider 3-dages-vinduet — kun til manuelle engangs-backfills.
+    const bd = parseInt(String(req.query.backfillDays ?? ''), 10)
+    const result = await syncCyclingResults(Number.isFinite(bd) && bd > 0 ? { backfillDays: bd } : {})
 
     // Trigger points-beregning for hver nyligt synket stage
     const pointsErrors: string[] = []

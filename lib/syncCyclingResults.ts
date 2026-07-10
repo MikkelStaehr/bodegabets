@@ -473,7 +473,12 @@ function parsePointsValue(raw: string | null | undefined): number | null {
 
 // ─── Public entry point ────────────────────────────────────────────────────
 
-export async function syncCyclingResults(): Promise<{
+/**
+ * @param opts.backfillDays Udvider backoff-vinduet (default 3 dage) så ældre
+ *   pending stages kan re-scrapes. Bruges KUN til manuelle engangs-backfills —
+ *   den daglige cron kalder uden argument og beholder 3-dages-vinduet.
+ */
+export async function syncCyclingResults(opts: { backfillDays?: number } = {}): Promise<{
   ok: boolean
   stagesProcessed: number
   resultsUpserted: number
@@ -512,7 +517,8 @@ export async function syncCyclingResults(): Promise<{
   //    fast efter HTTP 500 fra PCS). Stopper unyttig timely retry-loop.
   const today = new Date()
   const todayIso = today.toISOString().slice(0, 10)
-  const cutoffDate = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const backoffDays = opts.backfillDays ?? 3
+  const cutoffDate = new Date(today.getTime() - backoffDays * 24 * 60 * 60 * 1000)
   const cutoffIso = cutoffDate.toISOString().slice(0, 10)
   const raceIds = races.map((r) => r.id)
   const { data: stages, error: stagesErr } = await supabaseAdmin
