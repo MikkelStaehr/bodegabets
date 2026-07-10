@@ -33,7 +33,7 @@ const ROLES = [
     color: '#F5C4B3',
     bg: '#712B13',
     cat: 'Kat 1–3',
-    score: 'Flat ×1.8 · Hilly ×1.2',
+    score: 'Flat ×1.8 · spurt-tog ×1.2–1.4',
     bonus: 'Bunch / small group bonus',
   },
   {
@@ -50,7 +50,7 @@ const ROLES = [
     bg: '#444441',
     cat: 'Alle',
     score: 'Ingen multiplier',
-    bonus: '+7 vinderhold · +0,1/km udbrud',
+    bonus: '+7 vinderhold · +0,1/km udbrud · leadout +12/8/5',
   },
   {
     role: 'Joker',

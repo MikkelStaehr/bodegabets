@@ -14,6 +14,7 @@ import {
   TEAM_BONUS_DEFAULT,
   TRAIN_BONUS_PER_LEADOUT,
   TRAIN_MAX_LEADOUTS,
+  LEADOUT_BONUS,
   WON_HOW_SPRINTER_BONUS,
 } from '@/lib/cyclingScoringConstants'
 
@@ -273,6 +274,9 @@ const ROLES: RoleData[] = [
         ['1 équipier samme hold', `×${1 + TRAIN_BONUS_PER_LEADOUT}`],
         [`${TRAIN_MAX_LEADOUTS}+ équipiers samme hold`, `×${1 + TRAIN_BONUS_PER_LEADOUT * TRAIN_MAX_LEADOUTS}`],
       ]},
+      { label: 'Leadout-belønning', rows: [
+        ['Hver leadout-équipier får selv', `+${LEADOUT_BONUS[1]}/${LEADOUT_BONUS[2]}/${LEADOUT_BONUS[3]} (sprinter 1./2./3.)`],
+      ]},
       { label: 'Bonus (top-10)', rows: [
         ['Massespurt', `+${WON_HOW_SPRINTER_BONUS['Bunch sprint']}`],
         ['Lille gruppe-spurt', `+${WON_HOW_SPRINTER_BONUS['Small group sprint']}`],
@@ -285,7 +289,7 @@ const ROLES: RoleData[] = [
       { title: 'Kat 2 sprinter, 4. plads (ikke top-3 = intet spurt-tog)', calculation: `20 × ${CAT_MULTIPLIER[2]} × 1.8`, result: pt(20 * CAT_MULTIPLIER[2] * 1.8) },
     ],
     bonuses: [`+${TEAM_BONUS_DEFAULT} hvis vinderens hold`, 'Trøje-point (oftest pointtrøje)'],
-    strategy: 'Tror du sprinteren vinder? Tag en équipier fra samme hold med — det giver 20–40 % oven på.',
+    strategy: `Tror du sprinteren vinder? Tag 1–2 équipiers fra samme hold med som leadout: det giver 20–40 % oven på sprinteren, OG hver leadout får selv +${LEADOUT_BONUS[1]}/${LEADOUT_BONUS[2]}/${LEADOUT_BONUS[3]} (efter sprinterens 1./2./3.-plads). Et rigtigt tog slår at spamme løse sprintere.`,
   },
   {
     key: 'domestique',
@@ -315,7 +319,7 @@ const ROLES: RoleData[] = [
     key: 'equipier',
     name: 'Équipier',
     tagline: 'Holdkammerat — kan blive leadout',
-    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold, plus en udbruds-bonus på ${BREAK_POINTS_PER_KM} pt pr. km i udbrud. Ingen multiplikator. På SAMME hold som din Sprinter forstærker han sprinterens score.`,
+    desc: `Scorer fulde placerings-basispoint som alle andre roller (top-20: 50/30/20/10/5), plus +${EQUIPIER_TEAM_BONUS} hvis han er på vinderens hold, plus en udbruds-bonus på ${BREAK_POINTS_PER_KM} pt pr. km i udbrud. Ingen multiplikator. På SAMME hold som din Sprinter fungerer han som leadout: han forstærker sprinterens score OG får selv +${LEADOUT_BONUS[1]}/${LEADOUT_BONUS[2]}/${LEADOUT_BONUS[3]} når sprinteren bliver top-3.`,
     category: 'Alle kategorier',
     formulaLabel: `Basispoint + ${EQUIPIER_TEAM_BONUS} (hvis vinderens hold) + udbruds-km × ${BREAK_POINTS_PER_KM}`,
     scoring: [
@@ -331,16 +335,17 @@ const ROLES: RoleData[] = [
         ['Samme hold som vinder', `+${EQUIPIER_TEAM_BONUS}`],
         ['Ellers', 'Kun basispoint'],
       ]},
-      { label: 'Sammenspil', rows: [
-        ['Samme hold som Sprinter + Sprinter top-3', 'Spurt-tog aktiveres'],
+      { label: 'Leadout (samme hold som Sprinter)', rows: [
+        ['Sprinter top-3 → leadout-bonus', `+${LEADOUT_BONUS[1]}/${LEADOUT_BONUS[2]}/${LEADOUT_BONUS[3]} (efter sprinterens plads)`],
+        ['Forstærker samtidig sprinteren', '×1.2–1.4 på ham'],
       ]},
     ],
     examples: [
       { title: 'Équipier nr. 3 på etapen', calculation: '30 basispoint', result: '30 pt', highlight: true },
-      { title: 'Équipier 135 km i udbrud, fanget', calculation: `135 × ${BREAK_POINTS_PER_KM}`, result: '13,5 pt', highlight: true },
-      { title: 'Équipier nr. 30, vinderens hold', calculation: `0 + ${EQUIPIER_TEAM_BONUS}`, result: `${EQUIPIER_TEAM_BONUS} pt` },
+      { title: 'Leadout — sprinter vinder etapen', calculation: `${EQUIPIER_TEAM_BONUS} holdbonus + ${LEADOUT_BONUS[1]} leadout`, result: `${EQUIPIER_TEAM_BONUS + LEADOUT_BONUS[1]} pt`, highlight: true },
+      { title: 'Équipier 135 km i udbrud, fanget', calculation: `135 × ${BREAK_POINTS_PER_KM}`, result: '13,5 pt' },
     ],
-    strategy: 'Stærk til opportunister: en équipier i top-20 giver fuld placeringsscore, og hver km i udbrud giver point selv når han fanges. Ellers leadout for din Sprinter eller holdbonus-jagt.',
+    strategy: 'Stærk til opportunister (top-20 eller udbrud) — men også kernen i et spurt-tog: 1–2 équipiers fra din Sprinters hold forstærker ham OG scorer selv leadout-bonus, når han bliver top-3. Et rigtigt tog slår at spamme løse sprintere.',
   },
   {
     key: 'joker',
