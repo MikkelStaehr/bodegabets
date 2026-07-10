@@ -30,6 +30,8 @@ type Score = {
   intermediate_points?: number | null
   /** Udbruds-bonus (km × 0.1) for Domestique/Équipier/Joker. */
   break_points?: number | null
+  /** Leadout-bonus for equipier på sprinterens hold (sprinter top-3). */
+  leadout_points?: number | null
   total_points: number
 }
 
@@ -392,6 +394,7 @@ function PointsTooltip({ score, isJokerDnf }: { score: Score; isJokerDnf: boolea
     const breakKm = Math.round(score.break_points / BREAK_POINTS_PER_KM)
     lines.push({ label: `Udbruds-bonus (${breakKm} km)`, value: `+${Math.round(score.break_points * 10) / 10}`, highlight: true })
   }
+  if (score.leadout_points != null && score.leadout_points > 0) lines.push({ label: 'Leadout-bonus 🚂', value: `+${score.leadout_points}`, highlight: true })
   lines.push({ label: 'Total', value: `${Math.round(score.total_points * 10) / 10}`, isTotal: true })
 
   const roleAnchor = score.role.replace(/_\d+$/, '')

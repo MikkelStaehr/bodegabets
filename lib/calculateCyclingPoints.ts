@@ -20,6 +20,7 @@ import {
   getSprinterMultiplier,
   getWonHowGrimpeurBonus,
   computeBreakPoints,
+  computeLeadoutBonus,
 } from '@/lib/cyclingScoringConstants'
 
 // Konstanterne er nu i lib/cyclingScoringConstants.ts — én kilde til sandhed
@@ -106,6 +107,7 @@ type ScoreRow = {
   team_bonus: number
   intermediate_points: number
   break_points: number
+  leadout_points: number
   calculated_at: string
   // total_points er generated i DB — må ikke insertes
 }
@@ -313,6 +315,10 @@ export async function calculateCyclingPoints(
       : 0
     // Spurt-tog gælder ikke på TTT (ingen spurt-dynamik — holdet kører samlet)
     const trainMul = (!isTTT && newRules && sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
+    // Leadout-bonus: hver leadout-equipier (samme hold som sprinteren) får en
+    // flad bonus efter sprinterens placering (12/8/5) når sprinteren blev top-3.
+    // Gør leadout-slots værd at fylde i stedet for at være "døde".
+    const leadoutBonus = (!isTTT && newRules && sprinterTop3) ? computeLeadoutBonus(sprinterResult?.position) : 0
 
     // ── A. Active riders ──────────────────────────────────────
     // Ingen minus-point: ryttere der udgår eller placerer sig dårligt får
@@ -444,6 +450,12 @@ export async function calculateCyclingPoints(
       // selv uden top-20. Ikke på TTT (ingen udbrud i en holdtempo-etape).
       const breakPoints = isTTT ? 0 : computeBreakPoints(rider.role, result?.km_in_break ?? 0)
 
+      // Leadout-bonus: equipier fra sprinterens hold får leadoutBonus (12/8/5
+      // efter sprinterens placering) når sprinteren blev top-3.
+      const leadoutPoints = (rider.role === 'equipier' && sprinterRider && rider.team_name === sprinterRider.team_name)
+        ? leadoutBonus
+        : 0
+
       allScores.push({
         lineup_id: lineup.id,
         rider_id: rider.rider_id,
@@ -463,6 +475,7 @@ export async function calculateCyclingPoints(
         team_bonus: teamBonus,
         intermediate_points: intermediatePoints,
         break_points: breakPoints,
+        leadout_points: leadoutPoints,
         calculated_at: now,
       })
     }
