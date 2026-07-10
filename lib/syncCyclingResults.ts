@@ -344,8 +344,15 @@ async function scrapeClassifications(slug: string, stageNum: number): Promise<Cl
     const hasRiderLinks = $(tbl).find('tbody tr a').toArray().some((a) => /^rider\/[\w-]+$/.test($(a).attr('href') ?? ''))
     if (!hasRiderLinks) continue // hold-tabellen o.l.
     const headerTxt = $(tbl).find('thead th').toArray().map((th) => $(th).text().trim().toLowerCase()).join('|')
-    if (headerTxt.includes('pnt')) pntTables.push(tbl)
-    else if (headerTxt.includes('time')) timeTables.push(tbl)
+    const hasPnt = headerTxt.includes('pnt')
+    const hasTime = headerTxt.includes('time')
+    // STAGE-RESULTAT-tabellen har BÅDE "Pnt" (UCI/etape-point) OG "Time"/"Timelag".
+    // Den er ikke et klassement — tidligere blev den fanget af `includes('pnt')`
+    // og lagt som points-klassement, hvorved alt forskød sig (points←stage-resultat,
+    // bjerg←points, og KOM forsvandt helt → sprint_points altid 0).
+    // Klassementerne: points/bjerg har Pnt (+Today) UDEN Time; GC/ungdom har Time UDEN Pnt.
+    if (hasPnt && !hasTime) pntTables.push(tbl)
+    else if (hasTime && !hasPnt) timeTables.push(tbl)
   }
   const tableFor: Record<ClassificationKey, (typeof allGeneral)[number] | undefined> = {
     points: pntTables[0],
