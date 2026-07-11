@@ -140,7 +140,20 @@ export default async function CyclingGuidePage() {
         </SubCard>
 
         <SubCard title="Lås">
-          <P>Lineup låses <B>30 minutter</B> før start. Trup-uvælget låses ved blokkens deadline (typisk før første løb).</P>
+          <P>Lineup låses <B>30 minutter</B> før start. Trup-udvælget låses ved blokkens deadline (typisk før første løb).</P>
+        </SubCard>
+
+        <SubCard title="Glemt at sætte hold?">
+          <P>
+            Sætter du ikke lineup til en etape, kopieres din <B>forrige etapes opstilling</B> automatisk
+            når deadline rammer — remappet til den nye etapes profil (fx rykker en overskuds-équipier til
+            klatrer-slot på en bakket etape). Så du aldrig får en 0-etape ved at glemme det.
+          </P>
+          <P>
+            Det sker <B>først ved deadline</B> (aldrig med facit i hånden), og kun hvis du har deltaget
+            tidligere i løbet. Gælder ikke holdtempo (TTT). Vil du have et andet hold, skal du bare selv
+            sætte det inden deadline som normalt.
+          </P>
         </SubCard>
 
         {/* Brutto trup */}
