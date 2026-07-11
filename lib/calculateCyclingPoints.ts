@@ -21,6 +21,8 @@ import {
   getWonHowGrimpeurBonus,
   computeBreakPoints,
   computeLeadoutBonus,
+  TRAIN_BONUS_PER_LEADOUT,
+  TRAIN_MAX_LEADOUTS,
 } from '@/lib/cyclingScoringConstants'
 
 // Konstanterne er nu i lib/cyclingScoringConstants.ts — én kilde til sandhed
@@ -314,7 +316,7 @@ export async function calculateCyclingPoints(
       ? activeRiders.filter((r) => r.role === 'equipier' && r.team_name === sprinterRider.team_name).length
       : 0
     // Spurt-tog gælder ikke på TTT (ingen spurt-dynamik — holdet kører samlet)
-    const trainMul = (!isTTT && newRules && sprinterTop3 && leadoutCount > 0) ? 1 + 0.2 * Math.min(leadoutCount, 2) : 1.0
+    const trainMul = (!isTTT && newRules && sprinterTop3 && leadoutCount > 0) ? 1 + TRAIN_BONUS_PER_LEADOUT * Math.min(leadoutCount, TRAIN_MAX_LEADOUTS) : 1.0
     // Leadout-bonus: hver leadout-equipier (samme hold som sprinteren) får en
     // flad bonus efter sprinterens placering (12/8/5) når sprinteren blev top-3.
     // Gør leadout-slots værd at fylde i stedet for at være "døde".

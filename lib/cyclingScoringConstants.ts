@@ -143,9 +143,9 @@ export function computeBreakPoints(role: string, kmInBreak: number): number {
 // bliver top-3 — så et rigtigt tog er værd at bygge i stedet for at spamme
 // random sprintere. Uden dette er leadout-slots "døde" (kun holdbonus), og et
 // koordineret tog scorer det samme som 2 tilfældige point-ryttere.
-export const LEADOUT_BONUS: Record<number, number> = { 1: 12, 2: 8, 3: 5 }
+export const LEADOUT_BONUS: Record<number, number> = { 1: 20, 2: 14, 3: 8 }
 
-/** Leadout-bonus baseret på sprinterens placering (1→12, 2→8, 3→5, ellers 0). */
+/** Leadout-bonus baseret på sprinterens placering (1→20, 2→14, 3→8, ellers 0). */
 export function computeLeadoutBonus(sprinterPosition: number | null | undefined): number {
   if (sprinterPosition == null) return 0
   return LEADOUT_BONUS[sprinterPosition] ?? 0
@@ -153,8 +153,8 @@ export function computeLeadoutBonus(sprinterPosition: number | null | undefined)
 
 // ── Spurt-tog ──────────────────────────────────────────────────────────────
 
-export const TRAIN_BONUS_PER_LEADOUT = 0.2  // +20% pr. leadout-equipier
-export const TRAIN_MAX_LEADOUTS = 2          // cap ved 2 (×1.4 max)
+export const TRAIN_BONUS_PER_LEADOUT = 0.3  // +30% pr. leadout-equipier
+export const TRAIN_MAX_LEADOUTS = 2          // cap ved 2 (×1.6 max)
 
 /** Spurt-tog-multiplier baseret på antal leadout-equipiers. */
 export function computeTrainMultiplier(leadoutCount: number, sprinterTop3: boolean, newRules: boolean): number {
