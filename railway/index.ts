@@ -37,6 +37,7 @@ import { calculateRoundPoints, calculateChampionshipRoundPoints, syncProfilesPoi
 import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlocks'
 import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage, finalizeCyclingRaces } from '@/lib/calculateCyclingPoints'
 import { syncCyclingResults } from '@/lib/syncCyclingResults'
+import { carryOverMissingLineups } from '@/lib/cyclingCarryOver'
 import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
 import { syncCyclingStageTimes } from '@/lib/syncCyclingStageTimes'
 import { refreshCyclingRiders } from '@/lib/refreshCyclingRiders'
@@ -1106,6 +1107,20 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
     const now = new Date()
     let lockedCount = 0
 
+    // Auto-carry-over FØRST: spillere uden lineup til en etape (efter deadline)
+    // får automatisk kopieret deres forrige etapes opstilling (remappet). De
+    // indsættes allerede låste, så lås-trinnet nedenfor rører dem ikke.
+    const carry = await carryOverMissingLineups()
+    if (carry.created > 0) {
+      console.log(`[cycling-lock] Carry-over: ${carry.created} lineups`, carry.details)
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'cycling_carry_over',
+        status: 'success',
+        message: `carry-over: ${carry.created} lineups kopieret fra forrige etape`,
+        metadata: { details: carry.details },
+      })
+    }
+
     // Lås kun lineups hvor stage start_date - 30 min er passeret.
     // Block-deadline bruges IKKE — det er for bredt (dækker hele blokken med flere løb).
     const { data: allUnlocked } = await supabaseAdmin
@@ -1142,7 +1157,7 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
       })
     }
 
-    res.json({ ok: true, locked: lockedCount })
+    res.json({ ok: true, locked: lockedCount, carriedOver: carry.created })
   } catch (err) {
     console.error('[cycling-lock]', err)
     res.status(500).json({ error: String(err) })
