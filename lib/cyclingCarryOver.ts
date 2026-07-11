@@ -10,12 +10,57 @@
  * Kører fra lock-cronen — dvs. FØRST når deadline er passeret, aldrig med facit
  * i hånden (kopien er spillerens egen sidste opstilling, ikke hindsight-valg).
  * Idempotent: rører kun squads der IKKE allerede har et lineup på etapen.
+ *
+ * Remap-logikken er INLINET (i stedet for at importere lib/cyclingRoles), fordi
+ * den fil trækker @/types/cycling ind — og types/-mappen kopieres ikke med i
+ * railway-cron'ens Docker-image. Holder carry-over selvstændig og build-sikker.
  */
 
 import { supabaseAdmin } from '@/lib/supabase'
-import { remapSlotsToProfile } from '@/lib/cyclingRoles'
 import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
-import type { CyclingRoleKey } from '@/types/cycling'
+
+// Rolle-slots pr. profil (spejler lib/cyclingRoles.slotsForProfile for road-
+// etaper). TTT håndteres IKKE her — de springes helt over (special-form).
+const BOTH = ['leader', 'lieutenant', 'grimpeur', 'sprinter', 'domestique', 'equipier_0', 'equipier_1', 'joker']
+const SPRINT = ['leader', 'lieutenant', 'sprinter', 'domestique', 'equipier_0', 'equipier_1', 'equipier_2', 'joker']
+const CLIMB = ['leader', 'lieutenant', 'grimpeur', 'domestique', 'equipier_0', 'equipier_1', 'equipier_2', 'joker']
+const ALL_KEYS = ['leader', 'lieutenant', 'grimpeur', 'sprinter', 'domestique', 'equipier_0', 'equipier_1', 'equipier_2', 'joker']
+
+function slotsForProfile(profile: string | null | undefined): string[] {
+  switch (profile) {
+    case 'flat':
+    case 'mixed':
+      return SPRINT
+    case 'mountain':
+      return CLIMB
+    default: // hilly, cobbled, ukendt
+      return BOTH
+  }
+}
+
+/** Flyt et sæt slots (role-key → rider) til en ny profil; ingen ryttere tabes. */
+function remapSlots(slots: Record<string, string | null>, profile: string | null | undefined): Record<string, string> {
+  const active = slotsForProfile(profile)
+  const activeSet = new Set(active)
+  const result: Record<string, string> = {}
+  const orphans: string[] = []
+  for (const key of ALL_KEYS) {
+    const rider = slots[key]
+    if (!rider) continue
+    if (activeSet.has(key)) result[key] = rider
+    else orphans.push(rider)
+  }
+  let oi = 0
+  for (const s of active.filter((k) => k.startsWith('equipier_') && !result[k])) {
+    if (oi >= orphans.length) break
+    result[s] = orphans[oi++]
+  }
+  for (const s of active.filter((k) => !k.startsWith('equipier_') && !result[k])) {
+    if (oi >= orphans.length) break
+    result[s] = orphans[oi++]
+  }
+  return result
+}
 
 export async function carryOverMissingLineups(): Promise<{ created: number; details: string[] }> {
   const now = new Date()
@@ -37,6 +82,7 @@ export async function carryOverMissingLineups(): Promise<{ created: number; deta
     id: string; race_id: string; stage_number: number; profile: string | null
     start_date: string; start_time_utc: string | null
   }>) {
+    if (stage.profile === 'ttt') continue // TTT er special — ingen auto-carry-over
     // Kun EFTER deadline — carry-over må aldrig ske mens man kan se løbet.
     if (!isStageDeadlinePassed(stage.start_date, now, stage.start_time_utc)) continue
 
@@ -80,12 +126,12 @@ export async function carryOverMissingLineups(): Promise<{ created: number; deta
         .eq('lineup_id', lineupId)
       if (!prevRiders?.length) continue
 
-      const slots: Partial<Record<CyclingRoleKey, string | null>> = {}
+      const slots: Record<string, string | null> = {}
       for (const r of prevRiders) {
-        const key = (r.role === 'equipier' ? `equipier_${r.slot_index}` : r.role) as CyclingRoleKey
+        const key = r.role === 'equipier' ? `equipier_${r.slot_index}` : r.role
         slots[key] = r.rider_id
       }
-      const remapped = remapSlotsToProfile(slots, stage.profile)
+      const remapped = remapSlots(slots, stage.profile)
 
       const { data: newLu, error: e1 } = await supabaseAdmin
         .from('cycling_lineups')
@@ -94,14 +140,12 @@ export async function carryOverMissingLineups(): Promise<{ created: number; deta
         .single()
       if (e1 || !newLu) { details.push(`etape ${stage.stage_number} squad ${squadId.slice(0, 8)}: lineup-fejl ${e1?.message}`); continue }
 
-      const rows = Object.entries(remapped)
-        .filter(([, rider]) => !!rider)
-        .map(([key, rider]) => ({
-          lineup_id: newLu.id,
-          rider_id: rider as string,
-          role: key.startsWith('equipier_') ? 'equipier' : key,
-          slot_index: key.startsWith('equipier_') ? parseInt(key.split('_')[1], 10) : 0,
-        }))
+      const rows = Object.entries(remapped).map(([key, rider]) => ({
+        lineup_id: newLu.id,
+        rider_id: rider,
+        role: key.startsWith('equipier_') ? 'equipier' : key,
+        slot_index: key.startsWith('equipier_') ? parseInt(key.split('_')[1], 10) : 0,
+      }))
       const { error: e2 } = await supabaseAdmin.from('cycling_lineup_riders').insert(rows)
       if (e2) {
         await supabaseAdmin.from('cycling_lineups').delete().eq('id', newLu.id)
