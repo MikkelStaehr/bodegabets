@@ -38,6 +38,7 @@ import { updateBlockStatuses, evaluateFinishedBlocks } from '@/lib/evaluateBlock
 import { calculateCyclingPoints, runCyclingPointsForAllGames, runCyclingPointsForStage, finalizeCyclingRaces } from '@/lib/calculateCyclingPoints'
 import { syncCyclingResults } from '@/lib/syncCyclingResults'
 import { carryOverMissingLineups } from '@/lib/cyclingCarryOver'
+import { realignBlocksToRestDays } from '@/lib/cyclingRealign'
 import { syncCyclingStartlists } from '@/lib/syncCyclingStartlists'
 import { syncCyclingStageTimes } from '@/lib/syncCyclingStageTimes'
 import { refreshCyclingRiders } from '@/lib/refreshCyclingRiders'
@@ -1164,6 +1165,29 @@ app.get('/cycling-lock-lineups', async (_req, res) => {
   }
 })
 
+// ─── GET /cycling-realign-blocks ────────────────────────────────────────────
+// Snapper sub-blokkenes stage-ranges til hviledagene når rest_days er
+// tilgængelige (fixer den order-afhængige generator-bug). Idempotent; springer
+// løb over hvor en uge allerede er finished. Kører dagligt.
+app.get('/cycling-realign-blocks', async (_req, res) => {
+  try {
+    const result = await realignBlocksToRestDays()
+    if (result.realigned > 0) {
+      console.log(`[cycling-realign] ${result.realigned} løb re-alignet`, result.details)
+      await supabaseAdmin.from('admin_logs').insert({
+        type: 'cycling_realign',
+        status: 'success',
+        message: `cycling-realign: ${result.realigned} løb snappet til hviledage`,
+        metadata: { details: result.details },
+      })
+    }
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('[cycling-realign]', err)
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // ─── GET /sync-cycling-startlists ───────────────────────────────────────────
 // Synkroniserer startlister for upcoming/active cykel-løb fra PCS.
 // Kører dagligt — PCS opdaterer manuelt op til løbsstart, så daglig
@@ -1739,6 +1763,9 @@ app.listen(PORT, () => {
   // kritisk at have rigtig tid frem for vores 13:00 UTC default. PCS opdaterer
   // sjældent tider efter første publicering, så daglig sync er nok.
   cron.schedule('30 5 * * *', () => callEndpoint('/sync-cycling-stage-times'))
+
+  // Re-align sub-blokke til hviledage (efter stage-times, så nye rest_days er inde).
+  cron.schedule('45 5 * * *', () => callEndpoint('/cycling-realign-blocks'))
 
   // Hver 3. time — pull startlister fra PCS for upcoming/active løb.
   // PCS opdaterer rosters helt op til løbsstart (fx Pogačar trukket fra

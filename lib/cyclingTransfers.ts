@@ -26,7 +26,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase'
 
-export const MAX_TRANSFERS_PER_REST_DAY = 3
+export const MAX_TRANSFERS_PER_REST_DAY = 5
 
 type SquadRider = {
   rider_id: string
