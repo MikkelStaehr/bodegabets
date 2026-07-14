@@ -372,6 +372,9 @@ export default async function GamePage({ params }: Props) {
   // Rider-ids per squad (med transfers anvendt) — bruges af LineupBuilder til at
   // filtrere brutto-truppen til den AKTIVE bloks squad i pickeren.
   let lineupRiderIdsBySquad: Record<string, string[]> = {}
+  // squad_id → (rider_id → category_slot) pr. trup. Kategori er et snapshot pr.
+  // trup, så en rytter i flere trupper ikke arver forkert kategori i lineup'en.
+  let lineupCatBySquad: Record<string, Record<string, number>> = {}
   // Brugerens gemte lineup-presets pr. squad (Sprint/Bjerg/Tempo osv.)
   type LineupPresetRow = { id: string; squad_id: string; name: string; slot_index: number; slots: Record<string, string | null>; updated_at: string }
   let lineupPresets: LineupPresetRow[] = []
@@ -867,8 +870,34 @@ export default async function GamePage({ params }: Props) {
       ])
       lineupRiderIdsBySquad = ridersBySquad
       lineupPresets = (presetsData ?? []) as LineupPresetRow[]
+
+      // Kategori pr. trup (base-slot + transfer-ind-kategori), IKKE merget på
+      // tværs af trupper — så en rytter i flere trupper (fx Dauphiné Kat 3 +
+      // TdF Kat 2) viser den korrekte kategori i hver bloks lineup.
+      const [{ data: baseCatRows }, { data: trCatRows }] = await Promise.all([
+        supabaseAdmin
+          .from('cycling_squad_riders')
+          .select('squad_id, rider_id, category_slot')
+          .in('squad_id', allSquadIds),
+        supabaseAdmin
+          .from('cycling_squad_transfers')
+          .select('squad_id, rider_in_id, rider_in_category')
+          .in('squad_id', allSquadIds),
+      ])
+      const catMap: Record<string, Record<string, number>> = {}
+      for (const r of baseCatRows ?? []) {
+        ;(catMap[r.squad_id as string] ??= {})[r.rider_id as string] = (r.category_slot as number) ?? 5
+      }
+      for (const t of trCatRows ?? []) {
+        ;(catMap[t.squad_id as string] ??= {})[t.rider_in_id as string] = (t.rider_in_category as number) ?? 5
+      }
+      lineupCatBySquad = catMap
       if (effRiders.length > 0) {
         const catById = new Map(effRiders.map((e) => [e.rider_id, e.category_slot]))
+        // Foretræk kategorien fra den AKTIVE bloks trup (så en rytter i flere
+        // trupper ikke arver forkert kat i den flade liste — fx gameroom-visning).
+        const activeSquadId = cyclingActiveBlock ? blockSquadMap[cyclingActiveBlock.id] : undefined
+        const activeCat = activeSquadId ? catMap[activeSquadId] : undefined
         const { data: rd } = await supabaseAdmin
           .from('cycling_riders')
           .select('id, first_name, last_name, team_name, team_logo_url, photo_url')
@@ -880,7 +909,7 @@ export default async function GamePage({ params }: Props) {
           team_name: r.team_name as string,
           team_logo_url: (r.team_logo_url as string | null) ?? null,
           photo_url: (r.photo_url as string | null) ?? null,
-          category: catById.get(r.id as string) ?? 5,
+          category: activeCat?.[r.id as string] ?? catById.get(r.id as string) ?? 5,
         }))
       }
     }
@@ -1559,6 +1588,7 @@ export default async function GamePage({ params }: Props) {
                     standings={lineupStandings}
                     squadRiders={lineupSquadRiders}
                     squadRiderIdsBySquad={lineupRiderIdsBySquad}
+                    catBySquad={lineupCatBySquad}
                     presets={lineupPresets}
                     blocks={cyclingBlocks}
                     defaultBlockId={cyclingActiveBlock?.id ?? null}

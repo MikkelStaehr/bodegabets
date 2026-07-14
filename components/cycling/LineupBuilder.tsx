@@ -38,6 +38,12 @@ type Props = {
    *  i pickeren til at filtrere brutto-truppen ned til den AKTIVE bloks squad,
    *  så fx Giro-ryttere ikke vises som valgbare i Dauphiné-pickeren. */
   squadRiderIdsBySquad?: Record<string, string[]>
+  /** squad_id → (rider_id → category_slot) for DEN trup. Kategori er et snapshot
+   *  pr. trup, så en rytter i FLERE trupper (fx Dauphiné Kat 3 + TdF Kat 2) må
+   *  IKKE arve kategorien fra en anden trup — ellers tillader rolle-krav/limits
+   *  en forkert kategori (fx Grimpeur på en Kat 2-rytter der stod Kat 3 i en
+   *  tidligere trup). */
+  catBySquad?: Record<string, Record<string, number>>
   /** Gemte lineup-presets på tværs af brugerens squads. Filtreres til
    *  aktive bloks squad i UI'et. */
   presets?: CyclingLineupPreset[]
@@ -143,7 +149,7 @@ function ScrollableTabs({ children, background }: { children: React.ReactNode; b
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, squadRiderIdsBySquad, presets: initialPresets, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
+export default function LineupBuilder({ gameId, blockSquadMap, races, stages, startlists, abandoned, standings, squadRiders, squadRiderIdsBySquad, catBySquad, presets: initialPresets, blocks, defaultBlockId, lockDeadline, squadRiderCount, squadId, currentUserId }: Props) {
   const [presets, setPresets] = useState<CyclingLineupPreset[]>(initialPresets ?? [])
   // På mobile undgår vi autoFocus i picker-modalen — det åbnede keyboard'et
   // automatisk hver gang man klikkede et rolle-slot, hvilket lagde sig over
@@ -244,25 +250,32 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
   const [raceResults, setRaceResults] = useState<Record<string, ResultEntry[]>>({})
   const [raceLineupRiders, setRaceLineupRiders] = useState<Record<string, LineupEntry[]>>({})
 
-  const riderMap = useMemo(() => {
-    const map = new Map<string, CyclingSquadRider>()
-    for (const r of squadRiders) map.set(r.id, r)
-    return map
-  }, [squadRiders])
-
   // Derive current squad from active block
   const currentSquadId = activeBlockId ? blockSquadMap[activeBlockId] ?? null : null
   const hasAnySquad = Object.keys(blockSquadMap).length > 0
+
+  // Kategori-map for DEN aktive bloks squad (snapshot pr. trup). En rytter der
+  // er i flere trupper (fx Dauphiné Kat 3 + TdF Kat 2) skal vise kategorien fra
+  // den AKTIVE trup — ellers arver rolle-krav/kategori-limits en forkert kat.
+  const activeCatMap = catBySquad && currentSquadId ? catBySquad[currentSquadId] : undefined
+  const remapCat = (r: CyclingSquadRider): CyclingSquadRider =>
+    activeCatMap && activeCatMap[r.id] != null ? { ...r, category: activeCatMap[r.id] } : r
+
+  const riderMap = useMemo(() => {
+    const map = new Map<string, CyclingSquadRider>()
+    for (const r of squadRiders) map.set(r.id, remapCat(r))
+    return map
+  }, [squadRiders, activeCatMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ryttere der hører til den AKTIVE bloks squad (med transfers anvendt). Hvis
   // ingen mapping er givet (legacy / squad-side bruger samme komponent), fald
   // tilbage til hele truppen, så vi ikke gemmer alt væk.
   const currentSquadRiders = useMemo(() => {
-    if (!currentSquadId || !squadRiderIdsBySquad) return squadRiders
+    if (!currentSquadId || !squadRiderIdsBySquad) return squadRiders.map(remapCat)
     const ids = new Set(squadRiderIdsBySquad[currentSquadId] ?? [])
-    if (ids.size === 0) return squadRiders
-    return squadRiders.filter((r) => ids.has(r.id))
-  }, [squadRiders, squadRiderIdsBySquad, currentSquadId])
+    if (ids.size === 0) return squadRiders.map(remapCat)
+    return squadRiders.filter((r) => ids.has(r.id)).map(remapCat)
+  }, [squadRiders, squadRiderIdsBySquad, currentSquadId, activeCatMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch existing lineups on mount (fetches all lineups across squads)
   useEffect(() => {
