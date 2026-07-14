@@ -34,7 +34,7 @@ type Props = {
   onSaved: () => void
 }
 
-const MAX_SWAPS = 3
+const MAX_SWAPS = 5 // matcher MAX_TRANSFERS_PER_REST_DAY server-side
 // Standard kategori-grænser (matcher DEFAULT_CAT_LIMITS i lib/cyclingSquadLimits).
 // Defineret lokalt fordi det modul er server-only (importerer supabase).
 const CAT_LIMITS: Record<number, number> = { 1: 3, 2: 5, 3: 5, 4: 5, 5: 7 }
@@ -64,7 +64,7 @@ export default function TransferModal({
       setError(null)
       try {
         const [squadRes, startlistRes, transferRes] = await Promise.all([
-          fetch(`/api/games/${gameId}/cycling/squad?race_id=${raceId}&effective=true`),
+          fetch(`/api/games/${gameId}/cycling/squad?race_id=${raceId}&effective=true&before=${restDayDate}`),
           fetch(`/api/games/${gameId}/cycling/startlist?race_id=${raceId}`),
           fetch(`/api/games/${gameId}/cycling/transfer?race_id=${raceId}&rest_day_date=${restDayDate}`),
         ])

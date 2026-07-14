@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import { isStageDeadlinePassed } from '@/lib/cyclingDeadline'
 import {
-  getCurrentEffectiveSquad,
+  getEffectiveSquadRiders,
   MAX_TRANSFERS_PER_REST_DAY,
 } from '@/lib/cyclingTransfers'
 
@@ -110,8 +110,12 @@ export async function POST(req: NextRequest, { params }: Props) {
   const squad = await findSquadForRace(Number(gameId), user.id, raceId)
   if (!squad) return NextResponse.json({ error: 'Ingen brutto-trup for dette race' }, { status: 400 })
 
-  // Nuværende effektive trup (efter eventuelle tidligere transfers)
-  const currentSquad = await getCurrentEffectiveSquad(squad.id, raceId)
+  // Trup som den er på vej IND i denne hviledag: kun transfers FØR restDay
+  // anvendt. Vi må IKKE inkludere denne hviledags egne (eksisterende) transfers
+  // — ellers er out-rytteren allerede fjernet (→ "rider_out er ikke i trup") og
+  // in-rytteren talt dobbelt ved re-save/opdatering. POST'en erstatter denne
+  // dags transfers, så vi validerer mod udgangspunktet før dagen.
+  const currentSquad = await getEffectiveSquadRiders(squad.id, raceId, restDay)
   const currentIds = new Set(currentSquad.map((r) => r.rider_id))
 
   // Valider swaps

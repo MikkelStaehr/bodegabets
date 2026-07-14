@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
-import { getCurrentEffectiveSquad } from '@/lib/cyclingTransfers'
+import { getCurrentEffectiveSquad, getEffectiveSquadRiders } from '@/lib/cyclingTransfers'
 import { computeBlockSquadLimits, DEFAULT_MAX_TOTAL, MAX_PER_TEAM } from '@/lib/cyclingSquadLimits'
 
 type Props = { params: Promise<{ id: string }> }
@@ -19,6 +19,11 @@ export async function GET(req: NextRequest, { params }: Props) {
   const blockId = req.nextUrl.searchParams.get('block')
   const raceId = req.nextUrl.searchParams.get('race_id')
   const effective = req.nextUrl.searchParams.get('effective') === 'true'
+  // ?before=YYYY-MM-DD → effektiv trup KUN med transfers før denne dato anvendt.
+  // Bruges af transfer-modalen på en hviledag, så truppen vises som den var på
+  // vej IND i hviledagen (denne dags egne swaps er ikke anvendt endnu — ellers
+  // var out-rytteren allerede fjernet, og in-rytteren talt dobbelt).
+  const before = req.nextUrl.searchParams.get('before')
 
   // Race-specifik lookup: find blok via cycling_game_races
   let resolvedBlockId = blockId
@@ -49,7 +54,9 @@ export async function GET(req: NextRequest, { params }: Props) {
   // Hent rider-IDs: enten alle fra squad (default) eller effektiv (efter transfers)
   let riderIds: string[]
   if (effective && raceId) {
-    const effSquad = await getCurrentEffectiveSquad(squad.id, raceId)
+    const effSquad = before
+      ? await getEffectiveSquadRiders(squad.id, raceId, before)
+      : await getCurrentEffectiveSquad(squad.id, raceId)
     riderIds = effSquad.map((r) => r.rider_id)
   } else {
     const { data: squadRiderRows } = await supabaseAdmin
