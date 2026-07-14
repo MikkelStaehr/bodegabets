@@ -1600,6 +1600,7 @@ export default async function GamePage({ params }: Props) {
                   <CyclingRanglister
                     gameId={gameId}
                     activeBlockName={cyclingActiveBlockDisplayName}
+                    metaBlockName={cyclingActiveBlock?.name ?? null}
                     activeBlockStatus={cyclingActiveBlockStatus}
                   />
                 </>

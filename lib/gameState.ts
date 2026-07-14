@@ -75,6 +75,9 @@ export type LeaderboardEntry = {
   round_points: number
   block_wins: number
   block_points: number
+  /** Point i hele den nuværende TOP-blok (fx hele Tour de France), på tværs af
+   *  dens sub-blokke/uger. 0 for ikke-cykling. */
+  meta_block_points: number
   /** Sammenlagt point (profit) på tværs af ALLE runder/blokke i spillet. */
   total_points: number
   /** Netto-profit: samlet vundet − samlet satset (kun afgjorte bets). */
@@ -864,6 +867,9 @@ async function buildCyclingLeaderboard(
   // Beregnes fra samme scores-loop, bare uden current-block-filter.
   const totalPointsByUser = new Map<string, number>()
   for (const m of members) totalPointsByUser.set(m.user_id, 0)
+  // Meta-blok: point i HELE den nuværende top-blok (alle sub-blokke/uger).
+  const metaBlockByUser = new Map<string, number>()
+  for (const m of members) metaBlockByUser.set(m.user_id, 0)
 
   for (const s of scores ?? []) {
     const lineup = s.cycling_lineups as unknown as { squad_id: string; cycling_squads: { user_id: string } }
@@ -876,6 +882,9 @@ async function buildCyclingLeaderboard(
 
     // Nuværende blok / sub-blok — filtrér til kun aktive blok-races
     if (!currentBlockRaceIds.has(s.race_id as string)) continue
+    // Meta-blok (hele top-blokken) tæller ALLE stages i blokkens races —
+    // uafhængigt af hvilken uge/sub-blok der er aktiv.
+    metaBlockByUser.set(userId, (metaBlockByUser.get(userId) ?? 0) + pts)
     if (activeSubBlockRange) {
       const stage = s.cycling_stages as unknown as { stage_number: number } | null
       const sn = stage?.stage_number
@@ -908,7 +917,7 @@ async function buildCyclingLeaderboard(
     blockWins.set(b.winner_user_id, (blockWins.get(b.winner_user_id) ?? 0) + 1)
   }
 
-  return { leaderboard: buildEntries(members, userData, roundWins, blockWins, totalPointsByUser) }
+  return { leaderboard: buildEntries(members, userData, roundWins, blockWins, totalPointsByUser, undefined, undefined, undefined, undefined, undefined, metaBlockByUser) }
 }
 
 // ─── getActiveBlockStandings ────────────────────────────────────────────────
@@ -1642,6 +1651,7 @@ function buildEntries(
   wonBetsByUser?: Map<string, number>,
   lostBetsByUser?: Map<string, number>,
   wonLatestBlock?: Set<string>,
+  metaBlockPointsByUser?: Map<string, number>,
 ): LeaderboardEntry[] {
   const entries: LeaderboardEntry[] = members.map((m) => {
     const profile = m.profiles as { username: string; avatar_url: string | null }
@@ -1665,6 +1675,7 @@ function buildEntries(
       round_points: Math.round(totalRoundPoints * 10) / 10,
       block_wins: blockWins.get(m.user_id) ?? 0,
       block_points: Math.round(totalBlockPoints * 10) / 10,
+      meta_block_points: Math.round((metaBlockPointsByUser?.get(m.user_id) ?? 0) * 10) / 10,
       total_points: Math.round(totalPoints * 10) / 10,
       net_profit: Math.round((netProfitByUser?.get(m.user_id) ?? 0) * 10) / 10,
       mvp_count: mvpByUser?.get(m.user_id) ?? 0,

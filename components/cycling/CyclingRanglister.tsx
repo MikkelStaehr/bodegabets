@@ -2,22 +2,19 @@
 
 import { useState } from 'react'
 import { Trophy, Calendar, Flag } from 'lucide-react'
-import CyclingBlockStanding from './CyclingBlockStanding'
+import CyclingCurrentStanding from './CyclingCurrentStanding'
 import CyclingSeasonOverview from './CyclingSeasonOverview'
 
 type Props = {
   gameId: number
-  /** Aktive blok-navn til at vise prominent i blok-tabben. */
+  /** Aktive sub-blok-navn (fx "Uge 2") — kolonne-overskrift i det aktive spil. */
   activeBlockName: string | null
+  /** Navn på den nuværende TOP-blok (fx "Tour de France") — det aktive spil. */
+  metaBlockName: string | null
   activeBlockStatus: 'upcoming' | 'active' | 'finished' | null
 }
 
 type TabId = 'block' | 'season'
-
-const TABS: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }> = [
-  { id: 'block', label: 'Blok', icon: Flag },
-  { id: 'season', label: 'Sæson', icon: Calendar },
-]
 
 /**
  * Konsolideret rangliste-container med tabs for blok-stilling og sæson-overblik.
@@ -30,9 +27,16 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?:
  * "Blok"-tabben er default fordi den er mest aktuel for igangværende race.
  * Når intet blok er aktivt (alle finished), starter vi på "Sæson".
  */
-export default function CyclingRanglister({ gameId, activeBlockName, activeBlockStatus }: Props) {
+export default function CyclingRanglister({ gameId, activeBlockName, metaBlockName, activeBlockStatus }: Props) {
   const defaultTab: TabId = activeBlockStatus && activeBlockStatus !== 'finished' ? 'block' : 'season'
   const [tab, setTab] = useState<TabId>(defaultTab)
+
+  // Første fane = det NUVÆRENDE spil (den aktive top-blok). Navngives efter
+  // løbet, så den illustrerer det aktive spil frem for et generisk "Blok".
+  const TABS: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }> = [
+    { id: 'block', label: metaBlockName ?? 'Aktivt', icon: Flag },
+    { id: 'season', label: 'Sæson', icon: Calendar },
+  ]
 
   return (
     <div style={{
@@ -99,9 +103,10 @@ export default function CyclingRanglister({ gameId, activeBlockName, activeBlock
       <div style={{ padding: '0', background: '#FDFAF5' }}>
         {tab === 'block' && (
           <div style={{ padding: '4px 0' }}>
-            <CyclingBlockStanding
+            <CyclingCurrentStanding
               gameId={gameId}
-              blockName={activeBlockName}
+              metaBlockName={metaBlockName}
+              subBlockName={activeBlockName}
               blockStatus={activeBlockStatus}
               embedded
             />
