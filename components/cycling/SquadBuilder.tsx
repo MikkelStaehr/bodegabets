@@ -536,9 +536,9 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                             borderRadius: 2,
                             letterSpacing: '0.05em',
                           }}
-                          title="Ude af løbet — DNF/DNS"
+                          title="Udgået af løbet — DNF/DNS/OTL"
                         >
-                          UD AF LØBET
+                          DNF
                         </span>
                       )}
                       {!abandonedSet.has(rider.id) && isGhost && (
@@ -792,9 +792,9 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                               borderRadius: 2,
                               letterSpacing: '0.05em',
                             }}
-                            title="Ude af løbet — DNF/DNS"
+                            title="Udgået af løbet — DNF/DNS/OTL"
                           >
-                            UD
+                            DNF
                           </span>
                         )}
                       </div>

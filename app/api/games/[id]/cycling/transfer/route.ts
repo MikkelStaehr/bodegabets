@@ -39,10 +39,20 @@ export async function GET(req: NextRequest, { params }: Props) {
     .eq('race_id', raceId)
     .eq('rest_day_date', restDay)
 
+  // Udgåede ryttere i dette race (DNF/DNS/OTL/DSQ) — så modalen kan markere dem
+  // med et rødt DNF-badge (det er dem man typisk vil bytte ud på hviledagen).
+  const { data: dnfRows } = await supabaseAdmin
+    .from('cycling_results')
+    .select('rider_id')
+    .eq('race_id', raceId)
+    .eq('dnf', true)
+  const dnfRiderIds = [...new Set((dnfRows ?? []).map((r) => r.rider_id as string))]
+
   const count = transfers?.length ?? 0
   return NextResponse.json({
     transfers: transfers ?? [],
     remaining: Math.max(0, MAX_TRANSFERS_PER_REST_DAY - count),
+    dnfRiderIds,
   })
 }
 

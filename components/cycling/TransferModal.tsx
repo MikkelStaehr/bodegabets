@@ -39,6 +39,21 @@ const MAX_SWAPS = 5 // matcher MAX_TRANSFERS_PER_REST_DAY server-side
 // Defineret lokalt fordi det modul er server-only (importerer supabase).
 const CAT_LIMITS: Record<number, number> = { 1: 3, 2: 5, 3: 5, 4: 5, 5: 7 }
 
+/** Rødt DNF-badge for ryttere der er udgået af løbet. */
+function DnfBadge() {
+  return (
+    <span style={{
+      flexShrink: 0,
+      padding: '1px 5px', borderRadius: 2,
+      background: '#C8392B', color: '#fff',
+      fontFamily: "'Barlow Condensed', sans-serif",
+      fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
+    }}>
+      DNF
+    </span>
+  )
+}
+
 export default function TransferModal({
   gameId,
   raceId,
@@ -53,6 +68,7 @@ export default function TransferModal({
   const [currentSquad, setCurrentSquad] = useState<SquadRider[]>([])
   const [startlist, setStartlist] = useState<StartlistRider[]>([])
   const [existingTransfers, setExistingTransfers] = useState<Transfer[]>([])
+  const [dnfIds, setDnfIds] = useState<Set<string>>(new Set())
   const [swaps, setSwaps] = useState<{ out: string; in: string | null }[]>([])
   const [pickingInFor, setPickingInFor] = useState<number | null>(null)
 
@@ -79,6 +95,7 @@ export default function TransferModal({
         setCurrentSquad(squadData.riders ?? [])
         setStartlist(startlistData.riders ?? [])
         setExistingTransfers(transferData.transfers ?? [])
+        setDnfIds(new Set<string>(transferData.dnfRiderIds ?? []))
 
         // Prefyld med eksisterende transfers
         const pre: { out: string; in: string }[] = (transferData.transfers ?? []).map((t: Transfer) => ({
@@ -340,6 +357,7 @@ export default function TransferModal({
                             {out ? out.last_name : '?'}
                           </span>
                           {out && <CatBadge cat={out.category} />}
+                          {dnfIds.has(swap.out) && <DnfBadge />}
                         </div>
                         <ArrowRight size={14} color="#8FABC4" />
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -474,8 +492,10 @@ export default function TransferModal({
                           <span style={{
                             textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#F2EDE4',
                             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            display: 'flex', alignItems: 'center', gap: 6,
                           }}>
                             {r.last_name}
+                            {dnfIds.has(r.id) && <DnfBadge />}
                           </span>
                           <CatBadge cat={r.category} />
                         </button>
