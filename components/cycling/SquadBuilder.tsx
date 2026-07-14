@@ -42,6 +42,9 @@ type Props = {
   /** Rider-ids der er DNF/DNS i et af blokkens aktive løb. Vises som
    *  'UD'-badge så bruger kan se hvem der skal transferres ud. */
   abandonedRiderIds?: string[]
+  /** True når løbet er startet (lock_deadline passeret) — brutto-truppen kan
+   *  ikke længere ændres, kun transfers på hviledage. */
+  locked?: boolean
 }
 
 // Short race name aliases
@@ -101,7 +104,7 @@ function Spinner() {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId, blockRaceIds, squadLimits, abandonedRiderIds = [] }: Props) {
+export default function SquadBuilder({ gameId, availableRiders, raceStartlists, initialSquad, blockId, blockRaceIds, squadLimits, abandonedRiderIds = [], locked = false }: Props) {
   const abandonedSet = useMemo(() => new Set(abandonedRiderIds), [abandonedRiderIds])
   const CAT_LIMITS = squadLimits.catLimits
   const MAX_TOTAL = squadLimits.maxTotal
@@ -207,7 +210,10 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
     return list
   }, [availableRiders, squadIds, catFilter, teamFilter, search, confirmedOnly, confirmedSet])
 
-  function canAdd(rider: Rider): { ok: boolean; reason?: string; short?: string; kind?: 'total' | 'category' | 'team' } {
+  function canAdd(rider: Rider): { ok: boolean; reason?: string; short?: string; kind?: 'total' | 'category' | 'team' | 'locked' } {
+    if (locked) {
+      return { ok: false, kind: 'locked', reason: 'Truppen er låst — løbet er startet', short: 'Låst' }
+    }
     if (squad.length >= MAX_TOTAL) {
       return { ok: false, kind: 'total', reason: `Max ${MAX_TOTAL} ryttere`, short: 'Trup fyldt' }
     }
@@ -236,11 +242,13 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
   }
 
   function removeRider(riderId: string) {
+    if (locked) return
     setSquad((prev) => prev.filter((r) => r.id !== riderId))
     setSuccess(false)
   }
 
   async function handleSave() {
+    if (locked) return
     setError(null)
     setSaving(true)
     try {
@@ -270,8 +278,30 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
 
   return (
     <div>
+      {/* ── Trup låst (løbet er startet) ────────────────────────────── */}
+      {locked && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '12px 14px',
+            background: 'rgba(30,58,95,0.08)',
+            border: '1px solid rgba(30,58,95,0.35)',
+            borderRadius: 2,
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 12,
+            color: '#1E3A5F',
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ display: 'block', marginBottom: 4, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            🔒 Truppen er låst
+          </strong>
+          Løbet er startet, så brutto-truppen kan ikke længere ændres. Vil du bytte en rytter, kan du lave <strong>transfers på hviledage</strong> i stedet.
+        </div>
+      )}
+
       {/* ── Startlist-status (når der er > 24 timer til første etape) ── */}
-      {startlistUncertain && (
+      {!locked && startlistUncertain && (
         <div
           style={{
             marginBottom: 12,
@@ -457,6 +487,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                   key={rider.id}
                   type="button"
                   onClick={() => removeRider(rider.id)}
+                  disabled={locked}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -469,11 +500,11 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     borderBottomStyle: idx < squad.length - 1 ? 'solid' : 'none',
                     borderBottomWidth: idx < squad.length - 1 ? 1 : 0,
                     borderBottomColor: '#E8E0D3',
-                    cursor: 'pointer',
+                    cursor: locked ? 'default' : 'pointer',
                     textAlign: 'left',
                     transition: 'background 0.1s',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = isGhost ? 'rgba(200,57,43,0.12)' : '#f5ece0' }}
+                  onMouseEnter={(e) => { if (!locked) e.currentTarget.style.background = isGhost ? 'rgba(200,57,43,0.12)' : '#f5ece0' }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = isGhost ? 'rgba(200,57,43,0.06)' : 'transparent' }}
                   title={isGhost ? 'Ikke på startlisten — kører ikke i denne blok' : undefined}
                 >
@@ -539,18 +570,20 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
                     </div>
                   </div>
                   <CatBadge cat={rider.category} />
-                  <span
-                    style={{
-                      fontSize: 14,
-                      color: '#C8392B',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                      width: 20,
-                      textAlign: 'center',
-                    }}
-                  >
-                    ×
-                  </span>
+                  {!locked && (
+                    <span
+                      style={{
+                        fontSize: 14,
+                        color: '#C8392B',
+                        fontWeight: 700,
+                        flexShrink: 0,
+                        width: 20,
+                        textAlign: 'center',
+                      }}
+                    >
+                      ×
+                    </span>
+                  )}
                 </button>
                 )
               })
@@ -900,7 +933,7 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
         <button
           type="button"
           onClick={handleSave}
-          disabled={squad.length === 0 || saving}
+          disabled={squad.length === 0 || saving || locked}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -915,12 +948,12 @@ export default function SquadBuilder({ gameId, availableRiders, raceStartlists, 
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
             color: '#F2EDE4',
-            cursor: squad.length === 0 || saving ? 'not-allowed' : 'pointer',
-            opacity: squad.length === 0 || saving ? 0.4 : 1,
+            cursor: squad.length === 0 || saving || locked ? 'not-allowed' : 'pointer',
+            opacity: squad.length === 0 || saving || locked ? 0.4 : 1,
           }}
         >
           {saving && <Spinner />}
-          {saving ? 'Gemmer...' : 'Gem trup'}
+          {locked ? 'Truppen er låst' : saving ? 'Gemmer...' : 'Gem trup'}
         </button>
       </div>
     </div>

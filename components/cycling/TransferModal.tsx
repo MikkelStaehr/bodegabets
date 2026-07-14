@@ -123,11 +123,18 @@ export default function TransferModal({
   const outIds = new Set(swaps.map((s) => s.out))
   const inIds = new Set(swaps.map((s) => s.in).filter(Boolean) as string[])
 
-  // Kandidat-ryttere for swap IN: startliste minus nuværende trup minus allerede valgte ins
+  // Kandidat-ryttere for swap IN: startliste minus nuværende trup minus allerede
+  // valgte ins, OG kun SAMME kategori som den rytter man bytter ud (så kategori-
+  // slots bevares — en Kat X kan kun byttes med en anden Kat X).
   const availableIns = useMemo(() => {
+    if (pickingInFor === null) return []
     const currentIds = new Set(currentSquad.map((r) => r.id))
-    return startlist.filter((r) => !currentIds.has(r.id) && !inIds.has(r.id))
-  }, [startlist, currentSquad, inIds])
+    const outRider = squadById.get(swaps[pickingInFor]?.out)
+    const outCat = outRider?.category
+    return startlist.filter(
+      (r) => !currentIds.has(r.id) && !inIds.has(r.id) && (outCat == null || r.category === outCat),
+    )
+  }, [startlist, currentSquad, inIds, pickingInFor, swaps, squadById])
 
   const canAddMore = swaps.length < MAX_SWAPS
 
@@ -387,7 +394,7 @@ export default function TransferModal({
                     textTransform: 'uppercase', letterSpacing: '0.08em',
                     marginBottom: 8,
                   }}>
-                    Vælg rytter ind (fra startliste)
+                    Vælg rytter ind — kun Kat {squadById.get(swaps[pickingInFor]?.out)?.category ?? '?'} (fra startliste)
                   </div>
                   <div style={{ maxHeight: 240, overflow: 'auto' }}>
                     {availableIns.length === 0 ? (

@@ -97,6 +97,31 @@ export async function POST(req: NextRequest, { params }: Props) {
     .maybeSingle()
   if (!membership) return NextResponse.json({ error: 'Ikke medlem' }, { status: 403 })
 
+  // Lås: når blokkens deadline (løbsstart) er passeret, kan brutto-truppen ikke
+  // længere ændres — kun transfers på hviledage. Tjekker blokkens lock_deadline
+  // (eller parent-blokkens hvis bodyBlockId er en uge-blok).
+  if (bodyBlockId) {
+    const { data: blk } = await supabaseAdmin
+      .from('cycling_blocks')
+      .select('lock_deadline, parent_block_id')
+      .eq('id', bodyBlockId)
+      .maybeSingle()
+    let lockDeadline = blk?.lock_deadline as string | null | undefined
+    if (blk?.parent_block_id) {
+      const { data: parent } = await supabaseAdmin
+        .from('cycling_blocks')
+        .select('lock_deadline')
+        .eq('id', blk.parent_block_id as string)
+        .maybeSingle()
+      lockDeadline = (parent?.lock_deadline as string | null | undefined) ?? lockDeadline
+    }
+    if (lockDeadline && new Date() > new Date(lockDeadline)) {
+      return NextResponse.json({
+        error: 'Truppen er låst — løbet er startet. Brug transfers på hviledage i stedet.',
+      }, { status: 403 })
+    }
+  }
+
   // Fetch rider details for validation
   const { data: riders } = await supabaseAdmin
     .from('cycling_riders')

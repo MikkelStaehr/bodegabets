@@ -3,6 +3,7 @@ import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase'
 import SquadBuilder from '@/components/cycling/SquadBuilder'
 import type { Rider, RaceStartlist } from '@/components/cycling/SquadBuilder'
 import { computeBlockSquadLimits } from '@/lib/cyclingSquadLimits'
+import { getEffectiveSquadRiders } from '@/lib/cyclingTransfers'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,13 +110,27 @@ export default async function SquadPage({ params, searchParams }: Props) {
   // kan begrænses til netop denne bloks løb.
   let blockName: string | null = null
   let blockRaceIds: string[] = []
+  let locked = false
   if (blockId) {
     const { data: blockData } = await supabaseAdmin
       .from('cycling_blocks')
-      .select('name')
+      .select('name, lock_deadline, parent_block_id')
       .eq('id', blockId)
       .single()
     blockName = blockData?.name ?? null
+
+    // Lås: når blokkens (eller parent-blokkens) lock_deadline = løbsstart er
+    // passeret, kan brutto-truppen ikke længere ændres — kun transfers.
+    let lockDeadline = blockData?.lock_deadline as string | null | undefined
+    if (blockData?.parent_block_id) {
+      const { data: parentBlk } = await supabaseAdmin
+        .from('cycling_blocks')
+        .select('lock_deadline')
+        .eq('id', blockData.parent_block_id as string)
+        .single()
+      lockDeadline = (parentBlk?.lock_deadline as string | null | undefined) ?? lockDeadline
+    }
+    locked = !!lockDeadline && new Date() > new Date(lockDeadline)
 
     const { data: blockRaces } = await supabaseAdmin
       .from('cycling_game_races')
@@ -170,29 +185,39 @@ export default async function SquadPage({ params, searchParams }: Props) {
   const { data: existingSquad } = await existingSquadQuery.maybeSingle()
 
   if (existingSquad) {
-    // Brug category_slot fra squad (snapshot ved udtagelse), ikke live cycling_riders.category
-    const { data: squadRiders } = await supabaseAdmin
-      .from('cycling_squad_riders')
-      .select(`
-        category_slot,
-        rider:cycling_riders!inner(
-          id, first_name, last_name, team_name, team_logo_url, photo_url
-        )
-      `)
-      .eq('squad_id', existingSquad.id)
+    // EFFEKTIV trup (efter anvendte transfers) — ellers ville en udbyttet rytter
+    // (fx transferet ud) stadig blive vist i truppen. Kræver en race_id for at
+    // slå transfers op; uden blok-løb falder vi tilbage til base-truppen.
+    const effRaceId = blockRaceIds[0]
+    let effRiders: { rider_id: string; category_slot: number }[]
+    if (effRaceId) {
+      effRiders = await getEffectiveSquadRiders(existingSquad.id, effRaceId, '9999-12-31')
+    } else {
+      const { data: baseRows } = await supabaseAdmin
+        .from('cycling_squad_riders')
+        .select('rider_id, category_slot')
+        .eq('squad_id', existingSquad.id)
+      effRiders = (baseRows ?? []).map((r) => ({
+        rider_id: r.rider_id as string,
+        category_slot: (r.category_slot as number) ?? 5,
+      }))
+    }
 
-    initialSquad = (squadRiders ?? []).map((row) => {
-      const r = row.rider as unknown as Omit<Rider, 'category'>
-      return {
-        id: r.id,
-        first_name: r.first_name,
-        last_name: r.last_name,
-        team_name: r.team_name,
-        category: ((row as { category_slot?: number }).category_slot ?? 5),
-        team_logo_url: r.team_logo_url,
-        photo_url: r.photo_url,
-      }
-    })
+    const catByRider = new Map(effRiders.map((r) => [r.rider_id, r.category_slot]))
+    const { data: riderDetails } = await supabaseAdmin
+      .from('cycling_riders')
+      .select('id, first_name, last_name, team_name, team_logo_url, photo_url')
+      .in('id', effRiders.map((r) => r.rider_id))
+
+    initialSquad = (riderDetails ?? []).map((r) => ({
+      id: r.id as string,
+      first_name: r.first_name as string,
+      last_name: r.last_name as string,
+      team_name: r.team_name as string,
+      category: catByRider.get(r.id as string) ?? 5,
+      team_logo_url: r.team_logo_url as string | null,
+      photo_url: r.photo_url as string | null,
+    }))
   }
 
   return (
@@ -238,6 +263,7 @@ export default async function SquadPage({ params, searchParams }: Props) {
           blockRaceIds={blockRaceIds}
           squadLimits={squadLimits}
           abandonedRiderIds={[...abandonedRiderIds]}
+          locked={locked}
         />
       </div>
     </div>
