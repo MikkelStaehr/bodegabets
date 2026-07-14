@@ -50,7 +50,6 @@ export default function CyclingCurrentStanding({ gameId, metaBlockName, subBlock
   // Vis kun sub-blok som separat kontekst/kolonne hvis den adskiller sig fra
   // top-blokken (klassikere uden uger har sub == top → undgå dobbelt-navn).
   const hasSub = !!subBlockName && subBlockName !== metaBlockName
-  const blokLabel = hasSub ? subBlockName! : 'Blok'
 
   return (
     <div className={embedded ? 'px-4 sm:px-5 py-3' : 'bg-cream-dark border border-warm-border rounded-sm p-4 sm:p-5'}>
@@ -81,9 +80,9 @@ export default function CyclingCurrentStanding({ gameId, metaBlockName, subBlock
             </span>
             <span
               className="font-condensed text-[10px] font-bold uppercase tracking-[0.04em] text-warm-gray text-right truncate"
-              title={`Point i ${subBlockName ?? 'den aktive uge'}`}
+              title={`Blok-point i ${subBlockName ?? 'den aktive uge'}`}
             >
-              {blokLabel}
+              Blok
             </span>
           </div>
 
