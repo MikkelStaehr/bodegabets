@@ -71,6 +71,23 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const lineupIds = lineups.map((l) => l.id)
 
+  // Kategori-snapshot for DENNE trup (base-slot + transfer-ind-kat). Bruges i
+  // stedet for live cycling_riders.category, så visningen matcher scoringen og
+  // ikke ændrer sig hvis rytteren om-kategoriseres senere.
+  const [{ data: baseCatRows }, { data: trCatRows }] = await Promise.all([
+    supabaseAdmin
+      .from('cycling_squad_riders')
+      .select('rider_id, category_slot')
+      .eq('squad_id', squad.id),
+    supabaseAdmin
+      .from('cycling_squad_transfers')
+      .select('rider_in_id, rider_in_category')
+      .eq('squad_id', squad.id),
+  ])
+  const catByRider = new Map<string, number>()
+  for (const r of baseCatRows ?? []) catByRider.set(r.rider_id as string, (r.category_slot as number) ?? 5)
+  for (const t of trCatRows ?? []) catByRider.set(t.rider_in_id as string, (t.rider_in_category as number) ?? 5)
+
   const { data: lineupRiders } = await supabaseAdmin
     .from('cycling_lineup_riders')
     .select(`
@@ -163,7 +180,7 @@ export async function GET(req: NextRequest, { params }: Props) {
         first_name: r.first_name,
         last_name: r.last_name,
         team_name: r.team_name,
-        category: r.category,
+        category: catByRider.get(r.id) ?? r.category,
       }
     })
 

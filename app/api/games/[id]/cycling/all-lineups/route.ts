@@ -81,6 +81,27 @@ export async function GET(req: NextRequest, { params }: Props) {
     .select('lineup_id, rider_id, role, slot_index, rider:cycling_riders!inner(id, first_name, last_name, team_name, category, team_logo_url, photo_url)')
     .in('lineup_id', lineupIds)
 
+  // Kategori PR. trup (snapshot ved udtagelse + transfer-ind-kategori). Vi må
+  // IKKE bruge live cycling_riders.category: en rytter i flere trupper kan have
+  // forskellig kategori, og scoringen bruger snapshottet. Nøgle: squadId:riderId.
+  const [{ data: baseCatRows }, { data: trCatRows }] = await Promise.all([
+    supabaseAdmin
+      .from('cycling_squad_riders')
+      .select('squad_id, rider_id, category_slot')
+      .in('squad_id', squadIds),
+    supabaseAdmin
+      .from('cycling_squad_transfers')
+      .select('squad_id, rider_in_id, rider_in_category')
+      .in('squad_id', squadIds),
+  ])
+  const catBySquadRider = new Map<string, number>()
+  for (const r of baseCatRows ?? []) {
+    catBySquadRider.set(`${r.squad_id}:${r.rider_id}`, (r.category_slot as number) ?? 5)
+  }
+  for (const t of trCatRows ?? []) {
+    catBySquadRider.set(`${t.squad_id}:${t.rider_in_id}`, (t.rider_in_category as number) ?? 5)
+  }
+
   // Hent scores hvis de findes
   const { data: scores } = await supabaseAdmin
     .from('cycling_scores')
@@ -117,7 +138,7 @@ export async function GET(req: NextRequest, { params }: Props) {
         first_name: r.first_name,
         last_name: r.last_name,
         team_name: r.team_name,
-        category: r.category,
+        category: catBySquadRider.get(`${lineup.squad_id}:${r.id}`) ?? r.category,
         team_logo_url: r.team_logo_url,
         photo_url: r.photo_url,
         points: scoresByLineupRider.get(`${lineup.id}:${r.id}`) ?? null,
