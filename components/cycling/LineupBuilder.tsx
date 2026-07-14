@@ -596,6 +596,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
         const blockLabel = ab ? shortBlockName(ab.name) : ''
         const hasSquadForBlock = !!(activeBlockId && blockSquadMap[activeBlockId])
         const squadLink = `/games/${gameId}/squad${activeBlockId ? `?block=${activeBlockId}` : ''}`
+        // Løbet startet (blokkens lock_deadline passeret) → truppen kan kun SES,
+        // ikke redigeres. Baren bliver et view-link med 🔒, så den ikke ligner
+        // en "udtag"-handling.
+        const blockLocked = !!ab && new Date() > new Date(ab.lock_deadline)
 
         return hasSquadForBlock ? (
           <a
@@ -612,7 +616,10 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
               fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
               color: '#F2EDE4',
             }}>
-              Din brutto trup{blockLabel ? ` — ${blockLabel}` : ''}
+              {blockLocked ? '🔒 ' : ''}Din brutto trup{blockLabel ? ` — ${blockLabel}` : ''}
+              {blockLocked && (
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}> · se trup</span>
+              )}
             </span>
             <span style={{
               padding: '2px 8px', borderRadius: 999,
@@ -624,6 +631,28 @@ export default function LineupBuilder({ gameId, blockSquadMap, races, stages, st
                 : (squadRiderCount ?? 0)}/25 ryttere
             </span>
           </a>
+        ) : blockLocked ? (
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px',
+              background: theme.bgDark,
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 600,
+              color: 'rgba(255,255,255,0.5)',
+            }}>
+              🔒 Ingen brutto trup{blockLabel ? ` — ${blockLabel}` : ''}
+            </span>
+            <span style={{
+              fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, fontWeight: 600,
+              color: 'rgba(255,255,255,0.35)',
+            }}>
+              Løbet er startet
+            </span>
+          </div>
         ) : (
           <a
             href={squadLink}
