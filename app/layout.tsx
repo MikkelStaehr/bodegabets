@@ -33,6 +33,11 @@ const barlow = Barlow({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://bodega-bets.com'),
+  // PCS (procyclingstats.com) slog hotlink-beskyttelse til: rytter-/holdbilleder
+  // 403'er når browseren sender vores domæne som Referer. 'same-origin' beholder
+  // referer til vores egne requests men sender INTET til eksterne domæner → PCS
+  // svarer 200 igen. Fikser alle cykel-billeder uden at proxye dem.
+  referrer: 'same-origin',
   title: {
     default: 'Bodega Bets',
     template: '%s — Bodega Bets',

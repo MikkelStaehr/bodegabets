@@ -605,14 +605,23 @@ export async function syncCyclingResults(opts: { backfillDays?: number } = {}): 
     const classificationsComplete = gcCount >= 50
     // Resultat-tabellen kan være DELVIS selvom GC-klassementet allerede er
     // publiceret: en bjergetape drypper i mål over 20-40 min. Kræv derfor at vi
-    // har ~hele feltet (mod startlisten) før vi finaliserer — ellers låses
-    // delvise placeringer (Tour 2026 etape 2 blev låst på 116/184 ryttere → både
-    // udbruds-km og GC-snapshot ufuldstændige).
+    // har ~hele feltet før vi finaliserer — ellers låses delvise placeringer
+    // (Tour 2026 etape 2 blev låst på 116/184 ryttere → både udbruds-km og
+    // GC-snapshot ufuldstændige).
+    //
+    // VIGTIGT: feltet SKRUMPER gennem et Grand Tour (udgåede ryttere). En fast
+    // 90%-af-STARTLISTEN-tærskel betød at uge-3-etaper (hvor >10% er udgået)
+    // ALDRIG nåede "komplet" og altid hang til 24t-nødventilen → point ~1 døgn
+    // forsinket i sidste uge (Tour 2026 etape 17: 164 finishers, 19 udgåede,
+    // 164 < 90%×184 = 165 → hang). Mål derfor mod det NUVÆRENDE felt: GC-
+    // klassementet (gcCount) tæller kun ryttere der stadig er i løbet. Fald
+    // tilbage til startlisten hvis GC ikke er publiceret (fx endagsløb).
     const { count: startlistCount } = await supabaseAdmin
       .from('cycling_startlists')
       .select('*', { count: 'exact', head: true })
       .eq('race_id', stage.race_id)
-    const resultsComplete = !startlistCount || parsed.length >= Math.floor(startlistCount * 0.9)
+    const fieldBaseline = gcCount >= 50 ? gcCount : (startlistCount ?? 0)
+    const resultsComplete = !fieldBaseline || parsed.length >= Math.floor(fieldBaseline * 0.9)
     const stageAgeMs = Date.now() - new Date(stage.start_date).getTime()
     const stageOlderThan24h = stageAgeMs > 24 * 60 * 60 * 1000
     // SIDSTE etape afgør løbet — vent kun en kort grace (3t) på det fulde GC-
